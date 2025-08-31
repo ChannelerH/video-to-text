@@ -1,7 +1,7 @@
 "use client";
 
 import { CacheKey } from "@/services/constant";
-import { cacheSet } from "@/lib/cache";
+import { cacheSet } from "@/lib/simple-cache";
 import { getTimestamp } from "@/lib/time";
 import { useEffect } from "react";
 import { useParams } from "next/navigation";

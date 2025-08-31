@@ -7,7 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { cacheGet, cacheRemove } from "@/lib/cache";
+import { cacheGet, cacheRemove } from "@/lib/simple-cache";
 
 import { CacheKey } from "@/services/constant";
 import { ContextValue } from "@/types/context";
