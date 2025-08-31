@@ -32,25 +32,25 @@
         "variant": "outline"
       }
     ],
-    "show_sign": true,
-    "show_theme": false,
-    "show_locale": true
+    "show_sign": false,
+    "show_theme": true,
+    "show_locale": false
   },
   "hero": {
-    "title": "Video to Text – Convert videos to text & subtitles instantly",
-    "description": "Paste a link or upload a file, get a 90-second preview instantly, then unlock the full transcription. Supports YouTube, MP4, MOV, WebM and exports to SRT, TXT, VTT, DOCX formats.",
+    "title": "Audio to Text – Convert audio to text & subtitles instantly",
+    "description": "Upload audio files or paste links, get a 90-second preview instantly, then unlock the full transcription. Supports MP3, M4A, WAV, OGG with automatic language detection and bilingual output options.",
     "show_tool": true,
-    "tool_mode": "video",
+    "tool_mode": "audio",
     "show_mode_switch": true,
-    "tip": "Free 90-second preview • Priority YouTube captions • 24h auto-delete"
+    "tip": "Free 90-second preview • Auto language detection • 24h auto-delete"
   },
   "how_it_works": {
     "title": "How it works", 
-    "description": "Three simple steps to convert your media to text with high accuracy",
+    "description": "Three simple steps to convert your audio to text with high accuracy",
     "items": [
       {
-        "title": "Paste link or upload",
-        "description": "Add your video/audio URL or upload a file directly to get started",
+        "title": "Upload or paste link",
+        "description": "Add your audio URL or upload a file directly to get started",
         "icon": "RiUploadLine"
       },
       {
@@ -66,23 +66,23 @@
     ]
   },
   "tool_description": {
-    "title": "Video to Text Online",
-    "description": "Our tool supports MP4, MOV, WebM, and AVI video formats. For YouTube videos, we first extract existing captions for instant results (zero processing cost).",
+    "title": "Audio to Text Online",
+    "description": "Perfect for podcasts, course recordings, interviews, and voice memos. Our AI automatically detects the spoken language and transcribes with high accuracy.",
     "items": [
       {
-        "title": "YouTube Caption Priority",
-        "description": "We first extract existing captions for instant results (zero processing cost). When no captions exist, our AI transcription engine processes the audio track automatically.",
-        "icon": "RiYoutubeLine"
+        "title": "Multi-format Support",
+        "description": "Upload files up to several hours long in MP3, M4A, WAV, OGG, or FLAC formats.",
+        "icon": "RiFileUploadLine"
       },
       {
-        "title": "Multiple Export Formats",
-        "description": "Export your transcripts as SRT subtitle files with precise timestamps, plain TXT for easy editing, VTT for web players, or formatted DOCX documents.",
-        "icon": "RiFileDownloadLine"
+        "title": "Bilingual Transcription",
+        "description": "Choose bilingual transcription for mixed-language content, with optional translation features.",
+        "icon": "RiTranslateLine"
       },
       {
-        "title": "Professional Use Cases",
-        "description": "Perfect for content creators, educators, and accessibility compliance. Note: Age-restricted or region-locked videos may require direct file upload.",
-        "icon": "RiUserLine"
+        "title": "Speaker Separation",
+        "description": "Advanced features like speaker separation (diarization) help identify different voices in conversations.",
+        "icon": "RiUserVoiceLine"
       }
     ]
   },
@@ -185,28 +185,28 @@
   "faq": {
     "name": "faq",
     "label": "FAQ",
-    "title": "Video to Text FAQ",
-    "description": "Common questions about video transcription and our service",
+    "title": "Audio to Text FAQ",
+    "description": "Common questions about audio transcription and our service",
     "items": [
       {
-        "title": "How to convert video to text online?",
-        "description": "Simply paste a YouTube link or upload your MP4/MOV/WebM file. We'll provide a 90-second preview instantly, then you can unlock the full transcription with timestamps and export in multiple formats."
+        "title": "How to convert audio to text online?",
+        "description": "Upload your MP3, M4A, WAV, or OGG file, or paste a direct audio link. Get a 90-second preview to verify accuracy, then unlock the complete transcription with timestamps."
       },
       {
-        "title": "Can I paste a YouTube link to get SRT subtitles?",
-        "description": "Yes! We first extract existing YouTube captions (instant results), and if none exist, we'll transcribe the audio automatically. Both methods produce SRT files with accurate timestamps."
+        "title": "What audio formats are supported?",
+        "description": "We support MP3, M4A, WAV, OGG, and FLAC formats. Audio files up to several hours long are processed efficiently with high accuracy."
       },
       {
-        "title": "What video formats are supported?",
-        "description": "We support MP4, MOV, WebM, and AVI files. For online videos, YouTube links work best. Most common video codecs are automatically handled."
+        "title": "Does it support multiple languages and translation?",
+        "description": "Yes! Our system auto-detects the spoken language and can provide bilingual transcriptions. Translation features and speaker separation are available on monthly plans."
       },
       {
-        "title": "What if my video has no captions?",
-        "description": "No problem! Our AI transcription will process the audio track and generate accurate subtitles with timestamps. The 90-second preview lets you verify quality before full processing."
+        "title": "Can you separate different speakers?",
+        "description": "Speaker separation (diarization) is available on monthly subscriptions. It identifies different voices and labels them as Speaker 1, Speaker 2, etc. in the transcript."
       },
       {
         "title": "How is my privacy protected?",
-        "description": "Source videos are automatically deleted after 24 hours. Generated transcripts are stored for 7-30 days (configurable), and you can manually delete them anytime. All files are stored securely with encryption."
+        "description": "Audio files are deleted after 24 hours automatically. Transcripts are kept for 7-30 days and can be deleted manually. All processing happens securely with enterprise-grade encryption."
       }
     ]
   },
@@ -231,7 +231,7 @@
   "testimonial": {
     "disabled": true
   },
-  "faq": {
+  "showcase": {
     "disabled": true
   },
   "cta": {

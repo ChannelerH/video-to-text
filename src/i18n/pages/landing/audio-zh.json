@@ -32,25 +32,25 @@
         "variant": "outline"
       }
     ],
-    "show_sign": true,
-    "show_theme": false,
-    "show_locale": true
+    "show_sign": false,
+    "show_theme": true,
+    "show_locale": false
   },
   "hero": {
-    "title": "视频转文字 – 即时将视频转换为文本和字幕",
-    "description": "粘贴链接或上传文件，立即获得90秒预览，然后解锁完整转录。支持YouTube、MP4、MOV、WebM格式，导出为SRT、TXT、VTT、DOCX格式。",
+    "title": "音频转文字 – 即时将音频转换为文本和字幕",
+    "description": "上传音频文件或粘贴链接，立即获得90秒预览，然后解锁完整转录。支持MP3、M4A、WAV、OGG格式，自动语言检测和双语输出选项。",
     "show_tool": true,
-    "tool_mode": "video",
+    "tool_mode": "audio",
     "show_mode_switch": true,
-    "tip": "免费90秒预览 • 优先提取YouTube字幕 • 24小时自动删除"
+    "tip": "免费90秒预览 • 自动语言检测 • 24小时自动删除"
   },
   "how_it_works": {
     "title": "工作原理", 
-    "description": "三个简单步骤，高精度将媒体文件转换为文本",
+    "description": "三个简单步骤，高精度将音频转换为文本",
     "items": [
       {
-        "title": "粘贴链接或上传",
-        "description": "添加视频/音频URL或直接上传文件开始",
+        "title": "上传或粘贴链接",
+        "description": "添加音频URL或直接上传文件开始",
         "icon": "RiUploadLine"
       },
       {
@@ -66,23 +66,23 @@
     ]
   },
   "tool_description": {
-    "title": "视频转文字在线工具",
-    "description": "我们的工具支持MP4、MOV、WebM和AVI视频格式。对于YouTube视频，我们优先提取现有字幕以获得即时结果（零处理成本）。",
+    "title": "音频转文字在线工具",
+    "description": "适合播客、课程录音、采访和语音备忘录。我们的AI自动检测语言并高精度转录。",
     "items": [
       {
-        "title": "YouTube字幕优先",
-        "description": "我们优先提取现有字幕获得即时结果（零处理成本）。当不存在字幕时，我们的AI转录引擎会自动处理音频轨道。",
-        "icon": "RiYoutubeLine"
+        "title": "多格式支持",
+        "description": "上传长达几小时的MP3、M4A、WAV、OGG或FLAC格式文件。",
+        "icon": "RiFileUploadLine"
       },
       {
-        "title": "多种导出格式",
-        "description": "导出转录为带精确时间戳的SRT字幕文件、易于编辑的纯文本TXT、Web播放器的VTT或格式化的DOCX文档。",
-        "icon": "RiFileDownloadLine"
+        "title": "双语转录",
+        "description": "为混合语言内容选择双语转录，带可选翻译功能。",
+        "icon": "RiTranslateLine"
       },
       {
-        "title": "专业使用场景",
-        "description": "适合内容创作者、教育工作者和无障碍合规需求。注意：年龄限制或地区锁定的视频可能需要直接上传文件。",
-        "icon": "RiUserLine"
+        "title": "说话人分离",
+        "description": "高级功能如说话人分离（话者分离）有助于识别对话中的不同声音。",
+        "icon": "RiUserVoiceLine"
       }
     ]
   },
@@ -185,28 +185,28 @@
   "faq": {
     "name": "faq",
     "label": "常见问题",
-    "title": "视频转文字常见问题",
-    "description": "关于视频转录和我们服务的常见问题",
+    "title": "音频转文字常见问题",
+    "description": "关于音频转录和我们服务的常见问题",
     "items": [
       {
-        "title": "如何在线将视频转换为文字？",
-        "description": "只需粘贴YouTube链接或上传您的MP4/MOV/WebM文件。我们会立即提供90秒预览，然后您可以解锁带时间戳的完整转录并以多种格式导出。"
+        "title": "如何在线将音频转换为文字？",
+        "description": "上传您的MP3、M4A、WAV或OGG文件，或粘贴直接音频链接。获得90秒预览以验证准确性，然后解锁带时间戳的完整转录。"
       },
       {
-        "title": "可以粘贴YouTube链接获取SRT字幕吗？",
-        "description": "是的！我们优先提取现有的YouTube字幕（即时结果），如果没有字幕，我们会自动转录音频。两种方法都能产生带精确时间戳的SRT文件。"
+        "title": "支持哪些音频格式？",
+        "description": "我们支持MP3、M4A、WAV、OGG和FLAC格式。长达几小时的音频文件都能高效高精度处理。"
       },
       {
-        "title": "支持哪些视频格式？",
-        "description": "我们支持MP4、MOV、WebM和AVI文件。对于在线视频，YouTube链接效果最佳。大多数常见视频编解码器都能自动处理。"
+        "title": "支持多种语言和翻译吗？",
+        "description": "是的！我们的系统自动检测语言并可提供双语转录。月度计划提供翻译功能和说话人分离。"
       },
       {
-        "title": "如果我的视频没有字幕怎么办？",
-        "description": "没问题！我们的AI转录会处理音频轨道并生成带时间戳的准确字幕。90秒预览让您在完整处理前验证质量。"
+        "title": "能够分离不同说话人吗？",
+        "description": "说话人分离（话者分离）功能在月度订阅中提供。它识别不同声音并在转录中标记为说话人1、说话人2等。"
       },
       {
         "title": "如何保护我的隐私？",
-        "description": "源视频在24小时后自动删除。生成的转录保存7-30天（可配置），您可以随时手动删除。所有文件都通过加密安全存储。"
+        "description": "音频文件在24小时后自动删除。转录保存7-30天，可手动删除。所有处理都通过企业级加密安全进行。"
       }
     ]
   },
@@ -231,7 +231,7 @@
   "testimonial": {
     "disabled": true
   },
-  "faq": {
+  "showcase": {
     "disabled": true
   },
   "cta": {

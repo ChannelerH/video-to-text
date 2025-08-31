@@ -5,6 +5,7 @@ import HeroBg from "./bg";
 import { Hero as HeroType } from "@/types/blocks/hero";
 import Icon from "@/components/icon";
 import { Link } from "@/i18n/navigation";
+import ToolInterface from "@/components/tool-interface";
 
 export default function Hero({ hero }: { hero: HeroType }) {
   if (hero.disabled) {
@@ -62,6 +63,17 @@ export default function Hero({ hero }: { hero: HeroType }) {
               className="m mx-auto max-w-3xl text-muted-foreground lg:text-xl"
               dangerouslySetInnerHTML={{ __html: hero.description || "" }}
             />
+            
+            {/* 工具界面 */}
+            {hero.show_tool && (
+              <div className="mt-8">
+                <ToolInterface 
+                  mode={hero.tool_mode || "video"} 
+                  showModeSwitch={hero.show_mode_switch ?? true} 
+                />
+              </div>
+            )}
+            
             {hero.buttons && (
               <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
                 {hero.buttons.map((item, i) => {

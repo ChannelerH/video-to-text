@@ -19,6 +19,10 @@ export interface LandingPage {
   faq?: Section;
   cta?: Section;
   footer?: Footer;
+  // 新增的sections，但使用原有的Section类型
+  tool_description?: Section;
+  how_it_works?: Section;
+  export_formats?: Section;
 }
 
 export interface PricingPage {

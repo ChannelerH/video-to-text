@@ -121,3 +121,8 @@ export interface DataCard {
   tip?: string;
   icon?: string;
 }
+
+export interface Base {
+  name?: string;
+  disabled?: boolean;
+}

@@ -20,4 +20,8 @@ export interface Hero {
   tip?: string;
   show_happy_users?: boolean;
   show_badge?: boolean;
+  // 新增工具相关属性
+  show_tool?: boolean;
+  tool_mode?: "video" | "audio";
+  show_mode_switch?: boolean;
 }
