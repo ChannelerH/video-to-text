@@ -41,7 +41,6 @@
     "description": "Paste a link or upload a file, get a 90-second preview instantly, then unlock the full transcription. Supports YouTube, MP4, MOV, WebM and exports to SRT, TXT, VTT, DOCX formats.",
     "show_tool": true,
     "tool_mode": "video",
-    "show_mode_switch": true,
     "tip": "Free 90-second preview • Priority YouTube captions • 24h auto-delete"
   },
   "how_it_works": {
@@ -229,9 +228,6 @@
     "disabled": true
   },
   "testimonial": {
-    "disabled": true
-  },
-  "faq": {
     "disabled": true
   },
   "cta": {

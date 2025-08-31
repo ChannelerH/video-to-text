@@ -69,7 +69,6 @@ export default function Hero({ hero }: { hero: HeroType }) {
               <div className="mt-8">
                 <ToolInterface 
                   mode={hero.tool_mode || "video"} 
-                  showModeSwitch={hero.show_mode_switch ?? true} 
                 />
               </div>
             )}

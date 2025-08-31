@@ -41,7 +41,6 @@
     "description": "上传音频文件或粘贴链接，立即获得90秒预览，然后解锁完整转录。支持MP3、M4A、WAV、OGG格式，自动语言检测和双语输出选项。",
     "show_tool": true,
     "tool_mode": "audio",
-    "show_mode_switch": true,
     "tip": "免费90秒预览 • 自动语言检测 • 24小时自动删除"
   },
   "how_it_works": {

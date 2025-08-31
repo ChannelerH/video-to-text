@@ -41,7 +41,6 @@
     "description": "Upload audio files or paste links, get a 90-second preview instantly, then unlock the full transcription. Supports MP3, M4A, WAV, OGG with automatic language detection and bilingual output options.",
     "show_tool": true,
     "tool_mode": "audio",
-    "show_mode_switch": true,
     "tip": "Free 90-second preview • Auto language detection • 24h auto-delete"
   },
   "how_it_works": {

@@ -41,7 +41,6 @@
     "description": "粘贴链接或上传文件，立即获得90秒预览，然后解锁完整转录。支持YouTube、MP4、MOV、WebM格式，导出为SRT、TXT、VTT、DOCX格式。",
     "show_tool": true,
     "tool_mode": "video",
-    "show_mode_switch": true,
     "tip": "免费90秒预览 • 优先提取YouTube字幕 • 24小时自动删除"
   },
   "how_it_works": {
@@ -229,9 +228,6 @@
     "disabled": true
   },
   "testimonial": {
-    "disabled": true
-  },
-  "faq": {
     "disabled": true
   },
   "cta": {

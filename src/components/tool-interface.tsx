@@ -10,23 +10,18 @@ import { Upload, FileText, Download, Clock, Shield, Zap } from "lucide-react";
 
 interface ToolInterfaceProps {
   mode?: "video" | "audio";
-  showModeSwitch?: boolean;
-  onModeChange?: (mode: "video" | "audio") => void;
 }
 
 export default function ToolInterface({ 
-  mode = "video", 
-  showModeSwitch = true,
-  onModeChange 
+  mode = "video"
 }: ToolInterfaceProps) {
-  const [selectedMode, setSelectedMode] = useState(mode);
+  const [inputMethod, setInputMethod] = useState<"link" | "upload">("link");
   const [url, setUrl] = useState("");
   const [selectedFormats, setSelectedFormats] = useState(["txt", "srt"]);
   const [file, setFile] = useState<File | null>(null);
 
-  const handleModeChange = (newMode: "video" | "audio") => {
-    setSelectedMode(newMode);
-    onModeChange?.(newMode);
+  const handleMethodChange = (method: "link" | "upload") => {
+    setInputMethod(method);
     setUrl("");
     setFile(null);
   };
@@ -48,13 +43,13 @@ export default function ToolInterface({
   };
 
   const getAcceptTypes = () => {
-    return selectedMode === "video" 
+    return mode === "video" 
       ? ".mp4,.mov,.webm,.avi" 
       : ".mp3,.m4a,.wav,.ogg,.flac";
   };
 
   const getPlaceholder = () => {
-    return selectedMode === "video" 
+    return mode === "video" 
       ? "Paste a YouTube or MP4 link..." 
       : "Paste an MP3/M4A/WAV link...";
   };
@@ -70,51 +65,46 @@ export default function ToolInterface({
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {/* Mode Switch */}
-      {showModeSwitch && (
-        <div className="flex justify-center mb-6">
-          <Tabs value={selectedMode} onValueChange={(value) => handleModeChange(value as "video" | "audio")}>
-            <TabsList className="grid w-full grid-cols-2 max-w-sm">
-              <TabsTrigger value="video">Video</TabsTrigger>
-              <TabsTrigger value="audio">Audio</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      )}
+      {/* Input Method Switch */}
+      <div className="flex justify-center mb-6">
+        <Tabs value={inputMethod} onValueChange={(value) => handleMethodChange(value as "link" | "upload")}>
+          <TabsList className="grid w-full grid-cols-2 max-w-sm">
+          <TabsTrigger value="upload">Upload File</TabsTrigger>
+          <TabsTrigger value="link">Paste Link</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
 
       {/* Main Tool Interface */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-lg">
-        {/* URL Input */}
+        {/* Input Content */}
         <div className="space-y-4">
-          <div className="flex gap-3">
-            <Input
-              placeholder={getPlaceholder()}
-              value={url}
-              onChange={(e) => {
-                setUrl(e.target.value);
-                if (e.target.value) setFile(null);
-              }}
-              className="flex-1 h-12"
-              disabled={!!file}
-            />
+          {inputMethod === "link" ? (
+            <div>
+              <Input
+                placeholder={getPlaceholder()}
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                className="h-12"
+              />
+            </div>
+          ) : (
             <div className="relative">
               <input
                 type="file"
                 accept={getAcceptTypes()}
                 onChange={handleFileChange}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                disabled={!!url}
               />
               <Button
                 variant="outline"
-                className="h-12 px-6"
-                disabled={!!url}
+                className="w-full h-12"
               >
                 <Upload className="w-4 h-4 mr-2" />
-                Upload
+                Upload {mode === "video" ? "Video" : "Audio"} File
               </Button>
             </div>
-          </div>
+          )}
 
           {/* File Display */}
           {file && (
@@ -171,7 +161,7 @@ export default function ToolInterface({
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-600 dark:text-gray-400 pt-2">
             <div className="flex items-center gap-1">
               <Zap className="w-4 h-4 text-green-600" />
-              <span>{selectedMode === "video" ? "Fetch YouTube captions first" : "Auto language detection"}</span>
+              <span>{mode === "video" ? "Fetch YouTube captions first" : "Auto language detection"}</span>
             </div>
             <div className="flex items-center gap-1">
               <Shield className="w-4 h-4 text-blue-600" />
