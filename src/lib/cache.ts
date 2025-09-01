@@ -76,6 +76,7 @@ export class TranscriptionCache {
       videoTitle?: string;
       fileSize?: number;
       userTier?: string;
+      r2Key?: string;
     },
     options: CacheOptions = {}
   ): Promise<void> {

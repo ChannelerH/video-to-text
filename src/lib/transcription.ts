@@ -1,6 +1,7 @@
 import { YouTubeService, VideoInfo } from './youtube';
 import { ReplicateService, TranscriptionResult } from './replicate';
 import { transcriptionCache, CacheEntry } from './cache';
+import { CloudflareR2Service } from './r2-upload';
 import crypto from 'crypto';
 
 export interface TranscriptionRequest {
@@ -33,9 +34,11 @@ export interface TranscriptionResponse {
 
 export class TranscriptionService {
   private replicateService: ReplicateService;
+  private r2Service: CloudflareR2Service;
 
   constructor(replicateApiToken: string) {
     this.replicateService = new ReplicateService(replicateApiToken);
+    this.r2Service = new CloudflareR2Service();
   }
 
   /**
@@ -185,16 +188,45 @@ export class TranscriptionService {
    */
   private async processYouTubeAudioTranscription(videoInfo: VideoInfo, request: TranscriptionRequest): Promise<TranscriptionResponse> {
     try {
-      // 获取音频流
-      const audioUrl = await YouTubeService.getAudioStreamUrl(videoInfo.videoId);
+      // 获取音频流URL
+      const audioStreamUrl = await YouTubeService.getAudioStreamUrl(videoInfo.videoId);
+      console.log(`Got YouTube audio stream URL for video: ${videoInfo.videoId}`);
       
       // 估算成本
       const estimatedCost = this.replicateService.estimateCost(videoInfo.duration);
       console.log(`Estimated transcription cost: $${estimatedCost.toFixed(4)}`);
 
-      // 进行转录
-      const transcription = await this.replicateService.transcribeAudio(audioUrl, {
-        language: request.options?.language || 'auto'
+      // 下载音频流到内存
+      console.log('Downloading audio stream from YouTube...');
+      const audioResponse = await fetch(audioStreamUrl);
+      if (!audioResponse.ok) {
+        throw new Error(`Failed to download audio: ${audioResponse.statusText}`);
+      }
+      
+      const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
+      console.log(`Downloaded audio stream: ${audioBuffer.length} bytes`);
+
+      // 生成临时文件名
+      const audioFileName = `youtube_${videoInfo.videoId}_${Date.now()}.m4a`;
+      
+      // 上传音频到 Cloudflare R2
+      console.log('Uploading audio to Cloudflare R2...');
+      const uploadResult = await this.r2Service.uploadFile(
+        audioBuffer,
+        audioFileName,
+        'audio/mp4', // YouTube 音频流通常是 M4A/MP4 格式
+        {
+          folder: 'youtube-audio',
+          expiresIn: 2, // 2小时后自动删除
+          makePublic: true
+        }
+      );
+      console.log(`Audio uploaded to R2: ${uploadResult.key}`);
+
+      // 使用 R2 URL 进行转录
+      console.log('Starting Replicate transcription with R2 URL...');
+      const transcription = await this.replicateService.transcribeAudio(uploadResult.url, {
+        language: request.options?.language || 'auto',
       });
 
       // 生成不同格式
@@ -209,10 +241,21 @@ export class TranscriptionService {
         {
           originalUrl: request.content,
           videoTitle: videoInfo.title,
-          userTier: request.options?.userTier
+          userTier: request.options?.userTier,
+          r2Key: uploadResult.key // 保存 R2 key 用于后续清理
         },
         { userId: request.options?.userId }
       );
+
+      // 异步清理 R2 文件（不等待完成）
+      setTimeout(async () => {
+        try {
+          await this.r2Service.deleteFile(uploadResult.key);
+          console.log(`Cleaned up temporary audio file: ${uploadResult.key}`);
+        } catch (error) {
+          console.error('Failed to cleanup temporary audio file:', error);
+        }
+      }, 60000); // 1分钟后清理
 
       return {
         success: true,
@@ -225,10 +268,10 @@ export class TranscriptionService {
         }
       };
     } catch (error) {
-      console.error('Audio transcription failed:', error);
+      console.error('YouTube audio transcription failed:', error);
       return {
         success: false,
-        error: `Audio transcription failed: ${error}`
+        error: `Audio transcription failed: ${error instanceof Error ? error.message : String(error)}`
       };
     }
   }
@@ -259,7 +302,7 @@ export class TranscriptionService {
     try {
       // 进行转录
       const transcription = await this.replicateService.transcribeAudio(filePath, {
-        language: request.options?.language || 'auto'
+        language: request.options?.language || 'auto',
       });
 
       // 估算成本
