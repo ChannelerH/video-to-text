@@ -18,9 +18,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 验证类型
-    if (!['youtube_url', 'file_upload'].includes(type)) {
+    if (!['youtube_url', 'file_upload', 'audio_url'].includes(type)) {
       return NextResponse.json(
-        { success: false, error: 'Invalid type. Must be youtube_url or file_upload' },
+        { success: false, error: 'Invalid type. Must be youtube_url, file_upload, or audio_url' },
         { status: 400 }
       );
     }

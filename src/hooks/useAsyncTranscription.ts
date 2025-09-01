@@ -31,7 +31,7 @@ export function useAsyncTranscription(options: AsyncTranscriptionOptions = {}) {
     error: null
   });
 
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
 
   // 清理轮询
@@ -62,8 +62,8 @@ export function useAsyncTranscription(options: AsyncTranscriptionOptions = {}) {
         }));
 
         // 触发进度回调
-        if (progress && onProgress) {
-          onProgress(progress);
+        if (onProgress) {
+          onProgress(progress || 0);
         }
 
         // 任务完成
@@ -100,7 +100,7 @@ export function useAsyncTranscription(options: AsyncTranscriptionOptions = {}) {
 
   // 启动异步转录
   const startTranscription = useCallback(async (
-    type: 'youtube_url' | 'file_upload',
+    type: 'youtube_url' | 'file_upload' | 'audio_url',
     content: string,
     transcriptionOptions?: any
   ) => {

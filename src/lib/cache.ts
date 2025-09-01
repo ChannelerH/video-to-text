@@ -1,8 +1,9 @@
 import { TranscriptionResult } from './replicate';
+import { randomUUID } from 'crypto';
 
 export interface CacheEntry {
   id: string;
-  contentType: 'youtube' | 'user_file';
+  contentType: 'youtube' | 'user_file' | 'audio_url';
   contentKey: string;
   userId?: string;
   
@@ -41,9 +42,11 @@ export class TranscriptionCache {
   /**
    * 生成缓存键
    */
-  private generateCacheKey(contentType: 'youtube' | 'user_file', identifier: string, userId?: string): string {
+  private generateCacheKey(contentType: 'youtube' | 'user_file' | 'audio_url', identifier: string, userId?: string): string {
     if (contentType === 'youtube') {
       return `youtube:${identifier}`;
+    } else if (contentType === 'audio_url') {
+      return `audio_url:${identifier}`;
     } else {
       return `user:${userId}:${identifier}`;
     }
@@ -67,7 +70,7 @@ export class TranscriptionCache {
    * 存储转录结果到缓存
    */
   async set(
-    contentType: 'youtube' | 'user_file',
+    contentType: 'youtube' | 'user_file' | 'audio_url',
     identifier: string, // videoId 或 fileHash
     transcriptionData: TranscriptionResult,
     formats: CacheEntry['formats'],
@@ -77,6 +80,7 @@ export class TranscriptionCache {
       fileSize?: number;
       userTier?: string;
       r2Key?: string;
+      audioInfo?: any;
     },
     options: CacheOptions = {}
   ): Promise<void> {
@@ -96,7 +100,7 @@ export class TranscriptionCache {
     const expiresAt = new Date(now.getTime() + (ttlDays * 24 * 60 * 60 * 1000));
 
     const entry: CacheEntry = {
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       contentType,
       contentKey: cacheKey,
       userId: options.userId,
@@ -122,7 +126,7 @@ export class TranscriptionCache {
    * 从缓存获取转录结果
    */
   async get(
-    contentType: 'youtube' | 'user_file',
+    contentType: 'youtube' | 'user_file' | 'audio_url',
     identifier: string,
     userId?: string
   ): Promise<CacheEntry | null> {
@@ -164,7 +168,7 @@ export class TranscriptionCache {
    * 删除缓存条目
    */
   async delete(
-    contentType: 'youtube' | 'user_file',
+    contentType: 'youtube' | 'user_file' | 'audio_url',
     identifier: string,
     userId?: string
   ): Promise<boolean> {
@@ -273,4 +277,3 @@ export class TranscriptionCache {
 
 // 导出单例实例
 export const transcriptionCache = new TranscriptionCache();
-

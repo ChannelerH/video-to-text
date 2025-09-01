@@ -83,9 +83,21 @@ export default function ToolInterface({
     try {
       let requestData;
       if (inputMethod === "link" && url) {
-        setProgress("Processing video transcription...");
+        // 检测URL类型
+        const isYouTubeUrl = url.includes('youtube.com/watch') || 
+                           url.includes('youtu.be/') || 
+                           url.includes('youtube.com/shorts/') ||
+                           url.includes('m.youtube.com/watch');
+        
+        const urlType = isYouTubeUrl ? "youtube_url" : "audio_url";
+        
+        const progressText = isYouTubeUrl 
+          ? "Processing YouTube video..." 
+          : "Processing audio file from URL...";
+        
+        setProgress(progressText);
         requestData = {
-          type: "youtube_url",
+          type: urlType,
           content: url,
           action: "transcribe",
           options: { formats: selectedFormats }
@@ -96,7 +108,7 @@ export default function ToolInterface({
           type: "file_upload",
           content: uploadedFileInfo.replicateUrl,
           action: "transcribe",
-          options: { formats: selectedFormats }
+          options: { formats: selectedFormats, r2Key: uploadedFileInfo.r2Key }
         };
       } else {
         setProgress("Please wait for file upload to complete or enter a URL.");
@@ -116,11 +128,26 @@ export default function ToolInterface({
         setProgress("Transcription completed!");
       } else {
         console.error('Transcription API error:', result.error);
-        const userFriendlyError = result.error.includes('null response') 
-          ? 'The audio file appears to be invalid or corrupted. Please try uploading a valid audio/video file.'
-          : result.error.includes('No transcription content')
-          ? 'No speech was detected in the file. Please ensure your audio contains clear speech.'
-          : `Transcription failed: ${result.error}`;
+        let userFriendlyError = '';
+        
+        if (result.error.includes('null response')) {
+          userFriendlyError = 'The audio file appears to be invalid or corrupted. Please try uploading a valid audio/video file.';
+        } else if (result.error.includes('No transcription content')) {
+          userFriendlyError = 'No speech was detected in the file. Please ensure your audio contains clear speech.';
+        } else if (result.error.includes('Invalid YouTube URL')) {
+          userFriendlyError = 'Invalid YouTube URL. Please check the URL format and try again.';
+        } else if (result.error.includes('Unable to access URL')) {
+          userFriendlyError = 'Cannot access the audio URL. The file may not exist, require authentication, or the link may have expired.';
+        } else if (result.error.includes('Unsupported content type')) {
+          userFriendlyError = 'Unsupported file format. Please use MP3, WAV, OGG, AAC, M4A, or FLAC files.';
+        } else if (result.error.includes('File too large')) {
+          userFriendlyError = 'Audio file is too large. Please use files smaller than 100MB.';
+        } else if (result.error.includes('timeout')) {
+          userFriendlyError = 'Request timeout. The audio file may be too large or the connection is slow. Please try again.';
+        } else {
+          userFriendlyError = `Transcription failed: ${result.error}`;
+        }
+        
         setProgress(userFriendlyError);
       }
     } catch (error) {
@@ -186,8 +213,8 @@ export default function ToolInterface({
 
   const getPlaceholder = () => {
     return mode === "video" 
-      ? "Paste a YouTube or MP4 link..." 
-      : "Paste an MP3/M4A/WAV link...";
+      ? "Paste a YouTube link or direct audio/video URL (e.g., https://example.com/audio.mp3)..." 
+      : "Paste a direct audio file URL (e.g., https://example.com/audio.mp3, .wav, .ogg)...";
   };
 
   const formats = [
