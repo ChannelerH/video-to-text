@@ -38,9 +38,19 @@ export default function Header({ header }: { header: HeaderType }) {
     return null;
   }
 
+  // Avoid rendering duplicate sign controls when a Sign In button exists in header.buttons
+  const hasSignButton = Boolean(
+    header.buttons?.some((b) => {
+      const title = (b.title || "").toLowerCase();
+      const url = (b.url || "").toLowerCase();
+      return /sign|login|auth/.test(title) || /sign|login|auth/.test(url);
+    })
+  );
+
   return (
     <section className="py-3">
       <div className="container">
+        <div className="glass-nav px-4 py-2">
         <nav className="hidden justify-between lg:flex">
           <div className="flex items-center gap-6">
             <Link
@@ -163,12 +173,13 @@ export default function Header({ header }: { header: HeaderType }) {
                 </Button>
               );
             })}
-            {header.show_sign && <SignToggle />}
+            {header.show_sign && !hasSignButton && <SignToggle />}
           </div>
         </nav>
+        </div>
 
-        <div className="block lg:hidden">
-          <div className="flex items-center justify-between">
+        <div className="block lg:hidden mt-2">
+          <div className="glass-nav px-3 py-2 flex items-center justify-between">
             <Link
               href={(header.brand?.url || "/") as any}
               className="flex items-center gap-2"
@@ -299,7 +310,7 @@ export default function Header({ header }: { header: HeaderType }) {
                       );
                     })}
 
-                    {header.show_sign && <SignToggle />}
+                    {header.show_sign && !hasSignButton && <SignToggle />}
                   </div>
 
                   <div className="mt-4 flex items-center gap-2">

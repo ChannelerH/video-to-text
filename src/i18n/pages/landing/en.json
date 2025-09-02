@@ -24,16 +24,9 @@
         }
       ]
     },
-    "buttons": [
-      {
-        "title": "Sign In",
-        "url": "/auth/signin",
-        "target": "_self",
-        "variant": "outline"
-      }
-    ],
+    "buttons": [],
     "show_sign": true,
-    "show_theme": false,
+    "show_theme": true,
     "show_locale": true
   },
   "hero": {

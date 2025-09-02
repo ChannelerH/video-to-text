@@ -1,21 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, FileText, Download, Shield, Zap, Copy, Check } from "lucide-react";
+import { FileText, Download, Copy, Check, Code } from "lucide-react";
 
 interface ToolInterfaceProps {
   mode?: "video" | "audio";
 }
 
-export default function ToolInterface({ 
-  mode = "video"
-}: ToolInterfaceProps) {
-  const [inputMethod, setInputMethod] = useState<"link" | "upload">("upload");
+export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [url, setUrl] = useState("");
   const [selectedFormats, setSelectedFormats] = useState(["txt", "srt"]);
   const [file, setFile] = useState<File | null>(null);
@@ -24,23 +17,17 @@ export default function ToolInterface({
   const [result, setResult] = useState<any>(null);
   const [uploadedFileInfo, setUploadedFileInfo] = useState<any>(null);
   const [copiedText, setCopiedText] = useState<boolean>(false);
-
-  const handleMethodChange = (method: "link" | "upload") => {
-    setInputMethod(method);
-    setUrl("");
-    setFile(null);
-  };
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const handleFormatToggle = (format: string) => {
-    setSelectedFormats(prev => 
-      prev.includes(format) 
-        ? prev.filter(f => f !== format)
-        : [...prev, format]
+    setSelectedFormats((prev) =>
+      prev.includes(format) ? prev.filter((f) => f !== format) : [...prev, format]
     );
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement> | { target: { files: FileList | null } }) => {
+    const selectedFile = event.target.files?.[0] || null;
     if (selectedFile) {
       setFile(selectedFile);
       setUrl("");
@@ -74,7 +61,10 @@ export default function ToolInterface({
   };
 
   const handleTranscribe = async () => {
-    if (!url && !uploadedFileInfo) return;
+    if (!url && !uploadedFileInfo) {
+      setProgress("Please upload a file or enter a URL.");
+      return;
+    }
 
     setIsProcessing(true);
     setProgress("Starting transcription...");
@@ -82,7 +72,7 @@ export default function ToolInterface({
 
     try {
       let requestData;
-      if (inputMethod === "link" && url) {
+      if (url) {
         // 检测URL类型
         const isYouTubeUrl = url.includes('youtube.com/watch') || 
                            url.includes('youtu.be/') || 
@@ -102,7 +92,7 @@ export default function ToolInterface({
           action: "transcribe",
           options: { formats: selectedFormats }
         };
-      } else if (inputMethod === "upload" && uploadedFileInfo) {
+      } else if (uploadedFileInfo) {
         setProgress("Processing file transcription...");
         requestData = {
           type: "file_upload",
@@ -126,6 +116,7 @@ export default function ToolInterface({
       if (result.success) {
         setResult({ type: "full", data: result.data });
         setProgress("Transcription completed!");
+        setShowSuccess(true);
       } else {
         console.error('Transcription API error:', result.error);
         let userFriendlyError = '';
@@ -157,7 +148,6 @@ export default function ToolInterface({
       setIsProcessing(false);
     }
   };
-
 
   const downloadFormat = async (format: string) => {
     if (!result?.data) return;
@@ -205,142 +195,267 @@ export default function ToolInterface({
     return contentTypes[format] || 'text/plain';
   };
 
-  const getAcceptTypes = () => {
-    return mode === "video" 
-      ? ".mp4,.mov,.webm,.avi" 
-      : ".mp3,.m4a,.wav,.ogg,.flac";
-  };
+  const getAcceptTypes = () => (mode === "video" ? ".mp4,.mov,.webm,.avi" : ".mp3,.m4a,.wav,.ogg,.flac");
 
-  const getPlaceholder = () => {
-    return mode === "video" 
-      ? "Paste a YouTube link or direct audio/video URL (e.g., https://example.com/audio.mp3)..." 
+  const getPlaceholder = () =>
+    mode === "video"
+      ? "Paste a YouTube link or direct audio/video URL (e.g., https://example.com/audio.mp3)..."
       : "Paste a direct audio file URL (e.g., https://example.com/audio.mp3, .wav, .ogg)...";
+
+  // Build visualizer bars once
+  const bars = useMemo(() => Array.from({ length: 60 }), []);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const visualizerRef = useRef<HTMLDivElement | null>(null);
+
+  // Elastic/parallax effect for the whole upload container on hover
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let isHovering = false;
+    let rect = container.getBoundingClientRect();
+    let raf: number | null = null;
+
+    const onResize = () => {
+      rect = container.getBoundingClientRect();
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isHovering) return;
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const dx = e.clientX - centerX;
+        const dy = e.clientY - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const maxDistance = 400;
+        const strength = Math.min(distance / maxDistance, 1);
+        const translateX = dx * 0.015 * strength;
+        const translateY = dy * 0.015 * strength;
+        const rotateX = -(dy * 0.008) * strength;
+        const rotateY = (dx * 0.008) * strength;
+        const scale = 1 + strength * 0.008;
+        container.style.transform = `perspective(1200px) translate(${translateX}px, ${translateY}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(${scale})`;
+      });
+    };
+
+    const onEnter = () => {
+      isHovering = true;
+      rect = container.getBoundingClientRect();
+      container.style.transition = "transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+      window.addEventListener("mousemove", onMouseMove);
+    };
+
+    const onLeave = () => {
+      isHovering = false;
+      if (raf) cancelAnimationFrame(raf);
+      container.style.transition = "transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+      container.style.transform = "perspective(1200px) translate(0, 0) rotateX(0) rotateY(0) scale(1)";
+      window.removeEventListener("mousemove", onMouseMove);
+    };
+
+    const onDown = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest(".upload-zone, .url-input, button")) return;
+      container.style.transition = "transform 0.1s ease";
+      container.style.transform = "perspective(1200px) scale(0.995)";
+    };
+    const onUp = () => {
+      container.style.transition = "transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+      container.style.transform = "perspective(1200px) scale(1)";
+    };
+
+    window.addEventListener("resize", onResize);
+    container.addEventListener("mouseenter", onEnter);
+    container.addEventListener("mouseleave", onLeave);
+    container.addEventListener("mousedown", onDown);
+    window.addEventListener("mouseup", onUp);
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      container.removeEventListener("mouseenter", onEnter);
+      container.removeEventListener("mouseleave", onLeave);
+      container.removeEventListener("mousedown", onDown);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("mousemove", onMouseMove);
+    };
+  }, []);
+
+  // Interactive visualizer reactions (hover changes bar heights)
+  useEffect(() => {
+    const visualizer = visualizerRef.current;
+    if (!visualizer) return;
+    const onEnter = () => {
+      const bars = visualizer.querySelectorAll(".audio-bar") as NodeListOf<HTMLDivElement>;
+      bars.forEach((bar, i) => {
+        bar.style.height = `${Math.random() * 60 + 20}px`;
+        bar.style.transitionDelay = `${i * 0.01}s`;
+      });
+    };
+    const onLeave = () => {
+      const bars = visualizer.querySelectorAll(".audio-bar") as NodeListOf<HTMLDivElement>;
+      bars.forEach((bar, i) => {
+        bar.style.height = `${Math.random() * 30 + 15}px`;
+        bar.style.transitionDelay = `${i * 0.01}s`;
+      });
+    };
+    visualizer.addEventListener("mouseenter", onEnter);
+    visualizer.addEventListener("mouseleave", onLeave);
+    return () => {
+      visualizer.removeEventListener("mouseenter", onEnter);
+      visualizer.removeEventListener("mouseleave", onLeave);
+    };
+  }, []);
+
+  // drag & drop handlers
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove("dragover");
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleFileChange({ target: { files } });
+    }
   };
 
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.classList.add("dragover");
+  };
+
+  const onDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.classList.remove("dragover");
+  };
+
+  // Spotlight effect: update CSS vars for radial gradient center
+  const onMouseMoveZone = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    (e.currentTarget as HTMLDivElement).style.setProperty('--mx', x + '%');
+    (e.currentTarget as HTMLDivElement).style.setProperty('--my', y + '%');
+  };
+
+  // Only expose formats supported by backend to keep functionality unchanged
   const formats = [
     { id: "txt", label: "TXT", icon: FileText },
     { id: "srt", label: "SRT", icon: Download },
     { id: "vtt", label: "VTT", icon: Download },
-    { id: "docx", label: "DOCX", icon: FileText },
     { id: "md", label: "Markdown", icon: FileText },
-    { id: "json", label: "JSON", icon: FileText }
+    { id: "json", label: "JSON", icon: Code },
   ];
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {/* Input Method Switch */}
-      <div className="flex justify-center mb-6">
-        <Tabs value={inputMethod} onValueChange={(value) => handleMethodChange(value as  "upload" | "link" )}>
-          <TabsList className="grid w-full grid-cols-2 max-w-sm">
-          <TabsTrigger value="upload">Upload File</TabsTrigger>
-          <TabsTrigger value="link">Paste Link</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+      {/* Main Tool Interface - Styled to match provided design, behavior unchanged */}
+      <div className="upload-container" ref={containerRef}>
+        {/* Audio visualizer */}
+        <div className="audio-visualizer" ref={visualizerRef}>
+          {bars.map((_, i) => (
+            <div key={i} className="audio-bar" style={{ height: `${Math.random() * 40 + 20}px`, animationDelay: `${i * 0.03}s` }} />
+          ))}
+        </div>
 
-      {/* Main Tool Interface */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-lg">
-        {/* Input Content */}
-        <div className="space-y-4">
-          {inputMethod === "link" ? (
-            <div>
-              <Input
-                placeholder={getPlaceholder()}
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="h-12"
-              />
-            </div>
-          ) : (
-            <div className="relative">
-              <input
-                type="file"
-                accept={getAcceptTypes()}
-                onChange={handleFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              <Button
-                variant="outline"
-                className="w-full h-12"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Upload {mode === "video" ? "Video" : "Audio"} File
-              </Button>
-            </div>
-          )}
-
-          {/* File Display */}
-          {file && (
-            <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-medium">{file.name}</span>
-                <Badge variant="secondary" className="text-xs">
-                  {(file.size / (1024 * 1024)).toFixed(1)} MB
-                </Badge>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setFile(null);
-                  setUploadedFileInfo(null);
-                  setProgress("");
-                }}
-                className="text-red-600 hover:text-red-700"
-              >
-                Remove
-              </Button>
-            </div>
-          )}
-
-          {/* Export Format Selection */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Export Formats</h3>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-              {formats.map((format) => (
-                <label
-                  key={format.id}
-                  className="flex items-center space-x-2 p-2 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <Checkbox
-                    checked={selectedFormats.includes(format.id)}
-                    onCheckedChange={() => handleFormatToggle(format.id)}
-                  />
-                  <format.icon className="w-4 h-4" />
-                  <span className="text-sm">{format.label}</span>
-                </label>
-              ))}
-            </div>
+        {/* Upload Zone */}
+        <div
+          className="upload-zone"
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onMouseMove={onMouseMoveZone}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={getAcceptTypes()}
+            onChange={handleFileChange}
+            style={{ display: "none" }}
+          />
+          <div className="upload-icon">📊</div>
+          <div className="upload-title">Drop your file here or click to browse</div>
+          <div className="upload-desc">
+            {file ? `${file.name} • ${(file.size / (1024 * 1024)).toFixed(1)} MB` : "MP3, M4A, WAV, OGG, MP4 supported"}
           </div>
+        </div>
 
-          {/* Action Button */}
-          <Button 
-            className="w-full h-12 text-lg font-semibold"
-            size="lg"
-            disabled={
-              isProcessing || 
-              (inputMethod === "link" && !url) || 
-              (inputMethod === "upload" && !uploadedFileInfo)
-            }
+        {/* Divider */}
+        <div className="divider">or</div>
+
+        {/* URL input */}
+        <div className="url-section">
+          <input
+            type="text"
+            className="url-input"
+            placeholder={getPlaceholder()}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+          />
+        </div>
+
+        {/* Export Format Selection */}
+        <div className="format-section">
+          <div className="format-label">Export Formats</div>
+          <div className="format-grid">
+            {formats.map((format) => (
+              <div
+                key={format.id}
+                role="button"
+                aria-pressed={selectedFormats.includes(format.id)}
+                className={`format-chip ${selectedFormats.includes(format.id) ? "selected" : ""}`}
+                onClick={(e) => {
+                  handleFormatToggle(format.id);
+                  // Add a lightweight ripple
+                  const target = e.currentTarget as HTMLElement;
+                  const rect = target.getBoundingClientRect();
+                  const ripple = document.createElement("span");
+                  const size = Math.max(rect.width, rect.height);
+                  ripple.style.position = "absolute";
+                  ripple.style.width = ripple.style.height = `${size}px`;
+                  ripple.style.left = `${(e.clientX - rect.left) - size / 2}px`;
+                  ripple.style.top = `${(e.clientY - rect.top) - size / 2}px`;
+                  ripple.style.borderRadius = "50%";
+                  ripple.style.background = "rgba(255,255,255,0.5)";
+                  ripple.style.pointerEvents = "none";
+                  ripple.style.animation = "ripple 0.6s ease-out";
+                  target.style.position = "relative";
+                  target.style.overflow = "hidden";
+                  target.appendChild(ripple);
+                  setTimeout(() => ripple.remove(), 600);
+                }}
+              >
+                <span className={`fmt-icon fmt-${format.id}`}>
+                  <format.icon className="fmt-icon-svg" />
+                </span>
+                {format.label}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Action Button */}
+        <div className="balloon-button-container">
+          <button
+            className="balloon-button"
             onClick={handleTranscribe}
+            disabled={isProcessing}
+            style={{ opacity: isProcessing ? 0.7 : 1 }}
           >
-            <FileText className="w-5 h-5 mr-2" />
-            {isProcessing ? "Transcribing..." : "Transcribe"}
-          </Button>
+            {isProcessing ? "Processing..." : "Start Transcription"}
+          </button>
+        </div>
 
-          {/* Progress Display */}
-          {progress && (
-            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <p className="text-sm text-blue-700 dark:text-blue-300">{progress}</p>
-            </div>
-          )}
+        {/* Progress Display */}
+        {progress && (
+          <div className="mt-4 p-3 rounded-lg" style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)" }}>
+            <p className="text-sm" style={{ color: "#BFDBFE" }}>{progress}</p>
+          </div>
+        )}
 
-          {/* Results Display */}
+        {/* Results Display */}
           {result && result.data && (
             <div className="mt-4 space-y-4">
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                <h3 className="font-semibold text-green-800 dark:text-green-200 mb-4">
+              <div className="p-4 rounded-lg" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)" }}>
+                <h3 className="font-semibold mb-4" style={{ color: "#D1FAE5" }}>
                   Transcription Complete
                 </h3>
                 
@@ -358,12 +473,12 @@ export default function ToolInterface({
                   {/* Transcription Text */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-green-700 dark:text-green-300">Transcription Text:</h4>
+                      <h4 className="font-medium" style={{ color: "#A7F3D0" }}>Transcription Text:</h4>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => copyToClipboard(result.data.transcription.text)}
-                        className="text-green-600 hover:text-green-700"
+                        className=""
                       >
                         {copiedText ? (
                           <>
@@ -378,8 +493,8 @@ export default function ToolInterface({
                         )}
                       </Button>
                     </div>
-                    <div className="bg-white dark:bg-green-950/50 p-4 rounded-lg border border-green-200 dark:border-green-700 max-h-60 overflow-y-auto">
-                      <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+                    <div className="p-4 rounded-lg max-h-60 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
                         {result.data.transcription.text}
                       </p>
                     </div>
@@ -388,15 +503,15 @@ export default function ToolInterface({
                   {/* Segments with Timestamps */}
                   {result.data.transcription.segments && result.data.transcription.segments.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="font-medium text-green-700 dark:text-green-300">Timestamped Segments:</h4>
-                      <div className="bg-white dark:bg-green-950/50 p-4 rounded-lg border border-green-200 dark:border-green-700 max-h-60 overflow-y-auto">
+                      <h4 className="font-medium" style={{ color: "#A7F3D0" }}>Timestamped Segments:</h4>
+                      <div className="p-4 rounded-lg max-h-60 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
                         <div className="space-y-2">
                           {result.data.transcription.segments.map((segment: any, index: number) => (
                             <div key={index} className="text-sm">
-                              <span className="text-blue-600 dark:text-blue-400 font-mono text-xs">
+                              <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>
                                 [{Math.floor(segment.start / 60)}:{String(Math.floor(segment.start % 60)).padStart(2, '0')} - {Math.floor(segment.end / 60)}:{String(Math.floor(segment.end % 60)).padStart(2, '0')}]
                               </span>
-                              <span className="text-gray-800 dark:text-gray-200 ml-2">
+                              <span className="ml-2">
                                 {segment.text}
                               </span>
                             </div>
@@ -408,40 +523,45 @@ export default function ToolInterface({
                   
                   {/* Download Buttons */}
                   <div className="space-y-2">
-                    <h4 className="font-medium text-green-700 dark:text-green-300">Download Options:</h4>
+                    <h4 className="font-medium" style={{ color: "#A7F3D0" }}>Download Options:</h4>
                     <div className="flex flex-wrap gap-2">
-                      {Object.keys(result.data.formats).map((format) => (
-                        <Button
-                          key={format}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => downloadFormat(format)}
-                        >
-                          <Download className="w-4 h-4 mr-1" />
-                          {format.toUpperCase()}
-                        </Button>
-                      ))}
+                      {Object.keys(result.data.formats).map((format) => {
+                        const id = format.toLowerCase();
+                        const IconComp = id === 'json' ? Code : (id === 'txt' || id === 'md') ? FileText : Download;
+                        return (
+                          <Button
+                            key={format}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => downloadFormat(format)}
+                            className="inline-flex items-center"
+                          >
+                            <span className={`fmt-icon fmt-${id}`}>
+                              <IconComp className="fmt-icon-svg" />
+                            </span>
+                            {format.toUpperCase()}
+                          </Button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
-
-          {/* Trust Indicators */}
-          <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-600 dark:text-gray-400 pt-2">
-            <div className="flex items-center gap-1">
-              <Zap className="w-4 h-4 text-green-600" />
-              <span>{mode === "video" ? "Fetch YouTube captions first" : "Auto language detection"}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Shield className="w-4 h-4 text-blue-600" />
-              <span>24h auto-delete source files</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Zap className="w-4 h-4 text-purple-600" />
-              <span>High-quality AI transcription</span>
-            </div>
+      </div>
+      {/* Success overlay */}
+      <div className={`success-overlay ${showSuccess ? "show" : ""}`} onClick={() => setShowSuccess(false)}>
+        <div className="success-content" onClick={(e) => e.stopPropagation()}>
+          <div className="success-icon">✓</div>
+          <div className="text-2xl font-extrabold bg-clip-text text-transparent" style={{ backgroundImage: "linear-gradient(135deg,#667eea,#ec4899)" }}>
+            Transcription Complete!
+          </div>
+          <p className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
+            Your audio has been transformed into text.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <button className="balloon-button" onClick={() => setShowSuccess(false)}>Continue</button>
           </div>
         </div>
       </div>

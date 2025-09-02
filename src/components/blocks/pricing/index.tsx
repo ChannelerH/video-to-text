@@ -134,7 +134,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                         {item.label && (
                           <Badge
                             variant="outline"
-                            className="border-primary bg-primary px-1.5 ml-1 text-primary-foreground"
+                            className={`px-1.5 ml-1 ${item.is_featured ? 'bg-[#fbbf24] border-[#f59e0b] text-black' : 'border-primary bg-primary text-primary-foreground'}`}
                           >
                             {item.label}
                           </Badge>
@@ -161,13 +161,14 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
               return (
                 <div
                   key={index}
-                  className={`rounded-lg p-6 ${
+                  className={`pricing-card ${item.is_featured ? 'featured' : ''} rounded-lg p-0 ${
                     item.is_featured
-                      ? "border-primary border-2 bg-card text-card-foreground"
-                      : "border-muted border"
+                      ? "bg-card text-card-foreground"
+                      : "border-muted border bg-card"
                   }`}
                 >
-                  <div className="flex h-full flex-col justify-between gap-5">
+                  <div className="pricing-topbar" />
+                  <div className="flex h-full flex-col justify-between gap-5 p-6">
                     <div>
                       <div className="flex items-center gap-2 mb-4">
                         {item.title && (
@@ -179,7 +180,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                         {item.label && (
                           <Badge
                             variant="outline"
-                            className="border-primary bg-primary px-1.5 text-primary-foreground"
+                            className={`px-1.5 ${item.is_featured ? 'bg-[#fbbf24] border-[#f59e0b] text-black' : 'border-primary bg-primary text-primary-foreground'}`}
                           >
                             {item.label}
                           </Badge>
@@ -192,7 +193,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                           </span>
                         )}
                         {item.price && (
-                          <span className="text-5xl font-semibold">
+                          <span className="text-5xl font-semibold price-gradient">
                             {item.price}
                           </span>
                         )}
@@ -248,7 +249,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                       ) : null}
                       {item.button && (
                         <Button
-                          className="w-full flex items-center justify-center gap-2 font-semibold"
+                          className="btn-neon w-full flex items-center justify-center gap-2 font-semibold"
                           disabled={isLoading}
                           onClick={() => {
                             if (isLoading) {

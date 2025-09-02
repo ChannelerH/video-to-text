@@ -11,7 +11,9 @@ export default function FAQ({ section }: { section: SectionType }) {
       <div className="container">
         <div className="text-center">
           {section.label && (
-            <Badge className="text-xs font-medium">{section.label}</Badge>
+            <Badge className="text-xs font-medium bg-[#fbbf24] text-black border-[#f59e0b]">
+              {section.label}
+            </Badge>
           )}
           <h2 className="mt-4 text-4xl font-semibold">{section.title}</h2>
           <p className="mt-6 font-medium text-muted-foreground">
@@ -21,7 +23,7 @@ export default function FAQ({ section }: { section: SectionType }) {
         <div className="mx-auto mt-14 grid gap-8 md:grid-cols-2 md:gap-12">
           {section.items?.map((item, index) => (
             <div key={index} className="flex gap-4">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-sm border border-primary font-mono text-xs text-primary">
+              <span className="step-badge shrink-0 font-mono text-xs">
                 {index + 1}
               </span>
               <div>

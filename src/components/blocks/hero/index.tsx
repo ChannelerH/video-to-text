@@ -46,15 +46,15 @@ export default function Hero({ hero }: { hero: HeroType }) {
             )}
 
             {texts && texts.length > 1 ? (
-              <h1 className="mx-auto mb-3 mt-4 max-w-6xl text-balance text-4xl font-bold lg:mb-7 lg:text-7xl">
+              <h1 className="headline-gradient mx-auto mb-3 mt-4 max-w-6xl text-balance text-4xl font-extrabold tracking-[-0.03em] lg:mb-7 lg:text-7xl">
                 {texts[0]}
-                <span className="bg-linear-to-r from-primary via-primary to-primary bg-clip-text text-transparent">
+                <span className="bg-clip-text text-transparent" style={{backgroundImage:'linear-gradient(90deg,#06b6d4,#3b82f6)'}}>
                   {highlightText}
                 </span>
                 {texts[1]}
               </h1>
             ) : (
-              <h1 className="mx-auto mb-3 mt-4 max-w-6xl text-balance text-4xl font-bold lg:mb-7 lg:text-7xl">
+              <h1 className="headline-gradient mx-auto mb-3 mt-4 max-w-6xl text-balance text-4xl font-extrabold tracking-[-0.03em] lg:mb-7 lg:text-7xl bg-clip-text text-transparent" style={{backgroundImage:'linear-gradient(90deg,#06b6d4,#3b82f6)'}}>
                 {hero.title}
               </h1>
             )}
@@ -103,6 +103,25 @@ export default function Hero({ hero }: { hero: HeroType }) {
           </div>
         </div>
       </section>
+
+      {/* Bottom wave - multilayer */}
+      <div aria-hidden className="-z-40 relative">
+        <svg viewBox="0 0 1440 220" className="w-full h-[200px]" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="waveGrad1" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#ec4899" stopOpacity="0.25" />
+            </linearGradient>
+            <linearGradient id="waveGrad2" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#a855f7" stopOpacity="0.18" />
+            </linearGradient>
+          </defs>
+          <path d="M0,120 C240,160 480,70 720,110 C960,150 1200,200 1440,140 L1440,220 L0,220 Z" fill="url(#waveGrad1)" />
+          <path d="M0,140 C240,180 480,90 720,120 C960,150 1200,210 1440,160 L1440,220 L0,220 Z" fill="url(#waveGrad2)" />
+        </svg>
+      </div>
+
     </>
   );
 }
