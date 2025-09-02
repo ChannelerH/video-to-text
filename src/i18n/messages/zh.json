@@ -132,5 +132,53 @@
     "contact_tip": "其他联系方式",
     "rating_tip": "您对 ShipAny 的看法如何？",
     "placeholder": "在这里留下您的反馈..."
+  },
+  "tool_interface": {
+    "upload_tip": "拖放文件到此处或点击浏览",
+    "supported_formats": "支持 MP3、M4A、WAV、OGG、MP4 格式",
+    "url_placeholder": "粘贴 YouTube 链接或直接音频/视频 URL（例如：https://example.com/audio.mp3）...",
+    "audio_url_placeholder": "粘贴直接音频文件 URL（例如：https://example.com/audio.mp3、.wav、.ogg）...",
+    "export_formats": "导出格式",
+    "start_transcription": "开始转录",
+    "processing": "处理中...",
+    "upload_required": "请上传文件或输入 URL。",
+    "or": "或",
+    "formats": {
+      "txt": "TXT",
+      "srt": "SRT", 
+      "vtt": "VTT",
+      "md": "Markdown",
+      "json": "JSON"
+    },
+    "progress": {
+      "uploading": "正在上传文件到云存储...",
+      "upload_success": "文件上传成功！准备转录。",
+      "starting": "开始转录...",
+      "processing_youtube": "正在处理 YouTube 视频...",
+      "processing_audio_url": "正在处理来自 URL 的音频文件...",
+      "processing_file": "正在处理文件转录...",
+      "completed": "转录完成！",
+      "audio_transformed": "您的音频已转换为文本。"
+    },
+    "results": {
+      "transcription_complete": "转录完成",
+      "language": "语言：",
+      "duration": "时长：",
+      "transcription_text": "转录文本：",
+      "timestamped_segments": "时间戳片段：",
+      "download_options": "下载选项：",
+      "copy": "复制",
+      "copied": "已复制！"
+    },
+    "errors": {
+      "upload_failed": "上传失败。请重试。",
+      "wait_for_upload": "请等待文件上传完成或输入 URL。",
+      "general_error": "发生错误。请重试。"
+    },
+    "success": {
+      "title": "转录完成！",
+      "message": "您的音频已转换为文本。",
+      "continue": "继续"
+    }
   }
 }

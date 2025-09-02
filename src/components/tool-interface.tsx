@@ -4,12 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileText, Download, Copy, Check, Code } from "lucide-react";
 import PyramidLoader from "@/components/ui/pyramid-loader";
+import { useTranslations } from "next-intl";
 
 interface ToolInterfaceProps {
   mode?: "video" | "audio";
 }
 
 export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
+  const t = useTranslations("tool_interface");
   const [url, setUrl] = useState("");
   const [selectedFormats, setSelectedFormats] = useState(["txt", "srt"]);
   const [file, setFile] = useState<File | null>(null);
@@ -34,7 +36,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       setUrl("");
       
       // 立即上传文件到 R2
-      setProgress("Uploading file to cloud storage...");
+      setProgress(t("progress.uploading"));
       try {
         const formData = new FormData();
         formData.append("file", selectedFile);
@@ -48,14 +50,14 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         const uploadResult = await uploadResponse.json();
         if (uploadResult.success) {
           setUploadedFileInfo(uploadResult.data);
-          setProgress("File uploaded successfully! Ready for transcription.");
+          setProgress(t("progress.upload_success"));
         } else {
           setProgress(`Upload failed: ${uploadResult.error}`);
           setFile(null); // 清除文件选择
         }
       } catch (error) {
         console.error("Upload error:", error);
-        setProgress("Upload failed. Please try again.");
+        setProgress(t("errors.upload_failed"));
         setFile(null); // 清除文件选择
       }
     }
@@ -63,12 +65,12 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
 
   const handleTranscribe = async () => {
     if (!url && !uploadedFileInfo) {
-      setProgress("Please upload a file or enter a URL.");
+      setProgress(t("upload_required"));
       return;
     }
 
     setIsProcessing(true);
-    setProgress("Starting transcription...");
+    setProgress(t("progress.starting"));
     setResult(null);
 
     try {
@@ -83,8 +85,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         const urlType = isYouTubeUrl ? "youtube_url" : "audio_url";
         
         const progressText = isYouTubeUrl 
-          ? "Processing YouTube video..." 
-          : "Processing audio file from URL...";
+          ? t("progress.processing_youtube") 
+          : t("progress.processing_audio_url");
         
         setProgress(progressText);
         requestData = {
@@ -94,7 +96,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           options: { formats: selectedFormats }
         };
       } else if (uploadedFileInfo) {
-        setProgress("Processing file transcription...");
+        setProgress(t("progress.processing_file"));
         requestData = {
           type: "file_upload",
           content: uploadedFileInfo.replicateUrl,
@@ -102,7 +104,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           options: { formats: selectedFormats, r2Key: uploadedFileInfo.r2Key }
         };
       } else {
-        setProgress("Please wait for file upload to complete or enter a URL.");
+        setProgress(t("errors.wait_for_upload"));
         setIsProcessing(false);
         return;
       }
@@ -116,7 +118,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       const result = await response.json();
       if (result.success) {
         setResult({ type: "full", data: result.data });
-        setProgress("Transcription completed!");
+        setProgress(t("progress.completed"));
         setShowSuccess(true);
       } else {
         console.error('Transcription API error:', result.error);
@@ -144,7 +146,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       }
     } catch (error) {
       console.error("Transcription error:", error);
-      setProgress("An error occurred. Please try again.");
+      setProgress(t("errors.general_error"));
     } finally {
       setIsProcessing(false);
     }
@@ -200,8 +202,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
 
   const getPlaceholder = () =>
     mode === "video"
-      ? "Paste a YouTube link or direct audio/video URL (e.g., https://example.com/audio.mp3)..."
-      : "Paste a direct audio file URL (e.g., https://example.com/audio.mp3, .wav, .ogg)...";
+      ? t("url_placeholder")
+      : t("audio_url_placeholder");
 
   // Build visualizer bars once with stable heights for SSR
   const bars = useMemo(() => Array.from({ length: 60 }, (_, i) => ({
@@ -344,11 +346,11 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
 
   // Only expose formats supported by backend to keep functionality unchanged
   const formats = [
-    { id: "txt", label: "TXT", icon: FileText },
-    { id: "srt", label: "SRT", icon: Download },
-    { id: "vtt", label: "VTT", icon: Download },
-    { id: "md", label: "Markdown", icon: FileText },
-    { id: "json", label: "JSON", icon: Code },
+    { id: "txt", label: t("formats.txt"), icon: FileText },
+    { id: "srt", label: t("formats.srt"), icon: Download },
+    { id: "vtt", label: t("formats.vtt"), icon: Download },
+    { id: "md", label: t("formats.md"), icon: FileText },
+    { id: "json", label: t("formats.json"), icon: Code },
   ];
 
   return (
@@ -379,14 +381,14 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             style={{ display: "none" }}
           />
           <div className="upload-icon">📊</div>
-          <div className="upload-title">Drop your file here or click to browse</div>
+          <div className="upload-title">{t("upload_tip")}</div>
           <div className="upload-desc">
-            {file ? `${file.name} • ${(file.size / (1024 * 1024)).toFixed(1)} MB` : "MP3, M4A, WAV, OGG, MP4 supported"}
+            {file ? `${file.name} • ${(file.size / (1024 * 1024)).toFixed(1)} MB` : t("supported_formats")}
           </div>
         </div>
 
         {/* Divider */}
-        <div className="divider">or</div>
+        <div className="divider">{t("or")}</div>
 
         {/* URL input */}
         <div className="url-section">
@@ -401,7 +403,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
 
         {/* Export Format Selection */}
         <div className="format-section">
-          <div className="format-label">Export Formats</div>
+          <div className="format-label">{t("export_formats")}</div>
           <div className="format-grid">
             {formats.map((format) => (
               <div
@@ -447,7 +449,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             disabled={isProcessing}
             style={{ opacity: isProcessing ? 0.7 : 1 }}
           >
-            {isProcessing ? "Processing..." : "Start Transcription"}
+            {isProcessing ? t("processing") : t("start_transcription")}
           </button>
         </div>
 
@@ -464,24 +466,24 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             <div className="mt-4 space-y-4">
               <div className="p-4 rounded-lg" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)" }}>
                 <h3 className="font-semibold mb-4" style={{ color: "#D1FAE5" }}>
-                  Transcription Complete
+                  {t("results.transcription_complete")}
                 </h3>
                 
                 <div className="space-y-4">
                   {/* Metadata */}
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="font-medium">Language:</span> {result.data.transcription.language}
+                      <span className="font-medium">{t("results.language")}</span> {result.data.transcription.language}
                     </div>
                     <div>
-                      <span className="font-medium">Duration:</span> {Math.round(result.data.transcription.duration)}s
+                      <span className="font-medium">{t("results.duration")}</span> {Math.round(result.data.transcription.duration)}s
                     </div>
                   </div>
 
                   {/* Transcription Text */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium" style={{ color: "#A7F3D0" }}>Transcription Text:</h4>
+                      <h4 className="font-medium" style={{ color: "#A7F3D0" }}>{t("results.transcription_text")}</h4>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -491,12 +493,12 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                         {copiedText ? (
                           <>
                             <Check className="w-4 h-4 mr-1" />
-                            Copied!
+                            {t("results.copied")}
                           </>
                         ) : (
                           <>
                             <Copy className="w-4 h-4 mr-1" />
-                            Copy
+                            {t("results.copy")}
                           </>
                         )}
                       </Button>
@@ -511,7 +513,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                   {/* Segments with Timestamps */}
                   {result.data.transcription.segments && result.data.transcription.segments.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="font-medium" style={{ color: "#A7F3D0" }}>Timestamped Segments:</h4>
+                      <h4 className="font-medium" style={{ color: "#A7F3D0" }}>{t("results.timestamped_segments")}</h4>
                       <div className="p-4 rounded-lg max-h-60 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
                         <div className="space-y-2">
                           {result.data.transcription.segments.map((segment: any, index: number) => (
@@ -531,7 +533,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                   
                   {/* Download Buttons */}
                   <div className="space-y-2">
-                    <h4 className="font-medium" style={{ color: "#A7F3D0" }}>Download Options:</h4>
+                    <h4 className="font-medium" style={{ color: "#A7F3D0" }}>{t("results.download_options")}</h4>
                     <div className="flex flex-wrap gap-2">
                       {Object.keys(result.data.formats).map((format) => {
                         const id = format.toLowerCase();
@@ -563,13 +565,13 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         <div className="success-content" onClick={(e) => e.stopPropagation()}>
           <div className="success-icon">✓</div>
           <div className="text-2xl font-extrabold bg-clip-text text-transparent" style={{ backgroundImage: "linear-gradient(135deg,#667eea,#ec4899)" }}>
-            Transcription Complete!
+            {t("success.title")}
           </div>
           <p className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
-            Your audio has been transformed into text.
+            {t("success.message")}
           </p>
           <div className="mt-4 flex items-center justify-center gap-2">
-            <button className="balloon-button" onClick={() => setShowSuccess(false)}>Continue</button>
+            <button className="balloon-button" onClick={() => setShowSuccess(false)}>{t("success.continue")}</button>
           </div>
         </div>
       </div>

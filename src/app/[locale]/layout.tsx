@@ -8,6 +8,7 @@ import { Metadata } from "next";
 import { NextAuthSessionProvider } from "@/auth/session";
 import { NextIntlClientProvider } from "next-intl";
 import { ThemeProvider } from "@/providers/theme";
+import { locales } from "@/i18n/locale";
 
 export async function generateMetadata({
   params,
@@ -27,6 +28,10 @@ export async function generateMetadata({
     description: t("metadata.description") || "",
     keywords: t("metadata.keywords") || "",
   };
+}
+
+export function generateStaticParams() {
+  return locales.map((locale) => ({ locale }));
 }
 
 export default async function LocaleLayout({

@@ -132,5 +132,53 @@
     "contact_tip": "Other ways to contact us",
     "rating_tip": "How do you feel about ShipAny?",
     "placeholder": "Leave your words here..."
+  },
+  "tool_interface": {
+    "upload_tip": "Drop your file here or click to browse",
+    "supported_formats": "MP3, M4A, WAV, OGG, MP4 supported",
+    "url_placeholder": "Paste a YouTube link or direct audio/video URL (e.g., https://example.com/audio.mp3)...",
+    "audio_url_placeholder": "Paste a direct audio file URL (e.g., https://example.com/audio.mp3, .wav, .ogg)...",
+    "export_formats": "Export Formats",
+    "start_transcription": "Start Transcription",
+    "processing": "Processing...",
+    "upload_required": "Please upload a file or enter a URL.",
+    "or": "OR",
+    "formats": {
+      "txt": "TXT",
+      "srt": "SRT",
+      "vtt": "VTT", 
+      "md": "Markdown",
+      "json": "JSON"
+    },
+    "progress": {
+      "uploading": "Uploading file to cloud storage...",
+      "upload_success": "File uploaded successfully! Ready for transcription.",
+      "starting": "Starting transcription...",
+      "processing_youtube": "Processing YouTube video...",
+      "processing_audio_url": "Processing audio file from URL...",
+      "processing_file": "Processing file transcription...",
+      "completed": "Transcription completed!",
+      "audio_transformed": "Your audio has been transformed into text."
+    },
+    "results": {
+      "transcription_complete": "Transcription Complete",
+      "language": "Language:",
+      "duration": "Duration:",
+      "transcription_text": "Transcription Text:",
+      "timestamped_segments": "Timestamped Segments:",
+      "download_options": "Download Options:",
+      "copy": "Copy",
+      "copied": "Copied!"
+    },
+    "errors": {
+      "upload_failed": "Upload failed. Please try again.",
+      "wait_for_upload": "Please wait for file upload to complete or enter a URL.",
+      "general_error": "An error occurred. Please try again."
+    },
+    "success": {
+      "title": "Transcription Complete!",
+      "message": "Your audio has been transformed into text.",
+      "continue": "CONTINUE"
+    }
   }
 }
