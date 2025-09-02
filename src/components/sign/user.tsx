@@ -26,7 +26,7 @@ export default function SignUser({ user }: { user: User }) {
     },
     {
       title: t("user.user_center"),
-      url: "/my-orders",
+      url: "/my-credits",
     },
   ];
 
