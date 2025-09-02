@@ -1,5 +1,5 @@
-CREATE TABLE "categories" (
-	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "categories_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
+CREATE TABLE "v2tx_categories" (
+	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "v2tx_categories_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"uuid" varchar(255) NOT NULL,
 	"name" varchar(255) NOT NULL,
 	"title" varchar(255) NOT NULL,

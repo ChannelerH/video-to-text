@@ -1,5 +1,5 @@
-CREATE TABLE "affiliates" (
-	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "affiliates_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
+CREATE TABLE "v2tx_affiliates" (
+	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "v2tx_affiliates_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"user_uuid" varchar(255) NOT NULL,
 	"created_at" timestamp with time zone,
 	"status" varchar(50) DEFAULT '' NOT NULL,
@@ -10,8 +10,8 @@ CREATE TABLE "affiliates" (
 	"reward_amount" integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "apikeys" (
-	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "apikeys_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
+CREATE TABLE "v2tx_apikeys" (
+	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "v2tx_apikeys_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"api_key" varchar(255) NOT NULL,
 	"title" varchar(100),
 	"user_uuid" varchar(255) NOT NULL,
@@ -20,8 +20,8 @@ CREATE TABLE "apikeys" (
 	CONSTRAINT "apikeys_api_key_unique" UNIQUE("api_key")
 );
 --> statement-breakpoint
-CREATE TABLE "credits" (
-	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "credits_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
+CREATE TABLE "v2tx_credits" (
+	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "v2tx_credits_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"trans_no" varchar(255) NOT NULL,
 	"created_at" timestamp with time zone,
 	"user_uuid" varchar(255) NOT NULL,
@@ -32,8 +32,8 @@ CREATE TABLE "credits" (
 	CONSTRAINT "credits_trans_no_unique" UNIQUE("trans_no")
 );
 --> statement-breakpoint
-CREATE TABLE "feedbacks" (
-	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "feedbacks_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
+CREATE TABLE "v2tx_feedbacks" (
+	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "v2tx_feedbacks_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"created_at" timestamp with time zone,
 	"status" varchar(50),
 	"user_uuid" varchar(255),
@@ -41,8 +41,8 @@ CREATE TABLE "feedbacks" (
 	"rating" integer
 );
 --> statement-breakpoint
-CREATE TABLE "orders" (
-	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "orders_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
+CREATE TABLE "v2tx_orders" (
+	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "v2tx_orders_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"order_no" varchar(255) NOT NULL,
 	"created_at" timestamp with time zone,
 	"user_uuid" varchar(255) DEFAULT '' NOT NULL,
@@ -70,8 +70,8 @@ CREATE TABLE "orders" (
 	CONSTRAINT "orders_order_no_unique" UNIQUE("order_no")
 );
 --> statement-breakpoint
-CREATE TABLE "posts" (
-	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "posts_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
+CREATE TABLE "v2tx_posts" (
+	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "v2tx_posts_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"uuid" varchar(255) NOT NULL,
 	"slug" varchar(255),
 	"title" varchar(255),
@@ -87,8 +87,8 @@ CREATE TABLE "posts" (
 	CONSTRAINT "posts_uuid_unique" UNIQUE("uuid")
 );
 --> statement-breakpoint
-CREATE TABLE "users" (
-	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "users_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
+CREATE TABLE "v2tx_users" (
+	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "v2tx_users_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"uuid" varchar(255) NOT NULL,
 	"email" varchar(255) NOT NULL,
 	"created_at" timestamp with time zone,
@@ -106,4 +106,4 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_uuid_unique" UNIQUE("uuid")
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX "email_provider_unique_idx" ON "users" USING btree ("email","signin_provider");
+CREATE UNIQUE INDEX "email_provider_unique_idx" ON "v2tx_users" USING btree ("email","signin_provider");

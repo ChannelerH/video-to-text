@@ -45,3 +45,5 @@ supabase
 .*next
 .dev.vars*
 .source
+YOUTUBE_OPTIMIZATION.md
+.claude/settings.local.json
