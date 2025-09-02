@@ -6,6 +6,7 @@ import { Hero as HeroType } from "@/types/blocks/hero";
 import Icon from "@/components/icon";
 import { Link } from "@/i18n/navigation";
 import ToolInterface from "@/components/tool-interface";
+import BlurText from "./BlurText";
 
 export default function Hero({ hero }: { hero: HeroType }) {
   if (hero.disabled) {
@@ -45,19 +46,16 @@ export default function Hero({ hero }: { hero: HeroType }) {
               </Link>
             )}
 
-            {texts && texts.length > 1 ? (
-              <h1 className="headline-gradient mx-auto mb-3 mt-4 max-w-6xl text-balance text-4xl font-extrabold tracking-[-0.03em] lg:mb-7 lg:text-7xl">
-                {texts[0]}
-                <span className="bg-clip-text text-transparent" style={{backgroundImage:'linear-gradient(90deg,#06b6d4,#3b82f6)'}}>
-                  {highlightText}
-                </span>
-                {texts[1]}
-              </h1>
-            ) : (
-              <h1 className="headline-gradient mx-auto mb-3 mt-4 max-w-6xl text-balance text-4xl font-extrabold tracking-[-0.03em] lg:mb-7 lg:text-7xl bg-clip-text text-transparent" style={{backgroundImage:'linear-gradient(90deg,#06b6d4,#3b82f6)'}}>
-                {hero.title}
-              </h1>
-            )}
+            <h1 className="mx-auto mb-3 mt-4 max-w-6xl lg:mb-7 text-balance text-4xl lg:text-7xl font-extrabold tracking-[-0.03em]">
+              <BlurText
+                text={hero.title || ""}
+                delay={120}
+                animateBy="words"
+                direction="top"
+                className="inline"
+                spanClassName="hero-title"
+              />
+            </h1>
 
             <p
               className="m mx-auto max-w-3xl text-muted-foreground lg:text-xl"
