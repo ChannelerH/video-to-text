@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileText, Download, Copy, Check, Code } from "lucide-react";
+import PyramidLoader from "@/components/ui/pyramid-loader";
 
 interface ToolInterfaceProps {
   mode?: "video" | "audio";
@@ -202,8 +203,11 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       ? "Paste a YouTube link or direct audio/video URL (e.g., https://example.com/audio.mp3)..."
       : "Paste a direct audio file URL (e.g., https://example.com/audio.mp3, .wav, .ogg)...";
 
-  // Build visualizer bars once
-  const bars = useMemo(() => Array.from({ length: 60 }), []);
+  // Build visualizer bars once with stable heights for SSR
+  const bars = useMemo(() => Array.from({ length: 60 }, (_, i) => ({
+    height: 30 + (i % 20), // 预定义高度避免SSR不匹配
+    delay: i * 0.03
+  })), []);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const visualizerRef = useRef<HTMLDivElement | null>(null);
 
@@ -286,16 +290,19 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     const visualizer = visualizerRef.current;
     if (!visualizer) return;
     const onEnter = () => {
-      const bars = visualizer.querySelectorAll(".audio-bar") as NodeListOf<HTMLDivElement>;
-      bars.forEach((bar, i) => {
-        bar.style.height = `${Math.random() * 60 + 20}px`;
+      const barElements = visualizer.querySelectorAll(".audio-bar") as NodeListOf<HTMLDivElement>;
+      barElements.forEach((bar, i) => {
+        // 使用基于索引的伪随机值确保一致性
+        const height = 20 + (i * 7 % 40) + (i % 3 === 0 ? 10 : 0);
+        bar.style.height = `${height}px`;
         bar.style.transitionDelay = `${i * 0.01}s`;
       });
     };
     const onLeave = () => {
-      const bars = visualizer.querySelectorAll(".audio-bar") as NodeListOf<HTMLDivElement>;
-      bars.forEach((bar, i) => {
-        bar.style.height = `${Math.random() * 30 + 15}px`;
+      const barElements = visualizer.querySelectorAll(".audio-bar") as NodeListOf<HTMLDivElement>;
+      barElements.forEach((bar, i) => {
+        // 使用原始的预定义高度
+        bar.style.height = `${30 + (i % 20)}px`;
         bar.style.transitionDelay = `${i * 0.01}s`;
       });
     };
@@ -350,8 +357,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       <div className="upload-container" ref={containerRef}>
         {/* Audio visualizer */}
         <div className="audio-visualizer" ref={visualizerRef}>
-          {bars.map((_, i) => (
-            <div key={i} className="audio-bar" style={{ height: `${Math.random() * 40 + 20}px`, animationDelay: `${i * 0.03}s` }} />
+          {bars.map((bar, i) => (
+            <div key={i} className="audio-bar" style={{ height: `${bar.height}px`, animationDelay: `${bar.delay}s` }} />
           ))}
         </div>
 
@@ -446,8 +453,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
 
         {/* Progress Display */}
         {progress && (
-          <div className="mt-4 p-3 rounded-lg" style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)" }}>
-            <p className="text-sm" style={{ color: "#BFDBFE" }}>{progress}</p>
+          <div className="mt-8 flex flex-col items-center space-y-6 p-6 rounded-lg" style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)" }}>
+            {isProcessing && <PyramidLoader size="medium" />}
+            <p className="text-sm text-center" style={{ color: "#BFDBFE" }}>{progress}</p>
           </div>
         )}
 
