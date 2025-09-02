@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { Link } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { User } from "@/types/user";
 import { signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
@@ -19,6 +19,13 @@ import { NavItem } from "@/types/blocks/base";
 
 export default function SignUser({ user }: { user: User }) {
   const t = useTranslations();
+  const router = useRouter();
+  React.useEffect(() => {
+    // Prefetch user center route to make navigation feel instant
+    try {
+      router.prefetch?.("/my-credits");
+    } catch {}
+  }, [router]);
 
   const dropdownItems: NavItem[] = [
     {
@@ -54,16 +61,16 @@ export default function SignUser({ user }: { user: User }) {
         {dropdownItems.map((item, index) => (
           <React.Fragment key={index}>
             <DropdownMenuItem
-              key={index}
               className="flex justify-center cursor-pointer"
+              onSelect={() => {
+                if (item.url) {
+                  router.push(item.url as string);
+                } else {
+                  item.onClick?.();
+                }
+              }}
             >
-              {item.url ? (
-                <Link href={item.url as any} target={item.target}>
-                  {item.title}
-                </Link>
-              ) : (
-                <button onClick={item.onClick}>{item.title}</button>
-              )}
+              {item.title}
             </DropdownMenuItem>
             {index !== dropdownItems.length - 1 && <DropdownMenuSeparator />}
           </React.Fragment>
