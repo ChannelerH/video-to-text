@@ -467,6 +467,36 @@
   flex-shrink: 0;
 }
 
+/* ===== Pricing summary block (under price) ===== */
+.pricing-summary {
+  text-align: left;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  min-height: 72px;
+}
+
+@media (min-width: 768px) {
+  .pricing-summary { min-height: 84px; }
+}
+
+.pricing-desc {
+  color: #cbd5e1; /* slate-300 */
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.pricing-subtitle {
+  margin-top: 10px;
+  margin-bottom: 4px;
+  font-size: 0.75rem; /* text-xs */
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a5b4fc; /* indigo-200 */
+}
+
 /* ===== 响应式修正 ===== */
 @media (max-width: 768px) {
   :root {

@@ -205,15 +205,19 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                           </span>
                         )}
                       </div>
-                      {item.description && (
-                        <p className="text-muted-foreground text-sm leading-relaxed mt-2">
-                          {item.description}
-                        </p>
-                      )}
-                      {item.features_title && (
-                        <p className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          {item.features_title}
-                        </p>
+                      {(item.description || item.features_title) && (
+                        <div className="pricing-summary">
+                          {item.description && (
+                            <p className="pricing-desc">
+                              {item.description}
+                            </p>
+                          )}
+                          {item.features_title && (
+                            <p className="pricing-subtitle">
+                              {item.features_title}
+                            </p>
+                          )}
+                        </div>
                       )}
                       {item.features && (
                         <>
