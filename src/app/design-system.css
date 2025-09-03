@@ -2,39 +2,45 @@
    统一的设计语言 - 解决所有组件之间的视觉不一致问题 */
 
 :root {
-  /* === 8倍数间距系统 === */
-  --space-1: 8px;
-  --space-2: 16px;
-  --space-3: 24px;
-  --space-4: 32px;
-  --space-5: 40px;
-  --space-6: 48px;
-  --space-7: 56px;
-  --space-8: 64px;
-  --space-10: 80px;
-  --space-12: 96px;
-  --space-15: 120px;
+  /* === 专业8倍数间距系统 === */
+  --space-1: 8px;   /* xs */
+  --space-2: 16px;  /* sm */
+  --space-3: 24px;  /* md */
+  --space-4: 32px;  /* lg */
+  --space-6: 48px;  /* xl */
+  --space-8: 64px;  /* 2xl */
+  --space-12: 96px; /* 3xl */
+  --space-16: 128px; /* 4xl */
   
-  --section-spacing: var(--space-15);
-  --section-padding-y: var(--space-10);
-  --card-padding: var(--space-5);
+  --section-spacing: var(--space-16);
+  --section-padding-y: var(--space-8);
+  --card-padding: var(--space-4);
   --content-max-width: 1200px;
   
-  /* === 统一紫色系配色 === */
-  --primary-gradient: linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #c084fc 100%);
-  --secondary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
-  --premium-gradient: linear-gradient(135deg, #a855f7 0%, #c084fc 100%);
+  /* === 严格的紫色系专业配色 === */
+  --primary: #8B5CF6;
+  --primary-light: #A78BFA;
+  --primary-dark: #7C3AED;
+  --accent: #EC4899;  /* 替代黄色的粉色accent */
+  --background: #0F0F23;
+  --surface: rgba(139, 92, 246, 0.1);
+  --surface-hover: rgba(139, 92, 246, 0.15);
+  
+  --primary-gradient: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  --secondary-gradient: linear-gradient(135deg, #6366f1 0%, var(--primary) 100%);
+  --accent-gradient: linear-gradient(135deg, var(--accent) 0%, var(--primary) 100%);
+  --premium-gradient: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 100%);
   
   /* === 统一阴影系统 === */
-  --shadow-card: 0 20px 60px rgba(0,0,0,0.4), 0 0 60px rgba(189,0,255,0.15);
-  --shadow-card-hover: 0 30px 80px rgba(0,0,0,0.5), 0 0 100px rgba(189,0,255,0.25);
-  --shadow-featured: 0 25px 70px rgba(0,0,0,0.5), 0 0 100px rgba(255,184,0,0.4);
+  --shadow-card: 0 8px 32px rgba(0,0,0,0.4), 0 0 32px rgba(139,92,246,0.15);
+  --shadow-card-hover: 0 16px 48px rgba(0,0,0,0.5), 0 0 48px rgba(139,92,246,0.25);
+  --shadow-featured: 0 20px 60px rgba(0,0,0,0.5), 0 0 60px rgba(139,92,246,0.4);
   
-  /* === 统一边框系统 === */
-  --border-radius-lg: 24px;
-  --border-radius-xl: 32px;
-  --border-animated: linear-gradient(135deg, #00D9FF, #BD00FF, #FF0080, #00FF88);
+  /* === 统一边框系统 - 严格12px === */
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --border-animated: linear-gradient(135deg, var(--primary), var(--primary-light), var(--accent));
   
   /* === 统一背景系统 === */
   --bg-glass: rgba(26,26,35,0.95);
@@ -63,12 +69,12 @@
   background: transparent;
 }
 
-/* ===== 统一卡片系统 ===== */
+/* ===== 严格统一卡片系统 ===== */
 .design-card {
   position: relative;
   background: var(--bg-glass);
   backdrop-filter: var(--backdrop-blur);
-  border-radius: var(--border-radius-lg);
+  border-radius: var(--radius);  /* 严格12px */
   padding: var(--card-padding);
   box-shadow: var(--shadow-card);
   border: 1px solid rgba(139,92,246,0.2);
@@ -111,10 +117,10 @@
 .design-card.featured::before {
   background: var(--premium-gradient);
   opacity: 0.6;
-  animation: goldPulse 2s ease-in-out infinite;
+  animation: purplePulse 2s ease-in-out infinite;
 }
 
-@keyframes goldPulse {
+@keyframes purplePulse {
   0%, 100% { opacity: 0.5; filter: brightness(1); }
   50% { opacity: 0.8; filter: brightness(1.2); }
 }

@@ -246,7 +246,7 @@ export default function QuickStart({ section }: QuickStartProps) {
           className="mb-12"
         >
           <div className="flex items-center gap-3 justify-center mb-8">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-600 flex items-center justify-center text-white text-xl">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-500 to-blue-600 flex items-center justify-center text-white text-xl">
               <RiLightbulbLine />
             </div>
             <h3 className="design-heading-2">{t('tips.title')}</h3>
@@ -266,11 +266,11 @@ export default function QuickStart({ section }: QuickStartProps) {
                 className="design-card group"
               >
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 flex items-center justify-center text-yellow-400 text-xl flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 text-xl flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
                     <tip.icon />
                   </div>
                   <div className="flex-1">
-                    <h4 className="design-heading-5 mb-2 text-yellow-300 group-hover:text-yellow-200 transition-colors">
+                    <h4 className="design-heading-5 mb-2 text-purple-300 group-hover:text-purple-200 transition-colors">
                       {tip.title}
                     </h4>
                     <p className="text-gray-400 text-sm leading-relaxed">

@@ -134,7 +134,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                         {item.label && (
                           <Badge
                             variant="outline"
-                            className={`px-1.5 ml-1 ${item.is_featured ? 'bg-[#fbbf24] border-[#f59e0b] text-black' : 'border-primary bg-primary text-primary-foreground'}`}
+                            className={`px-1.5 ml-1 ${item.is_featured ? 'bg-purple-500 border-purple-400 text-white' : 'border-primary bg-primary text-primary-foreground'}`}
                           >
                             {item.label}
                           </Badge>
@@ -168,7 +168,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                         )}
                         <div className="flex-1"></div>
                         {item.label && (
-                          <div className={`design-badge ${item.is_featured ? 'gold' : ''}`}>
+                          <div className={`design-badge ${item.is_featured ? 'featured' : ''}`}>
                             {item.label}
                           </div>
                         )}

@@ -82,10 +82,21 @@ export default function ComparisonTable({ section }: { section: SectionType & { 
                 >
                   <div className="text-red-400 text-2xl font-bold mb-2">Manual Service</div>
                   <div className="text-4xl font-bold text-red-400 mb-2">{section.savings.manual_cost}</div>
-                  <div className="flex justify-center gap-1">
-                    {Array.from({length: 20}).map((_, i) => (
-                      <span key={i} className="text-red-400">💰</span>
-                    ))}
+                  
+                  {/* Visual cost representation with bars */}
+                  <div className="mt-4">
+                    <div className="flex justify-center mb-2">
+                      <div className="w-full max-w-32 bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <motion.div 
+                          className="h-full bg-gradient-to-r from-red-500 to-red-600 rounded-full"
+                          initial={{ width: "0%" }}
+                          whileInView={{ width: "100%" }}
+                          transition={{ delay: 0.5, duration: 1.2 }}
+                          viewport={{ once: true }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-xs text-red-300 font-mono">High cost baseline</span>
                   </div>
                 </motion.div>
 
@@ -99,10 +110,21 @@ export default function ComparisonTable({ section }: { section: SectionType & { 
                 >
                   <div className="text-orange-400 text-2xl font-bold mb-2">Competitors</div>
                   <div className="text-4xl font-bold text-orange-400 mb-2">{section.savings.competitor_cost}</div>
-                  <div className="flex justify-center gap-1">
-                    {Array.from({length: 5}).map((_, i) => (
-                      <span key={i} className="text-orange-400">💰</span>
-                    ))}
+                  
+                  {/* Visual cost representation with bars */}
+                  <div className="mt-4">
+                    <div className="flex justify-center mb-2">
+                      <div className="w-full max-w-32 bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <motion.div 
+                          className="h-full bg-gradient-to-r from-orange-500 to-orange-600 rounded-full"
+                          initial={{ width: "0%" }}
+                          whileInView={{ width: "70%" }}
+                          transition={{ delay: 0.7, duration: 1.2 }}
+                          viewport={{ once: true }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-xs text-orange-300 font-mono">30% cheaper</span>
                   </div>
                 </motion.div>
 
@@ -116,8 +138,21 @@ export default function ComparisonTable({ section }: { section: SectionType & { 
                 >
                   <div className="text-green-400 text-2xl font-bold mb-2">Our Service</div>
                   <div className="text-4xl font-bold text-green-400 mb-2">{section.savings.our_cost}</div>
-                  <div className="flex justify-center gap-1">
-                    <span className="text-green-400">💰</span>
+                  
+                  {/* Visual cost representation with bars */}
+                  <div className="mt-4">
+                    <div className="flex justify-center mb-2">
+                      <div className="w-full max-w-32 bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <motion.div 
+                          className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full"
+                          initial={{ width: "0%" }}
+                          whileInView={{ width: "15%" }}
+                          transition={{ delay: 0.9, duration: 1.2 }}
+                          viewport={{ once: true }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-xs text-green-300 font-mono">85% savings</span>
                   </div>
                 </motion.div>
               </div>
@@ -155,7 +190,7 @@ export default function ComparisonTable({ section }: { section: SectionType & { 
                       viewport={{ once: true }}
                     >
                       <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg p-4 relative">
-                        <Crown className="w-6 h-6 text-yellow-400 absolute -top-3 left-1/2 transform -translate-x-1/2" />
+                        <Crown className="w-6 h-6 text-purple-400 absolute -top-3 left-1/2 transform -translate-x-1/2" />
                         <div className="text-white font-bold text-lg">Our Service</div>
                         <div className="text-blue-100 text-sm">AI-Powered</div>
                       </div>

@@ -175,12 +175,12 @@ export default function ROICalculator({ section }: ROICalculatorProps) {
                   </p>
                 </div>
 
-                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
                   <div className="flex items-center gap-3 mb-2">
-                    <RiSpeedUpLine className="text-yellow-400" />
+                    <RiSpeedUpLine className="text-purple-400" />
                     <span className="text-sm text-gray-300">{t('waitingTime')}</span>
                   </div>
-                  <p className="text-2xl font-bold text-yellow-300">3-5天</p>
+                  <p className="text-2xl font-bold text-purple-300">3-5天</p>
                 </div>
               </div>
             </motion.div>

@@ -53,52 +53,69 @@ export default function TranscriptionDemo({ section }: TranscriptionDemoProps) {
   const tabs = t.raw('tabs') as Array<{
     id: string;
     title: string;
-    description: string;
-    inputDesc: string;
-    features: string[];
-    transcript: TranscriptItem[];
+    video_info: {
+      duration: string;
+      speaker: string;
+      background: string;
+      accent: string;
+    };
+    sample_text: string;
+    metrics: {
+      accuracy: string;
+      processing_time: string;
+      word_count: string;
+      confidence: string;
+    };
   }>;
 
   const demoData: DemoData[] = [
     {
       id: "english",
       title: tabs[0]?.title || "English Lecture",
-      description: tabs[0]?.description || "Technical tutorial video",
+      description: "Technical tutorial video",
       icon: RiPlayLine,
       gradient: "from-blue-500 to-purple-600",
-      inputDesc: tabs[0]?.inputDesc || "5-minute technical lecture video",
-      features: tabs[0]?.features || [],
-      transcript: tabs[0]?.transcript || []
+      inputDesc: tabs[0]?.video_info?.duration || "5-minute technical lecture video",
+      features: ["High accuracy transcription", "Technical terminology support", "Clear audio processing"],
+      transcript: [
+        { timestamp: "00:15", text: tabs[0]?.sample_text || "Welcome to this technical tutorial...", confidence: 96 }
+      ]
     },
     {
       id: "chinese",
       title: tabs[1]?.title || "Chinese Dialogue",
-      description: tabs[1]?.description || "Business meeting discussion",
+      description: "Business meeting discussion",
       icon: RiTranslate2,
       gradient: "from-green-500 to-teal-600",
-      inputDesc: tabs[1]?.inputDesc || "10-minute project discussion meeting",
-      features: tabs[1]?.features || [],
-      transcript: tabs[1]?.transcript || []
+      inputDesc: tabs[1]?.video_info?.duration || "10-minute project discussion meeting",
+      features: ["Mandarin Chinese support", "Multi-speaker detection", "Business context understanding"],
+      transcript: [
+        { timestamp: "01:22", text: tabs[1]?.sample_text || "我们来讨论一下这个项目的进展...", confidence: 94 }
+      ]
     },
     {
       id: "code",
       title: tabs[2]?.title || "Code Tutorial",
-      description: tabs[2]?.description || "Programming tutorial video",
+      description: "Programming tutorial video",
       icon: RiCodeLine,
       gradient: "from-purple-500 to-pink-600",
-      inputDesc: tabs[2]?.inputDesc || "15-minute Python programming tutorial",
-      features: tabs[2]?.features || [],
-      transcript: tabs[2]?.transcript || []
+      inputDesc: tabs[2]?.video_info?.duration || "15-minute Python programming tutorial",
+      features: ["Code syntax recognition", "Programming terminology", "Technical explanation clarity"],
+      transcript: [
+        { timestamp: "02:45", text: tabs[2]?.sample_text || "Let's define a function that handles user authentication...", confidence: 98 }
+      ]
     },
     {
       id: "meeting",
       title: tabs[3]?.title || "Multi-speaker",
-      description: tabs[3]?.description || "Team discussion meeting",
+      description: "Team discussion meeting",
       icon: RiTeamLine,
       gradient: "from-orange-500 to-red-600",
-      inputDesc: tabs[3]?.inputDesc || "20-minute multi-person discussion meeting",
-      features: tabs[3]?.features || [],
-      transcript: tabs[3]?.transcript || []
+      inputDesc: tabs[3]?.video_info?.duration || "20-minute multi-person discussion meeting",
+      features: ["Speaker identification", "Multiple voices separation", "Meeting context awareness"],
+      transcript: [
+        { timestamp: "00:30", text: tabs[3]?.sample_text || "Good morning everyone, let's start with the quarterly review...", confidence: 92 }
+      ]
     }
   ];
 

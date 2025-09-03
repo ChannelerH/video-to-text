@@ -34,9 +34,9 @@ export async function generateMetadata({
   }
 
   return {
-    title: "Video to Text Online – Paste a link or upload, free 90s preview, export SRT/TXT",
-    description: "Convert video to text instantly. Paste YouTube links or upload MP4/MOV files. Free 90-second preview, then export as SRT, TXT, VTT, DOCX, and more formats.",
-    keywords: "video to text, video transcription, YouTube to text, SRT generator, video subtitles, MP4 to text",
+    title: "V2TX - Video to Text Converter Online | Free 90s Preview, Export SRT/TXT",
+    description: "V2TX: Best video to text converter. Convert videos to text instantly with our AI-powered tool. Paste YouTube links or upload MP4/MOV files. Free 90-second preview, then export as SRT, TXT, VTT, DOCX formats.",
+    keywords: "V2TX, video to text, video to text converter, video transcription, YouTube to text, SRT generator, video subtitles, MP4 to text, video to text online, AI video transcription",
     alternates: {
       canonical: canonicalUrl,
     },
@@ -58,44 +58,30 @@ export default async function VideoToTextPage({
       {/* 1. Hero区（转换工具） */}
       {page.hero && <Hero hero={page.hero} />}
       
-      {/* 2. 使用场景展示 [新增] */}
+      {/* 2. 应用场景展示 - What can V2TX do for you */}
       <UseCases section={{ name: "use-cases", disabled: false }} />
       
-      {/* 3. 核心数据指标 */}
+      {/* 3. 核心数据展示 - 合并Stats + Why choose us，展示专业数据和优势 */}
       {page.stats && <Stats section={page.stats} />}
-      
-      {/* 4. 转写效果示例 [新增] */}
-      <TranscriptionDemo section={{ name: "transcription-demo", disabled: false }} />
-      
-      {/* 5. Why choose us */}
       {page.core_value && <Feature1 section={page.core_value} />}
       
-      {/* 6. 支持的格式和类型 [扩充] */}
-      <VideoTypes section={{ name: "video-types", disabled: false }} />
+      {/* 4. 实际效果展示 - 真实转写样本 */}
+      <TranscriptionDemo section={{ name: "transcription-demo", disabled: false }} />
       
-      {/* 7. 成本对比分析 */}
-      {page.service_matrix && <ComparisonTable section={page.service_matrix} />}
-      
-      {/* 8. 输出格式用途说明 [新增] */}
-      <OutputFormats section={{ name: "output-formats", disabled: false }} />
-      
-      {/* 9. ROI计算器 [新增] */}
+      {/* 5. 成本计算器 - ROI分析工具 */}
       <ROICalculator section={{ name: "roi-calculator", disabled: false }} />
       
-      {/* 10. 定价方案 */}
+      {/* 5.5. 支持格式 - 输入/输出格式完整展示 */}
+      <OutputFormats section={{ name: "output-formats", disabled: false }} />
+      
+      {/* 6. 定价方案 */}
       {page.pricing && <Pricing pricing={page.pricing} />}
       
-      {/* 11. 快速开始指南 [新增] */}
-      <QuickStart section={{ name: "quick-start", disabled: false }} />
+      {/* 7. FAQ + CTA */}
+      {page.faq && <FAQ section={page.faq} />}
       
-      {/* 12. Technical Specifications */}
-      <TechSpecs section={{ name: "tech-specs", disabled: false }} />
-      
-      {/* 13. FAQ */}
-      <FAQ section={{ name: "faq", disabled: false }} />
-      
-      {/* 14. CTA */}
-      {page.cta && <CTA section={page.cta} />}
+      {/* CTA temporarily disabled - will fix data structure issue */}
+      {/* <div>V2TX - Professional video to text conversion complete!</div> */}
     </>
   );
 }

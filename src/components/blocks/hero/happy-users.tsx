@@ -20,7 +20,7 @@ export default function HappyUsers() {
           {Array.from({ length: 5 }).map((_, index) => (
             <Star
               key={index}
-              className="size-5 fill-yellow-400 text-yellow-400"
+              className="size-5 fill-purple-500 text-purple-500"
             />
           ))}
         </div>

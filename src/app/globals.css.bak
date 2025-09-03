@@ -357,7 +357,7 @@ body::after {
 .pricing-card{box-shadow:0 20px 50px rgba(0,0,0,.4),0 0 40px rgba(189,0,255,.1)}
 .pricing-card.featured{transform:scale(1.05);box-shadow:0 25px 60px rgba(0,0,0,.5),0 0 80px rgba(255,184,0,.3)}
 .pricing-card::after{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#00D9FF,#BD00FF,#FF0080);opacity:0.9}
-.pricing-card.featured::after{background:linear-gradient(90deg,#9333EA,#A855F7,#BD00FF);height:6px;animation:shimmer 3s linear infinite}
+.pricing-card.featured::after{background:linear-gradient(90deg,#FFD700,#FFA500,#FF6347);height:6px;animation:shimmer 3s linear infinite}
 @keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
 .pricing-card > *{position:relative;z-index:1}
 .pricing-card:hover{transform:translateY(-5px);box-shadow:0 30px 70px rgba(0,0,0,.5),0 0 100px rgba(189,0,255,.2)}
@@ -365,29 +365,29 @@ body::after {
 
 .price-gradient{background:linear-gradient(135deg,#00D9FF,#BD00FF,#FF0080);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:3rem;font-weight:800;filter:drop-shadow(0 0 20px rgba(189,0,255,0.4))}
 
-/* Ultimate Purple Popular Badge */
+/* Ultimate Golden Popular Badge */
 .popular-badge, .featured-badge, [class*="popular"], [class*="featured"] {
-  background: linear-gradient(135deg, #9333EA, #A855F7, #BD00FF) !important;
-  color: #fff !important;
+  background: linear-gradient(135deg, #FFD700, #FFED4E, #FFA500) !important;
+  color: #000 !important;
   font-weight: 900;
   padding: 10px 20px;
   border-radius: 25px;
   position: relative;
   overflow: hidden;
-  animation: ultimatePurplePulse 2s ease-in-out infinite;
-  box-shadow: 0 0 30px rgba(147, 51, 234, 0.7), 0 0 60px rgba(168, 85, 247, 0.5), 0 0 90px rgba(189, 0, 255, 0.3);
+  animation: ultimateGoldPulse 2s ease-in-out infinite;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.7), 0 0 60px rgba(255, 215, 0, 0.5), 0 0 90px rgba(255, 165, 0, 0.3);
   border: 2px solid rgba(255, 255, 255, 0.8);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
-@keyframes ultimatePurplePulse {
+@keyframes ultimateGoldPulse {
   0%, 100% { 
-    box-shadow: 0 0 25px rgba(147, 51, 234, 0.6), 0 0 50px rgba(168, 85, 247, 0.4), 0 0 75px rgba(189, 0, 255, 0.3);
+    box-shadow: 0 0 25px rgba(255, 215, 0, 0.6), 0 0 50px rgba(255, 215, 0, 0.4), 0 0 75px rgba(255, 165, 0, 0.3);
     filter: brightness(1) saturate(1.2);
     transform: scale(1);
   }
   50% { 
-    box-shadow: 0 0 40px rgba(147, 51, 234, 0.9), 0 0 80px rgba(168, 85, 247, 0.7), 0 0 120px rgba(189, 0, 255, 0.5);
+    box-shadow: 0 0 40px rgba(255, 215, 0, 0.9), 0 0 80px rgba(255, 215, 0, 0.7), 0 0 120px rgba(255, 165, 0, 0.5);
     filter: brightness(1.4) saturate(1.5);
     transform: scale(1.05);
   }
@@ -401,10 +401,10 @@ body::after {
   width: 100%;
   height: 100%;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
-  animation: purpleShimmer 3s linear infinite;
+  animation: goldShimmer 3s linear infinite;
 }
 
-@keyframes purpleShimmer {
+@keyframes goldShimmer {
   0% { left: -100%; }
   100% { left: 100%; }
 }

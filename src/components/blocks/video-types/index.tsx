@@ -253,7 +253,7 @@ export default function VideoTypes({ section }: VideoTypesProps) {
               transition={{ duration: 0.6 }}
               className="flex items-center gap-3 mb-8"
             >
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-600 flex items-center justify-center text-white text-xl">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 flex items-center justify-center text-white text-xl">
                 <RiAlarmWarningLine className="mx-auto" />
               </div>
               <h3 className="design-heading-2">{t('limitations.title')}</h3>
@@ -273,11 +273,11 @@ export default function VideoTypes({ section }: VideoTypesProps) {
                   className="design-card group"
                 >
                   <div className="flex items-start gap-4 mb-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 flex items-center justify-center text-yellow-400 text-2xl flex-shrink-0">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-500/30 flex items-center justify-center text-orange-400 text-2xl flex-shrink-0">
                       <limitation.icon />
                     </div>
                     <div className="flex-1">
-                      <h4 className="design-heading-4 mb-2 text-yellow-300">
+                      <h4 className="design-heading-4 mb-2 text-orange-300">
                         {limitation.title}
                       </h4>
                       <p className="text-gray-400 text-sm mb-3">
