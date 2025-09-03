@@ -6,11 +6,13 @@ import Icon from "@/components/icon";
 import Link from "next/link";
 import { Section as SectionType } from "@/types/blocks/section";
 import { RiRocketLine, RiTimeLine } from "react-icons/ri";
+import { useTranslations } from "next-intl";
 
 export default function CTA({ section }: { section: SectionType }) {
   if (section.disabled) {
     return null;
   }
+  const t = useTranslations('final_cta');
 
   return (
     <section id={section.name} className="design-section">
@@ -95,7 +97,7 @@ export default function CTA({ section }: { section: SectionType }) {
             >
               <p className="text-blue-300 font-semibold flex items-center justify-center gap-2">
                 <RiTimeLine className="w-5 h-5" />
-                ⚡ Start saving time today - No setup required
+                ⚡ {t('urgency')}
               </p>
             </motion.div>
           </div>

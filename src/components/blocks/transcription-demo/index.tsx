@@ -277,11 +277,11 @@ export default function TranscriptionDemo({ section }: TranscriptionDemoProps) {
                     </div>
                   </div>
                   
-                  <div className="text-center">
+                  {/* <div className="text-center">
                     <button className="text-purple-400 hover:text-purple-300 text-sm font-semibold transition-colors">
                       {t('download_full_file')} →
                     </button>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </div>

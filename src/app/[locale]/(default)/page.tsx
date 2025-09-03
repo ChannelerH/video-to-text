@@ -12,6 +12,7 @@ import Pricing from "@/components/blocks/pricing";
 import QuickStart from "@/components/blocks/quick-start";
 import FAQ from "@/components/blocks/faq";
 import CTA from "@/components/blocks/cta";
+import { getTranslations } from "next-intl/server";
 // Added new core content modules for Video to Text functionality
 import { getLandingPage } from "@/services/page";
 import { setRequestLocale } from "next-intl/server";
@@ -51,6 +52,7 @@ export default async function VideoToTextPage({
   setRequestLocale(locale);
   
   const page = await getLandingPage(locale);
+  const t = await getTranslations();
 
   return (
     <>
@@ -76,7 +78,15 @@ export default async function VideoToTextPage({
       {page.faq && <FAQ section={page.faq} />}
 
       {/* 8. 收尾 CTA */}
-      <CTA section={{ name: "final-cta", disabled: false, title: "Ready to transcribe your first video?", description: "Start with a free 90s preview. Upgrade anytime for full features.", buttons: [{ title: "Get Started", url: "#", variant: "default"}] }} />
+      <CTA
+        section={{
+          name: "final-cta",
+          disabled: false,
+          title: t("final_cta.title"),
+          description: t("final_cta.description"),
+          buttons: [{ title: t("final_cta.get_started"), url: "#", variant: "default" }],
+        }}
+      />
     </>
   );
 }

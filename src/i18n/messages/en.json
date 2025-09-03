@@ -215,6 +215,12 @@
     "more_questions": "Have other questions? We're happy to help you",
     "contact_support": "Contact Support"
   },
+  "final_cta": {
+    "title": "Ready to transcribe your first video?",
+    "description": "Start with a free 90s preview. Upgrade anytime for full features.",
+    "get_started": "Get Started",
+    "urgency": "Start saving time today — No setup required"
+  },
   "user": {
     "sign_in": "Sign In",
     "sign_out": "Sign Out",
