@@ -92,7 +92,7 @@ export default function UseCases({ section }: UseCasesProps) {
   const useCaseCategories: UseCaseCategory[] = [
     {
       title: categories[0]?.title || "Education",
-      subtitle: "30% 的教育机构已使用",
+      subtitle: categories[0]?.subtitle || "30% of educational institutions are using",
       icon: RiGraduationCapLine,
       gradient: "from-blue-500 to-purple-600",
       cases: (categories[0]?.cases || []).map((item, index) => ({
@@ -103,7 +103,7 @@ export default function UseCases({ section }: UseCasesProps) {
     },
     {
       title: categories[1]?.title || "Content Creation",
-      subtitle: "节省 85% 制作时间",
+      subtitle: categories[1]?.subtitle || "Save 85% production time",
       icon: RiVideoLine,
       gradient: "from-purple-500 to-blue-600",
       cases: (categories[1]?.cases || []).map((item, index) => ({
@@ -114,7 +114,7 @@ export default function UseCases({ section }: UseCasesProps) {
     },
     {
       title: categories[2]?.title || "Business Use",
-      subtitle: "500+ 企业信赖之选",
+      subtitle: categories[2]?.subtitle || "Trusted by 500+ enterprises",
       icon: RiBuildingLine,
       gradient: "from-green-500 to-teal-600",
       cases: (categories[2]?.cases || []).map((item, index) => ({
@@ -125,7 +125,7 @@ export default function UseCases({ section }: UseCasesProps) {
     },
     {
       title: categories[3]?.title || "Research",
-      subtitle: "提升 60% 研究效率",
+      subtitle: categories[3]?.subtitle || "Improve 60% research efficiency",
       icon: RiSearchEyeLine,
       gradient: "from-indigo-500 to-purple-600",
       cases: (categories[3]?.cases || []).map((item, index) => ({

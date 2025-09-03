@@ -221,8 +221,8 @@ export default function TranscriptionDemo({ section }: TranscriptionDemoProps) {
                   <RiFileTextLine />
                 </div>
                 <div>
-                  <h3 className="design-heading-3 mb-1">转写结果</h3>
-                  <p className="text-gray-400">只送12秒就完成</p>
+                  <h3 className="design-heading-3 mb-1">{t('transcription_result')}</h3>
+                  <p className="text-gray-400">{t('completion_time')}</p>
                 </div>
               </div>
 
@@ -230,26 +230,26 @@ export default function TranscriptionDemo({ section }: TranscriptionDemoProps) {
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-800/40 rounded-lg p-4">
-                    <div className="text-gray-400 text-sm mb-1">输入</div>
-                    <div className="text-white font-semibold">5:23视频</div>
+                    <div className="text-gray-400 text-sm mb-1">{t('input')}</div>
+                    <div className="text-white font-semibold">{t('video_duration')}</div>
                   </div>
                   <div className="bg-gray-800/40 rounded-lg p-4">
-                    <div className="text-gray-400 text-sm mb-1">输出</div>
-                    <div className="text-white font-semibold">1,250字文稿</div>
+                    <div className="text-gray-400 text-sm mb-1">{t('output')}</div>
+                    <div className="text-white font-semibold">{t('word_count')}</div>
                   </div>
                   <div className="bg-gray-800/40 rounded-lg p-4">
-                    <div className="text-gray-400 text-sm mb-1">耗时</div>
-                    <div className="text-purple-400 font-semibold">12秒</div>
+                    <div className="text-gray-400 text-sm mb-1">{t('processing_time')}</div>
+                    <div className="text-purple-400 font-semibold">{t('seconds')}</div>
                   </div>
                   <div className="bg-gray-800/40 rounded-lg p-4">
-                    <div className="text-gray-400 text-sm mb-1">准确率</div>
+                    <div className="text-gray-400 text-sm mb-1">{t('accuracy')}</div>
                     <div className="text-purple-400 font-semibold">98%</div>
                   </div>
                 </div>
 
                 {/* 转写结果示例 */}
                 <div className="bg-gradient-to-br from-white/5 to-white/10 rounded-xl p-6">
-                  <div className="text-sm text-gray-400 mb-4">转写结果示例</div>
+                  <div className="text-sm text-gray-400 mb-4">{t('sample_result')}</div>
                   
                   <div className="bg-gray-900/50 rounded-lg p-4 font-mono text-sm mb-4 border-l-2 border-purple-500">
                     <div className="space-y-2 text-gray-300">
@@ -265,21 +265,21 @@ export default function TranscriptionDemo({ section }: TranscriptionDemoProps) {
                   <div className="grid grid-cols-3 gap-4 text-center mb-4">
                     <div>
                       <div className="text-white font-bold">SRT</div>
-                      <div className="text-xs text-gray-400">格式</div>
+                      <div className="text-xs text-gray-400">{t('format')}</div>
                     </div>
                     <div>
                       <div className="text-white font-bold">1,250</div>
-                      <div className="text-xs text-gray-400">字数</div>
+                      <div className="text-xs text-gray-400">{t('word_count_short')}</div>
                     </div>
                     <div>
                       <div className="text-purple-400 font-bold">98%</div>
-                      <div className="text-xs text-gray-400">准确率</div>
+                      <div className="text-xs text-gray-400">{t('accuracy_short')}</div>
                     </div>
                   </div>
                   
                   <div className="text-center">
                     <button className="text-purple-400 hover:text-purple-300 text-sm font-semibold transition-colors">
-                      下载完整转录文件 →
+                      {t('download_full_file')} →
                     </button>
                   </div>
                 </div>

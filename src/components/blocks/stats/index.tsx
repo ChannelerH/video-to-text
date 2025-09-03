@@ -1,10 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import Icon from "@/components/icon";
 import { Section as SectionType } from "@/types/blocks/section";
 
 export default function Stats({ section }: { section: SectionType }) {
+  const t = useTranslations('stats');
+  
   if (section.disabled) {
     return null;
   }
@@ -97,8 +100,8 @@ export default function Stats({ section }: { section: SectionType }) {
                 }}
               >↗ +12%</motion.span>
             </div>
-            <div className="text-gray-400 text-sm mb-1">今日处理</div>
-            <div className="text-xs text-gray-500">（行业平均：800）</div>
+            <div className="text-gray-400 text-sm mb-1">{t('daily_processed')}</div>
+            <div className="text-xs text-gray-500">{t('industry_average', { value: '800' })}</div>
           </motion.div>
 
           <motion.div
@@ -123,8 +126,8 @@ export default function Stats({ section }: { section: SectionType }) {
                 }}
               >🎯</motion.span>
             </div>
-            <div className="text-gray-400 text-sm mb-1">准确率</div>
-            <div className="text-xs text-gray-500">（行业领先）</div>
+            <div className="text-gray-400 text-sm mb-1">{t('accuracy_rate')}</div>
+            <div className="text-xs text-gray-500">{t('industry_leading')}</div>
           </motion.div>
 
           <motion.div
@@ -147,10 +150,10 @@ export default function Stats({ section }: { section: SectionType }) {
                   ease: "easeInOut",
                   delay: 1 
                 }}
-              >⚡ 快3倍</motion.span>
+              >⚡ {t('times_faster', { times: 3 })}</motion.span>
             </div>
-            <div className="text-gray-400 text-sm mb-1">平均速度</div>
-            <div className="text-xs text-gray-500">（竞品平均：6min）</div>
+            <div className="text-gray-400 text-sm mb-1">{t('average_speed')}</div>
+            <div className="text-xs text-gray-500">{t('competitor_average', { value: '6min' })}</div>
           </motion.div>
 
           <motion.div
@@ -175,10 +178,10 @@ export default function Stats({ section }: { section: SectionType }) {
                 }}
               >📈 +15</motion.span>
             </div>
-            <div className="text-gray-400 text-sm mb-1">在线用户</div>
+            <div className="text-gray-400 text-sm mb-1">{t('online_users')}</div>
             <div className="flex items-center justify-center gap-1">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-green-400 text-xs">实时</span>
+              <span className="text-green-400 text-xs">{t('live')}</span>
             </div>
           </motion.div>
         </div>

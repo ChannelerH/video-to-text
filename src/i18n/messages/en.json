@@ -4,6 +4,217 @@
     "description": "V2TX is the best video to text converter online. Convert videos to text instantly with AI-powered transcription. Free 90s preview, export SRT, TXT, DOCX formats.",
     "keywords": "V2TX, video to text, video transcription, video to text converter, online video transcription, AI video to text, YouTube to text"
   },
+  "stats": {
+    "daily_processed": "Daily Processed",
+    "accuracy_rate": "Accuracy Rate", 
+    "average_speed": "Average Speed",
+    "online_users": "Online Users",
+    "industry_average": "(Industry Avg: {value})",
+    "industry_leading": "(Industry Leading)",
+    "competitor_average": "(Competitor Avg: {value})",
+    "live": "Live",
+    "times_faster": "{times}x Faster"
+  },
+  "pricing": {
+    "most_popular": "POPULAR",
+    "show_less": "Show less",
+    "view_full_comparison": "View full comparison",
+    "cny_payment": "CNY Payment"
+  },
+  "transcription_demo": {
+    "title": "🎬 Real Transcription Results",
+    "description": "See how our AI accurately handles various types of video content<br />From technical lectures to business meetings, from code tutorials to group discussions",
+    "inputSection": "Input Video",
+    "videoInfo": "Video Information",
+    "transcriptionFeatures": "Transcription Features",
+    "transcriptionResults": "Transcription Results",
+    "transcription_result": "Transcription Result",
+    "completion_time": "Completed in just 12 seconds",
+    "input": "Input",
+    "output": "Output", 
+    "processing_time": "Time taken",
+    "accuracy": "Accuracy",
+    "video_duration": "5:23 Video",
+    "word_count": "1,250 words transcript",
+    "seconds": "12 seconds",
+    "sample_result": "Sample transcription result",
+    "format": "Format",
+    "word_count_short": "Words",
+    "accuracy_short": "Accuracy",
+    "download_full_file": "Download complete transcription file",
+    "tabs": [
+      {
+        "id": "english",
+        "title": "English Lecture",
+        "video_info": {
+          "duration": "5-minute technical lecture video",
+          "speaker": "Single",
+          "background": "Clean audio",
+          "accent": "American English"
+        },
+        "sample_text": "Welcome to this technical tutorial..."
+      },
+      {
+        "id": "chinese", 
+        "title": "Chinese Dialogue",
+        "video_info": {
+          "duration": "10-minute project discussion meeting",
+          "speaker": "Multiple",
+          "background": "Meeting room",
+          "accent": "Mandarin Chinese"
+        },
+        "sample_text": "我们来讨论一下这个项目的进展..."
+      },
+      {
+        "id": "code",
+        "title": "Code Tutorial", 
+        "video_info": {
+          "duration": "15-minute Python programming tutorial",
+          "speaker": "Single",
+          "background": "Screen recording",
+          "accent": "Technical English"
+        },
+        "sample_text": "Let's define a function that handles user authentication..."
+      },
+      {
+        "id": "meeting",
+        "title": "Multi-speaker",
+        "video_info": {
+          "duration": "20-minute multi-person discussion meeting",
+          "speaker": "Multiple",
+          "background": "Conference room",
+          "accent": "Mixed accents"
+        },
+        "sample_text": "Good morning everyone, let's start with the quarterly review..."
+      }
+    ]
+  },
+  "roi_calculator": {
+    "title": "💰 ROI Analysis & Cost Optimization",
+    "description": "Interactive cost-benefit analysis: Compare traditional transcription methods vs. V2TX AI solution<br />Data-driven insights for informed business decisions",
+    "monthly_demand": "Monthly demand",
+    "hours_video_transcription": "hours of video transcription",
+    "hours_min": "Minimum {hours} hours",
+    "hours_max": "Maximum {hours} hours",
+    "monthly_cost_comparison": "Monthly Cost Comparison ({hours} hours)",
+    "manual_transcription": "Manual transcription",
+    "other_tools": "Other tools",
+    "our_service": "Our service",
+    "coffee_price_comparison": "Cost equivalent to just a few cups of coffee",
+    "equivalent_to": "Equivalent to",
+    "coffee_vs_salary": "saving enough to cover a junior employee's salary",
+    "save_percent": "Save {percent}%",
+    "monthly_savings_amount": "Save ¥{amount}",
+    "per_month": "/month",
+    "yearly_total": "= ¥{amount}/year",
+    "yourNeeds": "📊 Your Requirements",
+    "monthlyHours": "Monthly transcription volume", 
+    "hours": "hours",
+    "traditionalWay": "Legacy Method",
+    "hiringCost": "Outsourcing costs",
+    "selfOrganizeTime": "Internal processing time",
+    "aboutDays": "≈ {days} work days",
+    "waitingTime": "Delivery timeline",
+    "waitingRange": "3–5 days",
+    "usingUs": "V2TX Solution",
+    "serviceCost": "Monthly subscription", 
+    "processingTime": "Processing overhead",
+    "onlyNeedCheck": "Quality assurance & fine-tuning only",
+    "getResult": "Delivery time",
+    "immediately": "Instant delivery",
+    "currency": "¥",
+    "perMonth": "/month",
+    "youWillSave": "💎 Cost Optimization Results",
+    "monthlySavings": "Monthly cost reduction",
+    "yearlySavings": "Annual savings", 
+    "roi": "ROI percentage",
+    "timeSaved": "Time efficiency gain",
+    "equivalentTo": "≈ ",
+    "workDays": " FTE days",
+    "startSavingCosts": "Optimize Costs Now"
+  },
+  "use_cases": {
+    "title": "📹 What can V2TX Video to Text do for you?",
+    "description": "From education to content creation, from business to research<br />Discover the powerful applications of video-to-text across various fields",
+    "categories": [
+      {
+        "title": "Education",
+        "subtitle": "Education",
+        "cases": [
+          {
+            "title": "Auto-generate subtitles for online courses",
+            "description": "Enhance learning experience with multilingual support"
+          },
+          {
+            "title": "Convert lecture recordings to text notes", 
+            "description": "Convenient for review and knowledge organization"
+          },
+          {
+            "title": "Add bilingual subtitles to foreign language videos",
+            "description": "Assist language learning and comprehension"
+          }
+        ]
+      },
+      {
+        "title": "Content Creation",
+        "subtitle": "Content Creation", 
+        "cases": [
+          {
+            "title": "Convert YouTube videos to blog articles",
+            "description": "One-click generation of text version content"
+          },
+          {
+            "title": "Quickly generate transcripts from podcast audio",
+            "description": "Save significant organization time"
+          },
+          {
+            "title": "Quickly locate key dialogue in video editing",
+            "description": "Improve editing efficiency"
+          }
+        ]
+      },
+      {
+        "title": "Business Use",
+        "subtitle": "Business Use",
+        "cases": [
+          {
+            "title": "Auto-generate meeting minutes from Zoom meetings",
+            "description": "Improve meeting efficiency"
+          },
+          {
+            "title": "Quickly organize customer interviews into documents",
+            "description": "Convenient for analysis and decision-making"
+          },
+          {
+            "title": "Convert training videos into training manuals",
+            "description": "Standardize training processes"
+          }
+        ]
+      },
+      {
+        "title": "Research",
+        "subtitle": "Research",
+        "cases": [
+          {
+            "title": "Transcribe interview recordings for coding analysis",
+            "description": "Essential tool for qualitative research"
+          },
+          {
+            "title": "Text-convert focus group discussion content",
+            "description": "More efficient data collection"
+          },
+          {
+            "title": "Quickly translate and transcribe multilingual content",
+            "description": "Break language barriers"
+          }
+        ]
+      }
+    ]
+  },
+  "faq": {
+    "more_questions": "Have other questions? We're happy to help you",
+    "contact_support": "Contact Support"
+  },
   "user": {
     "sign_in": "Sign In",
     "sign_out": "Sign Out",
@@ -181,692 +392,5 @@
       "continue": "CONTINUE"
     },
     "social_proof": "★★★★★ 4.8 | 1000+ conversions | 12 countries"
-  },
-  "use_cases": {
-    "title": "📹 What can V2TX Video to Text do for you?",
-    "description": "From education to content creation, from business to research<br />Discover the powerful applications of video-to-text across various fields",
-    "categories": [
-      {
-        "title": "Education",
-        "subtitle": "Education",
-        "cases": [
-          {
-            "title": "Auto-generate subtitles for online courses",
-            "description": "Enhance learning experience with multilingual support"
-          },
-          {
-            "title": "Convert lecture recordings to text notes", 
-            "description": "Convenient for review and knowledge organization"
-          },
-          {
-            "title": "Add bilingual subtitles to foreign language videos",
-            "description": "Assist language learning and comprehension"
-          }
-        ]
-      },
-      {
-        "title": "Content Creation",
-        "subtitle": "Content Creation", 
-        "cases": [
-          {
-            "title": "Convert YouTube videos to blog articles",
-            "description": "One-click generation of text version content"
-          },
-          {
-            "title": "Quickly generate transcripts from podcast audio",
-            "description": "Save significant organization time"
-          },
-          {
-            "title": "Quickly locate key dialogue in video editing",
-            "description": "Improve editing efficiency"
-          }
-        ]
-      },
-      {
-        "title": "Business Use",
-        "subtitle": "Business Use",
-        "cases": [
-          {
-            "title": "Auto-generate meeting minutes from Zoom meetings",
-            "description": "Improve meeting efficiency"
-          },
-          {
-            "title": "Quickly organize customer interviews into documents",
-            "description": "Convenient for analysis and decision-making"
-          },
-          {
-            "title": "Convert training videos into training manuals",
-            "description": "Standardize training processes"
-          }
-        ]
-      },
-      {
-        "title": "Research",
-        "subtitle": "Research",
-        "cases": [
-          {
-            "title": "Transcribe interview recordings for coding analysis",
-            "description": "Essential tool for qualitative research"
-          },
-          {
-            "title": "Text-convert focus group discussion content",
-            "description": "More efficient data collection"
-          },
-          {
-            "title": "Quickly translate and transcribe multilingual content",
-            "description": "Break language barriers"
-          }
-        ]
-      }
-    ]
-  },
-  "transcription_demo": {
-    "title": "🎬 Real Transcription Results",
-    "description": "See how our AI accurately handles various types of video content<br />From technical lectures to business meetings, from code tutorials to group discussions",
-    "inputSection": "Input Video",
-    "videoInfo": "Video Information",
-    "transcriptionFeatures": "Transcription Features",
-    "transcriptionResults": "Transcription Results", 
-    "autoGeneratedTranscript": "Auto-generated transcript with AI processing",
-    "tabs": [
-      {
-        "id": "interview",
-        "title": "Interview Dialogue",
-        "subtitle": "Interview"
-      },
-      {
-        "id": "lecture", 
-        "title": "Teaching Lecture",
-        "subtitle": "Lecture"
-      },
-      {
-        "id": "meeting",
-        "title": "Business Meeting", 
-        "subtitle": "Meeting"
-      },
-      {
-        "id": "podcast",
-        "title": "Podcast Show",
-        "subtitle": "Podcast"
-      }
-    ],
-    "content": {
-      "interview": {
-        "audio_info": "Audio source: Customer interview recording | Duration: 3:42 | Language: English",
-        "transcript": "Host: Today we have invited Mr. Johnson to share his company's experience in digital transformation.\n\nMr. Johnson: Thank you. Our company has been comprehensively promoting digital transformation since 2019, mainly focusing on three areas: first is the automation of internal processes...\n\nHost: What was the biggest challenge encountered in this process?\n\nMr. Johnson: I think the biggest challenge is actually employee acceptance. Technology itself is not the problem, the key is how to help the team adapt to new working methods.",
-        "confidence": 96
-      },
-      "lecture": {
-        "audio_info": "Audio source: University open course | Duration: 15 minutes | Language: English", 
-        "transcript": "Today we will explain the basics of neural networks in machine learning. Neural networks are computational models designed inspired by biological neural systems.\n\nThe simplest neural network contains three parts: input layer, hidden layer, and output layer. Each neuron receives input signals, processes them through activation functions, and then passes them to the next layer...\n\nThe backpropagation algorithm is the core algorithm for training neural networks, which adjusts the weight parameters in the network by calculating gradients.",
-        "confidence": 98
-      },
-      "meeting": {
-        "audio_info": "Audio source: Online meeting recording | Duration: 45 minutes | Language: English",
-        "transcript": "Manager Zhang: Hello everyone, today's meeting mainly discusses Q4 marketing strategy. Please have each department report on the current progress.\n\nMarketing Manager Wang: We have completed competitive analysis and found that main competitors invest heavily in social media marketing...\n\nSales Manager Li: From sales data, the online channel conversion rate is 15% higher than expected, suggesting we should increase digital marketing investment.",
-        "confidence": 94
-      },
-      "podcast": {
-        "audio_info": "Audio source: Tech podcast | Duration: 28 minutes | Language: English",
-        "transcript": "Host: Welcome to this episode of Tech Frontier, I'm host Wang. Today we're talking about the latest applications of artificial intelligence in healthcare.\n\nGuest: Hello everyone, I'm a product manager from a medical AI company. We recently launched a medical imaging diagnosis system based on deep learning...\n\nHost: What's the accuracy rate of this system? How does it perform in actual clinical applications?",
-        "confidence": 97
-      }
-    }
-  },
-  "video_types": {
-    "title": "📹 Supported Video Types",
-    "description": "Understand our transcription capabilities for different video types<br />And factors that may affect accuracy with solutions",
-    "supported_types": {
-      "title": "✅ Perfectly Supported Video Types",
-      "types": [
-        {
-          "title": "Online courses, educational videos",
-          "description": "Clear pronunciation, structured content", 
-          "accuracy": 98
-        },
-        {
-          "title": "Podcasts, interview programs",
-          "description": "Clear audio, natural dialogue",
-          "accuracy": 96
-        },
-        {
-          "title": "Meeting recordings, webinars",
-          "description": "Business dialogue, professional terminology",
-          "accuracy": 95
-        },
-        {
-          "title": "News, documentaries", 
-          "description": "Standard language, clear narration",
-          "accuracy": 97
-        },
-        {
-          "title": "Single-speaker presentations, TED talks",
-          "description": "Presentation style, clear thinking",
-          "accuracy": 98
-        },
-        {
-          "title": "Vlogs, personal sharing",
-          "description": "Casual conversation, relaxed tone", 
-          "accuracy": 92
-        }
-      ]
-    },
-    "limitations": {
-      "title": "⚠️ Factors That May Affect Accuracy",
-      "factors": [
-        {
-          "title": "Loud background music",
-          "impact": "Audio mixing interferes with recognition",
-          "accuracyLoss": 20,
-          "solution": "Suggest noise reduction or choosing sections with less music"
-        },
-        {
-          "title": "Multiple people speaking simultaneously",
-          "impact": "Overlapping voices difficult to separate",
-          "accuracyLoss": 30,
-          "solution": "AI will try to identify the main speaker"
-        },
-        {
-          "title": "Strong accents or dialects",
-          "impact": "Pronunciation deviation affects recognition", 
-          "accuracyLoss": 25,
-          "solution": "Support dialect dictionaries, continuous optimization"
-        },
-        {
-          "title": "Dense professional terminology",
-          "impact": "Lower recognition rate for specialized vocabulary",
-          "accuracyLoss": 15,
-          "solution": "Can be improved through custom vocabulary lists"
-        }
-      ]
-    },
-    "accuracyLabel": "accuracy",
-    "solutionLabel": "Solution",
-    "accuracyImpactLabel": "Accuracy Impact",
-    "accuracyNote": {
-      "title": "Accuracy Note",
-      "description": "Even under difficult conditions, our AI maintains a high baseline accuracy. The system automatically detects audio quality and provides confidence scores to help you judge the reliability of transcription results. For important content, we recommend using clear audio sources for best results."
-    }
-  },
-  "output_formats": {
-    "title": "📄 Export Formats and Their Uses",
-    "description": "Multiple professional formats for different needs<br />From video production to document editing, from API integration to data analysis",
-    "categories": [
-      {
-        "title": "Subtitle Formats",
-        "subtitle": "Subtitle Formats",
-        "description": "For video production and publishing",
-        "formats": [
-          {
-            "name": "SRT",
-            "description": "Universal subtitle format",
-            "features": ["Precise timeline", "Multi-language support", "High compatibility"],
-            "platforms": ["YouTube", "Vimeo", "Bilibili", "iQiyi"],
-            "tip": "Most common subtitle format, supported by almost all players"
-          },
-          {
-            "name": "VTT", 
-            "description": "Web video subtitles",
-            "features": ["HTML5 native support", "Customizable styles", "Interactive features"],
-            "platforms": ["Web players", "HTML5 video", "Online course platforms"],
-            "tip": "Preferred format for web videos, supports rich styling"
-          },
-          {
-            "name": "ASS",
-            "description": "Advanced subtitle format",
-            "features": ["Rich styles", "Effects support", "Multi-track"],
-            "platforms": ["Aegisub", "PotPlayer", "VLC"],
-            "tip": "Suitable for professional video production requiring complex styles and effects"
-          }
-        ]
-      },
-      {
-        "title": "Document Formats",
-        "subtitle": "Document Formats", 
-        "description": "For editing and sharing",
-        "formats": [
-          {
-            "name": "DOCX",
-            "description": "Word document", 
-            "features": ["Format preservation", "Editable", "Comment support"],
-            "platforms": ["Microsoft Word", "WPS", "Google Docs"],
-            "tip": "Convenient for further editing and formatting, supports inserting images and tables"
-          },
-          {
-            "name": "PDF",
-            "description": "Portable document",
-            "features": ["Fixed format", "Easy sharing", "Print friendly"],
-            "platforms": ["All devices", "Online preview", "Printers"],
-            "tip": "Suitable for formal documents and reports, ensures consistent display across devices"
-          },
-          {
-            "name": "TXT",
-            "description": "Plain text",
-            "features": ["Small size", "High compatibility", "Fast loading"],
-            "platforms": ["All text editors", "Code editors"],
-            "tip": "Most concise format, suitable for further processing and analysis"
-          }
-        ]
-      },
-      {
-        "title": "Data Formats",
-        "subtitle": "Data Formats",
-        "description": "For analysis and processing",
-        "formats": [
-          {
-            "name": "JSON",
-            "description": "Structured data",
-            "features": ["Timestamps", "Confidence scores", "Speaker identification"],
-            "platforms": ["API integration", "Data analysis tools", "Programming"],
-            "tip": "Contains complete metadata information, suitable for secondary development and data analysis"
-          },
-          {
-            "name": "CSV",
-            "description": "Tabular data", 
-            "features": ["Excel compatible", "Statistical analysis", "Batch processing"],
-            "platforms": ["Excel", "Google Sheets", "Data analysis software"],
-            "tip": "Convenient for statistical analysis and batch data processing"
-          },
-          {
-            "name": "XML",
-            "description": "Markup language",
-            "features": ["Clear structure", "Custom tags", "Validation support"],
-            "platforms": ["Professional software", "System integration", "Data exchange"],
-            "tip": "Suitable for enterprise-level system integration and complex data exchange needs"
-          }
-        ]
-      }
-    ]
-  },
-  "roi_calculator": {
-    "title": "💰 ROI Analysis & Cost Optimization",
-    "description": "Interactive cost-benefit analysis: Compare traditional transcription methods vs. V2TX AI solution<br />Data-driven insights for informed business decisions",
-    "yourNeeds": "📊 Your Requirements",
-    "monthlyHours": "Monthly transcription volume", 
-    "hours": "hours",
-    "traditionalWay": "Legacy Method",
-    "hiringCost": "Outsourcing costs",
-    "selfOrganizeTime": "Internal processing time",
-    "aboutDays": "≈ {days} work days",
-    "waitingTime": "Delivery timeline",
-    "waitingRange": "3–5 days",
-    "usingUs": "V2TX Solution",
-    "serviceCost": "Monthly subscription", 
-    "processingTime": "Processing overhead",
-    "onlyNeedCheck": "Quality assurance & fine-tuning only",
-    "getResult": "Delivery time",
-    "immediately": "Instant delivery",
-    "currency": "¥",
-    "perMonth": "/month",
-    "youWillSave": "💎 Cost Optimization Results",
-    "monthlySavings": "Monthly cost reduction",
-    "yearlySavings": "Annual savings", 
-    "roi": "ROI percentage",
-    "timeSaved": "Time efficiency gain",
-    "equivalentTo": "≈ ",
-    "workDays": " FTE days",
-    "startSavingCosts": "Optimize Costs Now"
-  },
-  "quick_start": {
-    "title": "🚀 Get Started in 30 Seconds",
-    "description": "No complex setup required, complete video-to-text in 4 simple steps<br />From upload to download, the entire process is simple and efficient",
-    "steps": [
-      {
-        "title": "Upload Video",
-        "description": "Drag files or paste links",
-        "details": [
-          "Support MP4, MOV, AVI, WMV and other formats",
-          "Or paste YouTube, Vimeo links directly",
-          "Maximum file size 2GB"
-        ]
-      },
-      {
-        "title": "Select Language (Optional)",
-        "description": "Auto-detect or manual selection",
-        "details": [
-          "AI auto-detects most languages",
-          "Support over 50 languages",
-          "Can improve accuracy with manual selection"
-        ]
-      },
-      {
-        "title": "Click Transcribe",
-        "description": "View progress in real-time", 
-        "details": [
-          "Real-time progress display",
-          "Processing time depends on video length",
-          "Usually completes in 1/10 of video duration"
-        ]
-      },
-      {
-        "title": "Download Results", 
-        "description": "Choose your preferred format",
-        "details": [
-          "Support SRT, VTT, TXT, DOCX formats",
-          "One-click copy to clipboard",
-          "Batch download multiple formats"
-        ]
-      }
-    ],
-    "tips": {
-      "title": "💡 Professional Tips",
-      "list": [
-        {
-          "title": "Clearer video, higher accuracy",
-          "description": "Recommend using high-quality audio source, avoid background noise interference"
-        },
-        {
-          "title": "Can test with free quota first",
-          "description": "90-second free preview, purchase full service when satisfied"
-        },
-        {
-          "title": "Batch processing saves more time",
-          "description": "Support simultaneous upload of multiple files, batch transcription more efficient"
-        },
-        {
-          "title": "Multi-user collaboration feature",
-          "description": "Support team project sharing, collaborative editing of transcription results"
-        }
-      ]
-    },
-    "cta_section": {
-      "title": "Ready to Get Started?",
-      "description": "Join thousands of users who are already using our service<br />Experience the efficiency of AI-powered video transcription",
-      "upload_btn": "Upload Video Now",
-      "demo_btn": "View Demo",
-      "features": [
-        { "label": "Free 90s preview" },
-        { "label": "Multiple export formats" },
-        { "label": "Lightning fast processing" }
-      ]
-    }
-  },
-  "use_cases": {
-    "title": "🎯 Perfect for Your Workflow",
-    "description": "From content creators to enterprise teams, V2TX adapts to your specific needs<br />Discover how professionals save hours daily with our AI-powered transcription",
-    "categories": [
-      {
-        "title": "Content Creation",
-        "description": "Perfect for creators who need accurate transcriptions fast",
-        "use_cases": [
-          {
-            "title": "YouTube Videos",
-            "description": "Auto-generate subtitles and transcripts from video URLs",
-            "accuracy": 96,
-            "time_saved": "90% faster than manual typing"
-          },
-          {
-            "title": "Podcast Episodes", 
-            "description": "Convert long-form audio to searchable text",
-            "accuracy": 94,
-            "time_saved": "5 hours per episode"
-          },
-          {
-            "title": "Social Media Content",
-            "description": "Transform videos into engaging text posts and captions",
-            "accuracy": 97,
-            "time_saved": "Create 10 posts from 1 video"
-          }
-        ]
-      },
-      {
-        "title": "Business & Enterprise",
-        "description": "Scale your operations with professional-grade transcription",
-        "use_cases": [
-          {
-            "title": "Meeting Minutes",
-            "description": "Never miss important decisions again",
-            "accuracy": 95,
-            "time_saved": "2 hours per meeting"
-          },
-          {
-            "title": "Interview Transcripts",
-            "description": "Focus on the conversation, not note-taking",
-            "accuracy": 97,
-            "time_saved": "4x faster than manual transcription"
-          },
-          {
-            "title": "Training Materials",
-            "description": "Make corporate training searchable and accessible",
-            "accuracy": 96,
-            "time_saved": "Instant searchability"
-          }
-        ]
-      },
-      {
-        "title": "Education & Research",
-        "description": "Enhanced learning through accessible content transformation",
-        "use_cases": [
-          {
-            "title": "Lecture Recordings",
-            "description": "Convert university lectures to study notes instantly",
-            "accuracy": 98,
-            "time_saved": "3 hours of note-taking per lecture"
-          },
-          {
-            "title": "Research Interviews",
-            "description": "Transform qualitative data into analyzable text",
-            "accuracy": 96,
-            "time_saved": "10x faster than manual transcription"
-          },
-          {
-            "title": "Language Learning",
-            "description": "Create bilingual subtitles for foreign content",
-            "accuracy": 94,
-            "time_saved": "Instant language comprehension aid"
-          }
-        ]
-      },
-      {
-        "title": "Media & Journalism",
-        "description": "Professional newsroom efficiency with enterprise-grade accuracy",
-        "use_cases": [
-          {
-            "title": "Press Conferences",
-            "description": "Get instant quotes and soundbites from live events",
-            "accuracy": 97,
-            "time_saved": "Publish stories 3x faster"
-          },
-          {
-            "title": "Documentary Footage",
-            "description": "Search through hours of raw footage instantly",
-            "accuracy": 95,
-            "time_saved": "Find key moments in seconds"
-          },
-          {
-            "title": "Broadcast News",
-            "description": "Archive and search TV/radio content efficiently",
-            "accuracy": 96,
-            "time_saved": "Instant content discovery"
-          }
-        ]
-      },
-      {
-        "title": "Developer & Tech",
-        "description": "Technical content processing with specialized accuracy",
-        "use_cases": [
-          {
-            "title": "Code Reviews",
-            "description": "Transcribe technical discussions and walkthroughs",
-            "accuracy": 93,
-            "time_saved": "Searchable technical knowledge base"
-          },
-          {
-            "title": "Conference Talks",
-            "description": "Convert tech talks into documentation",
-            "accuracy": 96,
-            "time_saved": "5x faster than manual notes"
-          },
-          {
-            "title": "API Documentation",
-            "description": "Transform video tutorials into written guides",
-            "accuracy": 95,
-            "time_saved": "Comprehensive docs in minutes"
-          }
-        ]
-      },
-      {
-        "title": "Legal & Compliance",
-        "description": "Secure, accurate transcription for legal professionals",
-        "use_cases": [
-          {
-            "title": "Depositions",
-            "description": "Professional-grade accuracy for legal proceedings",
-            "accuracy": 99,
-            "time_saved": "24-hour turnaround vs 7 days"
-          },
-          {
-            "title": "Client Consultations",
-            "description": "Secure transcription with confidentiality guaranteed",
-            "accuracy": 98,
-            "time_saved": "Focus on client, not note-taking"
-          },
-          {
-            "title": "Compliance Training",
-            "description": "Create searchable compliance documentation",
-            "accuracy": 97,
-            "time_saved": "Instant policy reference guide"
-          }
-        ]
-      }
-    ]
-  },
-  "transcription_demo": {
-    "title": "🎬 Real Results Showcase",
-    "description": "See V2TX in action with actual transcription samples<br />Compare accuracy, speed, and output quality across different content types",
-    "tabs": [
-      {
-        "id": "english",
-        "title": "English TED Talk",
-        "video_info": {
-          "duration": "5:23",
-          "speaker": "Single",
-          "background": "Clean audio",
-          "accent": "American English"
-        },
-        "sample_text": "In the age of artificial intelligence, we must ask ourselves fundamental questions about the nature of human creativity and technological innovation...",
-        "metrics": {
-          "accuracy": "98.5%",
-          "processing_time": "32 seconds",
-          "word_count": "1,247 words",
-          "confidence": "96.3%"
-        }
-      },
-      {
-        "id": "chinese",
-        "title": "Chinese Meeting",
-        "video_info": {
-          "duration": "12:40", 
-          "speaker": "Multiple",
-          "background": "Office environment",
-          "accent": "Standard Mandarin"
-        },
-        "sample_text": "本次会议主要围绕产品路线图和市场策略展开讨论，我们需要在下个季度实现关键里程碑...",
-        "metrics": {
-          "accuracy": "95.2%",
-          "processing_time": "1min 15s",
-          "word_count": "2,180 characters",
-          "confidence": "93.7%"
-        }
-      },
-      {
-        "id": "japanese",
-        "title": "Japanese Interview",
-        "video_info": {
-          "duration": "8:15",
-          "speaker": "Two speakers",
-          "background": "Studio quality",
-          "accent": "Tokyo dialect"
-        },
-        "sample_text": "この技術革新により、我々は新しい市場機会を見出すことができると確信しています...",
-        "metrics": {
-          "accuracy": "92.8%",
-          "processing_time": "48 seconds", 
-          "word_count": "985 characters",
-          "confidence": "91.4%"
-        }
-      }
-    ],
-    "inputSection": "📹 Video Input",
-    "videoInfo": "Video Information",
-    "transcriptionFeatures": "✨ AI Processing Features",
-    "transcriptionResults": "📄 Transcription Results", 
-    "autoGeneratedTranscript": "AI-generated transcript with timestamps",
-    "confidence": "Confidence"
-  },
-  "video_types": {
-    "title": "📹 Video Type Compatibility",
-    "description": "Optimized for different content types with specialized processing<br />See which formats work best for your specific use case",
-    "supported_types": {
-      "title": "✅ Optimized Content Types",
-      "types": [
-        {
-          "title": "Educational Videos & Online Courses",
-          "description": "Clear speech, structured content",
-          "accuracy": 98
-        },
-        {
-          "title": "Podcasts & Interview Shows", 
-          "description": "Natural dialogue, conversational flow",
-          "accuracy": 96
-        },
-        {
-          "title": "Business Meetings & Webinars",
-          "description": "Professional terminology, multiple speakers",
-          "accuracy": 95
-        },
-        {
-          "title": "News & Documentaries",
-          "description": "Standard pronunciation, clear narration",
-          "accuracy": 97
-        },
-        {
-          "title": "Presentations & TED Talks",
-          "description": "Single speaker, clear delivery",
-          "accuracy": 98
-        },
-        {
-          "title": "Vlogs & Personal Content",
-          "description": "Casual conversation, relaxed tone",
-          "accuracy": 92
-        }
-      ]
-    },
-    "limitations": {
-      "title": "⚠️ Challenging Scenarios", 
-      "factors": [
-        {
-          "title": "Heavy Background Music",
-          "impact": "Audio mixing interferes with speech recognition",
-          "accuracyLoss": 20,
-          "solution": "Use audio tracks with clear vocal separation"
-        },
-        {
-          "title": "Multiple Overlapping Speakers",
-          "impact": "Simultaneous speech is difficult to separate",
-          "accuracyLoss": 30,
-          "solution": "Works better with turn-based conversations"
-        },
-        {
-          "title": "Strong Accents or Dialects",
-          "impact": "Pronunciation variations affect accuracy",
-          "accuracyLoss": 25,
-          "solution": "Standard accent training improves results"
-        },
-        {
-          "title": "Technical Jargon Heavy Content",
-          "impact": "Specialized vocabulary may not be recognized",
-          "accuracyLoss": 15,
-          "solution": "Custom vocabulary lists available in Pro"
-        }
-      ]
-    },
-    "accuracyLabel": "accuracy",
-    "solutionLabel": "Solution",
-    "accuracyImpactLabel": "Accuracy Impact",
-    "accuracyNote": {
-      "title": "📊 Accuracy Expectations",
-      "description": "These percentages represent typical performance. Actual results may vary based on audio quality, speaker clarity, and content complexity. Pro users can improve accuracy with custom vocabulary and noise reduction features."
-    }
   }
 }

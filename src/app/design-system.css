@@ -7,6 +7,7 @@
   --space-2: 16px;  /* sm */
   --space-3: 24px;  /* md */
   --space-4: 32px;  /* lg */
+  --space-5: 40px;  /* xl- */
   --space-6: 48px;  /* xl */
   --space-8: 64px;  /* 2xl */
   --space-12: 96px; /* 3xl */
@@ -116,6 +117,8 @@
   box-shadow: 0 10px 30px rgba(0,0,0,0.2);
   background: rgba(55,65,81,0.6);
   border: 1px solid rgba(75,85,99,0.4);
+  /* Allow featured card badges to escape the card bounds */
+  overflow: visible;
 }
 
 .design-card.featured::before {
@@ -211,11 +214,11 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-2) var(--space-5);
+  padding: var(--space-2) var(--space-6);
   background: var(--primary-gradient);
   color: #ffffff !important;
-  font-weight: 800;
-  font-size: 1.2rem;
+  font-weight: 700;
+  font-size: 1rem;
   border: none;
   box-shadow: 0 8px 32px rgba(147, 51, 234, 0.4), 0 0 24px rgba(59, 130, 246, 0.3);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
@@ -284,6 +287,18 @@
   border-color: rgba(0,217,255,0.8);
   transform: translateY(-2px);
   box-shadow: 0 10px 30px rgba(0,217,255,0.3);
+}
+
+/* ===== Hero CTA scoped tweaks ===== */
+/* Make hero buttons a bit slimmer without affecting other CTAs */
+.hero-cta-group .design-btn-primary,
+.hero-cta-group .design-btn-secondary {
+  font-size: 1rem;           /* smaller than global 1.2rem */
+  padding: 10px 20px;        /* slimmer than global 16px 40px */
+}
+
+.hero-cta-group .design-btn-primary:hover {
+  transform: translateY(-3px) scale(1.05);
 }
 
 /* ===== 统一网格系统 ===== */

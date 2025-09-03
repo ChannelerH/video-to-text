@@ -4,6 +4,7 @@ import { Check, Loader } from "lucide-react";
 import { PricingItem, Pricing as PricingType } from "@/types/blocks/pricing";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import { useAppContext } from "@/contexts/app";
 import { useLocale } from "next-intl";
 
 export default function Pricing({ pricing }: { pricing: PricingType }) {
+  const t = useTranslations('pricing');
+  
   if (pricing.disabled) {
     return null;
   }
@@ -96,7 +99,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
   }, [pricing.items]);
 
   return (
-    <section id={pricing.name} className="design-section">
+    <section id={pricing.name} className="design-section" style={{ overflow: 'visible' }}>
       <div className="container">
         <div className="text-center mb-16">
           <h2 className="design-heading-2">
@@ -147,7 +150,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
               </RadioGroup>
             </div>
           )}
-          <div className="design-grid design-grid-3 w-full">
+          <div className="design-grid design-grid-3 w-full overflow-visible pt-8">
             {pricing.items?.map((item, index) => {
               if (item.group && item.group !== group) {
                 return null;
@@ -156,16 +159,16 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
               return (
                 <div
                   key={index}
-                  className={`design-card relative overflow-visible ${item.is_featured ? 'featured transform scale-110 z-10 shadow-2xl shadow-purple-500/40 ring-4 ring-purple-400/60 ring-offset-4 ring-offset-gray-900 bg-gradient-to-br from-purple-500/10 to-blue-500/10 animate-pulse' : 'scale-95 opacity-90'}`}
+                  className={`design-card relative overflow-visible text-left ${item.is_featured ? 'featured transform scale-110 z-10 shadow-2xl shadow-purple-500/40 ring-4 ring-purple-400/60 ring-offset-4 ring-offset-gray-900 bg-gradient-to-br from-purple-500/10 to-blue-500/10 animate-pulse' : 'scale-95 opacity-90'}`}
                   style={item.is_featured ? {
                     filter: 'drop-shadow(0 0 20px rgba(147, 51, 234, 0.4)) drop-shadow(0 0 40px rgba(79, 70, 229, 0.3))',
                     animation: 'glow 2s ease-in-out infinite alternate'
                   } : {}}
                 >
                   {item.is_featured && (
-                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                      <div className="design-badge premium px-6 py-3 text-lg font-black tracking-wide bg-gradient-to-r from-purple-500 to-blue-500 shadow-lg">
-                        🔥 MOST POPULAR 🔥
+                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10">
+                      <div className="px-3 py-1 text-xs font-bold bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-full shadow-lg whitespace-nowrap">
+                        🔥 {t('most_popular')} 🔥
                       </div>
                     </div>
                   )}
@@ -180,7 +183,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                         )}
                         <div className="flex-1"></div>
                         {item.label && (
-                          <div className={`design-badge ${item.is_featured ? 'featured' : ''}`}>
+                          <div className={`design-badge px-4 py-2 text-xs font-medium whitespace-nowrap ${item.is_featured ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 border border-purple-500/30' : ''}`}>
                             {item.label}
                           </div>
                         )}
@@ -203,12 +206,12 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                         )}
                       </div>
                       {item.description && (
-                        <p className="text-muted-foreground">
+                        <p className="text-muted-foreground text-sm leading-relaxed mt-2">
                           {item.description}
                         </p>
                       )}
                       {item.features_title && (
-                        <p className="mb-3 mt-6 font-semibold">
+                        <p className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           {item.features_title}
                         </p>
                       )}
@@ -226,7 +229,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                               className="text-sm font-semibold mt-2 text-purple-300 hover:text-purple-200"
                               onClick={() => setExpanded(prev => ({ ...prev, [item.product_id]: !prev[item.product_id] }))}
                             >
-                              {expanded[item.product_id] ? 'Show less' : 'View full comparison'}
+                              {expanded[item.product_id] ? t('show_less') : t('view_full_comparison')}
                             </button>
                           )}
                         </>
@@ -235,7 +238,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                     <div className="flex flex-col gap-2">
                       {item.cn_amount && item.cn_amount > 0 ? (
                         <div className="flex items-center gap-x-2 mt-2">
-                          <span className="text-sm">人民币支付 👉</span>
+                          <span className="text-sm">{t('cny_payment')} 👉</span>
                           <div
                             className="inline-block p-2 hover:cursor-pointer hover:bg-base-200 rounded-md"
                             onClick={() => {
@@ -255,7 +258,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                       ) : null}
                       {item.button && (
                         <button
-                          className={`w-full ${item.is_featured ? 'design-btn-primary text-xl py-4 font-bold bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30' : 'design-btn-primary'}`}
+                          className={`${item.is_featured ? 'design-btn-primary px-8 py-3 font-bold bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30' : 'design-btn-primary'} w-full sm:w-auto mx-auto`}
                           disabled={isLoading}
                           onClick={() => {
                             if (isLoading) {

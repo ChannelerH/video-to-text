@@ -72,7 +72,7 @@ export default function Hero({ hero }: { hero: HeroType }) {
             )}
             
             {hero.buttons && (
-              <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
+              <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row hero-cta-group">
                 {hero.buttons.map((item, i) => {
                   const isPrimary = item.variant === "default" || !item.variant;
                   return (

@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Section as SectionType } from "@/types/blocks/section";
 import { RiAddLine, RiSubtractLine, RiQuestionLine } from "react-icons/ri";
 
 export default function FAQ({ section }: { section: SectionType }) {
-  const [openItems, setOpenItems] = useState<Set<number>>(new Set()); // 全部默认收起
+  const t = useTranslations('faq');
+  const [openItems, setOpenItems] = useState<Set<number>>(new Set());
 
   if (section.disabled) {
     return null;
@@ -113,10 +115,10 @@ export default function FAQ({ section }: { section: SectionType }) {
           viewport={{ once: true }}
         >
           <p className="text-muted-foreground mb-4">
-            还有其他问题？我们很乐意帮助您
+            {t('more_questions')}
           </p>
           <button className="design-btn-secondary">
-            联系客服
+            {t('contact_support')}
           </button>
         </motion.div>
       </div>

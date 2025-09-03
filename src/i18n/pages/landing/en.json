@@ -34,7 +34,6 @@
     "description": "🎁 Free 10 mins daily - No credit card • ⚡ Powered by OpenAI Whisper",
     "show_tool": true,
     "tool_mode": "video",
-    "tip": "Processed 1,234 videos today",
     "announcement": {
       "label": "⚡ AI Powered",
       "title": "Powered by OpenAI Whisper V3",
@@ -231,7 +230,6 @@
         "unit": "Forever",
         "description": "Perfect for trying out",
         "is_featured": false,
-        "label": "🔥 Most Popular",
         "features_title": "Basic Features",
         "features": [
           "10 min/day",
@@ -242,7 +240,7 @@
         ],
         "not_included": [],
         "button": {
-          "title": "Start Free",
+          "title": "Get Started Free",
           "url": "#"
         },
         "tip": "Best for personal/occasional use"
@@ -264,10 +262,9 @@
         ],
         "not_included": [],
         "button": {
-          "title": "Go Pro",
+          "title": "Upgrade to Pro",
           "url": "#"
         },
-        "label": "Most chosen",
         "tip": "Recommended",
         "is_featured": true
       },

@@ -4,6 +4,163 @@
     "description": "V2TX 是最好的视频转文字在线工具。AI驱动的视频转录，即时将视频转换为文本。免费90秒预览，支持导出SRT、TXT、DOCX格式。",
     "keywords": "V2TX, 视频转文字, 视频转录, 视频转文字工具, 在线视频转录, AI视频转文字, YouTube转文字"
   },
+  "stats": {
+    "daily_processed": "今日处理",
+    "accuracy_rate": "准确率", 
+    "average_speed": "平均速度",
+    "online_users": "在线用户",
+    "industry_average": "（行业平均：{value}）",
+    "industry_leading": "（行业领先）",
+    "competitor_average": "（竞品平均：{value}）",
+    "live": "实时",
+    "times_faster": "快{times}倍"
+  },
+  "pricing": {
+    "most_popular": "热门",
+    "show_less": "收起",
+    "view_full_comparison": "查看完整对比", 
+    "cny_payment": "人民币支付"
+  },
+  "transcription_demo": {
+    "title": "🎬 真实转写效果展示",
+    "description": "看看我们的AI如何准确处理各种类型的视频内容<br />从技术讲座到商务会议，从编程教程到多人讨论",
+    "inputSection": "输入视频",
+    "videoInfo": "视频信息",
+    "transcriptionFeatures": "转写特性",
+    "transcriptionResults": "转写结果",
+    "transcription_result": "转写结果",
+    "completion_time": "只需12秒就完成",
+    "input": "输入",
+    "output": "输出", 
+    "processing_time": "耗时",
+    "accuracy": "准确率",
+    "video_duration": "5:23视频",
+    "word_count": "1,250字文稿",
+    "seconds": "12秒",
+    "sample_result": "转写结果示例",
+    "format": "格式",
+    "word_count_short": "字数",
+    "accuracy_short": "准确率",
+    "download_full_file": "下载完整转录文件",
+    "tabs": [
+      {
+        "id": "english",
+        "title": "英语讲座",
+        "video_info": {
+          "duration": "5分钟技术讲座视频",
+          "speaker": "单人",
+          "background": "清晰音频",
+          "accent": "美式英语"
+        },
+        "sample_text": "欢迎来到今天的技术教程..."
+      },
+      {
+        "id": "chinese", 
+        "title": "中文对话",
+        "video_info": {
+          "duration": "10分钟项目讨论会议",
+          "speaker": "多人",
+          "background": "会议室",
+          "accent": "普通话"
+        },
+        "sample_text": "我们来讨论一下这个项目的进展..."
+      },
+      {
+        "id": "code",
+        "title": "编程教程", 
+        "video_info": {
+          "duration": "15分钟Python编程教程",
+          "speaker": "单人",
+          "background": "屏幕录制",
+          "accent": "技术英语"
+        },
+        "sample_text": "让我们定义一个处理用户认证的函数..."
+      },
+      {
+        "id": "meeting",
+        "title": "多人会议",
+        "video_info": {
+          "duration": "20分钟多人讨论会议",
+          "speaker": "多人",
+          "background": "会议室",
+          "accent": "多种口音"
+        },
+        "sample_text": "大家早上好，让我们从季度回顾开始..."
+      }
+    ]
+  },
+  "roi_calculator": {
+    "title": "💰 ROI分析和成本优化",
+    "description": "交互式成本效益分析：比较传统转录方法与V2TX AI解决方案<br />基于数据的洞察，助您做出明智的商业决策",
+    "monthly_demand": "您的月需求",
+    "hours_video_transcription": "小时视频转写",
+    "hours_min": "最少{hours}小时",
+    "hours_max": "最多{hours}小时",
+    "monthly_cost_comparison": "月度成本对比（{hours}小时）",
+    "manual_transcription": "人工转写",
+    "other_tools": "其他工具",
+    "our_service": "我们服务",
+    "coffee_price_comparison": "每月只需一杯咖啡的价格",
+    "equivalent_to": "相当于",
+    "coffee_vs_salary": "节省成本足够支付一名初级员工的工资",
+    "save_percent": "节省{percent}%",
+    "monthly_savings_amount": "节省 ¥{amount}",
+    "per_month": "/月",
+    "yearly_total": "= ¥{amount}/年",
+    "yourNeeds": "📊 您的需求",
+    "monthlyHours": "月转录量", 
+    "hours": "小时",
+    "traditionalWay": "传统方式",
+    "hiringCost": "外包成本",
+    "selfOrganizeTime": "内部处理时间",
+    "aboutDays": "≈ {days} 工作日",
+    "waitingTime": "交付时间",
+    "waitingRange": "3–5 天",
+    "usingUs": "V2TX 解决方案",
+    "serviceCost": "月订阅费", 
+    "processingTime": "处理开销",
+    "onlyNeedCheck": "仅需质量保证和微调",
+    "getResult": "交付时间",
+    "immediately": "即时交付",
+    "currency": "¥",
+    "perMonth": "/月",
+    "youWillSave": "💎 成本优化结果",
+    "monthlySavings": "月度成本节省",
+    "yearlySavings": "年度节省", 
+    "roi": "ROI 百分比",
+    "timeSaved": "时间效率提升",
+    "equivalentTo": "≈ ",
+    "workDays": " 全职工作日",
+    "startSavingCosts": "立即开始节省成本"
+  },
+  "use_cases": {
+    "categories": [
+      {
+        "title": "教育",
+        "subtitle": "30% 的教育机构已使用",
+        "cases": []
+      },
+      {
+        "title": "内容创作",
+        "subtitle": "节省 85% 制作时间", 
+        "cases": []
+      },
+      {
+        "title": "商业用途",
+        "subtitle": "500+ 企业信赖之选",
+        "cases": []
+      },
+      {
+        "title": "研究",
+        "subtitle": "提升 60% 研究效率",
+        "cases": []
+      }
+    ]
+  },
+  "faq": {
+    "more_questions": "还有其他问题？我们很乐意帮助您",
+    "contact_support": "联系客服"
+  },
   "user": {
     "sign_in": "登录",
     "sign_out": "退出登录",

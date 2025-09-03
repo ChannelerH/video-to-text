@@ -33,10 +33,10 @@ export default function ROICalculator({ section }: { section: SectionType }) {
           viewport={{ once: true }}
         >
           <h2 className="design-heading-1 mb-4">
-            {section.title || "成本对比"}
+            {section.title || t('title')}
           </h2>
           <p className="design-description">
-            {section.description || "看看您能节省多少成本"}
+            {section.description || t('description')}
           </p>
         </motion.div>
 
@@ -49,9 +49,9 @@ export default function ROICalculator({ section }: { section: SectionType }) {
           transition={{ delay: 0.2 }}
         >
           <div className="text-center mb-6">
-            <label className="text-gray-400 text-sm">您的月需求</label>
+            <label className="text-gray-400 text-sm">{t('monthly_demand')}</label>
             <div className="text-3xl font-bold text-white mt-2">
-              {videoHours} 小时视频转写
+              {videoHours} {t('hours_video_transcription')}
             </div>
           </div>
           
@@ -65,8 +65,8 @@ export default function ROICalculator({ section }: { section: SectionType }) {
           />
           
           <div className="flex justify-between text-xs text-gray-500 mt-2">
-            <span>10小时</span>
-            <span>500小时</span>
+            <span>{t('hours_min', { hours: 10 })}</span>
+            <span>{t('hours_max', { hours: 500 })}</span>
           </div>
         </motion.div>
 
@@ -81,14 +81,14 @@ export default function ROICalculator({ section }: { section: SectionType }) {
           {/* 详细对比表 */}
           <div className="design-card p-8 bg-gray-900/30">
             <h3 className="text-lg font-semibold text-gray-300 mb-6">
-              月度成本对比（{videoHours}小时）
+              {t('monthly_cost_comparison', { hours: videoHours })}
             </h3>
             
             <div className="space-y-4">
               {/* 人工转写 */}
               <div>
                 <div className="flex justify-between items-end mb-2">
-                  <span className="text-gray-400">人工转写</span>
+                  <span className="text-gray-400">{t('manual_transcription')}</span>
                   <span className="text-xl font-bold text-gray-400">¥{humanCost.toLocaleString()}</span>
                 </div>
                 <div className="h-10 bg-gray-800 rounded-lg overflow-hidden">
@@ -105,7 +105,7 @@ export default function ROICalculator({ section }: { section: SectionType }) {
               {/* 其他工具 */}
               <div>
                 <div className="flex justify-between items-end mb-2">
-                  <span className="text-gray-400">其他工具</span>
+                  <span className="text-gray-400">{t('other_tools')}</span>
                   <span className="text-xl font-bold text-gray-400">¥{otherToolsCost.toLocaleString()}</span>
                 </div>
                 <div className="h-10 bg-gray-800 rounded-lg overflow-hidden">
@@ -122,7 +122,7 @@ export default function ROICalculator({ section }: { section: SectionType }) {
               {/* 我们的服务 */}
               <div>
                 <div className="flex justify-between items-end mb-2">
-                  <span className="text-purple-400 font-semibold">我们服务</span>
+                  <span className="text-purple-400 font-semibold">{t('our_service')}</span>
                   <span className="text-xl font-bold text-purple-400">¥{ourCost.toFixed(0)}</span>
                 </div>
                 <div className="h-10 bg-gray-800 rounded-lg overflow-hidden">
@@ -151,7 +151,7 @@ export default function ROICalculator({ section }: { section: SectionType }) {
             <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-purple-600/5 rounded-full"></div>
             
             <div className="text-center relative z-10">
-              <div className="text-sm text-gray-400 mb-4">每月只需一杯咖啡的价格</div>
+              <div className="text-sm text-gray-400 mb-4">{t('coffee_price_comparison')}</div>
               
               {/* 超大节省百分比 - 页面最醒目元素 */}
               <motion.div 
@@ -163,7 +163,10 @@ export default function ROICalculator({ section }: { section: SectionType }) {
                 initial={{ scale: 0.3, opacity: 0, rotateX: 90 }}
                 whileInView={{ scale: 1, opacity: 1, rotateX: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: 1.1, duration: 1.2, type: "spring", bounce: 0.4 }}
+                transition={{ 
+                  default: { delay: 1.1, duration: 1.2, type: "spring", bounce: 0.4 },
+                  textShadow: { duration: 2, repeat: Infinity, repeatType: 'reverse' }
+                }}
                 animate={{
                   textShadow: [
                     '0 0 100px rgba(34, 197, 94, 0.8)',
@@ -171,11 +174,8 @@ export default function ROICalculator({ section }: { section: SectionType }) {
                     '0 0 100px rgba(34, 197, 94, 0.8)'
                   ]
                 }}
-                transition={{
-                  textShadow: { duration: 2, repeat: Infinity, repeatType: 'reverse' }
-                }}
               >
-                节省{savingsPercent}%
+                {t('save_percent', { percent: savingsPercent })}
               </motion.div>
               
               <div className="space-y-2 mb-6">
@@ -186,7 +186,7 @@ export default function ROICalculator({ section }: { section: SectionType }) {
                   viewport={{ once: true }}
                   transition={{ delay: 1.5, duration: 0.6 }}
                 >
-                  节省 ¥{monthlySavings.toLocaleString()}<span className="text-lg text-gray-400">/月</span>
+                  {t('monthly_savings_amount', { amount: monthlySavings.toLocaleString() })}<span className="text-lg text-gray-400">{t('per_month')}</span>
                 </motion.div>
                 <motion.div 
                   className="text-2xl text-emerald-300 font-semibold"
@@ -195,14 +195,14 @@ export default function ROICalculator({ section }: { section: SectionType }) {
                   viewport={{ once: true }}
                   transition={{ delay: 1.8, duration: 0.6 }}
                 >
-                  = ¥{yearlySavings.toLocaleString()}/年
+                  {t('yearly_total', { amount: yearlySavings.toLocaleString() })}
                 </motion.div>
               </div>
               
               <div className="text-center p-4 bg-gray-800/30 rounded-lg">
-                <div className="text-sm text-gray-400 mb-1">相当于</div>
+                <div className="text-sm text-gray-400 mb-1">{t('equivalent_to')}</div>
                 <div className="text-lg font-semibold text-white">
-                  一杯咖啡 vs 一个月工资
+                  {t('coffee_vs_salary')}
                 </div>
               </div>
             </div>
