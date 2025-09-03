@@ -95,13 +95,13 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
   }, [pricing.items]);
 
   return (
-    <section id={pricing.name} className="py-16">
+    <section id={pricing.name} className="design-section">
       <div className="container">
-        <div className="mx-auto mb-12 text-center">
-          <h2 className="mb-4 text-4xl font-semibold lg:text-5xl">
+        <div className="text-center mb-16">
+          <h2 className="design-heading-2">
             {pricing.title}
           </h2>
-          <p className="text-muted-foreground lg:text-lg">
+          <p className="design-description">
             {pricing.description}
           </p>
         </div>
@@ -146,13 +146,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
               </RadioGroup>
             </div>
           )}
-          <div
-            className={`w-full mt-0 grid gap-6 md:grid-cols-${
-              pricing.items?.filter(
-                (item) => !item.group || item.group === group
-              )?.length
-            }`}
-          >
+          <div className="design-grid design-grid-3 w-full">
             {pricing.items?.map((item, index) => {
               if (item.group && item.group !== group) {
                 return null;
@@ -161,29 +155,22 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
               return (
                 <div
                   key={index}
-                  className={`pricing-card ${item.is_featured ? 'featured' : ''} rounded-lg p-0 ${
-                    item.is_featured
-                      ? "bg-card text-card-foreground"
-                      : "border-muted border bg-card"
-                  }`}
+                  className={`design-card ${item.is_featured ? 'featured' : ''}`}
                 >
                   <div className="pricing-topbar" />
                   <div className="flex h-full flex-col justify-between gap-5 p-6">
                     <div>
                       <div className="flex items-center gap-2 mb-4">
                         {item.title && (
-                          <h3 className="text-xl font-semibold">
+                          <h3 className="design-heading-3">
                             {item.title}
                           </h3>
                         )}
                         <div className="flex-1"></div>
                         {item.label && (
-                          <Badge
-                            variant="outline"
-                            className={`px-1.5 ${item.is_featured ? 'bg-[#fbbf24] border-[#f59e0b] text-black' : 'border-primary bg-primary text-primary-foreground'}`}
-                          >
+                          <div className={`design-badge ${item.is_featured ? 'gold' : ''}`}>
                             {item.label}
-                          </Badge>
+                          </div>
                         )}
                       </div>
                       <div className="flex items-end gap-2 mb-4">
@@ -193,7 +180,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                           </span>
                         )}
                         {item.price && (
-                          <span className="text-5xl font-semibold price-gradient">
+                          <span className="design-stat-number">
                             {item.price}
                           </span>
                         )}
@@ -214,11 +201,10 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                         </p>
                       )}
                       {item.features && (
-                        <ul className="flex flex-col gap-3">
+                        <ul className="design-feature-list">
                           {item.features.map((feature, fi) => {
                             return (
-                              <li className="flex gap-2" key={`feature-${fi}`}>
-                                <Check className="mt-1 size-4 shrink-0" />
+                              <li className="design-feature-item" key={`feature-${fi}`}>
                                 {feature}
                               </li>
                             );
@@ -248,8 +234,8 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                         </div>
                       ) : null}
                       {item.button && (
-                        <Button
-                          className="btn-neon w-full flex items-center justify-center gap-2 font-semibold"
+                        <button
+                          className="design-btn-primary w-full"
                           disabled={isLoading}
                           onClick={() => {
                             if (isLoading) {
@@ -258,21 +244,14 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                             handleCheckout(item);
                           }}
                         >
-                          {(!isLoading ||
-                            (isLoading && productId !== item.product_id)) && (
-                            <p>{item.button.title}</p>
-                          )}
-
                           {isLoading && productId === item.product_id && (
-                            <p>{item.button.title}</p>
+                            <Loader className="w-5 h-5 animate-spin" />
                           )}
-                          {isLoading && productId === item.product_id && (
-                            <Loader className="mr-2 h-4 w-4 animate-spin" />
-                          )}
+                          {item.button.title}
                           {item.button.icon && (
-                            <Icon name={item.button.icon} className="size-4" />
+                            <Icon name={item.button.icon} className="w-5 h-5" />
                           )}
-                        </Button>
+                        </button>
                       )}
                       {item.tip && (
                         <p className="text-muted-foreground text-sm mt-2">

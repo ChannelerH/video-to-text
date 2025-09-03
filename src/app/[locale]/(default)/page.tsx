@@ -1,8 +1,19 @@
 import Hero from "@/components/blocks/hero";
 import Feature1 from "@/components/blocks/feature1";
 import Feature from "@/components/blocks/feature";
-import FAQ from "@/components/blocks/faq";
+import Stats from "@/components/blocks/stats";
+import UseCases from "@/components/blocks/use-cases";
+import TranscriptionDemo from "@/components/blocks/transcription-demo";
+import VideoTypes from "@/components/blocks/video-types";
+import ComparisonTable from "@/components/blocks/comparison-table";
+import OutputFormats from "@/components/blocks/output-formats";
+import ROICalculator from "@/components/blocks/roi-calculator";
+import TechSpecs from "@/components/blocks/tech-specs";
 import Pricing from "@/components/blocks/pricing";
+import QuickStart from "@/components/blocks/quick-start";
+import FAQ from "@/components/blocks/faq";
+import CTA from "@/components/blocks/cta";
+// Added new core content modules for Video to Text functionality
 import { getLandingPage } from "@/services/page";
 import { setRequestLocale } from "next-intl/server";
 
@@ -44,12 +55,47 @@ export default async function VideoToTextPage({
 
   return (
     <>
+      {/* 1. Hero区（转换工具） */}
       {page.hero && <Hero hero={page.hero} />}
-      {page.how_it_works && <Feature section={page.how_it_works} />}
-      {page.tool_description && <Feature1 section={page.tool_description} />}
-      {page.export_formats && <Feature section={page.export_formats} />}
+      
+      {/* 2. 使用场景展示 [新增] */}
+      <UseCases section={{ name: "use-cases", disabled: false }} />
+      
+      {/* 3. 核心数据指标 */}
+      {page.stats && <Stats section={page.stats} />}
+      
+      {/* 4. 转写效果示例 [新增] */}
+      <TranscriptionDemo section={{ name: "transcription-demo", disabled: false }} />
+      
+      {/* 5. Why choose us */}
+      {page.core_value && <Feature1 section={page.core_value} />}
+      
+      {/* 6. 支持的格式和类型 [扩充] */}
+      <VideoTypes section={{ name: "video-types", disabled: false }} />
+      
+      {/* 7. 成本对比分析 */}
+      {page.service_matrix && <ComparisonTable section={page.service_matrix} />}
+      
+      {/* 8. 输出格式用途说明 [新增] */}
+      <OutputFormats section={{ name: "output-formats", disabled: false }} />
+      
+      {/* 9. ROI计算器 [新增] */}
+      <ROICalculator section={{ name: "roi-calculator", disabled: false }} />
+      
+      {/* 10. 定价方案 */}
       {page.pricing && <Pricing pricing={page.pricing} />}
-      {page.faq && <FAQ section={page.faq} />}
+      
+      {/* 11. 快速开始指南 [新增] */}
+      <QuickStart section={{ name: "quick-start", disabled: false }} />
+      
+      {/* 12. Technical Specifications */}
+      <TechSpecs section={{ name: "tech-specs", disabled: false }} />
+      
+      {/* 13. FAQ */}
+      <FAQ section={{ name: "faq", disabled: false }} />
+      
+      {/* 14. CTA */}
+      {page.cta && <CTA section={page.cta} />}
     </>
   );
 }

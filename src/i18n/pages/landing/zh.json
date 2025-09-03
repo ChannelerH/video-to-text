@@ -37,175 +37,582 @@
     "show_locale": true
   },
   "hero": {
-    "title": "视频转文字 – 即时将视频转换为文本和字幕",
-    "description": "粘贴链接或上传文件，立即获得90秒预览，然后解锁完整转录。支持YouTube、MP4、MOV、WebM格式，导出为SRT、TXT、VTT、DOCX格式。",
+    "title": "视频转文字 — 即时将视频转换为文本和字幕",
+    "description": "🎁 每日免费10分钟 - 无需信用卡 • ⚡ 基于OpenAI Whisper",
     "show_tool": true,
     "tool_mode": "video",
-    "tip": "免费90秒预览 • 优先提取YouTube字幕 • 24小时自动删除"
+    "tip": "今日已处理 1,234 个视频",
+    "announcement": {
+      "label": "⚡ AI Powered",
+      "title": "Powered by OpenAI Whisper V3",
+      "url": "#"
+    },
+    "buttons": [
+      {
+        "title": "试试样例视频",
+        "url": "#demo",
+        "target": "_self",
+        "variant": "outline",
+        "icon": "RiPlayLine"
+      },
+      {
+        "title": "查看定价",
+        "url": "/#pricing",
+        "target": "_self",
+        "variant": "default",
+        "icon": "RiMoneyDollarCircleLine"
+      }
+    ]
   },
-  "how_it_works": {
-    "title": "工作原理", 
-    "description": "三个简单步骤，高精度将媒体文件转换为文本",
+  "comparison": {
+    "title": "为什么选择我们？数据说话",
+    "description": "与其他工具的真实对比",
     "items": [
       {
-        "title": "粘贴链接或上传",
-        "description": "添加视频/音频URL或直接上传文件开始",
-        "icon": "RiUploadLine"
+        "title": "免费额度",
+        "description": "我们：10分钟/天 • 其他：3分钟/天",
+        "icon": "RiGiftLine"
       },
       {
-        "title": "获得90秒预览",
-        "description": "立即查看TXT/SRT预览，验证质量后再进行完整处理",
-        "icon": "RiEyeLine"
+        "title": "文件大小",
+        "description": "我们：500MB • 其他：100MB",
+        "icon": "RiFileUploadLine"
       },
       {
-        "title": "下载完整转录",
-        "description": "获取完整转录并以您偏好的格式下载",
-        "icon": "RiDownloadLine"
+        "title": "导出格式",
+        "description": "我们：5种格式 • 其他：2种格式",
+        "icon": "RiFileDownloadLine"
+      },
+      {
+        "title": "批量处理",
+        "description": "我们：支持 • 其他：不支持",
+        "icon": "RiStackLine"
+      },
+      {
+        "title": "无水印",
+        "description": "我们：始终免费 • 其他：仅付费版",
+        "icon": "RiShieldCheckLine"
+      },
+      {
+        "title": "处理速度",
+        "description": "我们：2分钟/小时 • 其他：5分钟/小时",
+        "icon": "RiTimeLine"
+      }
+    ]
+  },
+  "conversion_cases": {
+    "title": "真实转换案例",
+    "description": "查看用户的实际效果",
+    "items": [
+      {
+        "title": "英文演讲",
+        "description": "输入：TED演讲视频\n输出：带时间戳的完整文稿\n准确率：98%",
+        "icon": "RiSpeakLine"
+      },
+      {
+        "title": "中文会议",
+        "description": "输入：腾讯会议录屏\n输出：结构化会议纪要\n准确率：95%",
+        "icon": "RiTeamLine"
+      },
+      {
+        "title": "双语视频",
+        "description": "输入：YouTube教程\n输出：中英双语字幕\n支持格式：SRT/VTT",
+        "icon": "RiTranslate2Line"
+      }
+    ]
+  },
+  "tech_specs": {
+    "title": "技术参数详情",
+    "description": "专业用户关心的详细规格",
+    "items": [
+      {
+        "title": "处理性能",
+        "description": "60分钟视频约2分钟完成\n免费：1任务 / 专业：10并发",
+        "icon": "RiSpeedLine"
+      },
+      {
+        "title": "支持格式",
+        "description": "视频：MP4, MOV, AVI, MKV, WMV, FLV\n音频：MP3, WAV, M4A, AAC, OGG",
+        "icon": "RiFileList3Line"
+      },
+      {
+        "title": "输出选项",
+        "description": "SRT, VTT, TXT, DOCX, JSON\n自定义时间戳和格式",
+        "icon": "RiFileDownloadLine"
+      },
+      {
+        "title": "AI模型",
+        "description": "OpenAI Whisper Large V3\n准确率：95%+ (英文) 90%+ (中文)",
+        "icon": "RiRobot2Line"
+      },
+      {
+        "title": "语言支持",
+        "description": "100+语言自动检测\n方言支持程度不同",
+        "icon": "RiGlobalLine"
+      },
+      {
+        "title": "文件限制",
+        "description": "免费：500MB / 付费：2GB\n队列系统：先到先得",
+        "icon": "RiFileUploadLine"
+      }
+    ]
+  },
+  "use_cases": {
+    "name": "use-cases",
+    "title": "谁在使用？",
+    "description": "6 个典型场景与收益",
+    "items": [
+      {
+        "title": "视频创作者",
+        "description": "YouTube 转文章 • 多平台分发 • SEO 优化 • 每周节省 8 小时"
+      },
+      {
+        "title": "教育机构",
+        "description": "网课自动字幕 • 提升可访问性 • 多语言支持 • 覆盖 95% 学生"
+      },
+      {
+        "title": "企业用户",
+        "description": "会议记录 • 培训归档 • 合规留痕 • 效率提升 10 倍"
+      },
+      {
+        "title": "播客主播",
+        "description": "节目文稿 • 章节时间戳 • 听众笔记 • 2 小时→5 分钟"
+      },
+      {
+        "title": "媒体记者",
+        "description": "采访速记 • 当天交稿 • 多人对话分离"
+      },
+      {
+        "title": "研究人员",
+        "description": "讲座转笔记 • 质性研究编码 • 引用标注"
+      }
+    ],
+    "disabled": true
+  },
+  "cost_calculator": {
+    "title": "计算您的节省",
+    "description": "看看您相比传统转录能节省多少",
+    "items": [
+      {
+        "title": "每月转录量",
+        "description": "您每月需要转录多少小时？",
+        "icon": "RiTimeLine"
+      },
+      {
+        "title": "传统成本",
+        "description": "人工转录：￥200/小时",
+        "icon": "RiMoneyDollarCircleLine"
+      },
+      {
+        "title": "我们的服务",
+        "description": "AI转录：从￥60/月起",
+        "icon": "RiRobot2Line"
+      },
+      {
+        "title": "您的节省",
+        "description": "最高节睉93%的转录成本",
+        "icon": "RiSaveLine"
+      }
+    ]
+  },
+  "integrations": {
+    "name": "integrations",
+    "title": "快速导出到常用工具",
+    "description": "一键交付到云盘、笔记与协作平台。",
+    "items": [
+      {
+        "title": "Google Drive",
+        "description": "",
+        "icon": "RiGoogleLine"
+      },
+      {
+        "title": "Dropbox",
+        "description": "",
+        "icon": "RiDropboxLine"
+      },
+      {
+        "title": "OneDrive",
+        "description": "",
+        "icon": "RiMicrosoftLine"
+      },
+      {
+        "title": "Notion",
+        "description": "",
+        "icon": "RiNotionLine"
+      },
+      {
+        "title": "Obsidian",
+        "description": "",
+        "icon": "RiFolderLine"
+      },
+      {
+        "title": "钉钉 / 飞书",
+        "description": "",
+        "icon": "RiTeamLine"
+      }
+    ]
+  },
+  "security": {
+    "name": "security",
+    "title": "安全与隐私",
+    "description": "",
+    "items": [
+      {
+        "title": "SSL 加密传输",
+        "description": "上传/下载全程加密"
+      },
+      {
+        "title": "24 小时自动删除",
+        "description": "源文件自动清理"
+      },
+      {
+        "title": "GDPR 合规",
+        "description": "符合欧盟要求"
+      },
+      {
+        "title": "严格访问控制",
+        "description": "最小权限原则"
+      },
+      {
+        "title": "不存储原文件",
+        "description": "不长期保留源数据"
+      },
+      {
+        "title": "不用于训练模型",
+        "description": "不会用你的数据训练 AI"
+      }
+    ],
+    "disabled": true
+  },
+  "how_it_works": {
+    "title": "如何使用",
+    "description": "3 步完成，指标清晰",
+    "items": [
+      {
+        "title": "① 上传 — 灵活输入",
+        "description": "• 拖拽或点击选择\n• 支持批量（专业版 5 并发）\n• 粘贴 YouTube/Vimeo 链接导入\n• 格式：20+（MP4/MOV/AVI/…）\n• 大小：免费 100MB / 付费 2GB\n• 云端：Google Drive / Dropbox"
+      },
+      {
+        "title": "② AI 处理 — 智能流水线",
+        "description": "• OpenAI Whisper V3\n• 100+ 语言自动检测\n• GPU 加速（≈2 分钟/小时）\n• 智能降噪\n• 实时进度\n• 断点续传"
+      },
+      {
+        "title": "③ 下载 — 多样导出",
+        "description": "• 5 种格式：SRT/VTT/TXT/DOCX/JSON\n• 永久链接（30 天）\n• 批量打包下载\n• 一键导出 Notion/Google Docs\n• API 拉取结果\n• 邮件通知"
+      }
+    ],
+    "disabled": true
+  },
+  "real_time_stats": {
+    "title": "实时处理数据",
+    "description": "来自服务器的实时数据",
+    "items": [
+      {
+        "title": "12小时",
+        "description": "今日节省处理时间",
+        "icon": "RiTimeLine"
+      },
+      {
+        "title": "156个视频",
+        "description": "本周已转换",
+        "icon": "RiVideoLine"
+      },
+      {
+        "title": "28个国家",
+        "description": "全球服务覆盖",
+        "icon": "RiGlobalLine"
+      },
+      {
+        "title": "99.9%",
+        "description": "系统稳定性",
+        "icon": "RiShieldCheckLine"
       }
     ]
   },
   "tool_description": {
-    "title": "视频转文字在线工具",
-    "description": "我们的工具支持MP4、MOV、WebM和AVI视频格式。对于YouTube视频，我们优先提取现有字幕以获得即时结果（零处理成本）。",
+    "disabled": true
+  },
+  "demo": {
+    "disabled": true
+  },
+  "export_formats": {
+    "disabled": true
+  },
+  "supported": {
+    "title": "支持的平台与格式",
+    "description": "覆盖主流平台与常见文件类型",
     "items": [
       {
-        "title": "YouTube字幕优先",
-        "description": "我们优先提取现有字幕获得即时结果（零处理成本）。当不存在字幕时，我们的AI转录引擎会自动处理音频轨道。",
+        "title": "YouTube",
+        "description": "",
         "icon": "RiYoutubeLine"
       },
       {
-        "title": "多种导出格式",
-        "description": "导出转录为带精确时间戳的SRT字幕文件、易于编辑的纯文本TXT、Web播放器的VTT或格式化的DOCX文档。",
-        "icon": "RiFileDownloadLine"
+        "title": "MP4",
+        "description": "",
+        "icon": "RiMovieLine"
       },
       {
-        "title": "专业使用场景",
-        "description": "适合内容创作者、教育工作者和无障碍合规需求。注意：年龄限制或地区锁定的视频可能需要直接上传文件。",
-        "icon": "RiUserLine"
-      }
-    ]
-  },
-  "export_formats": {
-    "title": "导出格式",
-    "description": "选择多种输出格式以适合您的工作流程和要求",
-    "items": [
-      {
-        "title": "纯文本 (TXT)",
-        "description": "无时间戳的简单文本格式",
-        "icon": "RiFileTextLine"
+        "title": "MOV",
+        "description": "",
+        "icon": "RiClapperboardLine"
       },
       {
-        "title": "SubRip (SRT)",
-        "description": "带精确时间戳的字幕格式",
-        "icon": "RiFileDownloadLine"
+        "title": "WebM",
+        "description": "",
+        "icon": "RiPlayCircleLine"
       },
       {
-        "title": "WebVTT (VTT)",
-        "description": "Web视频文本轨道格式",
-        "icon": "RiFileDownloadLine"
+        "title": "MP3",
+        "description": "",
+        "icon": "RiMusic2Line"
       },
       {
-        "title": "Word文档 (DOCX)",
-        "description": "带样式的格式化文档",
-        "icon": "RiFileWordLine"
-      },
-      {
-        "title": "Markdown (MD)",
-        "description": "带格式的结构化文本",
-        "icon": "RiMarkdownLine"
-      },
-      {
-        "title": "JSON",
-        "description": "带时间戳的结构化数据",
-        "icon": "RiCodeLine"
+        "title": "WAV",
+        "description": "",
+        "icon": "RiSoundModuleLine"
       }
     ]
   },
   "pricing": {
     "name": "pricing",
-    "title": "简单定价",
-    "description": "从90秒免费预览开始，然后选择最适合您的方案",
+    "title": "简单透明的定价",
+    "description": "从适合你的套餐开始 • 🔥 限时：年付 8 折（本月）",
     "items": [
       {
-        "title": "免费预览",
+        "title": "免费版",
         "price": "￥0",
         "unit": "永久",
-        "description": "90秒预览",
+        "description": "非常适合试用",
+        "is_featured": false,
+        "label": "🔥 最受欢迎",
         "features": [
-          "90秒预览",
-          "TXT和SRT预览",
-          "基础质量",
-          "无需注册账户"
+          "每日 10 分钟",
+          "单文件 100MB",
+          "基础导出（SRT/TXT）",
+          "标准队列",
+          "邮件支持"
+        ],
+        "not_included": [
+          "批量处理",
+          "API 接入",
+          "优先队列"
         ],
         "button": {
-          "title": "免费试用",
+          "title": "开始免费使用",
           "url": "#"
-        }
+        },
+        "tip": "适合个人偶尔使用"
       },
       {
-        "title": "日通",
-        "price": "￥20",
-        "unit": "24小时",
-        "description": "200分钟处理",
-        "is_featured": true,
-        "label": "最超值",
+        "title": "专业版",
+        "price": "￥60",
+        "unit": "/月",
+        "description": "专业人士之选",
+        "annual_price": "￥48",
+        "annual_savings": "节睉20%",
         "features": [
-          "200分钟处理",
-          "优先队列",
-          "所有导出格式",
-          "24小时访问",
-          "更高质量"
+          "每月 300 分钟",
+          "单文件 2GB",
+          "全格式导出",
+          "5 个并发任务",
+          "API 1000 次/天",
+          "优先处理队列",
+          "批量下载",
+          "自定义词汇表",
+          "99% 可用性",
+          "24 小时技术支持"
         ],
-        "button": {
-          "title": "开始使用",
-          "url": "#"
-        }
-      },
-      {
-        "title": "月付",
-        "price": "￥80",
-        "unit": "每月",
-        "description": "300分钟月度额度",
-        "features": [
-          "300分钟月度额度",
-          "双语支持", 
-          "章节检测",
-          "说话人分离",
+        "not_included": [
+          "团队协作",
           "API访问",
-          "优先支持"
+          "Webhook支持"
         ],
         "button": {
-          "title": "订阅",
+          "title": "升级专业版",
           "url": "#"
-        }
+        },
+        "label": "热门选择",
+        "tip": "适合内容创作者与中小企业",
+        "is_featured": true
+      },
+      {
+        "title": "团队版",
+        "price": "￥199",
+        "unit": "/月",
+        "description": "团队与企业",
+        "annual_price": "￥159",
+        "annual_savings": "节睉20%",
+        "features": [
+          "不限分钟数",
+          "单文件 10GB",
+          "团队空间与角色",
+          "完整 API 与 SDK",
+          "Webhook 通知",
+          "高级分析",
+          "自定义集成",
+          "电话优先支持",
+          "99.9% SLA"
+        ],
+        "button": {
+          "title": "联系销售",
+          "url": "#"
+        },
+        "tip": "适合团队与企业",
+        "is_featured": false
       }
     ]
   },
   "faq": {
     "name": "faq",
     "label": "常见问题",
-    "title": "视频转文字常见问题",
-    "description": "关于视频转录和我们服务的常见问题",
+    "title": "有用且能执行的答案",
+    "description": "透明的限制与能力",
     "items": [
       {
-        "title": "如何在线将视频转换为文字？",
-        "description": "只需粘贴YouTube链接或上传您的MP4/MOV/WebM文件。我们会立即提供90秒预览，然后您可以解锁带时间戳的完整转录并以多种格式导出。"
+        "title": "支持中文吗？准确率如何？",
+        "description": "支持。普通话 90%+，粤语约 85%，其他方言约 70%。专业术语可通过自定义词汇表提升准确率。支持简繁体转换。"
       },
       {
-        "title": "可以粘贴YouTube链接获取SRT字幕吗？",
-        "description": "是的！我们优先提取现有的YouTube字幕（即时结果），如果没有字幕，我们会自动转录音频。两种方法都能产生带精确时间戳的SRT文件。"
+        "title": "免费版限制？",
+        "description": "每天 10 分钟（北京时间 0 点重置）；单文件 100MB；支持 SRT/TXT 导出；不支持批量；标准队列，高峰期等待 3–5 分钟。"
       },
       {
-        "title": "支持哪些视频格式？",
-        "description": "我们支持MP4、MOV、WebM和AVI文件。对于在线视频，YouTube链接效果最佳。大多数常见视频编解码器都能自动处理。"
+        "title": "如何使用批量处理？",
+        "description": "专业版支持 5 个并发；支持文件夹拖拽；总大小 ≤10GB；处理完成后打包下载；可设置 webhook 通知。"
       },
       {
-        "title": "如果我的视频没有字幕怎么办？",
-        "description": "没问题！我们的AI转录会处理音频轨道并生成带时间戳的准确字幕。90秒预览让您在完整处理前验证质量。"
+        "title": "隐私与数据安全？",
+        "description": "全程 SSL 加密；24 小时自动删除；不使用用户数据训练 AI；支持欧盟区域部署；企业版支持私有化部署。"
       },
       {
-        "title": "如何保护我的隐私？",
-        "description": "源视频在24小时后自动删除。生成的转录保存7-30天（可配置），您可以随时手动删除。所有文件都通过加密安全存储。"
+        "title": "背景音乐会影响吗？",
+        "description": "轻音乐影响 5–10%，强节奏 20–30%；建议使用原声或分离音轨；专业版提供智能降噪。"
+      },
+      {
+        "title": "如何集成 API？",
+        "description": "RESTful API，含文档与 SDK（Python/Node/PHP）；典型延迟 <100ms；速率限制：专业版 1000 次/天。"
+      }
+    ],
+    "disabled": true
+  },
+  "testimonial": {
+    "disabled": true
+  },
+  "cta": {
+    "name": "cta",
+    "title": "准备节省大量转写时间了吗？",
+    "description": "⏱️ 平均节省：每周 8 小时 • 每月 ¥2000 • 90% 人工工作\n🎯 已服务 10,000+ 用户：创作者 • 学校 • 企业 • 媒体\n💡 今日剩余额度：10 分钟\n30 天退款保证 • 无需信用卡 • 随时取消",
+    "buttons": [
+      {
+        "title": "立即开始",
+        "url": "#",
+        "icon": "RiPlayLine",
+        "variant": "default"
+      },
+      {
+        "title": "查看演示",
+        "url": "#demo",
+        "icon": "RiMovieLine",
+        "variant": "outline"
+      },
+      {
+        "title": "预约演示",
+        "url": "#contact",
+        "icon": "RiCalendarScheduleLine",
+        "variant": "outline"
+      }
+    ]
+  },
+  "stats": {
+    "title": "",
+    "description": "",
+    "items": [
+      {
+        "title": "12,345+",
+        "description": "本月已处理视频"
+      },
+      {
+        "title": "95%",
+        "description": "典型准确率（中/英）"
+      },
+      {
+        "title": "100+",
+        "description": "支持语言"
+      }
+    ]
+  },
+  "effect_compare": {
+    "name": "effect-compare",
+    "title": "真实转换效果展示",
+    "description": "标签页展示 EN/ZH/JP 示例，含预览与指标。",
+    "items": [
+      {
+        "title": "英文示例",
+        "description": "【视频】\n• TED 演讲片段\n• 时长：5:23\n• 说话人：1\n• 背景音：无\n\n【预览】\n\"In the age of AI, we must...\"\n\n【处理数据】\n准确率：98.5% | 用时：12秒 | 字数：1,250 | 段落：15\n【查看完整案例】"
+      },
+      {
+        "title": "中文会议",
+        "description": "【视频】\n• 腾讯会议录屏\n• 时长：12:40\n• 说话人：3\n\n【预览】\n\"本次会议围绕目标拆解与里程碑...\"\n\n【处理数据】\n准确率：95% | 用时：22秒 | 字数：1,980 | 小节：8"
+      },
+      {
+        "title": "日文片段",
+        "description": "【视频】\n• 教程片段\n• 时长：3:05\n\n【预览】\n\"本日はAIの基本概念について...\"\n\n【处理数据】\n准确率：94% | 用时：9秒 | 双语：EN/JP"
+      }
+    ],
+    "disabled": true
+  },
+  "service_matrix": {
+    "name": "service-matrix",
+    "title": "为什么选择我们？",
+    "description": "我们 vs 其他工具 vs 人工",
+    "items": [
+      {
+        "title": "价格/小时",
+        "description": "¥3 / ¥10 / ¥200"
+      },
+      {
+        "title": "处理速度",
+        "description": "2分 / 10分 / 3小时"
+      },
+      {
+        "title": "准确率",
+        "description": "95% / 85% / 98%"
+      },
+      {
+        "title": "支持语言",
+        "description": "100+ / 20+ / 需预约"
+      },
+      {
+        "title": "批量处理",
+        "description": "✓ / ✗ / ✗"
+      },
+      {
+        "title": "API 接入",
+        "description": "✓ / 付费 / ✗"
+      }
+    ]
+  },
+  "tech_advantages": {
+    "name": "tech-advantages",
+    "title": "基于前沿技术",
+    "description": "真正有用的技术优势",
+    "items": [
+      {
+        "title": "Whisper V3",
+        "description": "行业领先的识别准确率"
+      },
+      {
+        "title": "GPU 加速",
+        "description": "比 CPU 快约 10 倍"
+      },
+      {
+        "title": "智能降噪",
+        "description": "自动过滤背景音"
+      },
+      {
+        "title": "分段处理",
+        "description": "长视频稳定处理"
       }
     ]
   },
@@ -222,15 +629,6 @@
     "disabled": true
   },
   "feature": {
-    "disabled": true
-  },
-  "stats": {
-    "disabled": true
-  },
-  "testimonial": {
-    "disabled": true
-  },
-  "cta": {
     "disabled": true
   },
   "footer": {
@@ -299,6 +697,581 @@
           "title": "服务条款",
           "url": "/terms-of-service"
         }
+      ]
+    }
+  },
+  "core_benefits": {
+    "name": "core-benefits",
+    "title": "为什么选择我们？",
+    "description": "一眼看懂的核心优势",
+    "items": [
+      {
+        "title": "🚀 10分钟",
+        "description": "每日免费额度 • 比他家多 3 倍"
+      },
+      {
+        "title": "📁 500MB",
+        "description": "单文件上限 • 大 5 倍"
+      },
+      {
+        "title": "⚡ 2分钟",
+        "description": "处理 1 小时视频 • 快 60%"
+      },
+      {
+        "title": "🎯 95%",
+        "description": "典型准确率 • 高约 10%"
+      }
+    ],
+    "disabled": true
+  },
+  "cost_overview": {
+    "name": "cost-overview",
+    "title": "100 小时转写成本对比",
+    "description": "人工  ████████████████████  ¥20,000\n他家  ████  ¥1,000\n我们  ▌ ¥29\n\n💡 可节省 99.8% 的成本\n= 每月只需一杯咖啡\n= 1 名员工 1 天工资处理全年内容",
+    "items": [
+      {
+        "title": "",
+        "description": ""
+      }
+    ],
+    "disabled": true
+  },
+  "plan_quick_compare": {
+    "name": "plan-quick-compare",
+    "title": "套餐一览",
+    "description": "关键限制与能力",
+    "items": [
+      {
+        "title": "月额度",
+        "description": "5 小时 / 100 小时 / 不限"
+      },
+      {
+        "title": "单文件大小",
+        "description": "100MB / 2GB / 10GB"
+      },
+      {
+        "title": "并发数",
+        "description": "1 / 5 / 20"
+      },
+      {
+        "title": "API",
+        "description": "✗ / 1000/天 / 不限"
+      },
+      {
+        "title": "导出格式",
+        "description": "2 / 5 / 全部"
+      },
+      {
+        "title": "技术支持",
+        "description": "社区 / 邮件 / 专属"
+      },
+      {
+        "title": "SLA",
+        "description": "无 / 99% / 99.9%"
+      }
+    ],
+    "disabled": true
+  },
+  "formats": {
+    "name": "formats",
+    "title": "支持所有主流格式",
+    "description": "按输入/输出/云端分组展示",
+    "items": [
+      {
+        "title": "📥 输入格式",
+        "description": "视频：MP4 • MOV • AVI • MKV • WMV • FLV • WebM • 3GP\n音频：MP3 • WAV • AAC • M4A • FLAC • OGG • WMA\n大小：最高 2GB（免费 100MB）"
+      },
+      {
+        "title": "📤 输出格式",
+        "description": "字幕：SRT • VTT • ASS • SSA\n文档：TXT • DOCX • PDF • MD\n数据：JSON • XML • CSV"
+      },
+      {
+        "title": "☁️ 云端导入",
+        "description": "YouTube • Vimeo • Google Drive • Dropbox • OneDrive\n直接粘贴 URL 即可"
+      }
+    ],
+    "disabled": true
+  },
+  "workflow": {
+    "name": "workflow",
+    "title": "智能处理流程",
+    "description": "上传(2s) → 预处理(10s) → 识别(30s) → 优化(5s) → 导出(2s)\n↓        ↓            ↓         ↓        ↓\n验证     音频提取      AI 转写   智能纠错  格式转换\n支持2GB  降噪增强      WhisperV3 标点优化 5种格式",
+    "items": [
+      {
+        "title": "上传",
+        "description": "拖拽/链接导入，支持批量"
+      },
+      {
+        "title": "预处理",
+        "description": "语言检测，音频增强"
+      },
+      {
+        "title": "识别",
+        "description": "GPU 加速识别"
+      },
+      {
+        "title": "优化",
+        "description": "时间戳与标点优化"
+      },
+      {
+        "title": "导出",
+        "description": "SRT/VTT/TXT/DOCX/PDF"
+      }
+    ],
+    "disabled": true
+  },
+  "case_studies": {
+    "name": "cases-stats",
+    "title": "客户案例（数据化）",
+    "description": "来自真实落地的量化效果",
+    "items": [
+      {
+        "title": "某教育机构",
+        "description": "1000+ 节课程配字幕 • 节省 3 名全职 • 提升 20 倍效率"
+      },
+      {
+        "title": "某媒体公司",
+        "description": "日均 50 个采访转写 • 成本降低 95% • 时间从 3 天到 3 小时"
+      }
+    ],
+    "disabled": true
+  },
+  "core_value": {
+    "name": "core-value",
+    "title": "为什么选择我们？真实数据对比",
+    "description": "处理 100 小时：人工 ¥20,000 → 我们 ¥29（省 99.8%）。\n每日 10 分钟 • 1 小时≈2 分钟 • 95% 准确率 • 500MB/文件。",
+    "items": [
+      {
+        "title": "成本对比（100 小时/月）",
+        "description": "人工  ████████████████████  ¥20,000\n他家  ████                  ¥1,000\n我们  ▌                     ¥29\n\n节省 99.8% — 一杯咖啡的价格搞定整月内容"
+      },
+      {
+        "title": "效率对比（处理 1 小时视频所需）",
+        "description": "人工  ████████████████  180 分钟\n他家   ████████           10 分钟\n我们   ▌                  2 分钟\n\n快 90 倍 — 当天交付"
+      },
+      {
+        "title": "功能对比（关键能力）",
+        "description": "免费额度  10 分/天 • 他家：3 分\n文件大小  500MB/文件 • 他家：100MB\n批量处理  ✓ • 他家：✗\nAPI 接入  ✓ • 他家：付费/✗\n准确率    95%（典型）\n可用性    24/7"
+      }
+    ]
+  },
+  "use_cases": {
+    "heading": "Video to Text 能为您做什么？",
+    "description": "从教育培训到内容创作，从商业应用到学术研究\n发现视频转文字在各个领域的强大应用价值",
+    "categories": [
+      {
+        "title": "教育场景",
+        "subtitle": "Education",
+        "cases": [
+          {
+            "title": "网课自动生成字幕",
+            "description": "提升学习体验，支持多语言"
+          },
+          {
+            "title": "讲座录音转文字笔记",
+            "description": "便于复习和知识整理"
+          },
+          {
+            "title": "外语视频配双语字幕",
+            "description": "辅助语言学习和理解"
+          }
+        ]
+      },
+      {
+        "title": "内容创作",
+        "subtitle": "Content Creation",
+        "cases": [
+          {
+            "title": "YouTube视频转博客文章",
+            "description": "一键生成文字版内容"
+          },
+          {
+            "title": "播客音频快速生成文字稿",
+            "description": "节省大量整理时间"
+          },
+          {
+            "title": "视频剪辑快速定位关键对话",
+            "description": "提高剪辑效率"
+          }
+        ]
+      },
+      {
+        "title": "商业用途",
+        "subtitle": "Business Use",
+        "cases": [
+          {
+            "title": "Zoom会议自动生成会议纪要",
+            "description": "提高会议效率"
+          },
+          {
+            "title": "客户访谈快速整理成文档",
+            "description": "便于分析和决策"
+          },
+          {
+            "title": "培训视频转写成培训手册",
+            "description": "标准化培训流程"
+          }
+        ]
+      },
+      {
+        "title": "研究分析",
+        "subtitle": "Research",
+        "cases": [
+          {
+            "title": "采访录音转写便于编码分析",
+            "description": "质性研究必备工具"
+          },
+          {
+            "title": "焦点小组讨论内容文本化",
+            "description": "数据收集更高效"
+          },
+          {
+            "title": "多语言内容快速翻译转写",
+            "description": "打破语言障碍"
+          }
+        ]
+      }
+    ]
+  },
+  "transcription_demo": {
+    "heading": "转写效果展示",
+    "description": "查看我们在不同场景下的转写效果\n所有示例均为真实转写结果，未经人工修改",
+    "tabs": [
+      {
+        "id": "interview",
+        "title": "访谈对话",
+        "subtitle": "Interview"
+      },
+      {
+        "id": "lecture",
+        "title": "教学讲座",
+        "subtitle": "Lecture"
+      },
+      {
+        "id": "meeting",
+        "title": "商务会议",
+        "subtitle": "Meeting"
+      },
+      {
+        "id": "podcast",
+        "title": "播客节目",
+        "subtitle": "Podcast"
+      }
+    ],
+    "content": {
+      "interview": {
+        "audio_info": "音频来源: 客户访谈录音 | 时长: 3分42秒 | 语言: 中文",
+        "transcript": "主持人: 今天我们邀请到了李总，请您分享一下贵公司在数字化转型方面的经验。\n\n李总: 谢谢。我们公司从2019年开始全面推进数字化转型，主要集中在三个方面：首先是内部流程的自动化...\n\n主持人: 这个过程中遇到的最大挑战是什么？\n\n李总: 我觉得最大的挑战其实是员工的接受度。技术本身不是问题，关键是如何让团队适应新的工作方式。",
+        "confidence": 96
+      },
+      "lecture": {
+        "audio_info": "音频来源: 大学公开课 | 时长: 15分钟 | 语言: 中文",
+        "transcript": "今天我们来讲解机器学习中的神经网络基础。神经网络是受生物神经系统启发而设计的计算模型。\n\n最简单的神经网络包含三个部分：输入层、隐藏层和输出层。每个神经元接收输入信号，通过激活函数处理后传递给下一层...\n\n反向传播算法是训练神经网络的核心算法，它通过计算梯度来调整网络中的权重参数。",
+        "confidence": 98
+      },
+      "meeting": {
+        "audio_info": "音频来源: 线上会议录音 | 时长: 45分钟 | 语言: 中文",
+        "transcript": "张经理: 大家好，今天的会议主要讨论Q4的营销策略。请各部门汇报一下目前的进展情况。\n\n市场部王经理: 我们已经完成了竞品分析，发现主要竞争对手在社媒营销方面投入较大...\n\n销售部李经理: 从销售数据看，线上渠道的转化率比预期高15%，建议加大数字营销的投入。",
+        "confidence": 94
+      },
+      "podcast": {
+        "audio_info": "音频来源: 科技播客 | 时长: 28分钟 | 语言: 中文",
+        "transcript": "主播: 欢迎收听本期科技前沿，我是主播小王。今天我们聊聊人工智能在医疗领域的最新应用。\n\n嘉宾: 大家好，我是来自某医疗AI公司的产品经理。我们最近推出了一款基于深度学习的医学影像诊断系统...\n\n主播: 这套系统的准确率如何？在实际临床应用中表现怎么样？",
+        "confidence": 97
+      }
+    }
+  },
+  "video_types": {
+    "heading": "支持的视频类型",
+    "description": "了解我们对不同类型视频的转写能力\n以及可能影响准确率的因素和解决方案",
+    "supported_types": {
+      "title": "完美支持的视频类型",
+      "types": [
+        {
+          "title": "在线课程、教学视频",
+          "description": "清晰发音，结构化内容",
+          "accuracy": 98
+        },
+        {
+          "title": "播客、访谈节目",
+          "description": "音频清晰，对话自然",
+          "accuracy": 96
+        },
+        {
+          "title": "会议录屏、网络研讨会",
+          "description": "商务对话，专业术语",
+          "accuracy": 95
+        },
+        {
+          "title": "新闻、纪录片",
+          "description": "标准普通话，清晰叙述",
+          "accuracy": 97
+        },
+        {
+          "title": "单人演讲、TED talks",
+          "description": "演讲风格，思路清晰",
+          "accuracy": 98
+        },
+        {
+          "title": "Vlog、个人分享",
+          "description": "日常对话，轻松语调",
+          "accuracy": 92
+        }
+      ]
+    },
+    "limitations": {
+      "title": "可能影响准确率的情况",
+      "factors": [
+        {
+          "title": "背景音乐很大声",
+          "impact": "音频混叠干扰识别",
+          "accuracy_loss": 20,
+          "solution": "建议先降噪或选择音乐较小的时段"
+        },
+        {
+          "title": "多人同时说话",
+          "impact": "声音重叠难以分离",
+          "accuracy_loss": 30,
+          "solution": "AI会尽力识别主要发言人"
+        },
+        {
+          "title": "强口音或方言",
+          "impact": "发音偏差影响识别",
+          "accuracy_loss": 25,
+          "solution": "支持方言词库，持续优化"
+        },
+        {
+          "title": "专业术语密集",
+          "impact": "专业词汇识别率较低",
+          "accuracy_loss": 15,
+          "solution": "可通过自定义词汇表改善"
+        }
+      ]
+    },
+    "accuracy_note": {
+      "title": "准确率说明",
+      "description": "即使在困难条件下，我们的AI仍能保持较高的基础准确率。系统会自动检测音频质量并提供相应的置信度评分，帮助您判断转写结果的可信度。对于重要内容，建议使用清晰的音频源以获得最佳效果。"
+    }
+  },
+  "output_formats": {
+    "heading": "输出格式说明",
+    "description": "支持多种专业格式输出，满足不同场景的使用需求\n从字幕文件到文档格式，一次转写多种用途",
+    "categories": [
+      {
+        "title": "字幕格式",
+        "subtitle": "Subtitle Formats",
+        "description": "视频制作和发布专用",
+        "formats": [
+          {
+            "name": "SRT",
+            "description": "通用字幕格式",
+            "features": ["时间轴精确", "支持多语言", "兼容性强"],
+            "platforms": ["YouTube", "Vimeo", "Bilibili", "爱奇艺"],
+            "tip": "最常用的字幕格式，几乎所有播放器都支持"
+          },
+          {
+            "name": "VTT",
+            "description": "Web视频字幕",
+            "features": ["HTML5原生支持", "样式可定制", "互动功能"],
+            "platforms": ["网页播放器", "HTML5视频", "在线课程平台"],
+            "tip": "Web端视频的首选格式，支持丰富的样式设置"
+          },
+          {
+            "name": "ASS",
+            "description": "高级字幕格式",
+            "features": ["丰富样式", "特效支持", "多轨道"],
+            "platforms": ["Aegisub", "PotPlayer", "VLC"],
+            "tip": "适合需要复杂样式和特效的专业视频制作"
+          }
+        ]
+      },
+      {
+        "title": "文档格式",
+        "subtitle": "Document Formats",
+        "description": "编辑和分享专用",
+        "formats": [
+          {
+            "name": "DOCX",
+            "description": "Word文档",
+            "features": ["保留格式", "可编辑", "注释支持"],
+            "platforms": ["Microsoft Word", "WPS", "Google Docs"],
+            "tip": "便于后续编辑和格式调整，支持插入图片和表格"
+          },
+          {
+            "name": "PDF",
+            "description": "便携文档",
+            "features": ["格式固定", "易分享", "打印友好"],
+            "platforms": ["所有设备", "在线预览", "打印机"],
+            "tip": "适合正式文档和报告，确保在不同设备上显示一致"
+          },
+          {
+            "name": "TXT",
+            "description": "纯文本",
+            "features": ["体积小", "兼容性强", "加载快"],
+            "platforms": ["所有文本编辑器", "代码编辑器"],
+            "tip": "最简洁的格式，适合进一步处理和分析"
+          }
+        ]
+      },
+      {
+        "title": "数据格式",
+        "subtitle": "Data Formats",
+        "description": "分析和处理专用",
+        "formats": [
+          {
+            "name": "JSON",
+            "description": "结构化数据",
+            "features": ["时间戳", "置信度", "说话人标识"],
+            "platforms": ["API集成", "数据分析工具", "程序处理"],
+            "tip": "包含完整的元数据信息，适合二次开发和数据分析"
+          },
+          {
+            "name": "CSV",
+            "description": "表格数据",
+            "features": ["Excel兼容", "统计分析", "批量处理"],
+            "platforms": ["Excel", "Google Sheets", "数据分析软件"],
+            "tip": "方便进行统计分析和批量数据处理"
+          },
+          {
+            "name": "XML",
+            "description": "标记语言",
+            "features": ["结构清晰", "自定义标签", "验证支持"],
+            "platforms": ["专业软件", "系统集成", "数据交换"],
+            "tip": "适合企业级系统集成和复杂的数据交换需求"
+          }
+        ]
+      }
+    ]
+  },
+  "roi_calculator": {
+    "heading": "算算能省多少成本",
+    "description": "调整滑块看看使用我们的服务能为您节省多少时间和金钱\n让数据说话，ROI一目了然",
+    "input_section": {
+      "title": "您的需求",
+      "monthly_hours_label": "每月需要转写",
+      "hours_unit": "小时",
+      "slider_labels": ["1小时", "25小时", "50小时", "75小时", "100小时+"]
+    },
+    "traditional_method": {
+      "title": "传统方式",
+      "hiring_cost": {
+        "label": "雇人转写成本",
+        "unit": "元/月"
+      },
+      "self_work": {
+        "label": "自己整理时间",
+        "unit": "小时/月",
+        "days_note": "个工作日"
+      },
+      "waiting_time": {
+        "label": "等待时间",
+        "value": "3-5天"
+      }
+    },
+    "our_method": {
+      "title": "使用我们",
+      "service_cost": {
+        "label": "服务成本",
+        "unit": "元/月"
+      },
+      "processing_time": {
+        "label": "处理时间",
+        "unit": "小时/月",
+        "note": "仅需检查和微调"
+      },
+      "result_time": {
+        "label": "获得结果",
+        "value": "立即"
+      }
+    },
+    "savings_section": {
+      "title": "您将节省",
+      "monthly_savings": "每月节省",
+      "yearly_savings": "每年节省",
+      "roi": "投资回报率",
+      "time_saved": {
+        "label": "时间节省",
+        "unit": "小时/月",
+        "equivalent": "相当于{days}个工作日"
+      }
+    },
+    "cta": "立即开始节省成本"
+  },
+  "quick_start": {
+    "heading": "30秒快速开始",
+    "description": "无需复杂设置，4个简单步骤即可完成视频转文字\n从上传到下载，整个流程简单高效",
+    "steps": [
+      {
+        "title": "上传视频",
+        "description": "拖拽文件或粘贴链接",
+        "details": [
+          "支持MP4、MOV、AVI等常见格式",
+          "支持YouTube、Bilibili等平台链接",
+          "最大支持2GB文件上传",
+          "拖拽上传，简单便捷"
+        ]
+      },
+      {
+        "title": "选择语言（可选）",
+        "description": "自动检测或手动选择",
+        "details": [
+          "支持中文、英文、日语等30+语言",
+          "智能语言检测，准确率95%+",
+          "支持混合语言内容",
+          "可设置主要语言和次要语言"
+        ]
+      },
+      {
+        "title": "点击转写",
+        "description": "实时查看进度",
+        "details": [
+          "GPU加速处理，速度提升10倍",
+          "实时进度显示",
+          "预览前90秒免费",
+          "处理完成自动通知"
+        ]
+      },
+      {
+        "title": "下载结果",
+        "description": "选择需要的格式",
+        "details": [
+          "SRT、VTT字幕格式",
+          "TXT、DOCX文档格式",
+          "JSON、CSV数据格式",
+          "一键下载多种格式"
+        ]
+      }
+    ],
+    "tips": {
+      "title": "专业提示",
+      "list": [
+        {
+          "title": "视频越清晰，准确率越高",
+          "description": "建议使用高质量音频源，避免背景噪音干扰"
+        },
+        {
+          "title": "可以先用免费额度测试效果",
+          "description": "90秒免费预览，满意后再购买完整服务"
+        },
+        {
+          "title": "批量处理可节省更多时间",
+          "description": "支持同时上传多个文件，批量转写效率更高"
+        },
+        {
+          "title": "多人协作功能",
+          "description": "支持团队共享项目，协作编辑转写结果"
+        }
+      ]
+    },
+    "cta_section": {
+      "title": "准备好开始了吗？",
+      "description": "上传您的第一个视频，体验AI转写的强大功能\n前90秒完全免费，无需注册即可开始",
+      "upload_btn": "立即上传视频",
+      "demo_btn": "观看演示视频",
+      "features": [
+        { "label": "90秒免费预览" },
+        { "label": "多格式导出" },
+        { "label": "GPU加速处理" }
       ]
     }
   }

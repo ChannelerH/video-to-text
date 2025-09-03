@@ -22,7 +22,7 @@ export default function Hero({ hero }: { hero: HeroType }) {
   return (
     <>
       <HeroBg />
-      <section className="py-24">
+      <section className="design-section">
         <div className="container">
           {hero.show_badge && (
             <div className="flex items-center justify-center mb-8">
@@ -46,7 +46,7 @@ export default function Hero({ hero }: { hero: HeroType }) {
               </Link>
             )}
 
-            <h1 className="mx-auto mb-3 mt-4 max-w-6xl lg:mb-7 text-balance text-4xl lg:text-7xl font-extrabold tracking-[-0.03em]">
+            <h1 className="design-heading-1">
               <BlurText
                 text={hero.title || ""}
                 delay={120}
@@ -57,8 +57,8 @@ export default function Hero({ hero }: { hero: HeroType }) {
               />
             </h1>
 
-            <p
-              className="m mx-auto max-w-3xl text-muted-foreground lg:text-xl"
+            <div
+              className="design-description"
               dangerouslySetInnerHTML={{ __html: hero.description || "" }}
             />
             
@@ -74,21 +74,16 @@ export default function Hero({ hero }: { hero: HeroType }) {
             {hero.buttons && (
               <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
                 {hero.buttons.map((item, i) => {
+                  const isPrimary = item.variant === "default" || !item.variant;
                   return (
                     <Link
                       key={i}
                       href={item.url as any}
                       target={item.target || ""}
-                      className="flex items-center"
+                      className={isPrimary ? "design-btn-primary" : "design-btn-secondary"}
                     >
-                      <Button
-                        className="w-full"
-                        size="lg"
-                        variant={item.variant || "default"}
-                      >
-                        {item.icon && <Icon name={item.icon} className="" />}
-                        {item.title}
-                      </Button>
+                      {item.icon && <Icon name={item.icon} className="w-5 h-5" />}
+                      {item.title}
                     </Link>
                   );
                 })}

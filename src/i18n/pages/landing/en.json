@@ -30,146 +30,326 @@
     "show_locale": true
   },
   "hero": {
-    "title": "Video to Text – Convert videos to text & subtitles instantly",
-    "description": "Paste a link or upload a file, get a 90-second preview instantly, then unlock the full transcription. Supports YouTube, MP4, MOV, WebM and exports to SRT, TXT, VTT, DOCX formats.",
+    "title": "Video to Text — Convert videos to text & subtitles instantly",
+    "description": "🎁 Free 10 mins daily - No credit card • ⚡ Powered by OpenAI Whisper",
     "show_tool": true,
     "tool_mode": "video",
-    "tip": "Free 90-second preview • Priority YouTube captions • 24h auto-delete"
-  },
-  "how_it_works": {
-    "title": "How it works", 
-    "description": "Three simple steps to convert your media to text with high accuracy",
-    "items": [
+    "tip": "Processed 1,234 videos today",
+    "announcement": {
+      "label": "⚡ AI Powered",
+      "title": "Powered by OpenAI Whisper V3",
+      "url": "#"
+    },
+    "buttons": [
       {
-        "title": "Paste link or upload",
-        "description": "Add your video/audio URL or upload a file directly to get started",
-        "icon": "RiUploadLine"
+        "title": "Try sample video",
+        "url": "#demo",
+        "target": "_self",
+        "variant": "outline",
+        "icon": "RiPlayLine"
       },
       {
-        "title": "Get 90-second preview",
-        "description": "See TXT/SRT preview instantly to verify quality before full processing",
-        "icon": "RiEyeLine"
-      },
-      {
-        "title": "Download full transcription",
-        "description": "Get complete transcription and download in your preferred format",
-        "icon": "RiDownloadLine"
+        "title": "View Pricing",
+        "url": "/#pricing",
+        "target": "_self",
+        "variant": "default",
+        "icon": "RiMoneyDollarCircleLine"
       }
     ]
   },
-  "tool_description": {
-    "title": "Video to Text Online",
-    "description": "Our tool supports MP4, MOV, WebM, and AVI video formats. For YouTube videos, we first extract existing captions for instant results (zero processing cost).",
+  "comparison": {
+    "title": "Why choose us? Data speaks",
+    "description": "\n\n                    Us        Others\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nFree quota          10min/day    3min/day\nFile size limit     500MB        100MB\nExport formats      5 formats    2 formats\nBatch processing    ✓            ✗\nNo watermark        ✓            ✗\nProcessing speed    2min/hour    5min/hour"
+  },
+  "conversion_cases": {
+    "title": "Real conversion examples",
+    "description": "Actual results from users:\n\n[Case 1: English Lecture]\nInput: TED Talk video\nOutput: Complete transcript with timestamps  \nAccuracy: 98%\n\n[Case 2: Chinese Meeting]\nInput: Tencent Meeting recording\nOutput: Structured meeting minutes\nAccuracy: 95%\n\n[Case 3: Bilingual Video]\nInput: YouTube tutorial\nOutput: Chinese-English dual subtitles\nFormats: SRT/VTT"
+  },
+  "tech_specs": {
+    "title": "Technical specifications",
+    "description": "📊 Detailed specs\n\n• Speed: 60min video ≈ 2min completion\n• Concurrent: Free 1 task / Pro 10 tasks\n• Video formats: MP4, MOV, AVI, MKV, WMV, FLV\n• Audio formats: MP3, WAV, M4A, AAC, OGG\n• Output: SRT, VTT, TXT, DOCX, JSON\n• AI model: OpenAI Whisper Large V3\n• Accuracy: 95%+ (English) 90%+ (Chinese)\n• Languages: 100+ auto-detection\n• File limits: Free 500MB / Paid 2GB\n• Queue: First-come-first-serve"
+  },
+  "cost_calculator": {
+    "title": "Calculate your savings",
+    "description": "See how much you can save vs traditional transcription",
     "items": [
       {
-        "title": "YouTube Caption Priority",
-        "description": "We first extract existing captions for instant results (zero processing cost). When no captions exist, our AI transcription engine processes the audio track automatically.",
+        "title": "Monthly Transcription",
+        "description": "How many hours do you transcribe monthly?",
+        "icon": "RiTimeLine"
+      },
+      {
+        "title": "Traditional Cost",
+        "description": "Human transcription: $60/hour",
+        "icon": "RiMoneyDollarCircleLine"
+      },
+      {
+        "title": "Our Service",
+        "description": "AI transcription: Starting $9/month",
+        "icon": "RiRobot2Line"
+      },
+      {
+        "title": "Your Savings",
+        "description": "Save up to 93% on transcription costs",
+        "icon": "RiSaveLine"
+      }
+    ]
+  },
+  "integrations": {
+    "title": "Export to your tools",
+    "description": "🔗 Works with:\n\nCloud Storage: Google Drive | Dropbox | OneDrive\nNote-taking: Notion | Obsidian | Evernote  \nTeam Chat: Slack | Teams | Discord"
+  },
+  "security": {
+    "name": "security",
+    "title": "Security & Privacy",
+    "description": "",
+    "items": [
+      {
+        "title": "🔒 SSL encryption",
+        "description": "All transfers encrypted"
+      },
+      {
+        "title": "🗑️ 24h auto‑delete",
+        "description": "Source files removed"
+      },
+      {
+        "title": "✓ GDPR‑ready",
+        "description": "Aligned with EU principles"
+      },
+      {
+        "title": "🚫 No model training",
+        "description": "We don’t train on your data"
+      },
+      {
+        "title": "🔐 Access control",
+        "description": "Least‑privilege principle"
+      }
+    ],
+    "disabled": true
+  },
+  "how_it_works": {
+    "title": "How it works",
+    "description": "3 steps, with concrete limits and integrations",
+    "items": [
+      {
+        "title": "① Upload — Flexible input",
+        "description": "• Drag & drop or click to select\n• Batch uploads (Pro: 5 concurrent)\n• Import from YouTube/Vimeo (paste URL)\n• Formats: 20+ (MP4/MOV/AVI/...)\n• Size: Free 100MB • Paid 2GB\n• Cloud: Google Drive / Dropbox"
+      },
+      {
+        "title": "② AI Processing — Smart pipeline",
+        "description": "• OpenAI Whisper V3\n• 100+ languages auto‑detect\n• GPU acceleration (≈2m per 1h)\n• Intelligent denoise\n• Live progress bar\n• Resume on network issues"
+      },
+      {
+        "title": "③ Download — Rich export",
+        "description": "• 5 formats: SRT/VTT/TXT/DOCX/JSON\n• Permanent link (30 days)\n• Bulk zip download\n• Export to Notion/Google Docs\n• API to fetch results\n• Email notification"
+      }
+    ],
+    "disabled": true
+  },
+  "real_time_stats": {
+    "title": "Live processing stats",
+    "description": "Real-time data from our servers",
+    "items": [
+      {
+        "title": "12 Hours",
+        "description": "Processing time saved today",
+        "icon": "RiTimeLine"
+      },
+      {
+        "title": "156 Videos",
+        "description": "Converted this week",
+        "icon": "RiVideoLine"
+      },
+      {
+        "title": "28 Countries",
+        "description": "Served globally",
+        "icon": "RiGlobalLine"
+      },
+      {
+        "title": "99.9%",
+        "description": "System uptime",
+        "icon": "RiShieldCheckLine"
+      }
+    ]
+  },
+  "use_cases_extra": {
+    "disabled": true
+  },
+  "tool_description": {
+    "disabled": true
+  },
+  "demo": {
+    "disabled": true
+  },
+  "export_formats": {
+    "disabled": true
+  },
+  "supported": {
+    "title": "Supported Platforms & Formats",
+    "description": "Works great with popular platforms and file types",
+    "items": [
+      {
+        "title": "YouTube",
+        "description": "",
         "icon": "RiYoutubeLine"
       },
       {
-        "title": "Multiple Export Formats",
-        "description": "Export your transcripts as SRT subtitle files with precise timestamps, plain TXT for easy editing, VTT for web players, or formatted DOCX documents.",
-        "icon": "RiFileDownloadLine"
+        "title": "MP4",
+        "description": "",
+        "icon": "RiMovieLine"
       },
       {
-        "title": "Professional Use Cases",
-        "description": "Perfect for content creators, educators, and accessibility compliance. Note: Age-restricted or region-locked videos may require direct file upload.",
-        "icon": "RiUserLine"
-      }
-    ]
-  },
-  "export_formats": {
-    "title": "Export Formats",
-    "description": "Choose from multiple output formats to suit your workflow and requirements",
-    "items": [
-      {
-        "title": "Plain Text (TXT)",
-        "description": "Simple text format without timestamps",
-        "icon": "RiFileTextLine"
+        "title": "MOV",
+        "description": "",
+        "icon": "RiClapperboardLine"
       },
       {
-        "title": "SubRip (SRT)",
-        "description": "Subtitle format with precise timestamps",
-        "icon": "RiFileDownloadLine"
+        "title": "WebM",
+        "description": "",
+        "icon": "RiPlayCircleLine"
       },
       {
-        "title": "WebVTT (VTT)",
-        "description": "Web video text tracks format",
-        "icon": "RiFileDownloadLine"
+        "title": "MP3",
+        "description": "",
+        "icon": "RiMusic2Line"
       },
       {
-        "title": "Word Document (DOCX)",
-        "description": "Formatted document with styling",
-        "icon": "RiFileWordLine"
-      },
-      {
-        "title": "Markdown (MD)",
-        "description": "Structured text with formatting",
-        "icon": "RiMarkdownLine"
-      },
-      {
-        "title": "JSON",
-        "description": "Structured data with timestamps",
-        "icon": "RiCodeLine"
+        "title": "WAV",
+        "description": "",
+        "icon": "RiSoundModuleLine"
       }
     ]
   },
   "pricing": {
     "name": "pricing",
-    "title": "Simple Pricing",
-    "description": "Start free with 90-second previews, then choose what works best for you",
+    "title": "Simple, transparent pricing",
+    "description": "Choose a plan that fits • 🔥 Limited: 20% off annual (this month)",
     "items": [
       {
-        "title": "Free Preview",
+        "title": "Free",
         "price": "$0",
-        "unit": "Always",
-        "description": "90-second preview",
+        "unit": "Forever",
+        "description": "Perfect for trying out",
+        "is_featured": false,
+        "label": "🔥 Most Popular",
+        "features_title": "Basic Features",
         "features": [
-          "90-second preview",
-          "TXT & SRT preview",
-          "Basic quality",
-          "No account required"
+          "Transcription: 10min/day (resets UTC 0:00)",
+          "File size: single 100MB, 500MB/month total",
+          "Formats: MP4, MP3 basic support",
+          "Export: SRT, TXT only",
+          "Queue: standard (peak wait 3-5min)",
+          "Languages: 104 supported",
+          "Retention: 7 days auto-delete"
+        ],
+        "not_included": [
+          "Batch processing (5 concurrent)",
+          "API access (RESTful)",
+          "Priority queue (<1min)",
+          "Custom vocabulary",
+          "Advanced formats (VTT, ASS, DOCX)"
         ],
         "button": {
-          "title": "Try Free",
+          "title": "Start Free",
           "url": "#"
+        },
+        "tip": "Best for personal/occasional use"
+      },
+      {
+        "title": "Pro",
+        "price": "$9",
+        "unit": "/month",
+        "description": "For professionals",
+        "annual_price": "$7.20",
+        "annual_savings": "Save 20%",
+        "features_title": "Professional Features",
+        "features": [
+          "Transcription: 300min/month (rollover allowed)",
+          "File size: single 2GB, unlimited monthly",
+          "Formats: 20+ video/audio formats supported",
+          "Export: SRT, VTT, ASS, TXT, DOCX, JSON",
+          "Queue: priority lane (<1min processing)",
+          "API: 1000 calls/day, RESTful endpoints",
+          "Batch: 5 concurrent jobs, bulk download",
+          "Custom: professional vocabulary lists",
+          "SLA: 99.5% uptime guarantee",
+          "Support: email, 24hr response time",
+          "Retention: 30 days configurable"
+        ],
+        "not_included": [
+          "Team workspace & user roles",
+          "Webhook callbacks & integrations", 
+          "Advanced analytics dashboard",
+          "Phone support & dedicated success manager"
+        ],
+        "button": {
+          "title": "Go Pro",
+          "url": "#"
+        },
+        "label": "Most chosen",
+        "tip": "Creators & SMBs",
+        "is_featured": true
+      },
+      {
+        "title": "Team",
+        "price": "$29",
+        "unit": "/month",
+        "description": "For teams & enterprises",
+        "annual_price": "$23.20",
+        "annual_savings": "Save 20%",
+        "features_title": "Enterprise Features", 
+        "features": [
+          "Transcription: unlimited minutes/month",
+          "File size: single 10GB, unlimited total",
+          "Team: workspace, user roles, permissions",
+          "API: unlimited calls, full SDK suite",
+          "Webhooks: real-time callbacks & integrations",
+          "Analytics: advanced dashboard, detailed reports",
+          "Custom: integrations, SSO, white-label",
+          "Support: dedicated success manager, phone",
+          "SLA: 99.9% uptime with penalties",
+          "Security: SOC2, custom data retention",
+          "Compliance: GDPR, HIPAA options available"
+        ],
+        "button": {
+          "title": "Contact Sales",
+          "url": "#"
+        },
+        "tip": "Teams & enterprises",
+        "is_featured": false
+      }
+    ]
+  },
+  "testimonial": {
+    "name": "testimonials",
+    "title": "Loved by early users",
+    "description": "Real feedback from professionals who save hours daily",
+    "items": [
+      {
+        "title": "Sarah Chen",
+        "label": "Video Creator",
+        "description": "Way faster than other tools I've tried. The accuracy even gets technical terms right.",
+        "image": {
+          "src": "/imgs/users/7.png",
+          "alt": "Sarah"
         }
       },
       {
-        "title": "Day Pass",
-        "price": "$3",
-        "unit": "24 hours",
-        "description": "200 minutes processing",
-        "is_featured": true,
-        "label": "Best Value",
-        "features": [
-          "200 minutes processing",
-          "Priority queue",
-          "All export formats",
-          "24-hour access",
-          "Higher quality"
-        ],
-        "button": {
-          "title": "Get Started",
-          "url": "#"
+        "title": "Dr. Martinez",
+        "label": "Educator",
+        "description": "Perfect for creating lecture transcripts. My students love having searchable notes.",
+        "image": {
+          "src": "/imgs/users/5.png",
+          "alt": "Dr. Martinez"
         }
       },
       {
-        "title": "Monthly",
-        "price": "$12",
-        "unit": "per month",
-        "description": "300 minutes monthly",
-        "features": [
-          "300 minutes monthly",
-          "Bilingual support", 
-          "Chapter detection",
-          "Speaker separation",
-          "API access",
-          "Priority support"
-        ],
-        "button": {
-          "title": "Subscribe",
-          "url": "#"
+        "title": "Alex Kim",
+        "label": "Podcast Host",
+        "description": "Finally found a simple tool that just works. No complex setup, great results.",
+        "image": {
+          "src": "/imgs/users/9.png",
+          "alt": "Alex"
         }
       }
     ]
@@ -177,28 +357,214 @@
   "faq": {
     "name": "faq",
     "label": "FAQ",
-    "title": "Video to Text FAQ",
-    "description": "Common questions about video transcription and our service",
+    "title": "Answers you can act on",
+    "description": "Practical details with real limits",
     "items": [
       {
-        "title": "How to convert video to text online?",
-        "description": "Simply paste a YouTube link or upload your MP4/MOV/WebM file. We'll provide a 90-second preview instantly, then you can unlock the full transcription with timestamps and export in multiple formats."
+        "title": "Do you support Chinese? Accuracy?",
+        "description": "Yes. Mandarin 90%+; Cantonese ~85%; other dialects ~70%. Add custom vocabulary on Pro to improve domain terms."
       },
       {
-        "title": "Can I paste a YouTube link to get SRT subtitles?",
-        "description": "Yes! We first extract existing YouTube captions (instant results), and if none exist, we'll transcribe the audio automatically. Both methods produce SRT files with accurate timestamps."
+        "title": "What are free plan limits?",
+        "description": "Daily 10 minutes (resets at 00:00 UTC+8). 100MB/file. Exports: SRT/TXT. No batch. Standard queue (3–5m wait at peak)."
       },
       {
-        "title": "What video formats are supported?",
-        "description": "We support MP4, MOV, WebM, and AVI files. For online videos, YouTube links work best. Most common video codecs are automatically handled."
+        "title": "How to run batch processing?",
+        "description": "Pro supports 5 concurrent uploads, folder drag‑and‑drop, total size ≤10GB. Zip download. Optional webhook upon completion."
       },
       {
-        "title": "What if my video has no captions?",
-        "description": "No problem! Our AI transcription will process the audio track and generate accurate subtitles with timestamps. The 90-second preview lets you verify quality before full processing."
+        "title": "Privacy & data?",
+        "description": "SSL encryption. Files auto‑delete after 24h. We never train on user data. EU‑hosted options available. Self‑hosting offered for Enterprise."
       },
       {
-        "title": "How is my privacy protected?",
-        "description": "Source videos are automatically deleted after 24 hours. Generated transcripts are stored for 7-30 days (configurable), and you can manually delete them anytime. All files are stored securely with encryption."
+        "title": "Does background music affect accuracy?",
+        "description": "Light music: −5–10% accuracy. Strong beats: −20–30%. Tip: use original vocals or separate tracks. Pro includes intelligent denoise."
+      },
+      {
+        "title": "API integration?",
+        "description": "RESTful API with docs & SDKs (Python/Node/PHP). Typical latency <100ms. Rate limit: 1000/day on Pro."
+      }
+    ],
+    "disabled": true
+  },
+  "cta": {
+    "name": "cta",
+    "title": "Ready to save hours on transcription?",
+    "description": "⏱️ Average savings: 8h/week • ¥2000/month • 90% manual work\n🎯 Join 10,000+ users: creators • schools • companies • media\n💡 Today’s free quota left: 10 minutes\n30‑day refund • No credit card • Cancel anytime",
+    "buttons": [
+      {
+        "title": "Start Free Now",
+        "url": "#",
+        "icon": "RiPlayLine",
+        "variant": "default"
+      },
+      {
+        "title": "View Demo",
+        "url": "#demo",
+        "icon": "RiMovieLine",
+        "variant": "outline"
+      },
+      {
+        "title": "Book a Call",
+        "url": "#contact",
+        "icon": "RiCalendarScheduleLine",
+        "variant": "outline"
+      }
+    ]
+  },
+  "stats": {
+    "title": "",
+    "description": "",
+    "items": [
+      {
+        "title": "12,345+",
+        "description": "Videos processed"
+      },
+      {
+        "title": "98.5%",
+        "description": "Accuracy (EN: 98%, ZH: 95%)"
+      },
+      {
+        "title": "104",
+        "description": "Languages"
+      },
+      {
+        "title": "2m12s",
+        "description": "Avg processing (GPU accelerated)"
+      },
+      {
+        "title": "2GB",
+        "description": "Max file size"
+      },
+      {
+        "title": "10min",
+        "description": "Daily free"
+      },
+      {
+        "title": "24/7",
+        "description": "Online service"
+      },
+      {
+        "title": "99.9%",
+        "description": "Uptime SLA (Pro tier)"
+      }
+    ]
+  },
+  "effect_compare": {
+    "name": "effect-compare",
+    "title": "Real conversion showcase",
+    "description": "Tabs for EN/ZH/JP samples with preview and metrics.",
+    "items": [
+      {
+        "title": "English sample",
+        "description": "[Video]\n• TED talk clip\n• Duration: 5:23\n• Speaker: 1\n• Background: none\n\n[Preview]\n\"In the age of AI, we must...\"\n\"Technology is advancing at...\"\n\n[Metrics]\nAccuracy: 98.5% | Time: 12s | Words: 1,250 | Paragraphs: 15\n[View full case]"
+      },
+      {
+        "title": "Chinese meeting",
+        "description": "[Video]\n• Tencent Meeting\n• Duration: 12:40\n• Speakers: 3\n• Background: low\n\n[Preview]\n\"本次会议围绕目标拆解与里程碑...\"\n\n[Metrics]\nAccuracy: 95% | Time: 22s | Words: 1,980 | Sections: 8"
+      },
+      {
+        "title": "Japanese clip",
+        "description": "[Video]\n• Tutorial clip\n• Duration: 3:05\n• Speaker: 1\n\n[Preview]\n\"本日はAIの基本概念について...\"\n\n[Metrics]\nAccuracy: 94% | Time: 9s | Bilingual: EN/JP"
+      }
+    ],
+    "disabled": true
+  },
+  "service_matrix": {
+    "name": "service-matrix",
+    "title": "Why choose us? Real numbers",
+    "description": "Cost savings and feature comparison based on 100 hours monthly usage",
+    "savings": {
+      "title": "Annual Cost Savings",
+      "manual_cost": "¥239,652",
+      "competitor_cost": "¥12,000",
+      "our_cost": "¥348",
+      "savings_percent": "99.8%",
+      "subtitle": "Based on 100 hours/month processing"
+    },
+    "items": [
+      {
+        "title": "Cost per hour",
+        "description": "¥3.48 / ¥10 / ¥200",
+        "icon": "💰"
+      },
+      {
+        "title": "Processing speed",
+        "description": "2min / 10min / 3hrs",
+        "icon": "⚡"
+      },
+      {
+        "title": "Accuracy rate",
+        "description": "98.5% / 85% / 99%",
+        "icon": "🎯"
+      },
+      {
+        "title": "Languages supported",
+        "description": "104 / 20+ / By appointment",
+        "icon": "🌍"
+      },
+      {
+        "title": "Max file size",
+        "description": "2GB / 500MB / No limit",
+        "icon": "📁"
+      },
+      {
+        "title": "Output formats",
+        "description": "12 formats / 3 formats / 2 formats",
+        "icon": "📄"
+      },
+      {
+        "title": "Batch processing",
+        "description": "5 concurrent / ✗ / ✗",
+        "icon": "⚙️"
+      },
+      {
+        "title": "API access",
+        "description": "Full API / Paid add-on / ✗",
+        "icon": "🔗"
+      },
+      {
+        "title": "Turnaround time",
+        "description": "<2min / 10min / 3-24hrs",
+        "icon": "⏰"
+      },
+      {
+        "title": "Customer support",
+        "description": "24/7 chat / Email / Phone only",
+        "icon": "🎧"
+      },
+      {
+        "title": "Data retention",
+        "description": "30 days / 7 days / Permanent",
+        "icon": "💾"
+      },
+      {
+        "title": "Custom vocabulary",
+        "description": "✓ Unlimited / ✗ / ✓ Extra cost",
+        "icon": "📚"
+      }
+    ]
+  },
+  "tech_advantages": {
+    "name": "tech-advantages",
+    "title": "Built on modern AI",
+    "description": "Practical advantages that matter",
+    "items": [
+      {
+        "title": "Whisper V3",
+        "description": "State-of-the-art ASR accuracy"
+      },
+      {
+        "title": "GPU acceleration",
+        "description": "~10x faster than CPU"
+      },
+      {
+        "title": "Noise reduction",
+        "description": "Filters background noise"
+      },
+      {
+        "title": "Chunk processing",
+        "description": "Stable for long videos"
       }
     ]
   },
@@ -215,15 +581,6 @@
     "disabled": true
   },
   "feature": {
-    "disabled": true
-  },
-  "stats": {
-    "disabled": true
-  },
-  "testimonial": {
-    "disabled": true
-  },
-  "cta": {
     "disabled": true
   },
   "footer": {
@@ -292,6 +649,602 @@
           "title": "Terms of Service",
           "url": "/terms-of-service"
         }
+      ]
+    }
+  },
+  "core_benefits": {
+    "name": "core-benefits",
+    "title": "Why choose us?",
+    "description": "Clear advantages at a glance",
+    "items": [
+      {
+        "title": "🚀 10 minutes",
+        "description": "Daily free quota • 3× more than others"
+      },
+      {
+        "title": "📁 500MB",
+        "description": "File size limit • 5× larger than others"
+      },
+      {
+        "title": "⚡ 2 minutes",
+        "description": "Process 1h video • ~60% faster"
+      },
+      {
+        "title": "🎯 95%",
+        "description": "Typical accuracy • ~10% higher"
+      }
+    ],
+    "disabled": true
+  },
+  "cost_overview": {
+    "name": "cost-overview",
+    "title": "100h monthly transcription cost",
+    "description": "Manual  ████████████████████ ¥20,000\nOther   ████  ¥1,000\nUs      ▌ ¥29\n\nYou save 99.8% — a coffee/month, 1 day salary to process a year",
+    "items": [
+      {
+        "title": "",
+        "description": ""
+      }
+    ],
+    "disabled": true
+  },
+  "plan_quick_compare": {
+    "name": "plan-quick-compare",
+    "title": "Quick plan comparison",
+    "description": "Key limits and capabilities",
+    "items": [
+      {
+        "title": "Monthly quota",
+        "description": "5h / 100h / Unlimited"
+      },
+      {
+        "title": "Per‑file size",
+        "description": "100MB / 2GB / 10GB"
+      },
+      {
+        "title": "Concurrency",
+        "description": "1 / 5 / 20"
+      },
+      {
+        "title": "API",
+        "description": "✗ / 1000/day / Unlimited"
+      },
+      {
+        "title": "Export formats",
+        "description": "2 / 5 / All"
+      },
+      {
+        "title": "Support",
+        "description": "Community / Email / Dedicated"
+      },
+      {
+        "title": "SLA",
+        "description": "None / 99% / 99.9%"
+      }
+    ],
+    "disabled": true
+  },
+  "formats": {
+    "name": "formats",
+    "title": "Full format support",
+    "description": "Grouped by input/output/cloud",
+    "items": [
+      {
+        "title": "📥 Input",
+        "description": "Video: MP4 • MOV • AVI • MKV • WMV • FLV • WebM • 3GP\nAudio: MP3 • WAV • AAC • M4A • FLAC • OGG • WMA\nSize: up to 2GB (Free 100MB)"
+      },
+      {
+        "title": "📤 Output",
+        "description": "Subtitles: SRT • VTT • ASS • SSA\nDocuments: TXT • DOCX • PDF • MD\nData: JSON • XML • CSV"
+      },
+      {
+        "title": "☁️ Cloud import",
+        "description": "YouTube • Vimeo • Google Drive • Dropbox • OneDrive\nPaste URL to import"
+      }
+    ],
+    "disabled": true
+  },
+  "workflow": {
+    "name": "workflow",
+    "title": "Smart processing pipeline",
+    "description": "Upload(2s) → Preprocess(10s) → Recognize(30s) → Optimize(5s) → Export(2s)\n↓           ↓               ↓              ↓             ↓\nVerify     Audio extract   AI ASR        Smart fixes    Format",
+    "items": [
+      {
+        "title": "Upload",
+        "description": "Up to 2GB • Batch • URL import"
+      },
+      {
+        "title": "Preprocess",
+        "description": "Detect language • Denoise • Enhance"
+      },
+      {
+        "title": "Recognize",
+        "description": "GPU Whisper V3 • Fast & accurate"
+      },
+      {
+        "title": "Optimize",
+        "description": "Punctuation • Timestamps • Segments"
+      },
+      {
+        "title": "Export",
+        "description": "SRT • VTT • TXT • DOCX • PDF"
+      }
+    ],
+    "disabled": true
+  },
+  "case_studies": {
+    "name": "cases-stats",
+    "title": "Case studies (by numbers)",
+    "description": "Measured impact from real deployments",
+    "items": [
+      {
+        "title": "Education org",
+        "description": "1000+ lectures subtitled • Saved 3 FTE • 20× faster"
+      },
+      {
+        "title": "Media company",
+        "description": "50 interviews/day • Cost down 95% • From 3d to 3h"
+      }
+    ],
+    "disabled": true
+  },
+  "why_visuals": {
+    "name": "why-visuals",
+    "title": "Why choose us — visual comparison",
+    "description": "Speed • Cost • Capabilities",
+    "items": [
+      {
+        "title": "⏱️ Speed",
+        "description": "Us  ████████████████████ 2m\nOther ████████ 10m\nManual █ 180m"
+      },
+      {
+        "title": "💰 Cost (100h)",
+        "description": "Us  ▌ ¥29\nOther ██████ ¥1,000\nManual ████████████████████ ¥20,000"
+      },
+      {
+        "title": "📊 Features",
+        "description": "Batch ✅/❌/❌  •  API ✅/💰/❌  •  Live progress ✅/❌/❌  •  24/7 ✅/✅/❌"
+      }
+    ],
+    "disabled": true
+  },
+  "core_value": {
+    "name": "core-value",
+    "title": "Why choose us? Real numbers",
+    "description": "100h processing: Manual ¥20,000 → Us ¥29 (save 99.8%).\n10min free/day • 2min per 1h • 95% accuracy • 500MB/file.",
+    "items": [
+      {
+        "title": "Cost (100h/month)",
+        "description": "Manual  ████████████████████  ¥20,000\nOther   ████                 ¥1,000\nUs      ▌                    ¥29\n\nSave 99.8% — a coffee/month to process all content"
+      },
+      {
+        "title": "Efficiency (time to process 1h video)",
+        "description": "Manual  ████████████████  180m\nOther    ████████          10m\nUs       ▌                 2m\n\n90× faster — same‑day turnaround"
+      },
+      {
+        "title": "Capabilities (at a glance)",
+        "description": "Free quota   10min/day • Others: 3min\nFile size    500MB/file • Others: 100MB\nBatch        ✓ • Others: ✗\nAPI          ✓ • Others: paid/✗\nAccuracy     95% (typical)\nAvailability 24/7"
+      }
+    ]
+  },
+  "use_cases": {
+    "name": "use-cases",
+    "title": "📹 What can Video to Text do for you?",
+    "description": "From education to content creation, from business to research<br />Discover the powerful applications of video-to-text across various fields",
+    "categories": [
+      {
+        "title": "Education",
+        "subtitle": "Education",
+        "cases": [
+          {
+            "title": "Auto-generate subtitles for online courses",
+            "description": "Enhance learning experience with multilingual support"
+          },
+          {
+            "title": "Convert lecture recordings to text notes",
+            "description": "Convenient for review and knowledge organization"
+          },
+          {
+            "title": "Add bilingual subtitles to foreign language videos",
+            "description": "Assist language learning and comprehension"
+          }
+        ]
+      },
+      {
+        "title": "Content Creation",
+        "subtitle": "Content Creation",
+        "cases": [
+          {
+            "title": "Convert YouTube videos to blog articles",
+            "description": "One-click generation of text version content"
+          },
+          {
+            "title": "Quickly generate transcripts from podcast audio",
+            "description": "Save significant organization time"
+          },
+          {
+            "title": "Quickly locate key dialogue in video editing",
+            "description": "Improve editing efficiency"
+          }
+        ]
+      },
+      {
+        "title": "Business Use",
+        "subtitle": "Business Use",
+        "cases": [
+          {
+            "title": "Auto-generate meeting minutes from Zoom meetings",
+            "description": "Improve meeting efficiency"
+          },
+          {
+            "title": "Quickly organize customer interviews into documents",
+            "description": "Convenient for analysis and decision-making"
+          },
+          {
+            "title": "Convert training videos into training manuals",
+            "description": "Standardize training processes"
+          }
+        ]
+      },
+      {
+        "title": "Research",
+        "subtitle": "Research",
+        "cases": [
+          {
+            "title": "Transcribe interview recordings for coding analysis",
+            "description": "Essential tool for qualitative research"
+          },
+          {
+            "title": "Text-convert focus group discussion content",
+            "description": "More efficient data collection"
+          },
+          {
+            "title": "Quickly translate and transcribe multilingual content",
+            "description": "Break language barriers"
+          }
+        ]
+      }
+    ]
+  },
+  "transcription_demo": {
+    "heading": "🎬 Real Transcription Results",
+    "description": "See how our AI accurately handles various types of video content<br />From technical lectures to business meetings, from code tutorials to group discussions",
+    "tabs": [
+      {
+        "id": "interview",
+        "title": "Interview Dialogue",
+        "subtitle": "Interview"
+      },
+      {
+        "id": "lecture",
+        "title": "Teaching Lecture",
+        "subtitle": "Lecture"
+      },
+      {
+        "id": "meeting",
+        "title": "Business Meeting",
+        "subtitle": "Meeting"
+      },
+      {
+        "id": "podcast",
+        "title": "Podcast Show",
+        "subtitle": "Podcast"
+      }
+    ],
+    "content": {
+      "interview": {
+        "audio_info": "Audio source: Customer interview recording | Duration: 3:42 | Language: English",
+        "transcript": "Host: Today we have invited Mr. Johnson to share his company's experience in digital transformation.\n\nMr. Johnson: Thank you. Our company has been comprehensively promoting digital transformation since 2019, mainly focusing on three areas: first is the automation of internal processes...\n\nHost: What was the biggest challenge encountered in this process?\n\nMr. Johnson: I think the biggest challenge is actually employee acceptance. Technology itself is not the problem, the key is how to help the team adapt to new working methods.",
+        "confidence": 96
+      },
+      "lecture": {
+        "audio_info": "Audio source: University open course | Duration: 15 minutes | Language: English",
+        "transcript": "Today we will explain the basics of neural networks in machine learning. Neural networks are computational models designed inspired by biological neural systems.\n\nThe simplest neural network contains three parts: input layer, hidden layer, and output layer. Each neuron receives input signals, processes them through activation functions, and then passes them to the next layer...\n\nThe backpropagation algorithm is the core algorithm for training neural networks, which adjusts the weight parameters in the network by calculating gradients.",
+        "confidence": 98
+      },
+      "meeting": {
+        "audio_info": "Audio source: Online meeting recording | Duration: 45 minutes | Language: English",
+        "transcript": "Manager Zhang: Hello everyone, today's meeting mainly discusses Q4 marketing strategy. Please have each department report on the current progress.\n\nMarketing Manager Wang: We have completed competitive analysis and found that main competitors invest heavily in social media marketing...\n\nSales Manager Li: From sales data, the online channel conversion rate is 15% higher than expected, suggesting we should increase digital marketing investment.",
+        "confidence": 94
+      },
+      "podcast": {
+        "audio_info": "Audio source: Tech podcast | Duration: 28 minutes | Language: English",
+        "transcript": "Host: Welcome to this episode of Tech Frontier, I'm host Wang. Today we're talking about the latest applications of artificial intelligence in healthcare.\n\nGuest: Hello everyone, I'm a product manager from a medical AI company. We recently launched a medical imaging diagnosis system based on deep learning...\n\nHost: What's the accuracy rate of this system? How does it perform in actual clinical applications?",
+        "confidence": 97
+      }
+    }
+  },
+  "video_types": {
+    "heading": "📹 Supported Video Types",
+    "description": "Understand our transcription capabilities for different video types<br />And factors that may affect accuracy with solutions",
+    "supported_types": {
+      "title": "✅ Perfectly Supported Video Types",
+      "types": [
+        {
+          "title": "Online courses, educational videos",
+          "description": "Clear pronunciation, structured content",
+          "accuracy": 98
+        },
+        {
+          "title": "Podcasts, interview programs",
+          "description": "Clear audio, natural dialogue",
+          "accuracy": 96
+        },
+        {
+          "title": "Meeting recordings, webinars",
+          "description": "Business dialogue, professional terminology",
+          "accuracy": 95
+        },
+        {
+          "title": "News, documentaries",
+          "description": "Standard language, clear narration",
+          "accuracy": 97
+        },
+        {
+          "title": "Single-speaker presentations, TED talks",
+          "description": "Presentation style, clear thinking",
+          "accuracy": 98
+        },
+        {
+          "title": "Vlogs, personal sharing",
+          "description": "Casual conversation, relaxed tone",
+          "accuracy": 92
+        }
+      ]
+    },
+    "limitations": {
+      "title": "⚠️ Factors That May Affect Accuracy",
+      "factors": [
+        {
+          "title": "Loud background music",
+          "impact": "Audio mixing interferes with recognition",
+          "accuracy_loss": 20,
+          "solution": "Suggest noise reduction or choosing sections with less music"
+        },
+        {
+          "title": "Multiple people speaking simultaneously",
+          "impact": "Overlapping voices difficult to separate",
+          "accuracy_loss": 30,
+          "solution": "AI will try to identify the main speaker"
+        },
+        {
+          "title": "Strong accents or dialects",
+          "impact": "Pronunciation deviation affects recognition",
+          "accuracy_loss": 25,
+          "solution": "Support dialect dictionaries, continuous optimization"
+        },
+        {
+          "title": "Dense professional terminology",
+          "impact": "Lower recognition rate for specialized vocabulary",
+          "accuracy_loss": 15,
+          "solution": "Can be improved through custom vocabulary lists"
+        }
+      ]
+    },
+    "accuracy_note": {
+      "title": "Accuracy Note",
+      "description": "Even under difficult conditions, our AI maintains a high baseline accuracy. The system automatically detects audio quality and provides confidence scores to help you judge the reliability of transcription results. For important content, we recommend using clear audio sources for best results."
+    }
+  },
+  "output_formats": {
+    "heading": "📄 Export Formats and Their Uses",
+    "description": "Multiple professional formats for different needs<br />From video production to document editing, from API integration to data analysis",
+    "categories": [
+      {
+        "title": "Subtitle Formats",
+        "subtitle": "Subtitle Formats",
+        "description": "For video production and publishing",
+        "formats": [
+          {
+            "name": "SRT",
+            "description": "Universal subtitle format",
+            "features": ["Precise timeline", "Multi-language support", "High compatibility"],
+            "platforms": ["YouTube", "Vimeo", "Bilibili", "iQiyi"],
+            "tip": "Most common subtitle format, supported by almost all players"
+          },
+          {
+            "name": "VTT",
+            "description": "Web video subtitles",
+            "features": ["HTML5 native support", "Customizable styles", "Interactive features"],
+            "platforms": ["Web players", "HTML5 video", "Online course platforms"],
+            "tip": "Preferred format for web videos, supports rich styling"
+          },
+          {
+            "name": "ASS",
+            "description": "Advanced subtitle format",
+            "features": ["Rich styles", "Effects support", "Multi-track"],
+            "platforms": ["Aegisub", "PotPlayer", "VLC"],
+            "tip": "Suitable for professional video production requiring complex styles and effects"
+          }
+        ]
+      },
+      {
+        "title": "Document Formats",
+        "subtitle": "Document Formats",
+        "description": "For editing and sharing",
+        "formats": [
+          {
+            "name": "DOCX",
+            "description": "Word document",
+            "features": ["Format preservation", "Editable", "Comment support"],
+            "platforms": ["Microsoft Word", "WPS", "Google Docs"],
+            "tip": "Convenient for further editing and formatting, supports inserting images and tables"
+          },
+          {
+            "name": "PDF",
+            "description": "Portable document",
+            "features": ["Fixed format", "Easy sharing", "Print friendly"],
+            "platforms": ["All devices", "Online preview", "Printers"],
+            "tip": "Suitable for formal documents and reports, ensures consistent display across devices"
+          },
+          {
+            "name": "TXT",
+            "description": "Plain text",
+            "features": ["Small size", "High compatibility", "Fast loading"],
+            "platforms": ["All text editors", "Code editors"],
+            "tip": "Most concise format, suitable for further processing and analysis"
+          }
+        ]
+      },
+      {
+        "title": "Data Formats",
+        "subtitle": "Data Formats",
+        "description": "For analysis and processing",
+        "formats": [
+          {
+            "name": "JSON",
+            "description": "Structured data",
+            "features": ["Timestamps", "Confidence scores", "Speaker identification"],
+            "platforms": ["API integration", "Data analysis tools", "Programming"],
+            "tip": "Contains complete metadata information, suitable for secondary development and data analysis"
+          },
+          {
+            "name": "CSV",
+            "description": "Tabular data",
+            "features": ["Excel compatible", "Statistical analysis", "Batch processing"],
+            "platforms": ["Excel", "Google Sheets", "Data analysis software"],
+            "tip": "Convenient for statistical analysis and batch data processing"
+          },
+          {
+            "name": "XML",
+            "description": "Markup language",
+            "features": ["Clear structure", "Custom tags", "Validation support"],
+            "platforms": ["Professional software", "System integration", "Data exchange"],
+            "tip": "Suitable for enterprise-level system integration and complex data exchange needs"
+          }
+        ]
+      }
+    ]
+  },
+  "roi_calculator": {
+    "heading": "💰 Calculate Your Cost Savings",
+    "description": "Adjust the slider to see how much time and money you can save using our service<br />Let the numbers speak for themselves, ROI at a glance",
+    "input_section": {
+      "title": "📊 Your Needs",
+      "monthly_hours_label": "Monthly transcription needed",
+      "hours_unit": "hours",
+      "slider_labels": ["1 hour", "25 hours", "50 hours", "75 hours", "100+ hours"]
+    },
+    "traditional_method": {
+      "title": "Traditional Way",
+      "hiring_cost": {
+        "label": "Hiring transcription cost",
+        "unit": "/month"
+      },
+      "self_work": {
+        "label": "Self-organizing time",
+        "unit": "hours/month",
+        "days_note": "work days"
+      },
+      "waiting_time": {
+        "label": "Waiting time",
+        "value": "3-5 days"
+      }
+    },
+    "our_method": {
+      "title": "Using Us",
+      "service_cost": {
+        "label": "Service cost",
+        "unit": "/month"
+      },
+      "processing_time": {
+        "label": "Processing time",
+        "unit": "hours/month",
+        "note": "Only need checking and fine-tuning"
+      },
+      "result_time": {
+        "label": "Get result",
+        "value": "Immediately"
+      }
+    },
+    "savings_section": {
+      "title": "💎 You Will Save",
+      "monthly_savings": "Monthly savings",
+      "yearly_savings": "Yearly savings",
+      "roi": "Return on investment",
+      "time_saved": {
+        "label": "Time saved:",
+        "unit": "hours/month",
+        "equivalent": "Equivalent to {days} work days"
+      }
+    },
+    "cta": "Start Saving Costs Now"
+  },
+  "quick_start": {
+    "heading": "🚀 Get Started in 30 Seconds",
+    "description": "No complex setup required, complete video-to-text in 4 simple steps<br />From upload to download, the entire process is simple and efficient",
+    "steps": [
+      {
+        "title": "Upload Video",
+        "description": "Drag files or paste links",
+        "details": [
+          "Support MP4, MOV, AVI and other common formats",
+          "Support YouTube, Bilibili and other platform links",
+          "Maximum support for 2GB file upload",
+          "Drag and drop upload, simple and convenient"
+        ]
+      },
+      {
+        "title": "Select Language (Optional)",
+        "description": "Auto-detect or manual selection",
+        "details": [
+          "Support Chinese, English, Japanese and 30+ languages",
+          "Smart language detection, 95%+ accuracy",
+          "Support mixed language content",
+          "Can set primary and secondary languages"
+        ]
+      },
+      {
+        "title": "Click Transcribe",
+        "description": "View progress in real-time",
+        "details": [
+          "GPU-accelerated processing, 10x speed boost",
+          "Real-time progress display",
+          "Preview first 90 seconds for free",
+          "Automatic notification when processing complete"
+        ]
+      },
+      {
+        "title": "Download Results",
+        "description": "Choose your preferred format",
+        "details": [
+          "SRT, VTT subtitle formats",
+          "TXT, DOCX document formats",
+          "JSON, CSV data formats",
+          "One-click download multiple formats"
+        ]
+      }
+    ],
+    "tips": {
+      "title": "💡 Professional Tips",
+      "list": [
+        {
+          "title": "Clearer video, higher accuracy",
+          "description": "Recommend using high-quality audio source, avoid background noise interference"
+        },
+        {
+          "title": "Can test with free quota first",
+          "description": "90-second free preview, purchase full service when satisfied"
+        },
+        {
+          "title": "Batch processing saves more time",
+          "description": "Support simultaneous upload of multiple files, batch transcription more efficient"
+        },
+        {
+          "title": "Multi-user collaboration feature",
+          "description": "Support team project sharing, collaborative editing of transcription results"
+        }
+      ]
+    },
+    "cta_section": {
+      "title": "Ready to get started?",
+      "description": "Upload your first video and experience the power of AI transcription<br />First 90 seconds completely free, no registration required to start",
+      "upload_btn": "Upload Video Now",
+      "demo_btn": "Watch Demo Video",
+      "features": [
+        { "label": "90s free preview" },
+        { "label": "Multi-format export" },
+        { "label": "GPU-accelerated processing" }
       ]
     }
   }

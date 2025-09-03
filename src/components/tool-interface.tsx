@@ -453,6 +453,13 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           </button>
         </div>
 
+        {/* Social proof under primary action */}
+        {!isProcessing && (
+          <div className="mt-2 text-center text-xs text-muted-foreground">
+            {t("social_proof")}
+          </div>
+        )}
+
         {/* Progress Display */}
         {progress && (
           <div className="mt-8 flex flex-col items-center space-y-6 p-6 rounded-lg" style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)" }}>

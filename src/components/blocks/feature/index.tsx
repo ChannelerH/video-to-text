@@ -7,26 +7,35 @@ export default function Feature({ section }: { section: SectionType }) {
   }
 
   return (
-    <section id={section.name} className="py-16">
+    <section id={section.name} className="design-section">
       <div className="container">
-        <div className="mx-auto flex max-w-(--breakpoint-md) flex-col items-center gap-2">
-          <h2 className="mb-2 text-pretty text-3xl font-bold lg:text-4xl">
+        <div className="text-center mb-16">
+          <h2 className="design-heading-2">
             {section.title}
           </h2>
-          <p className="mb-8 max-w-xl text-muted-foreground lg:max-w-none lg:text-lg">
+          <p className="design-description">
             {section.description}
           </p>
         </div>
-        <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-3">
+        <div className={`design-grid ${section.items && section.items.length <= 3 ? 'design-grid-3' : section.items && section.items.length <= 6 ? 'design-grid-6' : 'design-grid-4'}`}>
           {section.items?.map((item, i) => (
-            <div key={i} className="flex flex-col">
-              {item.icon && (
-                <div className="mb-5 flex size-16 items-center justify-center rounded-full border border-primary">
-                  <Icon name={item.icon} className="size-8 text-primary" />
+            <div key={i} className="design-card flex flex-col items-center text-center">
+              {/* 步骤编号（仅在3步骤时显示） */}
+              {section.items && section.items.length === 3 && (
+                <div className="step-number mb-4">
+                  {i + 1}
                 </div>
               )}
-              <h3 className="mb-2 text-xl font-semibold">{item.title}</h3>
-              <p className="text-muted-foreground">{item.description}</p>
+              
+              {item.icon && (
+                <div className="design-icon">
+                  <Icon name={item.icon} className="w-8 h-8" />
+                </div>
+              )}
+              <h3 className="design-heading-3 text-center">{item.title}</h3>
+              {item.description && (
+                <p className="text-gray-300 leading-relaxed">{item.description}</p>
+              )}
             </div>
           ))}
         </div>
