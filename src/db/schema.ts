@@ -65,6 +65,7 @@ export const orders = pgTable("v2tx_orders", {
   paid_at: timestamp({ withTimezone: true }),
   paid_email: varchar({ length: 255 }),
   paid_detail: text(),
+  payment_provider: varchar({ length: 50 }).default("stripe"),
 });
 
 // API Keys table

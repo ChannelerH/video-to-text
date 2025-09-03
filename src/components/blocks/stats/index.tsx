@@ -10,7 +10,7 @@ export default function Stats({ section }: { section: SectionType }) {
   }
 
   return (
-    <section id={section.name} className="design-section bg-gradient-to-b from-gray-900/50 to-purple-900/20">
+    <section id={section.name} className="design-section">
       <div className="container">
         {(section.title || section.description || section.label) && (
           <div className="text-center mb-16">
@@ -74,117 +74,113 @@ export default function Stats({ section }: { section: SectionType }) {
           </div>
         )}
         
-        <div className="design-grid design-grid-4 gap-6">
-          {section.items?.map((item: any, i: number) => {
-            const colorMap: { [key: string]: string } = {
-              blue: "text-blue-400 border-blue-400/30 bg-blue-400/10",
-              green: "text-green-400 border-green-400/30 bg-green-400/10", 
-              emerald: "text-emerald-400 border-emerald-400/30 bg-emerald-400/10",
-              purple: "text-purple-400 border-purple-400/30 bg-purple-400/10",
-              red: "text-red-400 border-red-400/30 bg-red-400/10",
-              violet: "text-violet-400 border-violet-400/30 bg-violet-400/10",
-              indigo: "text-indigo-400 border-indigo-400/30 bg-indigo-400/10",
-              pink: "text-pink-400 border-pink-400/30 bg-pink-400/10"
-            };
-            
-            const cardColor = colorMap[item.color] || colorMap.purple;
-            
-            return (
-              <motion.div
-                key={i}
-                className={`relative p-6 rounded-xl border backdrop-blur-sm hover:backdrop-blur-md transition-all duration-300 ${cardColor}`}
-                initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+        {/* 4个核心指标 - 简洁布局 */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <motion.div
+            className="design-card text-center p-6"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            viewport={{ once: true }}
+          >
+            <div className="text-3xl font-bold mb-1 text-white">
+              2,567 <motion.span 
+                className="text-lg text-green-400 font-black" 
+                animate={{ 
+                  y: [-2, 2, -2],
+                  scale: [1, 1.1, 1]
+                }}
                 transition={{ 
-                  delay: i * 0.1, 
-                  duration: 0.6,
-                  type: "spring",
-                  stiffness: 120
+                  duration: 2, 
+                  repeat: Infinity, 
+                  ease: "easeInOut" 
                 }}
-                viewport={{ once: true }}
-                whileHover={{ 
-                  scale: 1.02,
-                  y: -4,
-                  transition: { duration: 0.2 }
-                }}
-              >
-                {/* Dashboard-style indicator */}
-                <motion.div 
-                  className="absolute top-4 right-4 w-2 h-2 bg-green-400 rounded-full"
-                  animate={{ 
-                    opacity: [0.3, 1, 0.3],
-                  }}
-                  transition={{ 
-                    duration: 2 + (i * 0.3),
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                />
-                
-                <div className="relative z-10">
-                  {/* Icon */}
-                  <motion.div 
-                    className="mb-4 flex items-center justify-between"
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ 
-                      delay: i * 0.1 + 0.2, 
-                      duration: 0.5
-                    }}
-                    viewport={{ once: true }}
-                  >
-                    <Icon name={item.icon || "RiBarChartLine"} className="w-8 h-8" />
-                    <span className="text-xs font-mono opacity-60">#{i + 1}</span>
-                  </motion.div>
+              >↗ +12%</motion.span>
+            </div>
+            <div className="text-gray-400 text-sm mb-1">今日处理</div>
+            <div className="text-xs text-gray-500">（行业平均：800）</div>
+          </motion.div>
 
-                  {/* Data Value */}
-                  <motion.div 
-                    className="mb-3"
-                    initial={{ scale: 0.5, opacity: 0 }}
-                    whileInView={{ scale: 1, opacity: 1 }}
-                    transition={{ 
-                      delay: i * 0.1 + 0.3, 
-                      duration: 0.6,
-                      type: "spring",
-                      stiffness: 150
-                    }}
-                    viewport={{ once: true }}
-                  >
-                    <div className="text-3xl font-bold mb-1">
-                      {item.title || item.label}
-                    </div>
-                    <div className="text-sm opacity-80">
-                      {item.description}
-                    </div>
-                  </motion.div>
-                  
-                  {/* Trend indicator */}
-                  <motion.div 
-                    className="flex items-center gap-2 text-xs font-semibold opacity-60"
-                    initial={{ opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 0.6, y: 0 }}
-                    transition={{ delay: i * 0.1 + 0.5, duration: 0.5 }}
-                    viewport={{ once: true }}
-                  >
-                    <motion.span 
-                      className="inline-block"
-                      animate={{ 
-                        rotate: [0, 5, -5, 0],
-                      }}
-                      transition={{ 
-                        duration: 3 + (i * 0.5),
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                    >
-                      📊
-                    </motion.span>
-                    {item.trend}
-                  </motion.div>
-                </div>
-              </motion.div>
-            );
-          })}
+          <motion.div
+            className="design-card text-center p-6"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+            viewport={{ once: true }}
+          >
+            <div className="text-3xl font-bold mb-1 text-white">
+              95.5% <motion.span 
+                className="text-lg text-green-400 font-black" 
+                animate={{ 
+                  rotate: [0, 10, 0],
+                  scale: [1, 1.15, 1]
+                }}
+                transition={{ 
+                  duration: 1.5, 
+                  repeat: Infinity, 
+                  ease: "easeInOut",
+                  delay: 0.5 
+                }}
+              >🎯</motion.span>
+            </div>
+            <div className="text-gray-400 text-sm mb-1">准确率</div>
+            <div className="text-xs text-gray-500">（行业领先）</div>
+          </motion.div>
+
+          <motion.div
+            className="design-card text-center p-6"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.4 }}
+            viewport={{ once: true }}
+          >
+            <div className="text-3xl font-bold mb-1 text-white">
+              1.9min <motion.span 
+                className="text-lg text-blue-400 font-black" 
+                animate={{ 
+                  x: [-3, 3, -3],
+                  opacity: [0.8, 1, 0.8]
+                }}
+                transition={{ 
+                  duration: 1.8, 
+                  repeat: Infinity, 
+                  ease: "easeInOut",
+                  delay: 1 
+                }}
+              >⚡ 快3倍</motion.span>
+            </div>
+            <div className="text-gray-400 text-sm mb-1">平均速度</div>
+            <div className="text-xs text-gray-500">（竞品平均：6min）</div>
+          </motion.div>
+
+          <motion.div
+            className="design-card text-center p-6"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+            viewport={{ once: true }}
+          >
+            <div className="text-3xl font-bold mb-1 text-white">
+              234 <motion.span 
+                className="text-lg text-purple-400 font-black" 
+                animate={{ 
+                  scale: [1, 1.2, 1],
+                  y: [-1, 1, -1]
+                }}
+                transition={{ 
+                  duration: 2.2, 
+                  repeat: Infinity, 
+                  ease: "easeInOut",
+                  delay: 1.5 
+                }}
+              >📈 +15</motion.span>
+            </div>
+            <div className="text-gray-400 text-sm mb-1">在线用户</div>
+            <div className="flex items-center justify-center gap-1">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="text-green-400 text-xs">实时</span>
+            </div>
+          </motion.div>
         </div>
         
         {/* Professional social proof */}

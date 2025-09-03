@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import Icon from "@/components/icon";
@@ -14,7 +16,7 @@ export default function CTA({ section }: { section: SectionType }) {
     <section id={section.name} className="design-section">
       <div className="container">
         <motion.div 
-          className="design-card featured text-center py-16"
+          className="design-card text-center py-16 bg-gradient-to-b from-gray-900/50 to-gray-800/30 border-gray-700/30"
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
@@ -29,7 +31,7 @@ export default function CTA({ section }: { section: SectionType }) {
               transition={{ delay: 0.2, duration: 0.5 }}
               viewport={{ once: true }}
             >
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-r from-purple-500 to-pink-600 flex items-center justify-center text-white text-4xl mx-auto shadow-2xl">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white text-4xl mx-auto shadow-2xl">
                 <RiRocketLine className="w-10 h-10" />
               </div>
             </motion.div>
@@ -72,7 +74,7 @@ export default function CTA({ section }: { section: SectionType }) {
                       <Link
                         href={item.url || ""}
                         target={item.target}
-                        className={isPrimary ? "design-btn-primary enhanced" : "design-btn-secondary"}
+                        className={isPrimary ? "inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-lg shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200 border-2 border-blue-500/30" : "design-btn-secondary"}
                       >
                         {/* Temporarily disable dynamic icons */}
                         {item.title}
@@ -85,13 +87,13 @@ export default function CTA({ section }: { section: SectionType }) {
 
             {/* Urgency indicator */}
             <motion.div 
-              className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg p-4 border border-purple-400/20"
+              className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-lg p-4 border border-blue-400/30"
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.6, duration: 0.5 }}
               viewport={{ once: true }}
             >
-              <p className="text-purple-300 font-semibold flex items-center justify-center gap-2">
+              <p className="text-blue-300 font-semibold flex items-center justify-center gap-2">
                 <RiTimeLine className="w-5 h-5" />
                 ⚡ Start saving time today - No setup required
               </p>

@@ -17,14 +17,14 @@
   --card-padding: var(--space-4);
   --content-max-width: 1200px;
   
-  /* === 严格的紫色系专业配色 === */
-  --primary: #8B5CF6;
-  --primary-light: #A78BFA;
-  --primary-dark: #7C3AED;
-  --accent: #EC4899;  /* 替代黄色的粉色accent */
-  --background: #0F0F23;
-  --surface: rgba(139, 92, 246, 0.1);
-  --surface-hover: rgba(139, 92, 246, 0.15);
+  /* === 优化后的专业配色 - 减少紫色使用 === */
+  --primary: #6366F1;  /* 调整为更中性的蓝紫色 */
+  --primary-light: #818CF8;
+  --primary-dark: #4F46E5;
+  --accent: #10B981;  /* 改为绿色accent，减少过度紫色 */
+  --background: #0A0A0F;  /* 更深的背景，提高对比度 */
+  --surface: rgba(255, 255, 255, 0.05);  /* 中性表面色 */
+  --surface-hover: rgba(255, 255, 255, 0.08);
   
   --primary-gradient: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
   --secondary-gradient: linear-gradient(135deg, #6366f1 0%, var(--primary) 100%);
@@ -60,9 +60,10 @@
   margin-top: 0;
 }
 
+/* 简化背景，提高对比度 */
 .design-section:nth-child(odd) {
-  background: var(--bg-glass-light);
-  backdrop-filter: var(--backdrop-blur);
+  background: rgba(10,10,15,0.3);
+  backdrop-filter: blur(5px);
 }
 
 .design-section:nth-child(even) {
@@ -72,14 +73,15 @@
 /* ===== 严格统一卡片系统 ===== */
 .design-card {
   position: relative;
-  background: var(--bg-glass);
-  backdrop-filter: var(--backdrop-blur);
+  background: rgba(55,65,81,0.4);
+  backdrop-filter: blur(10px);
   border-radius: var(--radius);  /* 严格12px */
   padding: var(--card-padding);
-  box-shadow: var(--shadow-card);
-  border: 1px solid rgba(139,92,246,0.2);
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  border: 1px solid rgba(75,85,99,0.3);
+  transition: all 0.3s ease-out;
   overflow: hidden;
+  text-align: center; /* 统一居中对齐 */
 }
 
 .design-card.interactive {
@@ -110,23 +112,28 @@
 }
 
 .design-card.featured {
-  transform: scale(1.05);
-  box-shadow: var(--shadow-featured);
+  transform: scale(1.02);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  background: rgba(55,65,81,0.6);
+  border: 1px solid rgba(75,85,99,0.4);
 }
 
 .design-card.featured::before {
-  background: var(--premium-gradient);
-  opacity: 0.6;
-  animation: purplePulse 2s ease-in-out infinite;
+  display: none;
 }
 
-@keyframes purplePulse {
-  0%, 100% { opacity: 0.5; filter: brightness(1); }
-  50% { opacity: 0.8; filter: brightness(1.2); }
-}
 
 .design-card.featured:hover {
-  transform: scale(1.08) translateY(-8px);
+  transform: scale(1.03) translateY(-3px);
+  box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+}
+
+.design-card.compact {
+  padding: var(--space-3);
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 /* ===== 专业5级字体层级系统 ===== */
@@ -206,14 +213,16 @@
   gap: var(--space-1);
   padding: var(--space-2) var(--space-5);
   background: var(--primary-gradient);
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 1.1rem;
+  color: #ffffff !important;
+  font-weight: 800;
+  font-size: 1.2rem;
   border: none;
+  box-shadow: 0 8px 32px rgba(147, 51, 234, 0.4), 0 0 24px rgba(59, 130, 246, 0.3);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   border-radius: 50px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 10px 30px rgba(189,0,255,0.4), 0 0 40px rgba(0,217,255,0.3);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
   text-decoration: none;
   overflow: hidden;
 }
@@ -223,7 +232,7 @@
 }
 
 .design-btn-primary.enhanced {
-  background: linear-gradient(135deg, #00D9FF 0%, #BD00FF 50%, #FF0080 100%);
+  background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 50%, #1E40AF 100%);
   background-size: 200% 200%;
   animation: gradientShift 3s ease infinite;
 }
@@ -245,8 +254,9 @@
 }
 
 .design-btn-primary:hover {
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 15px 40px rgba(189,0,255,0.6), 0 0 60px rgba(0,217,255,0.5);
+  transform: translateY(-4px) scale(1.08);
+  box-shadow: 0 16px 48px rgba(147, 51, 234, 0.6), 0 0 36px rgba(59, 130, 246, 0.5);
+  filter: brightness(1.1);
 }
 
 .design-btn-primary:hover::before {
@@ -329,8 +339,8 @@
 
 .design-icon:hover {
   transform: scale(1.15) rotate(10deg);
-  box-shadow: 0 15px 40px rgba(189,0,255,0.5), 0 0 60px rgba(0,217,255,0.4);
-  background: linear-gradient(135deg, #00FF88, #00D9FF, #BD00FF, #FF0080);
+  box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+  background: linear-gradient(135deg, #10B981, #3B82F6, #1D4ED8, #1E40AF);
 }
 
 .design-icon.pulse {
@@ -368,7 +378,7 @@
   display: inline-flex;
   align-items: center;
   padding: var(--space-1) var(--space-2);
-  background: var(--secondary-gradient);
+  background: linear-gradient(135deg, #6B7280, #9CA3AF);
   color: #ffffff;
   font-size: 0.875rem;
   font-weight: 600;
@@ -377,23 +387,15 @@
 }
 
 .design-badge.premium {
-  background: var(--premium-gradient);
-  color: #ffffff;
+  background: rgba(59,130,246,0.2);
+  color: #93C5FD;
   font-weight: 700;
-  box-shadow: 0 5px 20px rgba(168,85,247,0.4);
-  animation: premiumPulse 3s ease-in-out infinite;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  border: 1px solid rgba(59,130,246,0.3);
 }
 
-@keyframes premiumPulse {
-  0%, 100% { 
-    filter: brightness(1) saturate(1.2);
-    box-shadow: 0 5px 20px rgba(168,85,247,0.4);
-  }
-  50% { 
-    filter: brightness(1.2) saturate(1.4);
-    box-shadow: 0 8px 30px rgba(168,85,247,0.6);
-  }
-}
+
+
 
 /* ===== 统一数据展示系统 ===== */
 .design-stat {

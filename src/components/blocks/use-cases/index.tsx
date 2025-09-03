@@ -92,7 +92,7 @@ export default function UseCases({ section }: UseCasesProps) {
   const useCaseCategories: UseCaseCategory[] = [
     {
       title: categories[0]?.title || "Education",
-      subtitle: categories[0]?.subtitle || "Education",
+      subtitle: "30% 的教育机构已使用",
       icon: RiGraduationCapLine,
       gradient: "from-blue-500 to-purple-600",
       cases: (categories[0]?.cases || []).map((item, index) => ({
@@ -103,9 +103,9 @@ export default function UseCases({ section }: UseCasesProps) {
     },
     {
       title: categories[1]?.title || "Content Creation",
-      subtitle: categories[1]?.subtitle || "Content Creation",
+      subtitle: "节省 85% 制作时间",
       icon: RiVideoLine,
-      gradient: "from-purple-500 to-pink-600",
+      gradient: "from-purple-500 to-blue-600",
       cases: (categories[1]?.cases || []).map((item, index) => ({
         icon: [RiVideoLine, RiMicLine, RiSearchEyeLine][index] || RiVideoLine,
         title: item.title,
@@ -114,7 +114,7 @@ export default function UseCases({ section }: UseCasesProps) {
     },
     {
       title: categories[2]?.title || "Business Use",
-      subtitle: categories[2]?.subtitle || "Business Use",
+      subtitle: "500+ 企业信赖之选",
       icon: RiBuildingLine,
       gradient: "from-green-500 to-teal-600",
       cases: (categories[2]?.cases || []).map((item, index) => ({
@@ -125,9 +125,9 @@ export default function UseCases({ section }: UseCasesProps) {
     },
     {
       title: categories[3]?.title || "Research",
-      subtitle: categories[3]?.subtitle || "Research",
+      subtitle: "提升 60% 研究效率",
       icon: RiSearchEyeLine,
-      gradient: "from-orange-500 to-red-600",
+      gradient: "from-indigo-500 to-purple-600",
       cases: (categories[3]?.cases || []).map((item, index) => ({
         icon: [RiChatQuoteLine, RiTeamLine, RiGlobalLine][index] || RiChatQuoteLine,
         title: item.title,

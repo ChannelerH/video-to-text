@@ -387,8 +387,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="divider">{t("or")}</div>
+        {/* Subtle separator (remove heavy divider) */}
+        <p className="my-4 text-center text-sm opacity-80">{t("or")}</p>
 
         {/* URL input */}
         <div className="url-section">

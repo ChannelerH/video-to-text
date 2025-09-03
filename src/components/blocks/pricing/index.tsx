@@ -30,6 +30,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [productId, setProductId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const handleCheckout = async (item: PricingItem, cn_pay: boolean = false) => {
     try {
@@ -134,7 +135,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                         {item.label && (
                           <Badge
                             variant="outline"
-                            className={`px-1.5 ml-1 ${item.is_featured ? 'bg-purple-500 border-purple-400 text-white' : 'border-primary bg-primary text-primary-foreground'}`}
+                            className={`px-1.5 ml-1 border-primary bg-primary text-primary-foreground`}
                           >
                             {item.label}
                           </Badge>
@@ -155,8 +156,19 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
               return (
                 <div
                   key={index}
-                  className={`design-card ${item.is_featured ? 'featured' : ''}`}
+                  className={`design-card relative overflow-visible ${item.is_featured ? 'featured transform scale-110 z-10 shadow-2xl shadow-purple-500/40 ring-4 ring-purple-400/60 ring-offset-4 ring-offset-gray-900 bg-gradient-to-br from-purple-500/10 to-blue-500/10 animate-pulse' : 'scale-95 opacity-90'}`}
+                  style={item.is_featured ? {
+                    filter: 'drop-shadow(0 0 20px rgba(147, 51, 234, 0.4)) drop-shadow(0 0 40px rgba(79, 70, 229, 0.3))',
+                    animation: 'glow 2s ease-in-out infinite alternate'
+                  } : {}}
                 >
+                  {item.is_featured && (
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                      <div className="design-badge premium px-6 py-3 text-lg font-black tracking-wide bg-gradient-to-r from-purple-500 to-blue-500 shadow-lg">
+                        🔥 MOST POPULAR 🔥
+                      </div>
+                    </div>
+                  )}
                   <div className="pricing-topbar" />
                   <div className="flex h-full flex-col justify-between gap-5 p-6">
                     <div>
@@ -180,7 +192,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                           </span>
                         )}
                         {item.price && (
-                          <span className="design-stat-number">
+                          <span className={`design-stat-number ${item.is_featured ? 'text-6xl bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent font-black' : ''}`}>
                             {item.price}
                           </span>
                         )}
@@ -201,15 +213,23 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                         </p>
                       )}
                       {item.features && (
-                        <ul className="design-feature-list">
-                          {item.features.map((feature, fi) => {
-                            return (
+                        <>
+                          <ul className="design-feature-list">
+                            {(expanded[item.product_id] ? item.features : item.features.slice(0, 5)).map((feature, fi) => (
                               <li className="design-feature-item" key={`feature-${fi}`}>
                                 {feature}
                               </li>
-                            );
-                          })}
-                        </ul>
+                            ))}
+                          </ul>
+                          {item.features.length > 5 && (
+                            <button
+                              className="text-sm font-semibold mt-2 text-purple-300 hover:text-purple-200"
+                              onClick={() => setExpanded(prev => ({ ...prev, [item.product_id]: !prev[item.product_id] }))}
+                            >
+                              {expanded[item.product_id] ? 'Show less' : 'View full comparison'}
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                     <div className="flex flex-col gap-2">
@@ -235,7 +255,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                       ) : null}
                       {item.button && (
                         <button
-                          className="design-btn-primary w-full"
+                          className={`w-full ${item.is_featured ? 'design-btn-primary text-xl py-4 font-bold bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30' : 'design-btn-primary'}`}
                           disabled={isLoading}
                           onClick={() => {
                             if (isLoading) {

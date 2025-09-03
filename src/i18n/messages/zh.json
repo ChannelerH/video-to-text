@@ -489,6 +489,7 @@
     "selfOrganizeTime": "自己整理时间",
     "aboutDays": "大约{days}个工作日",
     "waitingTime": "等待时间",
+    "waitingRange": "3-5天",
     "usingUs": "使用我们",
     "serviceCost": "服务成本",
     "processingTime": "处理时间",
@@ -502,7 +503,9 @@
     "timeSaved": "节省时间",
     "equivalentTo": "相当于",
     "workDays": "个工作日",
-    "startSavingCosts": "立即开始节省成本"
+    "startSavingCosts": "立即开始节省成本",
+    "currency": "¥",
+    "perMonth": "/月"
   },
   "quick_start": {
     "title": "🚀 30秒快速开始",

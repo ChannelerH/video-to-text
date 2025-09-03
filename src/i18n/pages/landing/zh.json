@@ -158,36 +158,82 @@
     ]
   },
   "use_cases": {
-    "name": "use-cases",
-    "title": "谁在使用？",
-    "description": "6 个典型场景与收益",
-    "items": [
+    "heading": "Video to Text 能为您做什么？",
+    "description": "从教育培训到内容创作，从商业应用到学术研究\n发现视频转文字在各个领域的强大应用价值",
+    "categories": [
       {
-        "title": "视频创作者",
-        "description": "YouTube 转文章 • 多平台分发 • SEO 优化 • 每周节省 8 小时"
+        "title": "教育场景",
+        "subtitle": "Education",
+        "cases": [
+          {
+            "title": "网课自动生成字幕",
+            "description": "提升学习体验，支持多语言"
+          },
+          {
+            "title": "讲座录音转文字笔记",
+            "description": "便于复习和知识整理"
+          },
+          {
+            "title": "外语视频配双语字幕",
+            "description": "辅助语言学习和理解"
+          }
+        ]
       },
       {
-        "title": "教育机构",
-        "description": "网课自动字幕 • 提升可访问性 • 多语言支持 • 覆盖 95% 学生"
+        "title": "内容创作",
+        "subtitle": "Content Creation",
+        "cases": [
+          {
+            "title": "YouTube视频转博客文章",
+            "description": "一键生成文字版内容"
+          },
+          {
+            "title": "播客音频快速生成文字稿",
+            "description": "节省大量整理时间"
+          },
+          {
+            "title": "视频剪辑快速定位关键对话",
+            "description": "提高剪辑效率"
+          }
+        ]
       },
       {
-        "title": "企业用户",
-        "description": "会议记录 • 培训归档 • 合规留痕 • 效率提升 10 倍"
+        "title": "商业用途",
+        "subtitle": "Business Use",
+        "cases": [
+          {
+            "title": "Zoom会议自动生成会议纪要",
+            "description": "提高会议效率"
+          },
+          {
+            "title": "客户访谈快速整理成文档",
+            "description": "便于分析和决策"
+          },
+          {
+            "title": "培训视频转写成培训手册",
+            "description": "标准化培训流程"
+          }
+        ]
       },
       {
-        "title": "播客主播",
-        "description": "节目文稿 • 章节时间戳 • 听众笔记 • 2 小时→5 分钟"
-      },
-      {
-        "title": "媒体记者",
-        "description": "采访速记 • 当天交稿 • 多人对话分离"
-      },
-      {
-        "title": "研究人员",
-        "description": "讲座转笔记 • 质性研究编码 • 引用标注"
+        "title": "研究分析",
+        "subtitle": "Research",
+        "cases": [
+          {
+            "title": "采访录音转写便于编码分析",
+            "description": "质性研究必备工具"
+          },
+          {
+            "title": "焦点小组讨论内容文本化",
+            "description": "数据收集更高效"
+          },
+          {
+            "title": "多语言内容快速翻译转写",
+            "description": "打破语言障碍"
+          }
+        ]
       }
-    ],
-    "disabled": true
+    ]
   },
   "cost_calculator": {
     "title": "计算您的节省",
@@ -387,20 +433,13 @@
         "is_featured": false,
         "label": "🔥 最受欢迎",
         "features": [
-          "每日 10 分钟转写",
-          "100MB 文件大小限制",
-          "基础 MP4、MP3 支持",
-          "SRT、TXT 导出格式",
-          "支持 104 种语言",
-          "标准处理队列",
-          "7 天文件保留",
-          "永久免费使用"
+          "每日 10 分钟",
+          "基础格式",
+          "标准处理",
+          "无 API",
+          "无批量"
         ],
-        "not_included": [
-          "批量处理",
-          "API 接入",
-          "优先队列"
-        ],
+        "not_included": [],
         "button": {
           "title": "开始免费使用",
           "url": "#"
@@ -415,26 +454,19 @@
         "annual_price": "￥48",
         "annual_savings": "节睉20%",
         "features": [
-          "每月 300 分钟转写",
-          "2GB 文件，无月度限制",
-          "20+ 视频/音频格式",
-          "6 种导出格式（SRT、VTT、DOCX等）",
-          "优先处理（<1分钟）",
-          "API 接口（1000次/天）",
-          "批量处理（5个并发）",
-          "30天保留 + 邮件支持"
+          "无限分钟",
+          "全部格式",
+          "优先处理",
+          "API 访问",
+          "批量处理"
         ],
-        "not_included": [
-          "团队协作",
-          "API访问",
-          "Webhook支持"
-        ],
+        "not_included": [],
         "button": {
           "title": "升级专业版",
           "url": "#"
         },
         "label": "热门选择",
-        "tip": "适合内容创作者与中小企业",
+        "tip": "推荐",
         "is_featured": true
       },
       {
@@ -445,14 +477,11 @@
         "annual_price": "￥159",
         "annual_savings": "节睉20%",
         "features": [
-          "无限转写分钟数",
-          "10GB 文件，无限存储",
-          "团队空间与用户管理",
-          "无限 API 调用 + 完整 SDK",
-          "Webhook 与自定义集成",
-          "高级分析仪表板",
-          "SSO、白标化选项",
-          "专属支持 + 99.9% SLA"
+          "团队空间",
+          "更高并发",
+          "企业支持",
+          "自定义集成",
+          "SLA"
         ],
         "button": {
           "title": "联系销售",
@@ -855,84 +884,6 @@
       }
     ]
   },
-  "use_cases": {
-    "heading": "Video to Text 能为您做什么？",
-    "description": "从教育培训到内容创作，从商业应用到学术研究\n发现视频转文字在各个领域的强大应用价值",
-    "categories": [
-      {
-        "title": "教育场景",
-        "subtitle": "Education",
-        "cases": [
-          {
-            "title": "网课自动生成字幕",
-            "description": "提升学习体验，支持多语言"
-          },
-          {
-            "title": "讲座录音转文字笔记",
-            "description": "便于复习和知识整理"
-          },
-          {
-            "title": "外语视频配双语字幕",
-            "description": "辅助语言学习和理解"
-          }
-        ]
-      },
-      {
-        "title": "内容创作",
-        "subtitle": "Content Creation",
-        "cases": [
-          {
-            "title": "YouTube视频转博客文章",
-            "description": "一键生成文字版内容"
-          },
-          {
-            "title": "播客音频快速生成文字稿",
-            "description": "节省大量整理时间"
-          },
-          {
-            "title": "视频剪辑快速定位关键对话",
-            "description": "提高剪辑效率"
-          }
-        ]
-      },
-      {
-        "title": "商业用途",
-        "subtitle": "Business Use",
-        "cases": [
-          {
-            "title": "Zoom会议自动生成会议纪要",
-            "description": "提高会议效率"
-          },
-          {
-            "title": "客户访谈快速整理成文档",
-            "description": "便于分析和决策"
-          },
-          {
-            "title": "培训视频转写成培训手册",
-            "description": "标准化培训流程"
-          }
-        ]
-      },
-      {
-        "title": "研究分析",
-        "subtitle": "Research",
-        "cases": [
-          {
-            "title": "采访录音转写便于编码分析",
-            "description": "质性研究必备工具"
-          },
-          {
-            "title": "焦点小组讨论内容文本化",
-            "description": "数据收集更高效"
-          },
-          {
-            "title": "多语言内容快速翻译转写",
-            "description": "打破语言障碍"
-          }
-        ]
-      }
-    ]
-  },
   "transcription_demo": {
     "heading": "转写效果展示",
     "description": "查看我们在不同场景下的转写效果\n所有示例均为真实转写结果，未经人工修改",
@@ -1065,22 +1016,47 @@
           {
             "name": "SRT",
             "description": "通用字幕格式",
-            "features": ["时间轴精确", "支持多语言", "兼容性强"],
-            "platforms": ["YouTube", "Vimeo", "Bilibili", "爱奇艺"],
+            "features": [
+              "时间轴精确",
+              "支持多语言",
+              "兼容性强"
+            ],
+            "platforms": [
+              "YouTube",
+              "Vimeo",
+              "Bilibili",
+              "爱奇艺"
+            ],
             "tip": "最常用的字幕格式，几乎所有播放器都支持"
           },
           {
             "name": "VTT",
             "description": "Web视频字幕",
-            "features": ["HTML5原生支持", "样式可定制", "互动功能"],
-            "platforms": ["网页播放器", "HTML5视频", "在线课程平台"],
+            "features": [
+              "HTML5原生支持",
+              "样式可定制",
+              "互动功能"
+            ],
+            "platforms": [
+              "网页播放器",
+              "HTML5视频",
+              "在线课程平台"
+            ],
             "tip": "Web端视频的首选格式，支持丰富的样式设置"
           },
           {
             "name": "ASS",
             "description": "高级字幕格式",
-            "features": ["丰富样式", "特效支持", "多轨道"],
-            "platforms": ["Aegisub", "PotPlayer", "VLC"],
+            "features": [
+              "丰富样式",
+              "特效支持",
+              "多轨道"
+            ],
+            "platforms": [
+              "Aegisub",
+              "PotPlayer",
+              "VLC"
+            ],
             "tip": "适合需要复杂样式和特效的专业视频制作"
           }
         ]
@@ -1093,22 +1069,45 @@
           {
             "name": "DOCX",
             "description": "Word文档",
-            "features": ["保留格式", "可编辑", "注释支持"],
-            "platforms": ["Microsoft Word", "WPS", "Google Docs"],
+            "features": [
+              "保留格式",
+              "可编辑",
+              "注释支持"
+            ],
+            "platforms": [
+              "Microsoft Word",
+              "WPS",
+              "Google Docs"
+            ],
             "tip": "便于后续编辑和格式调整，支持插入图片和表格"
           },
           {
             "name": "PDF",
             "description": "便携文档",
-            "features": ["格式固定", "易分享", "打印友好"],
-            "platforms": ["所有设备", "在线预览", "打印机"],
+            "features": [
+              "格式固定",
+              "易分享",
+              "打印友好"
+            ],
+            "platforms": [
+              "所有设备",
+              "在线预览",
+              "打印机"
+            ],
             "tip": "适合正式文档和报告，确保在不同设备上显示一致"
           },
           {
             "name": "TXT",
             "description": "纯文本",
-            "features": ["体积小", "兼容性强", "加载快"],
-            "platforms": ["所有文本编辑器", "代码编辑器"],
+            "features": [
+              "体积小",
+              "兼容性强",
+              "加载快"
+            ],
+            "platforms": [
+              "所有文本编辑器",
+              "代码编辑器"
+            ],
             "tip": "最简洁的格式，适合进一步处理和分析"
           }
         ]
@@ -1121,22 +1120,46 @@
           {
             "name": "JSON",
             "description": "结构化数据",
-            "features": ["时间戳", "置信度", "说话人标识"],
-            "platforms": ["API集成", "数据分析工具", "程序处理"],
+            "features": [
+              "时间戳",
+              "置信度",
+              "说话人标识"
+            ],
+            "platforms": [
+              "API集成",
+              "数据分析工具",
+              "程序处理"
+            ],
             "tip": "包含完整的元数据信息，适合二次开发和数据分析"
           },
           {
             "name": "CSV",
             "description": "表格数据",
-            "features": ["Excel兼容", "统计分析", "批量处理"],
-            "platforms": ["Excel", "Google Sheets", "数据分析软件"],
+            "features": [
+              "Excel兼容",
+              "统计分析",
+              "批量处理"
+            ],
+            "platforms": [
+              "Excel",
+              "Google Sheets",
+              "数据分析软件"
+            ],
             "tip": "方便进行统计分析和批量数据处理"
           },
           {
             "name": "XML",
             "description": "标记语言",
-            "features": ["结构清晰", "自定义标签", "验证支持"],
-            "platforms": ["专业软件", "系统集成", "数据交换"],
+            "features": [
+              "结构清晰",
+              "自定义标签",
+              "验证支持"
+            ],
+            "platforms": [
+              "专业软件",
+              "系统集成",
+              "数据交换"
+            ],
             "tip": "适合企业级系统集成和复杂的数据交换需求"
           }
         ]
@@ -1150,7 +1173,13 @@
       "title": "您的需求",
       "monthly_hours_label": "每月需要转写",
       "hours_unit": "小时",
-      "slider_labels": ["1小时", "25小时", "50小时", "75小时", "100小时+"]
+      "slider_labels": [
+        "1小时",
+        "25小时",
+        "50小时",
+        "75小时",
+        "100小时+"
+      ]
     },
     "traditional_method": {
       "title": "传统方式",
@@ -1269,9 +1298,15 @@
       "upload_btn": "立即上传视频",
       "demo_btn": "观看演示视频",
       "features": [
-        { "label": "90秒免费预览" },
-        { "label": "多格式导出" },
-        { "label": "GPU加速处理" }
+        {
+          "label": "90秒免费预览"
+        },
+        {
+          "label": "多格式导出"
+        },
+        {
+          "label": "GPU加速处理"
+        }
       ]
     }
   }

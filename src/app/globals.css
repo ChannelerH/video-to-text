@@ -100,6 +100,16 @@ button[type="submit"]:hover, .btn-primary:hover, .primary-button:hover {
   box-shadow: 0 12px 35px rgba(168,85,247,0.4), 0 0 30px rgba(0,212,255,0.3) !important;
 }
 
+/* Pricing card glow animation */
+@keyframes glow {
+  from {
+    filter: drop-shadow(0 0 20px rgba(147, 51, 234, 0.4)) drop-shadow(0 0 40px rgba(79, 70, 229, 0.3));
+  }
+  to {
+    filter: drop-shadow(0 0 30px rgba(147, 51, 234, 0.6)) drop-shadow(0 0 60px rgba(79, 70, 229, 0.5));
+  }
+}
+
 pre {
   @apply px-4;
 }
@@ -222,10 +232,9 @@ pre {
 .btn-neon:hover{box-shadow:0 0 28px rgba(0,212,255,.5),0 0 60px rgba(124,58,237,.28)}
 
 /* Pricing: ultra enhanced gradient cards */
-.pricing-card{position:relative;border-radius:20px;background:rgba(26,26,35,0.95);backdrop-filter:blur(20px);overflow:hidden}
-.pricing-card::before{content:"";position:absolute;inset:0;border-radius:20px;padding:2px;background:linear-gradient(135deg,#00D9FF,#BD00FF);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.5;transition:opacity .3s ease}
-.pricing-card.featured::before{background:linear-gradient(135deg,#a855f7,#c084fc,#BD00FF);opacity:1;animation:purpleGlow 3s ease-in-out infinite}
-@keyframes purpleGlow{0%,100%{opacity:0.8;filter:hue-rotate(0deg)}50%{opacity:1;filter:hue-rotate(10deg)}}
+.pricing-card{position:relative;border-radius:20px;background:rgba(55,65,81,0.4);backdrop-filter:blur(20px);overflow:hidden;border:1px solid rgba(75,85,99,0.3)}
+.pricing-card::before{display:none}
+.pricing-card.featured{background:rgba(55,65,81,0.6);border:1px solid rgba(59,130,246,0.3)}
 
 /* Tech grid overlay for hero with gradient animation */
 .tech-grid{position:absolute;inset:0;pointer-events:none;opacity:.12;background-image:linear-gradient(rgba(0,217,255,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(189,0,255,.08) 1px,transparent 1px);background-size:60px 60px;animation:gridFlow 10s ease-in-out infinite}
@@ -354,44 +363,51 @@ body::after {
 .balloon-button{background:linear-gradient(135deg,#a855f7 0%,#ec4899 100%);box-shadow:0 10px 24px rgba(236,72,153,.3),inset 0 -2px 0 rgba(0,0,0,.2)}
 .balloon-button:hover{animation:pulseGlow 1.2s ease-in-out}
 @keyframes pulseGlow{0%{box-shadow:0 0 18px rgba(236,72,153,.3)}50%{box-shadow:0 0 34px rgba(236,72,153,.55)}100%{box-shadow:0 0 18px rgba(236,72,153,.3)}}
-.pricing-card{box-shadow:0 20px 50px rgba(0,0,0,.4),0 0 40px rgba(189,0,255,.1)}
-.pricing-card.featured{transform:scale(1.05);box-shadow:0 25px 60px rgba(0,0,0,.5),0 0 80px rgba(255,184,0,.3)}
-.pricing-card::after{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#00D9FF,#BD00FF,#FF0080);opacity:0.9}
-.pricing-card.featured::after{background:linear-gradient(90deg,#9333EA,#A855F7,#BD00FF);height:6px;animation:shimmer 3s linear infinite}
+.pricing-card{box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.pricing-card.featured{transform:scale(1.02);box-shadow:0 15px 40px rgba(0,0,0,.3);}
+.pricing-card::after{display:none}
+.pricing-card.featured::after{display:none}
 @keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
 .pricing-card > *{position:relative;z-index:1}
-.pricing-card:hover{transform:translateY(-5px);box-shadow:0 30px 70px rgba(0,0,0,.5),0 0 100px rgba(189,0,255,.2)}
-.pricing-card.featured:hover{transform:scale(1.08) translateY(-5px)}
+.pricing-card:hover{transform:translateY(-3px);box-shadow:0 15px 40px rgba(0,0,0,.3)}
+.pricing-card.featured:hover{transform:scale(1.03) translateY(-3px);box-shadow:0 20px 50px rgba(0,0,0,.4);}
 
-.price-gradient{background:linear-gradient(135deg,#00D9FF,#BD00FF,#FF0080);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:3rem;font-weight:800;filter:drop-shadow(0 0 20px rgba(189,0,255,0.4))}
+
+.price-gradient{background:linear-gradient(135deg,#3B82F6,#1D4ED8,#1E40AF);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:3rem;font-weight:800;filter:drop-shadow(0 0 20px rgba(59,130,246,0.4))}
+
+/* Range slider purple thumb */
+.slider-thumb-purple::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #8B5CF6;
+  cursor: pointer;
+}
+
+.slider-thumb-purple::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #8B5CF6;
+  cursor: pointer;
+  border: none;
+}
 
 /* Ultimate Purple Popular Badge */
 .popular-badge, .featured-badge, [class*="popular"], [class*="featured"] {
-  background: linear-gradient(135deg, #9333EA, #A855F7, #BD00FF) !important;
-  color: #fff !important;
-  font-weight: 900;
-  padding: 10px 20px;
-  border-radius: 25px;
+  background: rgba(59,130,246,0.2) !important;
+  color: #93C5FD !important;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 20px;
   position: relative;
   overflow: hidden;
-  animation: ultimatePurplePulse 2s ease-in-out infinite;
-  box-shadow: 0 0 30px rgba(147, 51, 234, 0.7), 0 0 60px rgba(168, 85, 247, 0.5), 0 0 90px rgba(189, 0, 255, 0.3);
-  border: 2px solid rgba(255, 255, 255, 0.8);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  border: 1px solid rgba(59,130,246,0.3);
+  text-shadow: none;
 }
 
-@keyframes ultimatePurplePulse {
-  0%, 100% { 
-    box-shadow: 0 0 25px rgba(147, 51, 234, 0.6), 0 0 50px rgba(168, 85, 247, 0.4), 0 0 75px rgba(189, 0, 255, 0.3);
-    filter: brightness(1) saturate(1.2);
-    transform: scale(1);
-  }
-  50% { 
-    box-shadow: 0 0 40px rgba(147, 51, 234, 0.9), 0 0 80px rgba(168, 85, 247, 0.7), 0 0 120px rgba(189, 0, 255, 0.5);
-    filter: brightness(1.4) saturate(1.5);
-    transform: scale(1.05);
-  }
-}
 
 .popular-badge::before, .featured-badge::before {
   content: "";
@@ -412,13 +428,13 @@ body::after {
 /* How it Works icons with hover magic */
 .how-it-works-icon, [class*="size-16"] {
   position: relative;
-  background: linear-gradient(135deg, #00D9FF, #BD00FF, #FF0080);
+  background: linear-gradient(135deg, #3B82F6, #1D4ED8, #1E40AF);
   border: none !important;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 20px rgba(189,0,255,0.3), 0 0 40px rgba(0,217,255,0.2);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
   animation: iconGlow 3s ease-in-out infinite;
   transition: all 0.3s ease;
   cursor: pointer;
@@ -426,11 +442,11 @@ body::after {
 
 @keyframes iconGlow {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(189,0,255,0.3), 0 0 30px rgba(0,217,255,0.2);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
     transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 25px rgba(189,0,255,0.5), 0 0 50px rgba(0,217,255,0.4);
+    box-shadow: 0 12px 35px rgba(0,0,0,0.3);
     transform: scale(1.05);
   }
 }
@@ -438,8 +454,8 @@ body::after {
 .how-it-works-icon:hover, [class*="size-16"]:hover {
   animation: none;
   transform: scale(1.15) rotate(10deg);
-  box-shadow: 0 0 40px rgba(189,0,255,0.7), 0 0 80px rgba(0,217,255,0.6), 0 0 120px rgba(255,0,128,0.4);
-  background: linear-gradient(135deg, #00FF88, #00D9FF, #BD00FF, #FF0080);
+  box-shadow: 0 15px 45px rgba(0,0,0,0.4);
+  background: linear-gradient(135deg, #10B981, #3B82F6, #1D4ED8, #1E40AF);
 }
 
 .how-it-works-icon svg, [class*="size-16"] svg {

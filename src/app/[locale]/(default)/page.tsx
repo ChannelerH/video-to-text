@@ -6,7 +6,6 @@ import UseCases from "@/components/blocks/use-cases";
 import TranscriptionDemo from "@/components/blocks/transcription-demo";
 import VideoTypes from "@/components/blocks/video-types";
 import ComparisonTable from "@/components/blocks/comparison-table";
-import OutputFormats from "@/components/blocks/output-formats";
 import ROICalculator from "@/components/blocks/roi-calculator";
 import TechSpecs from "@/components/blocks/tech-specs";
 import Pricing from "@/components/blocks/pricing";
@@ -58,30 +57,26 @@ export default async function VideoToTextPage({
       {/* 1. Hero区（转换工具） */}
       {page.hero && <Hero hero={page.hero} />}
       
-      {/* 2. 应用场景展示 - What can V2TX do for you */}
-      <UseCases section={{ name: "use-cases", disabled: false }} />
-      
-      {/* 3. 核心数据展示 - 合并Stats + Why choose us，展示专业数据和优势 */}
+      {/* 2. 信任指标（关键数据） */}
       {page.stats && <Stats section={page.stats} />}
-      {page.core_value && <Feature1 section={page.core_value} />}
-      
-      {/* 4. 实际效果展示 - 真实转写样本 */}
+
+      {/* 3. 使用场景（核心场景） */}
+      <UseCases section={{ name: "use-cases", disabled: false }} />
+
+      {/* 4. 效果展示（真实转写样本） */}
       <TranscriptionDemo section={{ name: "transcription-demo", disabled: false }} />
-      
-      {/* 5. 成本计算器 - ROI分析工具 */}
+
+      {/* 5. 成本分析（ROI） */}
       <ROICalculator section={{ name: "roi-calculator", disabled: false }} />
-      
-      {/* 5.5. 支持格式 - 输入/输出格式完整展示 */}
-      <OutputFormats section={{ name: "output-formats", disabled: false }} />
-      
-      {/* 6. 定价方案 */}
+
+      {/* 6. 定价方案（精简版） */}
       {page.pricing && <Pricing pricing={page.pricing} />}
-      
-      {/* 7. FAQ + CTA */}
+
+      {/* 7. FAQ 精选 */}
       {page.faq && <FAQ section={page.faq} />}
-      
-      {/* CTA temporarily disabled - will fix data structure issue */}
-      {/* <div>V2TX - Professional video to text conversion complete!</div> */}
+
+      {/* 8. 收尾 CTA */}
+      <CTA section={{ name: "final-cta", disabled: false, title: "Ready to transcribe your first video?", description: "Start with a free 90s preview. Upgrade anytime for full features.", buttons: [{ title: "Get Started", url: "#", variant: "default"}] }} />
     </>
   );
 }

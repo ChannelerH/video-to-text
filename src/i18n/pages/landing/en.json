@@ -234,22 +234,13 @@
         "label": "🔥 Most Popular",
         "features_title": "Basic Features",
         "features": [
-          "10 minutes daily transcription",
-          "100MB file size limit",
-          "Basic MP4, MP3 support",
-          "SRT, TXT export formats",
-          "104 languages supported",
-          "Standard processing queue",
-          "7-day file retention",
-          "Free forever"
+          "10 min/day",
+          "Basic formats",
+          "Standard processing",
+          "No API",
+          "No batch"
         ],
-        "not_included": [
-          "Batch processing (5 concurrent)",
-          "API access (RESTful)",
-          "Priority queue (<1min)",
-          "Custom vocabulary",
-          "Advanced formats (VTT, ASS, DOCX)"
-        ],
+        "not_included": [],
         "button": {
           "title": "Start Free",
           "url": "#"
@@ -265,27 +256,19 @@
         "annual_savings": "Save 20%",
         "features_title": "Professional Features",
         "features": [
-          "300 minutes monthly transcription",
-          "2GB file size, unlimited monthly",
-          "20+ video/audio formats",
-          "6 export formats (SRT, VTT, DOCX, etc)",
-          "Priority processing (<1min)",
-          "API access (1000 calls/day)",
-          "Batch processing (5 concurrent)",
-          "30-day retention + email support"
+          "Unlimited minutes",
+          "All formats",
+          "Priority processing",
+          "API access",
+          "Batch processing"
         ],
-        "not_included": [
-          "Team workspace & user roles",
-          "Webhook callbacks & integrations", 
-          "Advanced analytics dashboard",
-          "Phone support & dedicated success manager"
-        ],
+        "not_included": [],
         "button": {
           "title": "Go Pro",
           "url": "#"
         },
         "label": "Most chosen",
-        "tip": "Creators & SMBs",
+        "tip": "Recommended",
         "is_featured": true
       },
       {
@@ -295,16 +278,13 @@
         "description": "For teams & enterprises",
         "annual_price": "$23.20",
         "annual_savings": "Save 20%",
-        "features_title": "Enterprise Features", 
+        "features_title": "Enterprise Features",
         "features": [
-          "Unlimited transcription minutes",
-          "10GB files, unlimited storage",
-          "Team workspace & user management",
-          "Unlimited API calls + full SDK",
-          "Webhooks & custom integrations",
-          "Advanced analytics dashboard",
-          "SSO, white-label options",
-          "Dedicated support + 99.9% SLA"
+          "Team workspace",
+          "Higher concurrency",
+          "Enterprise support",
+          "Custom integrations",
+          "SLA"
         ],
         "button": {
           "title": "Contact Sales",
@@ -1061,22 +1041,47 @@
           {
             "name": "SRT",
             "description": "Universal subtitle format",
-            "features": ["Precise timeline", "Multi-language support", "High compatibility"],
-            "platforms": ["YouTube", "Vimeo", "Bilibili", "iQiyi"],
+            "features": [
+              "Precise timeline",
+              "Multi-language support",
+              "High compatibility"
+            ],
+            "platforms": [
+              "YouTube",
+              "Vimeo",
+              "Bilibili",
+              "iQiyi"
+            ],
             "tip": "Most common subtitle format, supported by almost all players"
           },
           {
             "name": "VTT",
             "description": "Web video subtitles",
-            "features": ["HTML5 native support", "Customizable styles", "Interactive features"],
-            "platforms": ["Web players", "HTML5 video", "Online course platforms"],
+            "features": [
+              "HTML5 native support",
+              "Customizable styles",
+              "Interactive features"
+            ],
+            "platforms": [
+              "Web players",
+              "HTML5 video",
+              "Online course platforms"
+            ],
             "tip": "Preferred format for web videos, supports rich styling"
           },
           {
             "name": "ASS",
             "description": "Advanced subtitle format",
-            "features": ["Rich styles", "Effects support", "Multi-track"],
-            "platforms": ["Aegisub", "PotPlayer", "VLC"],
+            "features": [
+              "Rich styles",
+              "Effects support",
+              "Multi-track"
+            ],
+            "platforms": [
+              "Aegisub",
+              "PotPlayer",
+              "VLC"
+            ],
             "tip": "Suitable for professional video production requiring complex styles and effects"
           }
         ]
@@ -1089,22 +1094,45 @@
           {
             "name": "DOCX",
             "description": "Word document",
-            "features": ["Format preservation", "Editable", "Comment support"],
-            "platforms": ["Microsoft Word", "WPS", "Google Docs"],
+            "features": [
+              "Format preservation",
+              "Editable",
+              "Comment support"
+            ],
+            "platforms": [
+              "Microsoft Word",
+              "WPS",
+              "Google Docs"
+            ],
             "tip": "Convenient for further editing and formatting, supports inserting images and tables"
           },
           {
             "name": "PDF",
             "description": "Portable document",
-            "features": ["Fixed format", "Easy sharing", "Print friendly"],
-            "platforms": ["All devices", "Online preview", "Printers"],
+            "features": [
+              "Fixed format",
+              "Easy sharing",
+              "Print friendly"
+            ],
+            "platforms": [
+              "All devices",
+              "Online preview",
+              "Printers"
+            ],
             "tip": "Suitable for formal documents and reports, ensures consistent display across devices"
           },
           {
             "name": "TXT",
             "description": "Plain text",
-            "features": ["Small size", "High compatibility", "Fast loading"],
-            "platforms": ["All text editors", "Code editors"],
+            "features": [
+              "Small size",
+              "High compatibility",
+              "Fast loading"
+            ],
+            "platforms": [
+              "All text editors",
+              "Code editors"
+            ],
             "tip": "Most concise format, suitable for further processing and analysis"
           }
         ]
@@ -1117,22 +1145,46 @@
           {
             "name": "JSON",
             "description": "Structured data",
-            "features": ["Timestamps", "Confidence scores", "Speaker identification"],
-            "platforms": ["API integration", "Data analysis tools", "Programming"],
+            "features": [
+              "Timestamps",
+              "Confidence scores",
+              "Speaker identification"
+            ],
+            "platforms": [
+              "API integration",
+              "Data analysis tools",
+              "Programming"
+            ],
             "tip": "Contains complete metadata information, suitable for secondary development and data analysis"
           },
           {
             "name": "CSV",
             "description": "Tabular data",
-            "features": ["Excel compatible", "Statistical analysis", "Batch processing"],
-            "platforms": ["Excel", "Google Sheets", "Data analysis software"],
+            "features": [
+              "Excel compatible",
+              "Statistical analysis",
+              "Batch processing"
+            ],
+            "platforms": [
+              "Excel",
+              "Google Sheets",
+              "Data analysis software"
+            ],
             "tip": "Convenient for statistical analysis and batch data processing"
           },
           {
             "name": "XML",
             "description": "Markup language",
-            "features": ["Clear structure", "Custom tags", "Validation support"],
-            "platforms": ["Professional software", "System integration", "Data exchange"],
+            "features": [
+              "Clear structure",
+              "Custom tags",
+              "Validation support"
+            ],
+            "platforms": [
+              "Professional software",
+              "System integration",
+              "Data exchange"
+            ],
             "tip": "Suitable for enterprise-level system integration and complex data exchange needs"
           }
         ]
@@ -1146,7 +1198,13 @@
       "title": "📊 Your Needs",
       "monthly_hours_label": "Monthly transcription needed",
       "hours_unit": "hours",
-      "slider_labels": ["1 hour", "25 hours", "50 hours", "75 hours", "100+ hours"]
+      "slider_labels": [
+        "1 hour",
+        "25 hours",
+        "50 hours",
+        "75 hours",
+        "100+ hours"
+      ]
     },
     "traditional_method": {
       "title": "Traditional Way",
@@ -1265,9 +1323,15 @@
       "upload_btn": "Upload Video Now",
       "demo_btn": "Watch Demo Video",
       "features": [
-        { "label": "90s free preview" },
-        { "label": "Multi-format export" },
-        { "label": "GPU-accelerated processing" }
+        {
+          "label": "90s free preview"
+        },
+        {
+          "label": "Multi-format export"
+        },
+        {
+          "label": "GPU-accelerated processing"
+        }
       ]
     }
   }

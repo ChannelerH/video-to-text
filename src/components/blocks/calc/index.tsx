@@ -64,7 +64,7 @@ export default function CostCalculator({ section }: { section: SectionType }) {
                   {currency}{ourCost.toLocaleString()}/mo
                 </span>
               </div>
-              <div className="mt-3 h-px bg-border" />
+              {/* Removed hard divider; rely on spacing for separation */}
               <div className="flex items-center justify-between">
                 <span className="text-sm">{cfg.saveLabel || "You save"}</span>
                 <span className="text-xl font-bold tabular-nums text-primary">
@@ -89,4 +89,3 @@ export default function CostCalculator({ section }: { section: SectionType }) {
     </section>
   );
 }
-
