@@ -298,6 +298,51 @@
     "user_center": "User Center",
     "admin_system": "Admin System"
   },
+  "my_transcriptions": {
+    "title": "My Transcriptions",
+    "description": "Only results (TXT/SRT/VTT/JSON/MD) are stored; raw media is not kept.",
+    "empty": "No transcriptions yet",
+    "search_placeholder": "Search title or URL",
+    "search": "Search",
+    "prev": "Prev",
+    "next": "Next",
+    "table": {
+      "created_at": "Created",
+      "title": "Title",
+      "source": "Source",
+      "duration": "Duration",
+      "actions": "Download"
+    },
+    "actions": {
+      "rerun": "Re-run",
+      "delete": "Delete",
+      "confirm_title": "Delete transcription",
+      "confirm_desc": "Only results are stored. Deleting will remove all formats for this item.",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "confirm_delete": "Delete this transcription? This cannot be undone.",
+      "delete_failed": "Delete failed",
+      "rerun_ok": "Re-run started (cache may return instantly)",
+      "rerun_failed": "Re-run failed",
+      "rerun_file_hint": "Please re-upload the file to re-run.",
+      "undo": "Undo",
+      "undo_success": "Restored.",
+      "undo_failed": "Restore failed"
+    },
+    "source": {
+      "youtube_url": "YouTube",
+      "audio_url": "Audio URL",
+      "file_upload": "File Upload"
+    },
+    "select_all": "Select all",
+    "clear": "Clear",
+    "delete_selected": "Delete selected",
+    "export_zip": "Export ZIP",
+    "deleted_ok": "Deleted",
+    "deleted_fail": "Delete failed",
+    "export_ok": "ZIP ready",
+    "export_fail": "Export failed"
+  },
   "sign_modal": {
     "sign_in_title": "Sign In",
     "sign_in_description": "Sign in to your account",
@@ -443,6 +488,7 @@
       "processing_audio_url": "Processing audio file from URL...",
       "processing_file": "Processing file transcription...",
       "completed": "Transcription completed!",
+      "preview_ready": "Preview generated (90s). Sign in to get full result.",
       "audio_transformed": "Your audio has been transformed into text."
     },
     "results": {
@@ -463,7 +509,16 @@
     "success": {
       "title": "Transcription Complete!",
       "message": "Your audio has been transformed into text.",
-      "continue": "CONTINUE"
+      "continue": "CONTINUE",
+      "view_history": "View History",
+      "redirecting": "(Redirecting in {seconds}s)"
+    },
+    "preview": {
+      "title": "Preview Only",
+      "banner": "Unauthenticated: showing 90s preview",
+      "message": "Sign in to run full transcription and save results to your history.",
+      "sign_in": "Sign in to unlock full",
+      "download_disabled": "Download disabled in preview"
     },
     "social_proof": "★★★★★ 4.8 | 1000+ conversions | 12 countries"
   }

@@ -143,3 +143,33 @@ export const feedbacks = pgTable("v2tx_feedbacks", {
   content: text(),
   rating: integer(),
 });
+
+// Transcription jobs (metadata only; no raw media persisted)
+export const transcriptions = pgTable("v2tx_transcriptions", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  job_id: varchar({ length: 64 }).notNull().unique(),
+  user_uuid: varchar({ length: 255 }).notNull().default(""),
+  source_type: varchar({ length: 50 }).notNull(), // youtube_url | audio_url | file_upload
+  source_hash: varchar({ length: 255 }).notNull(), // videoId / url sha256 / r2 key hash
+  source_url: varchar({ length: 1024 }),
+  title: varchar({ length: 512 }),
+  language: varchar({ length: 50 }),
+  duration_sec: integer().notNull().default(0),
+  cost_minutes: integer().notNull().default(0),
+  status: varchar({ length: 50 }).notNull().default("completed"),
+  created_at: timestamp({ withTimezone: true }),
+  completed_at: timestamp({ withTimezone: true }),
+  deleted: boolean().notNull().default(false),
+});
+
+// Transcription results in multiple formats
+export const transcription_results = pgTable("v2tx_transcription_results", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  job_id: varchar({ length: 64 }).notNull(),
+  format: varchar({ length: 20 }).notNull(), // txt|srt|vtt|json|md
+  content: text().notNull(),
+  size_bytes: integer().notNull().default(0),
+  created_at: timestamp({ withTimezone: true }),
+}, (t) => [
+  uniqueIndex("transcription_result_unique").on(t.job_id, t.format)
+]);

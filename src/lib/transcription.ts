@@ -11,6 +11,8 @@ export interface TranscriptionRequest {
     language?: string;
     userId?: string;
     userTier?: string;
+    isPreview?: boolean; // 是否为预览请求
+    fallbackEnabled?: boolean; // 是否启用降级
     formats?: string[]; // ['txt', 'srt', 'vtt', 'json', 'md']
     r2Key?: string; // 对于文件上传，传入 R2 对象键用于稳定缓存
     downloadOptions?: DownloadOptions; // YouTube 下载优化选项
@@ -171,6 +173,31 @@ export class TranscriptionService {
         },
         { userId: request.options?.userId }
       );
+
+      let jobId = crypto.randomUUID();
+
+      // 写入数据库（仅登录用户）
+      if (request.options?.userId) {
+        try {
+          const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
+          const row = await createOrReuseTranscription({
+            job_id: jobId,
+            user_uuid: request.options?.userId || "",
+            source_type: 'youtube_url',
+            source_hash: videoInfo.videoId,
+            source_url: request.content,
+            title: videoInfo.title,
+            language: transcription.language,
+            duration_sec: videoInfo.duration,
+            cost_minutes: Math.ceil(videoInfo.duration/60),
+            status: 'completed'
+          });
+          jobId = (row as any).job_id || jobId;
+          await upsertTranscriptionFormats(jobId, formats);
+        } catch (e) {
+          console.warn('DB write skipped:', e);
+        }
+      }
 
       return {
         success: true,
@@ -381,6 +408,8 @@ export class TranscriptionService {
       console.log('Starting Replicate transcription with R2 URL...');
       const transcription = await this.replicateService.transcribeAudio(uploadResult.url, {
         language: request.options?.language || 'auto',
+        userTier: request.options?.userTier, // 传递用户等级信息
+        fallbackEnabled: request.options?.fallbackEnabled
       });
 
       // 生成不同格式
@@ -496,6 +525,8 @@ export class TranscriptionService {
       console.log('Starting Replicate transcription with R2 URL...');
       const transcription = await this.replicateService.transcribeAudio(uploadResult.url, {
         language: request.options?.language || 'auto',
+        userTier: request.options?.userTier, // 传递用户等级信息
+        fallbackEnabled: request.options?.fallbackEnabled
       });
 
       // 6. 生成不同格式
@@ -535,6 +566,30 @@ export class TranscriptionService {
         transcription.segments?.length ? 
           Math.max(...transcription.segments.map((s: any) => s.end)) : 60
       );
+
+      // 8. 写入数据库（仅登录用户）
+      if (request.options?.userId) {
+        try {
+          const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
+          let jobId = crypto.randomUUID();
+          const row = await createOrReuseTranscription({
+            job_id: jobId,
+            user_uuid: request.options?.userId || "",
+            source_type: 'audio_url',
+            source_hash: urlHash,
+            source_url: url,
+            title: audioInfo.filename,
+            language: transcription.language,
+            duration_sec: transcription.duration,
+            cost_minutes: Math.ceil(transcription.duration/60),
+            status: 'completed'
+          });
+          jobId = (row as any).job_id || jobId;
+          await upsertTranscriptionFormats(jobId, formats);
+        } catch (e) {
+          console.warn('DB write skipped:', e);
+        }
+      }
 
       return {
         success: true,
@@ -852,9 +907,11 @@ export class TranscriptionService {
     }
 
     try {
-      // 进行转录
+      // 进行转录（根据用户等级选择模型）
       const transcription = await this.replicateService.transcribeAudio(filePath, {
         language: request.options?.language || 'auto',
+        userTier: request.options?.userTier, // 传递用户等级信息
+        fallbackEnabled: request.options?.fallbackEnabled
       });
 
       // 估算成本
@@ -874,6 +931,30 @@ export class TranscriptionService {
         },
         { userId: request.options?.userId }
       );
+
+      // 写入数据库（仅登录用户）
+      if (request.options?.userId) {
+        try {
+          const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
+          let jobId = crypto.randomUUID();
+          const row = await createOrReuseTranscription({
+            job_id: jobId,
+            user_uuid: request.options?.userId || "",
+            source_type: 'file_upload',
+            source_hash: fileHash,
+            source_url: filePath,
+            title: 'uploaded file',
+            language: transcription.language,
+            duration_sec: transcription.duration,
+            cost_minutes: Math.ceil(transcription.duration/60),
+            status: 'completed'
+          });
+          jobId = (row as any).job_id || jobId;
+          await upsertTranscriptionFormats(jobId, formats);
+        } catch(e) {
+          console.warn('DB write skipped:', e);
+        }
+      }
 
       return {
         success: true,
@@ -950,31 +1031,150 @@ export class TranscriptionService {
       }
     }
 
-    // 如果没有字幕，返回提示需要完整转录
-    return {
-      success: true,
-      preview: {
-        text: "No existing captions found. Full transcription with AI will be required to generate preview.",
-        srt: "",
-        duration: 0
+    // 如果没有字幕，尝试进行音频转录生成预览（使用降级机制）
+    // 但是对于未登录用户，我们应该限制这个功能避免成本过高
+    const isAuthenticated = request.options?.userId ? true : false;
+    
+    // 如果未登录且没有字幕，返回提示信息
+    if (!isAuthenticated) {
+      console.log('Unauthenticated user without captions - skipping audio transcription');
+      return {
+        success: true,
+        preview: {
+          text: "Sign in to generate AI-powered preview for videos without captions.",
+          srt: "",
+          duration: 0
+        }
+      };
+    }
+    
+    try {
+      console.log('No captions found, attempting audio transcription with fallback...');
+      
+      // 使用完整的下载逻辑（包含降级机制）
+      const downloadOptions = this.createOptimizedDownloadOptions(request, videoInfo.duration);
+      
+      // 先尝试优化下载，失败后自动降级
+      let audioBuffer: Buffer;
+      try {
+        audioBuffer = await YouTubeService.downloadAudioStreamOptimized(
+          videoInfo.videoId,
+          downloadOptions
+        );
+      } catch (optimizedError) {
+        console.warn('Optimized download failed, trying ytdl-core stream...');
+        audioBuffer = await YouTubeService.downloadAudioWithYtdlStream(
+          videoInfo.videoId,
+          { ...downloadOptions, timeout: 60000 }
+        );
       }
-    };
+
+      // 上传音频到 R2
+      const audioFileName = `youtube_preview_${videoInfo.videoId}_${Date.now()}.m4a`;
+      const uploadResult = await this.r2Service.uploadFile(
+        audioBuffer,
+        audioFileName,
+        'audio/mp4',
+        {
+          folder: 'youtube-preview',
+          expiresIn: 1,
+          makePublic: true
+        }
+      );
+
+      // 转录音频（预览模式使用快速模型）
+      console.log(`Starting preview transcription with URL: ${uploadResult.url}`);
+      console.log(`Preview options: isPreview=true, userTier=${request.options?.userTier || 'pro'}`);
+      
+      const transcription = await this.replicateService.transcribeAudio(uploadResult.url, {
+        language: request.options?.language || 'auto',
+        userTier: request.options?.userTier || 'pro', // 预览模式优先使用快速模型
+        isPreview: true,
+        fallbackEnabled: request.options?.fallbackEnabled !== false // 预览默认启用降级
+      });
+
+      // 异步清理临时文件
+      setTimeout(async () => {
+        try {
+          await this.r2Service.deleteFile(uploadResult.key);
+        } catch (error) {
+          console.error('Failed to cleanup preview audio:', error);
+        }
+      }, 30000);
+
+      // 提取90秒预览
+      const preview = this.extractPreview(transcription, {
+        txt: transcription.text,
+        srt: this.replicateService.convertToSRT(transcription)
+      });
+
+      return { success: true, preview };
+    } catch (error) {
+      console.error('YouTube preview generation failed with all methods:', error);
+      
+      // 如果是网络或API错误，返回错误状态
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // 检查是否是特定的已知错误
+      if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        return {
+          success: false,
+          error: 'Unable to access video. It may be private, age-restricted, or region-locked.'
+        };
+      }
+      
+      if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
+        return {
+          success: false,
+          error: 'Request timed out. Please try again.'
+        };
+      }
+      
+      // 对于其他错误，返回通用的预览不可用消息，但仍标记为成功避免前端显示错误
+      return {
+        success: true,
+        preview: {
+          text: "Preview temporarily unavailable. Please sign in for full transcription.",
+          srt: "",
+          duration: 0
+        }
+      };
+    }
   }
 
   /**
    * 生成文件预览
    */
-  private async generateFilePreview(_request: TranscriptionRequest): Promise<TranscriptionResponse> {
-    // 对于文件，我们需要实际进行转录才能生成预览
-    // 这里可以考虑只转录前90秒，但Replicate的Whisper API通常需要处理整个文件
-    return {
-      success: true,
-      preview: {
-        text: "File upload detected. Full transcription processing will be required to generate preview.",
-        srt: "",
-        duration: 0
-      }
-    };
+  private async generateFilePreview(request: TranscriptionRequest): Promise<TranscriptionResponse> {
+    try {
+      // 对于文件上传，我们需要进行完整转录然后截取90秒预览
+      console.log('Generating file preview by full transcription (using fast model)...');
+      
+      // 预览模式使用快速模型
+      const transcription = await this.replicateService.transcribeAudio(request.content, {
+        language: request.options?.language || 'auto',
+        userTier: request.options?.userTier || 'pro', // 预览模式优先使用快速模型
+        isPreview: true,
+        fallbackEnabled: request.options?.fallbackEnabled !== false // 预览默认启用降级
+      });
+
+      // 从完整转录中提取90秒预览
+      const preview = this.extractPreview(transcription, {
+        txt: transcription.text,
+        srt: this.replicateService.convertToSRT(transcription)
+      });
+
+      return {
+        success: true,
+        preview
+      };
+    } catch (error) {
+      console.error('File preview generation failed:', error);
+      return {
+        success: false,
+        error: `Preview generation failed: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
   }
 
   /**
@@ -994,8 +1194,11 @@ export class TranscriptionService {
    * 从完整转录中提取预览
    */
   private extractPreview(transcription: TranscriptionResult, formats: Record<string, string>): NonNullable<TranscriptionResponse['preview']> {
+    // 使用优化后的标点符号处理
+    const optimizedText = this.replicateService.convertToPlainText(transcription);
+    
     return {
-      text: this.truncateText(transcription.text, 90),
+      text: this.truncateText(optimizedText, 90),
       srt: this.truncateSRT(formats.srt || '', 90),
       duration: Math.min(90, transcription.duration)
     };

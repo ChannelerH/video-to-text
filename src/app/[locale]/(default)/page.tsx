@@ -35,9 +35,9 @@ export async function generateMetadata({
   }
 
   return {
-    title: "V2TX - Video to Text Converter Online | Free 90s Preview, Export SRT/TXT",
-    description: "V2TX: Best video to text converter. Convert videos to text instantly with our AI-powered tool. Paste YouTube links or upload MP4/MOV files. Free 90-second preview, then export as SRT, TXT, VTT, DOCX formats.",
-    keywords: "V2TX, video to text, video to text converter, video transcription, YouTube to text, SRT generator, video subtitles, MP4 to text, video to text online, AI video transcription",
+    title: "Video to Text Converter - AI Transcription in Minutes | V2TX",
+    description: "Convert videos to text with 95% accuracy. Free 10 mins daily. No credit card required. Supports YouTube, MP4, 100+ languages. Powered by OpenAI Whisper.",
+    keywords: "",
     alternates: {
       canonical: canonicalUrl,
     },

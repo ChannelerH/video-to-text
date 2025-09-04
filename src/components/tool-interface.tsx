@@ -22,6 +22,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [copiedText, setCopiedText] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [redirectTick, setRedirectTick] = useState<number | null>(null);
 
   const handleFormatToggle = (format: string) => {
     setSelectedFormats((prev) =>
@@ -116,10 +117,24 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       });
 
       const result = await response.json();
-      if (result.success) {
+      if (result.success && result.data) {
         setResult({ type: "full", data: result.data });
         setProgress(t("progress.completed"));
         setShowSuccess(true);
+        // 自动跳转到历史页（延迟几秒）
+        let left = 3;
+        setRedirectTick(left);
+        const timer = setInterval(() => {
+          left -= 1;
+          setRedirectTick(left);
+          if (left <= 0) {
+            clearInterval(timer);
+            window.location.href = "/my-transcriptions";
+          }
+        }, 1000);
+      } else if (result.success && result.preview) {
+        setResult({ type: "preview", data: result.preview, authRequired: result.authRequired });
+        setProgress(t("progress.preview_ready"));
       } else {
         console.error('Transcription API error:', result.error);
         let userFriendlyError = '';
@@ -153,7 +168,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   };
 
   const downloadFormat = async (format: string) => {
-    if (!result?.data) return;
+    if (!result?.data || result.type !== 'full') return;
 
     try {
       // 创建并下载文件
@@ -469,7 +484,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         )}
 
         {/* Results Display */}
-          {result && result.data && (
+          {result && result.type === 'full' && result.data && (
             <div className="mt-4 space-y-4">
               <div className="p-4 rounded-lg" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)" }}>
                 <h3 className="font-semibold mb-4" style={{ color: "#D1FAE5" }}>
@@ -566,6 +581,28 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
               </div>
             </div>
           )}
+
+          {/* Preview only (unauthenticated) */}
+          {result?.type === 'preview' && (
+            <div className="mt-6">
+              <div className="design-card p-6 text-left">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-xl font-semibold">{t('preview.title')}</h3>
+                  {result.authRequired && (
+                    <span className="text-sm text-amber-300">{t('preview.banner')}</span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-300 mb-2">{t('preview.message')}</p>
+                <div className="p-4 rounded-lg max-h-52 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(59,130,246,0.25)" }}>
+                  <p className="text-sm whitespace-pre-wrap">{result.data.text}</p>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <a className="design-btn-primary" href="/auth/signin">{t('preview.sign_in')}</a>
+                  <button className="design-btn-secondary cursor-not-allowed opacity-70" disabled>{t('preview.download_disabled')}</button>
+                </div>
+              </div>
+            </div>
+          )}
       </div>
       {/* Success overlay */}
       <div className={`success-overlay ${showSuccess ? "show" : ""}`} onClick={() => setShowSuccess(false)}>
@@ -575,10 +612,11 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             {t("success.title")}
           </div>
           <p className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
-            {t("success.message")}
+            {t("success.message")} {redirectTick !== null && redirectTick >= 0 ? t("success.redirecting", { seconds: redirectTick }) : ""}
           </p>
           <div className="mt-4 flex items-center justify-center gap-2">
             <button className="balloon-button" onClick={() => setShowSuccess(false)}>{t("success.continue")}</button>
+            <a className="design-btn-primary" href="/my-transcriptions">{t("success.view_history")}</a>
           </div>
         </div>
       </div>

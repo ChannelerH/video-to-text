@@ -153,6 +153,51 @@
     "user_center": "用户中心",
     "admin_system": "管理后台"
   },
+  "my_transcriptions": {
+    "title": "我的转录",
+    "description": "仅保存转录结果（TXT/SRT/VTT/JSON/MD），不长期保存原始音视频。",
+    "empty": "暂无转录记录",
+    "search_placeholder": "搜索标题或链接",
+    "search": "搜索",
+    "prev": "上一页",
+    "next": "下一页",
+    "table": {
+      "created_at": "创建时间",
+      "title": "标题",
+      "source": "来源",
+      "duration": "时长",
+      "actions": "下载"
+    },
+    "actions": {
+      "rerun": "重跑",
+      "delete": "删除",
+      "confirm_title": "删除转录",
+      "confirm_desc": "仅保存结果。删除后该条目的所有格式都会被移除。",
+      "cancel": "取消",
+      "confirm": "确认",
+      "confirm_delete": "确认删除该转录记录？此操作不可恢复。",
+      "delete_failed": "删除失败",
+      "rerun_ok": "已发起重跑（命中缓存会秒回）",
+      "rerun_failed": "重跑失败",
+      "rerun_file_hint": "文件上传类型需重新上传后再重跑",
+      "undo": "撤销",
+      "undo_success": "已恢复",
+      "undo_failed": "恢复失败"
+    },
+    "source": {
+      "youtube_url": "YouTube",
+      "audio_url": "音频链接",
+      "file_upload": "文件上传"
+    },
+    "select_all": "全选",
+    "clear": "清空",
+    "delete_selected": "批量删除",
+    "export_zip": "导出 ZIP",
+    "deleted_ok": "已删除",
+    "deleted_fail": "删除失败",
+    "export_ok": "已导出 ZIP",
+    "export_fail": "导出失败"
+  },
   "sign_modal": {
     "sign_in_title": "登录",
     "sign_in_description": "登录您的账户",
@@ -299,6 +344,7 @@
       "processing_audio_url": "正在处理来自 URL 的音频文件...",
       "processing_file": "正在处理文件转录...",
       "completed": "转录完成！",
+      "preview_ready": "已生成 90 秒预览。登录可获得完整结果并保存记录。",
       "audio_transformed": "您的音频已转换为文本。"
     },
     "results": {
@@ -319,7 +365,16 @@
     "success": {
       "title": "转录完成！",
       "message": "您的音频已转换为文本。",
-      "continue": "继续"
+      "continue": "继续",
+      "view_history": "查看历史",
+      "redirecting": "（{seconds} 秒后跳转）"
+    },
+    "preview": {
+      "title": "仅预览",
+      "banner": "未登录：仅展示 90 秒预览",
+      "message": "登录后可进行完整转录，并将结果保存到历史记录。",
+      "sign_in": "登录解锁完整结果",
+      "download_disabled": "预览模式不可下载"
     },
     "social_proof": "★★★★★ 4.8 | 1000+ 次转换 | 覆盖 12 个国家"
   },

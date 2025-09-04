@@ -108,3 +108,20 @@ export async function getUserInfo() {
 
   return user;
 }
+
+/**
+ * 获取用户信息和等级
+ */
+export async function getUserInfoWithTier() {
+  const user_uuid = await getUserUuid();
+
+  if (!user_uuid) {
+    return { user: null, userTier: 'free' };
+  }
+
+  const user = await findUserByUuid(user_uuid);
+  const { getUserTier } = await import('@/services/user-tier');
+  const userTier = await getUserTier(user_uuid);
+
+  return { user, userTier };
+}

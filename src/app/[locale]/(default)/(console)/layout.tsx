@@ -22,6 +22,12 @@ export default async function ({ children }: { children: ReactNode }) {
           icon: "RiBankCardLine",
           is_active: false,
         },
+        {
+          title: t("my_transcriptions.title"),
+          url: "/my-transcriptions",
+          icon: "RiFileList2Line",
+          is_active: false,
+        },
       ],
     },
   };

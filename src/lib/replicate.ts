@@ -5,6 +5,9 @@ export interface TranscriptionOptions {
   model?: 'large-v2' | 'large-v3';
   temperature?: number;
   patience?: number;
+  userTier?: string; // 用户等级
+  isPreview?: boolean; // 是否为预览请求
+  fallbackEnabled?: boolean; // 是否启用降级
 }
 
 export interface TranscriptionResult {
@@ -27,6 +30,13 @@ export interface TranscriptionSegment {
   no_speech_prob: number;
 }
 
+interface ModelInfo {
+  id: string;
+  name: string;
+  speed: string;
+  costPerMinute: number;
+}
+
 export class ReplicateService {
   private replicate: Replicate;
 
@@ -34,6 +44,57 @@ export class ReplicateService {
     this.replicate = new Replicate({
       auth: apiToken,
     });
+  }
+
+  /**
+   * 根据用户等级选择最佳模型
+   */
+  private getModelByUserTier(userTier?: string, isPreview?: boolean): ModelInfo {
+    // 预览请求的特殊处理
+    if (isPreview) {
+      // 未登录预览使用快速模型以提升体验
+      return {
+        id: 'douwantech/faster-whisper:338fae1406dd5ddd578aed6b6ce96a85a10f030b8101c5a155eb630b06b8b424',
+        name: 'Faster Whisper',
+        speed: '3-4 minutes',
+        costPerMinute: 0.001
+      };
+    }
+
+    switch(userTier) {
+      case 'premium':
+      case 'pro':
+        // 付费用户使用快速模型
+        return {
+          id: 'douwantech/faster-whisper:338fae1406dd5ddd578aed6b6ce96a85a10f030b8101c5a155eb630b06b8b424',
+          name: 'Faster Whisper',
+          speed: '3-4 minutes',
+          costPerMinute: 0.001
+        };
+      
+      case 'basic':
+      case 'free':
+      default:
+        // 免费和基础用户使用标准模型
+        return {
+          id: 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
+          name: 'Standard Whisper',
+          speed: '8-10 minutes',
+          costPerMinute: 0.0045
+        };
+    }
+  }
+
+  /**
+   * 获取降级模型（当主模型失败时使用）
+   */
+  private getFallbackModel(): ModelInfo {
+    return {
+      id: 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
+      name: 'Standard Whisper (Fallback)',
+      speed: '8-10 minutes',
+      costPerMinute: 0.0045
+    };
   }
 
   /**
@@ -46,27 +107,90 @@ export class ReplicateService {
     audioUrl: string, 
     options: TranscriptionOptions = {}
   ): Promise<TranscriptionResult> {
+    // 尝试使用主模型
     try {
-      const input = {
-        audio: audioUrl,
-        model: options.model || 'large-v3',
-        language: options.language === 'auto' ? undefined : options.language, // 自动检测语言时不传language参数
-        translate: false,
-        temperature: options.temperature || 0,
-        transcription: "plain text", // 返回纯文本格式
-        suppress_tokens: "-1",
-        logprob_threshold: -1,
-        no_speech_threshold: 0.6,
-        condition_on_previous_text: true,
-        compression_ratio_threshold: 2.4,
-        temperature_increment_on_fallback: 0.2
-      };
+      return await this.transcribeWithModel(audioUrl, options, false);
+    } catch (error) {
+      console.error('Primary model failed:', error);
+      
+      // 如果启用了降级且不是预览请求，尝试使用降级模型
+      if (options.fallbackEnabled && !options.isPreview) {
+        console.log('Attempting fallback to standard model...');
+        try {
+          return await this.transcribeWithModel(audioUrl, options, true);
+        } catch (fallbackError) {
+          console.error('Fallback model also failed:', fallbackError);
+          throw new Error('All transcription models failed. Please try again later.');
+        }
+      }
+      
+      throw error;
+    }
+  }
 
-      console.log(`Starting transcription with Replicate Whisper...`);
+  /**
+   * 使用指定模型进行转录
+   */
+  private async transcribeWithModel(
+    audioUrl: string,
+    options: TranscriptionOptions,
+    useFallback: boolean
+  ): Promise<TranscriptionResult> {
+    try {
+      // 根据用户等级选择模型
+      const modelInfo = useFallback 
+        ? this.getFallbackModel() 
+        : this.getModelByUserTier(options.userTier, options.isPreview);
+      
+      // 根据模型类型准备输入参数
+      let input: any;
+      
+      if (modelInfo.name === 'Faster Whisper') {
+        // douwantech/faster-whisper 的输入参数
+        input = {
+          audio: audioUrl,
+          model: 'large-v3',  // faster-whisper 支持的模型版本
+          language: options.language === 'auto' ? null : options.language,
+          initial_prompt: '',
+          suppress_tokens: '',
+          condition_on_previous_text: true,
+          temperature: options.temperature || 0,
+          compression_ratio_threshold: 2.4,
+          logprob_threshold: -1,
+          no_speech_threshold: 0.6,
+          word_timestamps: true,
+          prepend_punctuations: '"\'"¿([{-',
+          append_punctuations: '"\'.。,，!！?？:：")]}、',
+          vad_filter: false,
+          vad_parameters: null
+        };
+      } else {
+        // openai/whisper 的输入参数
+        input = {
+          audio: audioUrl,
+          model: options.model || 'large-v3',
+          language: options.language === 'auto' ? undefined : options.language,
+          translate: false,
+          temperature: options.temperature || 0,
+          transcription: "verbose json",
+          suppress_tokens: "-1",
+          logprob_threshold: -1,
+          no_speech_threshold: 0.6,
+          condition_on_previous_text: true,
+          compression_ratio_threshold: 2.4,
+          temperature_increment_on_fallback: 0.2,
+          word_timestamps: true
+        };
+      }
+
+      console.log(`Starting transcription with ${modelInfo.name} (${options.userTier || 'free'} tier)...`);
+      console.log(`Model ID: ${modelInfo.id}`);
+      console.log(`Is Preview: ${options.isPreview}`);
+      console.log(`Fallback Enabled: ${options.fallbackEnabled}`);
       console.log(`Input parameters:`, input);
       
       const output = await this.replicate.run(
-        "openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e",
+        modelInfo.id as `${string}/${string}:${string}`,
         { input }
       ) as any;
 
@@ -78,7 +202,7 @@ export class ReplicateService {
       }
 
       // 检查输出格式是否正确
-      if (typeof output !== 'object') {
+      if (typeof output !== 'object' && typeof output !== 'string') {
         console.error('Unexpected output format:', typeof output, output);
         throw new Error('Replicate API returned unexpected response format');
       }
@@ -86,7 +210,26 @@ export class ReplicateService {
       // 根据实际返回格式解析数据
       let transcription, segments, detected_language;
       
-      if (output.output) {
+      // 处理 douwantech/faster-whisper 的输出格式
+      if (modelInfo.name === 'Faster Whisper' && typeof output === 'string') {
+        console.log('Processing Faster Whisper SRT output from URL');
+        
+        // output 是一个 URL，需要下载 SRT 文件
+        try {
+          const srtResponse = await fetch(output);
+          const srtContent = await srtResponse.text();
+          console.log('Downloaded SRT content length:', srtContent.length);
+          
+          // 解析 SRT 内容
+          const parsedSRT = this.parseSRT(srtContent);
+          transcription = parsedSRT.text;
+          segments = parsedSRT.segments;
+          detected_language = options.language || 'unknown';
+        } catch (fetchError) {
+          console.error('Failed to fetch SRT from URL:', fetchError);
+          throw new Error('Failed to download transcription result');
+        }
+      } else if (output.output) {
         // 嵌套格式 (如你之前提供的示例)
         console.log('Using nested format: output.output');
         ({ transcription, segments, detected_language } = output.output);
@@ -121,6 +264,96 @@ export class ReplicateService {
   }
 
   /**
+   * 解析 SRT 格式内容
+   */
+  private parseSRT(srtContent: string): { text: string; segments: TranscriptionSegment[] } {
+    const lines = srtContent.split('\n').map(line => line.trim());
+    const segments: TranscriptionSegment[] = [];
+    let fullText = '';
+    let i = 0;
+    let segmentId = 0;
+
+    while (i < lines.length) {
+      // 跳过空行
+      if (!lines[i]) {
+        i++;
+        continue;
+      }
+
+      // 跳过序号行
+      if (/^\d+$/.test(lines[i])) {
+        i++;
+        
+        // 解析时间戳
+        if (i < lines.length && lines[i].includes('-->')) {
+          const [startTime, endTime] = lines[i].split('-->').map(t => t.trim());
+          const startSeconds = this.srtTimeToSeconds(startTime);
+          const endSeconds = this.srtTimeToSeconds(endTime);
+          i++;
+
+          // 收集文本行（可能有多行）
+          let text = '';
+          while (i < lines.length && lines[i] && !/^\d+$/.test(lines[i])) {
+            text += (text ? ' ' : '') + lines[i];
+            i++;
+          }
+
+          if (text) {
+            segments.push({
+              id: segmentId++,
+              seek: 0,
+              start: startSeconds,
+              end: endSeconds,
+              text: text,
+              tokens: [],
+              temperature: 0,
+              avg_logprob: 0,
+              compression_ratio: 1,
+              no_speech_prob: 0
+            });
+            
+            fullText += (fullText ? ' ' : '') + text;
+          }
+        }
+      } else {
+        i++;
+      }
+    }
+
+    // 优化标点符号
+    fullText = this.optimizePunctuation(fullText);
+
+    return {
+      text: fullText,
+      segments
+    };
+  }
+
+  /**
+   * 将 SRT 时间格式转换为秒数
+   */
+  private srtTimeToSeconds(srtTime: string): number {
+    // 格式: HH:MM:SS,mmm 或 MM:SS,mmm
+    const parts = srtTime.replace(',', '.').split(':');
+    
+    if (parts.length === 3) {
+      // HH:MM:SS.mmm
+      const hours = parseFloat(parts[0]);
+      const minutes = parseFloat(parts[1]);
+      const seconds = parseFloat(parts[2]);
+      return hours * 3600 + minutes * 60 + seconds;
+    } else if (parts.length === 2) {
+      // MM:SS.mmm
+      const minutes = parseFloat(parts[0]);
+      const seconds = parseFloat(parts[1]);
+      return minutes * 60 + seconds;
+    } else {
+      // SS.mmm
+      return parseFloat(srtTime.replace(',', '.'));
+    }
+  }
+
+  /**
    * 将转录结果转换为 SRT 格式
    */
   convertToSRT(transcription: TranscriptionResult): string {
@@ -132,7 +365,7 @@ export class ReplicateService {
       .map((segment, index) => {
         const startTime = this.secondsToSRTTime(segment.start);
         const endTime = this.secondsToSRTTime(segment.end);
-        const text = segment.text.trim();
+        const text = this.optimizePunctuation(segment.text.trim());
 
         return `${index + 1}\n${startTime} --> ${endTime}\n${text}\n`;
       })
@@ -165,10 +398,45 @@ export class ReplicateService {
   }
 
   /**
-   * 将转录结果转换为纯文本
+   * 将转录结果转换为纯文本（优化标点符号）
    */
   convertToPlainText(transcription: TranscriptionResult): string {
-    return transcription.text.trim();
+    let text = transcription.text.trim();
+    
+    // 标点符号优化
+    text = this.optimizePunctuation(text);
+    
+    return text;
+  }
+
+  /**
+   * 优化文本中的标点符号
+   */
+  private optimizePunctuation(text: string): string {
+    // 1. 去除标点符号前的多余空格
+    text = text.replace(/\s+([.!?,:;])/g, '$1');
+    
+    // 2. 确保句子结束标点后有适当空格
+    text = text.replace(/([.!?])\s*([A-Z])/g, '$1 $2');
+    
+    // 3. 优化逗号和分号后的空格
+    text = text.replace(/([,:;])\s*([a-zA-Z])/g, '$1 $2');
+    
+    // 4. 处理引号内的标点
+    text = text.replace(/([""'])\s+([.!?])/g, '$2$1');
+    text = text.replace(/([.!?])\s+([""'])/g, '$1$2');
+    
+    // 5. 处理中文标点符号
+    text = text.replace(/\s*([。！？，；：])\s*/g, '$1');
+    text = text.replace(/([。！？])\s*([A-Za-z\u4e00-\u9fff])/g, '$1 $2');
+    
+    // 6. 清理多余的空格
+    text = text.replace(/\s+/g, ' ');
+    
+    // 7. 确保首字母大写（英文）
+    text = text.replace(/^\s*([a-z])/g, (match, p1) => match.replace(p1, p1.toUpperCase()));
+    
+    return text.trim();
   }
 
   /**
@@ -194,12 +462,13 @@ export class ReplicateService {
     markdown += `### Content\n\n`;
     
     if (transcription.segments && transcription.segments.length > 0) {
-      transcription.segments.forEach((segment, index) => {
+      transcription.segments.forEach((segment) => {
         const timestamp = this.secondsToTimestamp(segment.start);
-        markdown += `**[${timestamp}]** ${segment.text.trim()}\n\n`;
+        const text = this.optimizePunctuation(segment.text.trim());
+        markdown += `**[${timestamp}]** ${text}\n\n`;
       });
     } else {
-      markdown += transcription.text;
+      markdown += this.optimizePunctuation(transcription.text);
     }
 
     return markdown;
