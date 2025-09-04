@@ -376,12 +376,17 @@ body::after {
 .price-gradient{background:linear-gradient(135deg,#3B82F6,#1D4ED8,#1E40AF);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:3rem;font-weight:800;filter:drop-shadow(0 0 20px rgba(59,130,246,0.4))}
 
 /* Range slider purple thumb */
+.slider-thumb-purple {
+  accent-color: #8B5CF6; /* fallback color for supported browsers */
+}
 .slider-thumb-purple::-webkit-slider-thumb {
   appearance: none;
   width: 20px;
   height: 20px;
   border-radius: 50%;
   background: #8B5CF6;
+  border: 3px solid rgba(255,255,255,0.7);
+  box-shadow: 0 6px 14px rgba(139,92,246,0.45), 0 0 0 3px rgba(139,92,246,0.25);
   cursor: pointer;
 }
 
@@ -390,8 +395,29 @@ body::after {
   height: 20px;
   border-radius: 50%;
   background: #8B5CF6;
+  border: 3px solid rgba(255,255,255,0.7);
+  box-shadow: 0 6px 14px rgba(139,92,246,0.45), 0 0 0 3px rgba(139,92,246,0.25);
   cursor: pointer;
   border: none;
+}
+
+/* Improve track visibility */
+.slider-thumb-purple::-webkit-slider-runnable-track {
+  height: 12px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgba(148,163,184,0.35), rgba(51,65,85,0.35));
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+.slider-thumb-purple::-moz-range-track {
+  height: 12px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgba(148,163,184,0.35), rgba(51,65,85,0.35));
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+.slider-thumb-purple:focus {
+  outline: none;
 }
 
 /* Ultimate Purple Popular Badge */

@@ -61,10 +61,10 @@ export default function ROICalculator({ section }: { section: SectionType }) {
             max="500"
             value={videoHours}
             onChange={(e) => setVideoHours(Number(e.target.value))}
-            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb-purple"
+            className="w-full h-3 md:h-3 bg-gray-700/70 rounded-full appearance-none cursor-pointer slider-thumb-purple ring-1 ring-white/10 shadow-inner"
           />
           
-          <div className="flex justify-between text-xs text-gray-500 mt-2">
+          <div className="flex justify-between text-[13px] text-gray-400 font-medium mt-2 drop-shadow">
             <span>{t('hours_min', { hours: 10 })}</span>
             <span>{t('hours_max', { hours: 500 })}</span>
           </div>
