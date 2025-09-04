@@ -554,8 +554,8 @@
     ]
   },
   "stats": {
-    "title": "",
-    "description": "",
+    "title": "⚡ 实时性能看板",
+    "description": "展示 V2TX 的实时指标<br />数据会定期刷新（聚合统计）",
     "items": [
       {
         "title": "12,345+",
@@ -671,7 +671,7 @@
       },
       "url": "/"
     },
-    "copyright": "© 2025 • 视频转文字 版权所有。",
+    "copyright": "© 2025 • V2TX 版权所有。",
     "nav": {
       "items": [
         {

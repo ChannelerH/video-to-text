@@ -6,7 +6,7 @@
       "title": "V2TX",
       "logo": {
         "src": "/logo.png",
-        "alt": "V2TX - Video to Text"
+        "alt": "V2TX"
       },
       "url": "/"
     },
@@ -390,7 +390,7 @@
   },
   "stats": {
     "title": "⚡ Live Performance Dashboard",
-    "description": "Real-time metrics showing V2TX in action across the globe<br />Updated every 15 seconds with actual usage data",
+    "description": "Real-time metrics showing V2TX in action across the globe<br />Refreshed periodically with aggregated usage data",
     "items": [
       {
         "title": "2,847",
@@ -586,22 +586,22 @@
   "footer": {
     "name": "footer",
     "brand": {
-      "title": "Video to Text",
+      "title": "V2TX",
       "description": "Convert videos and audio to text online. Free 90-second previews, multiple export formats including SRT, TXT, VTT, DOCX, and JSON.",
       "logo": {
         "src": "/logo.png",
-        "alt": "Video to Text"
+        "alt": "V2TX"
       },
       "url": "/"
     },
-    "copyright": "© 2025 • Video to Text All rights reserved.",
+    "copyright": "© 2025 • V2TX All rights reserved.",
     "nav": {
       "items": [
         {
           "title": "Tools",
           "children": [
             {
-              "title": "Video to Text",
+              "title": "V2TX",
               "url": "/",
               "target": "_self"
             },

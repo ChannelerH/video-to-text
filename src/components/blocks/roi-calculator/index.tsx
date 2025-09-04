@@ -2,21 +2,29 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Section as SectionType } from "@/types/blocks/section";
 
 export default function ROICalculator({ section }: { section: SectionType }) {
   const t = useTranslations("roi_calculator");
+  const locale = useLocale();
   const [videoHours, setVideoHours] = useState(100);
 
   if (section.disabled) {
     return null;
   }
 
-  // 详细成本计算
-  const humanCost = videoHours * 200; // ¥200/小时人工成本
-  const otherToolsCost = videoHours * 10; // ¥10/小时其他工具
-  const ourCost = videoHours * 0.29; // ¥0.29/小时AI成本
+  // 详细成本计算（根据语言切换货币与单价）
+  const isZH = (locale || "en").toLowerCase().startsWith("zh");
+  const currencySymbol = isZH ? "¥" : "$";
+  // 定价模型：人工按小时，工具按月订阅（与产品定价一致）
+  const rateHuman = isZH ? 200 : 60; // 人工时薪
+  const ourMonthly = isZH ? 29 : 9;  // 我们 Pro 订阅（与定价页一致）
+  const otherMonthly = isZH ? 99 : 29; // 市场竞品月费（合理假设）
+
+  const humanCost = videoHours * rateHuman;
+  const otherToolsCost = otherMonthly;
+  const ourCost = ourMonthly;
   const monthlySavings = humanCost - ourCost;
   const yearlySavings = monthlySavings * 12;
   const roi = ((monthlySavings / ourCost) * 100).toFixed(0);
@@ -89,7 +97,7 @@ export default function ROICalculator({ section }: { section: SectionType }) {
               <div>
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-gray-400">{t('manual_transcription')}</span>
-                  <span className="text-xl font-bold text-gray-400">¥{humanCost.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-gray-400">{currencySymbol}{humanCost.toLocaleString()}</span>
                 </div>
                 <div className="h-10 bg-gray-800 rounded-lg overflow-hidden">
                   <motion.div 
@@ -106,7 +114,7 @@ export default function ROICalculator({ section }: { section: SectionType }) {
               <div>
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-gray-400">{t('other_tools')}</span>
-                  <span className="text-xl font-bold text-gray-400">¥{otherToolsCost.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-gray-400">{currencySymbol}{otherToolsCost.toLocaleString()}</span>
                 </div>
                 <div className="h-10 bg-gray-800 rounded-lg overflow-hidden">
                   <motion.div 
@@ -123,7 +131,7 @@ export default function ROICalculator({ section }: { section: SectionType }) {
               <div>
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-purple-400 font-semibold">{t('our_service')}</span>
-                  <span className="text-xl font-bold text-purple-400">¥{ourCost.toFixed(0)}</span>
+                  <span className="text-xl font-bold text-purple-400">{currencySymbol}{(+ourCost.toFixed(0)).toLocaleString()}</span>
                 </div>
                 <div className="h-10 bg-gray-800 rounded-lg overflow-hidden">
                   <motion.div 
@@ -186,7 +194,7 @@ export default function ROICalculator({ section }: { section: SectionType }) {
                   viewport={{ once: true }}
                   transition={{ delay: 1.5, duration: 0.6 }}
                 >
-                  {t('monthly_savings_amount', { amount: monthlySavings.toLocaleString() })}<span className="text-lg text-gray-400">{t('per_month')}</span>
+                  {t('monthly_savings_amount', { currency: currencySymbol, amount: monthlySavings.toLocaleString() })}<span className="text-lg text-gray-400">{t('per_month')}</span>
                 </motion.div>
                 <motion.div 
                   className="text-2xl text-emerald-300 font-semibold"
@@ -195,7 +203,7 @@ export default function ROICalculator({ section }: { section: SectionType }) {
                   viewport={{ once: true }}
                   transition={{ delay: 1.8, duration: 0.6 }}
                 >
-                  {t('yearly_total', { amount: yearlySavings.toLocaleString() })}
+                  {t('yearly_total', { currency: currencySymbol, amount: yearlySavings.toLocaleString() })}
                 </motion.div>
               </div>
               

@@ -3,10 +3,10 @@
   "theme": "light",
   "header": {
     "brand": {
-      "title": "Video to Text",
+      "title": "V2TX",
       "logo": {
         "src": "/logo.png",
-        "alt": "Video to Text"
+        "alt": "V2TX"
       },
       "url": "/"
     },
@@ -239,22 +239,22 @@
   "footer": {
     "name": "footer",
     "brand": {
-      "title": "Video to Text",
+      "title": "V2TX",
       "description": "Convert videos and audio to text online. Free 90-second previews, multiple export formats including SRT, TXT, VTT, DOCX, and JSON.",
       "logo": {
         "src": "/logo.png",
-        "alt": "Video to Text"
+        "alt": "V2TX"
       },
       "url": "/"
     },
-    "copyright": "© 2025 • Video to Text All rights reserved.",
+    "copyright": "© 2025 • V2TX All rights reserved.",
     "nav": {
       "items": [
         {
           "title": "Tools",
           "children": [
             {
-              "title": "Video to Text",
+              "title": "V2TX",
               "url": "/",
               "target": "_self"
             },

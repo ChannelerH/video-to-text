@@ -157,6 +157,9 @@ export default function UseCases({ section }: UseCasesProps) {
               {t('title')}
             </h2>
             <p className="design-description" dangerouslySetInnerHTML={{ __html: t('description') }} />
+            <div className="mt-4 inline-flex items-center px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-full text-purple-300 text-sm font-medium">
+              {t('processing_notice')}
+            </div>
           </motion.div>
         </motion.div>
 
