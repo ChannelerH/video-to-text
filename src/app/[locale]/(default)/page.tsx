@@ -4,6 +4,7 @@ import Feature from "@/components/blocks/feature";
 import Stats from "@/components/blocks/stats";
 import UseCases from "@/components/blocks/use-cases";
 import TranscriptionDemo from "@/components/blocks/transcription-demo";
+import WhyChooseUs from "@/components/blocks/why-choose-us";
 import VideoTypes from "@/components/blocks/video-types";
 import ComparisonTable from "@/components/blocks/comparison-table";
 import ROICalculator from "@/components/blocks/roi-calculator";
@@ -68,16 +69,19 @@ export default async function VideoToTextPage({
       {/* 4. 效果展示（真实转写样本） */}
       <TranscriptionDemo section={{ name: "transcription-demo", disabled: false }} />
 
-      {/* 5. 成本分析（ROI） */}
+      {/* 5. 竞争优势（为什么选择我们） */}
+      <WhyChooseUs section={{ name: "why-choose-us", disabled: false }} />
+
+      {/* 6. 成本分析（ROI） */}
       <ROICalculator section={{ name: "roi-calculator", disabled: false }} />
 
-      {/* 6. 定价方案（精简版） */}
+      {/* 7. 定价方案（精简版） */}
       {page.pricing && <Pricing pricing={page.pricing} />}
 
-      {/* 7. FAQ 精选 */}
+      {/* 8. FAQ 精选 */}
       {page.faq && <FAQ section={page.faq} />}
 
-      {/* 8. 收尾 CTA */}
+      {/* 9. 收尾 CTA */}
       <CTA
         section={{
           name: "final-cta",

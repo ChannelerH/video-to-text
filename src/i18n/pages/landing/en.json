@@ -353,10 +353,6 @@
         "description": "Light music: −5–10% accuracy. Strong beats: −20–30%. Tip: use original vocals or separate tracks. Pro includes intelligent denoise."
       },
       {
-        "title": "API integration?",
-        "description": "RESTful API with docs & SDKs (Python/Node/PHP). Typical latency <100ms. Rate limit: 1000/day on Pro."
-      },
-      {
         "title": "What video formats are supported?",
         "description": "20+ formats: MP4, MOV, AVI, WMV, MKV, FLV, WEBM, 3GP, OGV. Audio: MP3, WAV, M4A, AAC, FLAC, WMA, OGG. Max 2GB per file."
       }

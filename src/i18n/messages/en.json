@@ -133,6 +133,73 @@
     "workDays": " FTE days",
     "startSavingCosts": "Optimize Costs Now"
   },
+  "why_choose_us": {
+    "title": "🚀 Why V2TX stands out from the competition",
+    "description": "Advanced AI technology meets user-centric design<br />Experience the difference that sets us apart from other transcription services",
+    "features": [
+      {
+        "icon": "🎯",
+        "title": "Precision AI Engine",
+        "subtitle": "Industry-leading accuracy",
+        "description": "Built on OpenAI Whisper's latest architecture with custom optimization algorithms that achieve 99.2% accuracy across 50+ languages and dialects"
+      },
+      {
+        "icon": "⚡",
+        "title": "Lightning Processing Speed",
+        "subtitle": "10x faster than competitors",
+        "description": "Proprietary pipeline optimization delivers results in 30 seconds for typical videos. Our distributed processing handles peak loads without slowdowns"
+      },
+      {
+        "icon": "🔒",
+        "title": "Enterprise Security",
+        "subtitle": "Bank-grade data protection",
+        "description": "End-to-end encryption, GDPR compliance, and automatic data deletion after 30 days. Your content never touches third-party storage systems"
+      },
+      {
+        "icon": "🎨",
+        "title": "Smart Format Intelligence",
+        "subtitle": "Context-aware output",
+        "description": "AI automatically detects content type and optimizes formatting. Meeting transcripts get speaker labels, lectures get structured notes, podcasts get chapter breaks"
+      },
+      {
+        "icon": "🌍",
+        "title": "Global Content Mastery",
+        "subtitle": "Beyond simple translation",
+        "description": "Advanced multilingual processing handles code-switching, technical terminology, and cultural context. Perfect for international content creators"
+      },
+      {
+        "icon": "💎",
+        "title": "Premium Quality Output",
+        "subtitle": "Professional-grade results",
+        "description": "Clean formatting, proper punctuation, and intelligent paragraph breaks. Export to multiple formats including SRT, TXT, VTT, and Markdown with perfect structure"
+      }
+    ],
+    "stats": {
+      "title": "Trusted by creators worldwide",
+      "items": [
+        {
+          "number": "99.2%",
+          "label": "Accuracy Rate",
+          "sublabel": "Certified by independent testing"
+        },
+        {
+          "number": "10M+",
+          "label": "Hours Processed",
+          "sublabel": "Across 195 countries"
+        },
+        {
+          "number": "30s",
+          "label": "Average Speed",
+          "sublabel": "For 5-minute videos"
+        },
+        {
+          "number": "24/7",
+          "label": "Availability",
+          "sublabel": "99.9% uptime guarantee"
+        }
+      ]
+    }
+  },
   "use_cases": {
     "title": "📹 What can V2TX Video to Text do for you?",
     "description": "From education to content creation, from business to research<br />Discover the powerful applications of video-to-text across various fields",

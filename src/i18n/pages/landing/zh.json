@@ -517,10 +517,6 @@
       {
         "title": "背景音乐会影响吗？",
         "description": "轻音乐影响 5–10%，强节奏 20–30%；建议使用原声或分离音轨；专业版提供智能降噪。"
-      },
-      {
-        "title": "如何集成 API？",
-        "description": "RESTful API，含文档与 SDK（Python/Node/PHP）；典型延迟 <100ms；速率限制：专业版 1000 次/天。"
       }
     ],
     "disabled": true
