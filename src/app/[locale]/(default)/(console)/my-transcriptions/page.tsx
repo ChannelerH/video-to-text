@@ -7,7 +7,7 @@ import { TableColumn } from "@/types/blocks/table";
 import Actions from "@/components/console/transcriptions/actions";
 import TranscriptionsTable from "@/components/console/transcriptions/table";
 
-export default async function Page({ searchParams }: { searchParams?: { page?: string; q?: string } }) {
+export default async function Page({ searchParams }: { searchParams?: Promise<{ page?: string; q?: string }> }) {
   const t = await getTranslations();
   const user_uuid = await getUserUuid();
   const callbackUrl = `${process.env.NEXT_PUBLIC_WEB_URL}/my-transcriptions`;
@@ -15,10 +15,11 @@ export default async function Page({ searchParams }: { searchParams?: { page?: s
     redirect(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
   }
 
-  const page = Math.max(parseInt(searchParams?.page || '1', 10), 1);
+  const s = (await (searchParams || Promise.resolve({} as any))) as { page?: string; q?: string };
+  const page = Math.max(parseInt(s.page || '1', 10), 1);
   const limit = 20;
   const offset = (page - 1) * limit;
-  const q = searchParams?.q || '';
+  const q = s.q || '';
   const qs = new URLSearchParams({ limit: String(limit), offset: String(offset), ...(q ? { q } : {}) }).toString();
   const res = await fetch(`${process.env.NEXT_PUBLIC_WEB_URL}/api/transcriptions?${qs}`, { cache: 'no-store' });
   const { success, data, total } = await res.json();

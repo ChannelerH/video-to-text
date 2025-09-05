@@ -106,12 +106,17 @@ export class RateLimiter {
   }
 }
 
-// 预览请求限制配置
+// 预览请求限制配置 - 更严格的限制策略
 export const PREVIEW_LIMITS = {
   ANONYMOUS: {
-    maxRequests: 3,        // 每个时间窗口最多3次预览
+    maxRequests: 1,        // 未登录每小时只能1次预览（90秒截断）
     windowMs: 60 * 60 * 1000,  // 1小时时间窗口
-    dailyMax: 10          // 每日最多10次（需要额外跟踪）
+    dailyMax: 3           // 每日最多3次
+  },
+  AUTHENTICATED: {
+    maxRequests: 5,        // 登录用户每小时5次预览
+    windowMs: 60 * 60 * 1000,  // 1小时时间窗口
+    dailyMax: 20          // 每日最多20次
   },
   SUSPICIOUS: {
     maxRequests: 1,        // 可疑用户限制更严

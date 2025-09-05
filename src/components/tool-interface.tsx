@@ -4,7 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileText, Download, Copy, Check, Code } from "lucide-react";
 import PyramidLoader from "@/components/ui/pyramid-loader";
+import { useRouter } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
 import { useTranslations } from "next-intl";
+import { useSession } from "next-auth/react";
+import { useAppContext } from "@/contexts/app";
+import { isAuthEnabled } from "@/lib/auth";
 
 interface ToolInterfaceProps {
   mode?: "video" | "audio";
@@ -12,6 +17,12 @@ interface ToolInterfaceProps {
 
 export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const t = useTranslations("tool_interface");
+  
+  // Authentication state
+  const { data: session } = isAuthEnabled() ? useSession() : { data: null };
+  const { user } = useAppContext();
+  const isAuthenticated = !!(session?.user || user);
+  
   const [url, setUrl] = useState("");
   const [selectedFormats, setSelectedFormats] = useState(["txt", "srt"]);
   const [file, setFile] = useState<File | null>(null);
@@ -22,7 +33,25 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [copiedText, setCopiedText] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [redirectTick, setRedirectTick] = useState<number | null>(null);
+  const router = useRouter();
+  const locale = useLocale();
+
+  const goToHistory = () => {
+    const href = locale && locale !== 'en' ? `/${locale}/my-transcriptions` : `/my-transcriptions`;
+    try {
+      router.push('/my-transcriptions');
+      // 保险兜底：如果 SPA 跳转被阻塞，fallback 到硬跳转
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          window.location.assign(href);
+        }
+      }, 400);
+    } catch {
+      if (typeof window !== 'undefined') {
+        window.location.assign(href);
+      }
+    }
+  };
 
   const handleFormatToggle = (format: string) => {
     setSelectedFormats((prev) =>
@@ -75,6 +104,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     setResult(null);
 
     try {
+      // Determine action based on authentication status
+      const action = isAuthenticated ? "transcribe" : "preview";
+      console.log(`Using action: ${action} (authenticated: ${isAuthenticated})`);
+      
       let requestData;
       if (url) {
         // 检测URL类型
@@ -86,22 +119,25 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         const urlType = isYouTubeUrl ? "youtube_url" : "audio_url";
         
         const progressText = isYouTubeUrl 
-          ? t("progress.processing_youtube") 
-          : t("progress.processing_audio_url");
+          ? (action === "preview" ? t("progress.generating_preview") : t("progress.processing_youtube"))
+          : (action === "preview" ? t("progress.generating_preview") : t("progress.processing_audio_url"));
         
         setProgress(progressText);
         requestData = {
           type: urlType,
           content: url,
-          action: "transcribe",
+          action: action,
           options: { formats: selectedFormats }
         };
       } else if (uploadedFileInfo) {
-        setProgress(t("progress.processing_file"));
+        const progressText = action === "preview" 
+          ? t("progress.generating_preview")
+          : t("progress.processing_file");
+        setProgress(progressText);
         requestData = {
           type: "file_upload",
           content: uploadedFileInfo.replicateUrl,
-          action: "transcribe",
+          action: action,
           options: { formats: selectedFormats, r2Key: uploadedFileInfo.r2Key }
         };
       } else {
@@ -117,21 +153,12 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       });
 
       const result = await response.json();
+      console.log("API Response:", result);
+      
       if (result.success && result.data) {
         setResult({ type: "full", data: result.data });
         setProgress(t("progress.completed"));
         setShowSuccess(true);
-        // 自动跳转到历史页（延迟几秒）
-        let left = 3;
-        setRedirectTick(left);
-        const timer = setInterval(() => {
-          left -= 1;
-          setRedirectTick(left);
-          if (left <= 0) {
-            clearInterval(timer);
-            window.location.href = "/my-transcriptions";
-          }
-        }, 1000);
       } else if (result.success && result.preview) {
         setResult({ type: "preview", data: result.preview, authRequired: result.authRequired });
         setProgress(t("progress.preview_ready"));
@@ -594,7 +621,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                 </div>
                 <p className="text-sm text-gray-300 mb-2">{t('preview.message')}</p>
                 <div className="p-4 rounded-lg max-h-52 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(59,130,246,0.25)" }}>
-                  <p className="text-sm whitespace-pre-wrap">{result.data.text}</p>
+                  <p className="text-sm whitespace-pre-wrap">
+                    {result.data.text || "Preview temporarily unavailable. Please sign in for full transcription."}
+                  </p>
                 </div>
                 <div className="mt-4 flex gap-2">
                   <a className="design-btn-primary" href="/auth/signin">{t('preview.sign_in')}</a>
@@ -612,11 +641,11 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             {t("success.title")}
           </div>
           <p className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
-            {t("success.message")} {redirectTick !== null && redirectTick >= 0 ? t("success.redirecting", { seconds: redirectTick }) : ""}
+            {t("success.message")}
           </p>
           <div className="mt-4 flex items-center justify-center gap-2">
             <button className="balloon-button" onClick={() => setShowSuccess(false)}>{t("success.continue")}</button>
-            <a className="design-btn-primary" href="/my-transcriptions">{t("success.view_history")}</a>
+            <button className="design-btn-primary" onClick={goToHistory}>{t("success.view_history")}</button>
           </div>
         </div>
       </div>

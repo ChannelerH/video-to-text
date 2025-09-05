@@ -8,12 +8,17 @@ import { AbuseDetector } from '@/lib/abuse-detector';
 import { quotaTracker } from '@/services/quota-tracker';
 import { headers } from 'next/headers';
 
-// 初始化服务
+// 初始化服务 - 支持两个模型：Deepgram + OpenAI Whisper
 const transcriptionService = new TranscriptionService(
-  process.env.REPLICATE_API_TOKEN || ''
+  process.env.REPLICATE_API_TOKEN || '',
+  process.env.DEEPGRAM_API_KEY
 );
 const rateLimiter = new RateLimiter();
 const abuseDetector = new AbuseDetector();
+
+// 如果有Deepgram API Key，使用优化的转录服务
+const deepgramEnabled = !!process.env.DEEPGRAM_API_KEY;
+console.log(`Deepgram ${deepgramEnabled ? 'enabled' : 'disabled'} - Using ${deepgramEnabled ? 'Deepgram + Whisper' : 'Whisper only'} strategy`);
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,9 +69,17 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // 速率限制检查
+      // 根据用户状态选择限制策略
       const suspicionScore = abuseDetector.getSuspicionScore(identifier);
-      const limits = suspicionScore > 10 ? PREVIEW_LIMITS.SUSPICIOUS : PREVIEW_LIMITS.ANONYMOUS;
+      let limits;
+      
+      if (suspicionScore > 10) {
+        limits = PREVIEW_LIMITS.SUSPICIOUS;
+      } else if (user_uuid) {
+        limits = PREVIEW_LIMITS.AUTHENTICATED; // 已登录用户
+      } else {
+        limits = PREVIEW_LIMITS.ANONYMOUS; // 未登录用户
+      }
       const rateCheck = rateLimiter.checkLimit(
         identifier,
         limits.maxRequests,
@@ -75,11 +88,16 @@ export async function POST(request: NextRequest) {
       );
       
       if (!rateCheck.allowed) {
+        const errorMessage = user_uuid 
+          ? 'Preview limit reached. Try again in an hour or upgrade your plan.'
+          : 'Preview limit reached (1 per hour for guests). Sign in for more previews.';
+        
         return NextResponse.json(
           { 
             success: false, 
-            error: 'Preview limit exceeded. Please sign in for full access.',
-            resetAt: new Date(rateCheck.resetAt).toISOString()
+            error: errorMessage,
+            resetAt: new Date(rateCheck.resetAt).toISOString(),
+            authRequired: !user_uuid
           },
           { status: 429 }
         );
@@ -196,9 +214,10 @@ export async function POST(request: NextRequest) {
         }
       });
       
-      // 记录使用情况
-      if (result.success && result.duration) {
-        const actualMinutes = result.duration / 60;
+      // 记录使用情况（按真实转录时长）
+      const durationSec = result?.data?.transcription?.duration || 0;
+      if (result.success && durationSec > 0) {
+        const actualMinutes = durationSec / 60;
         await quotaTracker.recordUsage(user_uuid, actualMinutes, userTier);
       }
       

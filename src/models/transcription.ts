@@ -18,7 +18,7 @@ export async function createOrReuseTranscription(params: {
 }) {
   const now = new Date();
 
-  // Try to find an existing completed job for the same source (global dedup)
+  // Try to find an existing completed job for the same source AND same user (avoid cross-user reuse)
   const existing = await db
     .select()
     .from(transcriptions)
@@ -26,7 +26,8 @@ export async function createOrReuseTranscription(params: {
       eq(transcriptions.source_type as any, params.source_type),
       eq(transcriptions.source_hash, params.source_hash),
       eq(transcriptions.deleted, false as any),
-      eq(transcriptions.status as any, "completed")
+      eq(transcriptions.status as any, "completed"),
+      eq(transcriptions.user_uuid, params.user_uuid || "")
     ))
     .orderBy(desc(transcriptions.completed_at))
     .limit(1);
@@ -101,8 +102,11 @@ export async function listUserTranscriptions(user_uuid: string, limit = 20, offs
   return base;
 }
 
-export async function getTranscription(job_id: string) {
-  const [job] = await db.select().from(transcriptions).where(eq(transcriptions.job_id, job_id)).limit(1);
+export async function getTranscription(job_id: string, user_uuid?: string) {
+  const where = user_uuid
+    ? and(eq(transcriptions.job_id, job_id), eq(transcriptions.user_uuid, user_uuid), eq(transcriptions.deleted, false as any))
+    : eq(transcriptions.job_id, job_id);
+  const [job] = await db.select().from(transcriptions).where(where as any).limit(1);
   if (!job) return null;
   const rows = await db.select().from(transcription_results).where(eq(transcription_results.job_id, job_id));
   const formats: Record<string, string> = {};

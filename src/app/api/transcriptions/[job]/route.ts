@@ -5,7 +5,7 @@ import { getUserUuid } from "@/services/user";
 export async function GET(_req: NextRequest, { params }: { params: { job: string } }) {
   const user_uuid = await getUserUuid();
   if (!user_uuid) return NextResponse.json({ success:false, error: 'unauthorized' }, { status: 401 });
-  const data = await getTranscription(params.job);
+  const data = await getTranscription(params.job, user_uuid);
   if (!data) return NextResponse.json({ success:false, error: 'not_found' }, { status: 404 });
   return NextResponse.json({ success: true, data });
 }

@@ -172,7 +172,7 @@ export class ReplicateService {
           language: options.language === 'auto' ? undefined : options.language,
           translate: false,
           temperature: options.temperature || 0,
-          transcription: "verbose json",
+          transcription: "plain text",
           suppress_tokens: "-1",
           logprob_threshold: -1,
           no_speech_threshold: 0.6,
