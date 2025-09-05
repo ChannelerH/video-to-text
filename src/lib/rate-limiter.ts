@@ -3,6 +3,9 @@ interface RateLimitEntry {
   firstRequest: number;
   lastRequest: number;
   fingerprint?: string;
+  // daily scope
+  dayStart?: number; // start timestamp (00:00) for daily window
+  dayCount?: number;
 }
 
 export class RateLimiter {
@@ -22,25 +25,33 @@ export class RateLimiter {
     identifier: string, 
     maxRequests: number, 
     windowMs: number,
-    fingerprint?: string
-  ): { allowed: boolean; remaining: number; resetAt: number } {
+    fingerprint?: string,
+    dailyMax?: number
+  ): { allowed: boolean; remaining: number; resetAt: number; dailyRemaining?: number; dailyResetAt?: number } {
     const now = Date.now();
     const entry = this.cache.get(identifier);
 
     if (!entry) {
       // 新的请求者
-      this.cache.set(identifier, {
+      const newEntry: RateLimitEntry = {
         count: 1,
         firstRequest: now,
         lastRequest: now,
-        fingerprint
-      });
+        fingerprint,
+        dayStart: this.getTodayStart(now),
+        dayCount: 1,
+      };
+      this.cache.set(identifier, newEntry);
 
-      return {
+      const base = {
         allowed: true,
         remaining: maxRequests - 1,
         resetAt: now + windowMs
       };
+      if (dailyMax && dailyMax > 0) {
+        return { ...base, dailyRemaining: dailyMax - 1, dailyResetAt: (newEntry.dayStart || 0) + 24 * 60 * 60 * 1000 };
+      }
+      return base;
     }
 
     // 检查时间窗口
@@ -51,17 +62,37 @@ export class RateLimiter {
       entry.lastRequest = now;
       entry.fingerprint = fingerprint || entry.fingerprint;
 
-      return {
+      const base = {
         allowed: true,
         remaining: maxRequests - 1,
         resetAt: now + windowMs
       };
+      if (dailyMax && dailyMax > 0) {
+        entry.dayStart = this.getTodayStart(now);
+        entry.dayCount = 1;
+        return { ...base, dailyRemaining: dailyMax - 1, dailyResetAt: (entry.dayStart || 0) + 24 * 60 * 60 * 1000 };
+      }
+      return base;
     }
 
     // 检查设备指纹变化（可能的规避行为）
     if (fingerprint && entry.fingerprint && fingerprint !== entry.fingerprint) {
       console.warn(`Fingerprint mismatch for ${identifier}: ${entry.fingerprint} -> ${fingerprint}`);
       // 可以选择更严格的处理
+    }
+
+    // Daily window check
+    if (dailyMax && dailyMax > 0) {
+      const today = this.getTodayStart(now);
+      if (!entry.dayStart || entry.dayStart !== today) {
+        entry.dayStart = today;
+        entry.dayCount = 0;
+      }
+      entry.dayCount = (entry.dayCount || 0) + 1;
+      if (entry.dayCount > dailyMax) {
+        const resetAt = (entry.dayStart || today) + 24 * 60 * 60 * 1000;
+        return { allowed: false, remaining: Math.max(0, maxRequests - entry.count), resetAt, dailyRemaining: 0, dailyResetAt: resetAt };
+      }
     }
 
     // 在时间窗口内
@@ -71,8 +102,19 @@ export class RateLimiter {
     const allowed = entry.count <= maxRequests;
     const remaining = Math.max(0, maxRequests - entry.count);
     const resetAt = entry.firstRequest + windowMs;
+    const resp: { allowed: boolean; remaining: number; resetAt: number; dailyRemaining?: number; dailyResetAt?: number } = { allowed, remaining, resetAt };
+    if (dailyMax && dailyMax > 0) {
+      const dailyRemaining = Math.max(0, dailyMax - (entry.dayCount || 0));
+      resp.dailyRemaining = dailyRemaining;
+      resp.dailyResetAt = (entry.dayStart || this.getTodayStart(now)) + 24 * 60 * 60 * 1000;
+    }
+    return resp;
+  }
 
-    return { allowed, remaining, resetAt };
+  private getTodayStart(now: number): number {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
   }
 
   /**

@@ -50,40 +50,14 @@ export class ReplicateService {
   /**
    * 根据用户等级选择最佳模型
    */
-  private getModelByUserTier(userTier?: string, isPreview?: boolean): ModelInfo {
-    // 预览请求的特殊处理
-    if (isPreview) {
-      // 未登录预览使用快速模型以提升体验
-      return {
-        id: 'douwantech/faster-whisper:338fae1406dd5ddd578aed6b6ce96a85a10f030b8101c5a155eb630b06b8b424',
-        name: 'Faster Whisper',
-        speed: '3-4 minutes',
-        costPerMinute: 0.001
-      };
-    }
-
-    switch(userTier) {
-      case 'premium':
-      case 'pro':
-        // 付费用户使用快速模型
-        return {
-          id: 'douwantech/faster-whisper:338fae1406dd5ddd578aed6b6ce96a85a10f030b8101c5a155eb630b06b8b424',
-          name: 'Faster Whisper',
-          speed: '3-4 minutes',
-          costPerMinute: 0.001
-        };
-      
-      case 'basic':
-      case 'free':
-      default:
-        // 免费和基础用户使用标准模型
-        return {
-          id: 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
-          name: 'Standard Whisper',
-          speed: '8-10 minutes',
-          costPerMinute: 0.0045
-        };
-    }
+  private getModelByUserTier(_userTier?: string, _isPreview?: boolean): ModelInfo {
+    // 仅保留 openai/whisper 一个系列（统一模型策略）
+    return {
+      id: 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
+      name: 'Standard Whisper',
+      speed: '8-10 minutes',
+      costPerMinute: 0.0045
+    };
   }
 
   /**
@@ -143,46 +117,24 @@ export class ReplicateService {
         ? this.getFallbackModel() 
         : this.getModelByUserTier(options.userTier, options.isPreview);
       
-      // 根据模型类型准备输入参数
-      let input: any;
-      
-      if (modelInfo.name === 'Faster Whisper') {
-        // douwantech/faster-whisper 的输入参数
-        input = {
-          audio: audioUrl,
-          model: 'large-v3',  // faster-whisper 支持的模型版本
-          language: options.language === 'auto' ? null : options.language,
-          initial_prompt: '',
-          suppress_tokens: '',
-          condition_on_previous_text: true,
-          temperature: options.temperature || 0,
-          compression_ratio_threshold: 2.4,
-          logprob_threshold: -1,
-          no_speech_threshold: 0.6,
-          word_timestamps: true,
-          prepend_punctuations: '"\'"¿([{-',
-          append_punctuations: '"\'.。,，!！?？:：")]}、',
-          vad_filter: false,
-          vad_parameters: null
-        };
-      } else {
-        // openai/whisper 的输入参数
-        input = {
-          audio: audioUrl,
-          model: options.model || 'large-v3',
-          language: options.language === 'auto' ? undefined : options.language,
-          translate: false,
-          temperature: options.temperature || 0,
-          transcription: "plain text",
-          suppress_tokens: "-1",
-          logprob_threshold: -1,
-          no_speech_threshold: 0.6,
-          condition_on_previous_text: true,
-          compression_ratio_threshold: 2.4,
-          temperature_increment_on_fallback: 0.2,
-          word_timestamps: true
-        };
-      }
+      // 统一：仅 openai/whisper 输入参数
+      let input: any = {
+        audio: audioUrl,
+        // 兼容某些版本提示 audio_file 必填的问题
+        audio_file: audioUrl,
+        model: options.model || 'large-v3',
+        language: options.language === 'auto' ? undefined : options.language,
+        translate: false,
+        temperature: options.temperature || 0,
+        transcription: "plain text",
+        suppress_tokens: "-1",
+        logprob_threshold: -1,
+        no_speech_threshold: 0.6,
+        condition_on_previous_text: true,
+        compression_ratio_threshold: 2.4,
+        temperature_increment_on_fallback: 0.2,
+        word_timestamps: true
+      };
 
       console.log(`Starting transcription with ${modelInfo.name} (${options.userTier || 'free'} tier)...`);
       console.log(`Model ID: ${modelInfo.id}`);
@@ -190,10 +142,28 @@ export class ReplicateService {
       console.log(`Fallback Enabled: ${options.fallbackEnabled}`);
       console.log(`Input parameters:`, input);
       
-      const output = await this.replicate.run(
-        modelInfo.id as `${string}/${string}:${string}`,
-        { input }
-      ) as any;
+      let output: any;
+      try {
+        output = await this.replicate.run(
+          modelInfo.id as `${string}/${string}:${string}`,
+          { input }
+        );
+      } catch (err: any) {
+        const msg = String(err?.message || err);
+        // 针对 422 且提示 audio_file is required 的兼容重试
+        if (msg.includes('audio_file is required')) {
+          console.warn('Replicate run failed: audio_file required. Retrying with audio_file only...');
+          const fallbackInput = { ...input };
+          delete (fallbackInput as any).audio;
+          (fallbackInput as any).audio_file = audioUrl;
+          output = await this.replicate.run(
+            modelInfo.id as `${string}/${string}:${string}`,
+            { input: fallbackInput }
+          );
+        } else {
+          throw err;
+        }
+      }
 
       console.log(`Replicate API response:`, output);
 
@@ -211,9 +181,9 @@ export class ReplicateService {
       // 根据实际返回格式解析数据
       let transcription, segments, detected_language;
       
-      // 处理 douwantech/faster-whisper 的输出格式
-      if (modelInfo.name === 'Faster Whisper' && typeof output === 'string') {
-        console.log('Processing Faster Whisper SRT output from URL');
+      // 兼容：有些 cog 返回 SRT URL 字符串
+      if (typeof output === 'string') {
+        console.log('Processing SRT output from URL');
         
         // output 是一个 URL，需要下载 SRT 文件
         try {

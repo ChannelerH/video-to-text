@@ -1,20 +1,33 @@
 import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * Create a WAV clip (16kHz mono PCM) of the first N seconds from a remote audio URL using ffmpeg.
  * Tries ffmpeg-static first, then falls back to system ffmpeg.
  */
-export async function createWavClipFromUrl(audioUrl: string, seconds: number = 10): Promise<Buffer> {
-  const clipSeconds = Math.max(1, Math.min(30, Math.floor(seconds || 10)));
-
-  // Resolve ffmpeg binary
-  let ffmpegPath: string | undefined;
+function resolveFfmpegPath(): string {
+  // Highest priority: explicit env override
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    ffmpegPath = require('ffmpeg-static');
-  } catch {
-    ffmpegPath = 'ffmpeg';
-  }
+    const mod = require('ffmpeg-static');
+    const p: string = (mod && (mod.default || mod)) as string;
+    if (typeof p === 'string' && p.length > 0) {
+      // Next/Turbopack sometimes rewrites the string in logs; validate at runtime
+      const cleaned = p.replace(/\s*\[app-route\].*$/i, '');
+      if (fs.existsSync(cleaned)) return cleaned;
+    }
+  } catch {}
+  return 'ffmpeg'; // Fallback to system ffmpeg in PATH
+}
+
+export async function createWavClipFromUrl(audioUrl: string, seconds: number = 10): Promise<Buffer> {
+  // Allow up to 120s to support 90s preview; probes typically pass 8–12s
+  const clipSeconds = Math.max(1, Math.min(120, Math.floor(seconds || 10)));
+
+  // Resolve ffmpeg binary
+  const ffmpegPath = resolveFfmpegPath();
 
   return new Promise<Buffer>((resolve, reject) => {
     try {
@@ -41,7 +54,7 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
         'pipe:1'
       ];
 
-      const proc = spawn(ffmpegPath!, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      const proc = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
       const chunks: Buffer[] = [];
       proc.stdout.on('data', (d) => chunks.push(d as Buffer));

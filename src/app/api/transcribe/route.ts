@@ -133,7 +133,8 @@ export async function POST(request: NextRequest) {
         identifier,
         limits.maxRequests,
         limits.windowMs,
-        fingerprint
+        fingerprint,
+        (limits as any).dailyMax
       );
       
       if (!rateCheck.allowed) {
@@ -178,7 +179,9 @@ export async function POST(request: NextRequest) {
           ...result,
           rateLimit: {
             remaining: rateCheck.remaining,
-            resetAt: new Date(rateCheck.resetAt).toISOString()
+            resetAt: new Date(rateCheck.resetAt).toISOString(),
+            dailyRemaining: rateCheck.dailyRemaining,
+            dailyResetAt: rateCheck.dailyResetAt ? new Date(rateCheck.dailyResetAt).toISOString() : undefined
           }
         });
       } catch (error) {
@@ -200,7 +203,8 @@ export async function POST(request: NextRequest) {
           identifier,
           PREVIEW_LIMITS.ANONYMOUS.maxRequests,
           PREVIEW_LIMITS.ANONYMOUS.windowMs,
-          fingerprint
+          fingerprint,
+          PREVIEW_LIMITS.ANONYMOUS.dailyMax
         );
         
         if (!rateCheck.allowed) {

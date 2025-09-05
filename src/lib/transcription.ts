@@ -1046,8 +1046,9 @@ export class TranscriptionService {
     // 但是对于未登录用户，我们应该限制这个功能避免成本过高
     const isAuthenticated = request.options?.userId ? true : false;
     
-    // 如果未登录且没有字幕，返回提示信息
-    if (!isAuthenticated) {
+    // 如果未登录且没有字幕，根据开关决定是否允许匿名预览
+    const allowAnonPreview = process.env.PREVIEW_ALLOW_ANON === '1' || process.env.PREVIEW_ALLOW_ANON === 'true';
+    if (!isAuthenticated && !allowAnonPreview) {
       console.log('Unauthenticated user without captions - skipping audio transcription');
       return {
         success: true,
@@ -1057,6 +1058,9 @@ export class TranscriptionService {
           duration: 0
         }
       };
+    }
+    if (!isAuthenticated && allowAnonPreview) {
+      console.log('Anonymous preview allowed by PREVIEW_ALLOW_ANON; proceeding with 90s clip transcription');
     }
     
     try {
