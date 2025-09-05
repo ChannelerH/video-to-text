@@ -484,6 +484,7 @@
       "uploading": "Uploading file to cloud storage...",
       "upload_success": "File uploaded successfully! Ready for transcription.",
       "starting": "Starting transcription...",
+      "chinese_upgrade": "Detected Chinese. Upgrading to advanced model for better accuracy. Processing may be slightly slower.",
       "generating_preview": "Generating 90s preview...",
       "processing_youtube": "Processing YouTube video...",
       "processing_audio_url": "Processing audio file from URL...",

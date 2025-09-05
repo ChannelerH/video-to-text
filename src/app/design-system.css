@@ -49,6 +49,22 @@
   --backdrop-blur: blur(20px);
 }
 
+/* ===== Floating toast animation ===== */
+.toast-floating {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  animation: toastStay 10s ease-in-out forwards;
+}
+
+@keyframes toastStay {
+  0% { opacity: 0; transform: translateY(-8px); }
+  10% { opacity: 1; transform: translateY(0); }
+  90% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+
 /* ===== 统一Section布局 ===== */
 .design-section {
   position: relative;

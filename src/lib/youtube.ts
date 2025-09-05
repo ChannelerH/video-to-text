@@ -733,6 +733,58 @@ export class YouTubeService {
   }
 
   /**
+   * 仅下载前 N 秒音频片段用于语言探针（尽量小且快速）
+   */
+  static async downloadAudioClip(videoId: string, seconds: number = 10): Promise<Buffer> {
+    const clipSeconds = Math.max(5, Math.min(20, Math.floor(seconds)));
+    const info = await ytdl.getInfo(videoId);
+    const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
+    if (audioFormats.length === 0) {
+      throw new Error('No audio formats available');
+    }
+    // 选择更小的音频格式以尽快取得片段
+    const bestFormat = audioFormats
+      .filter(f => f.audioBitrate && f.audioBitrate >= 48)
+      .sort((a, b) => {
+        const aSize = parseInt(a.contentLength || '999999999');
+        const bSize = parseInt(b.contentLength || '999999999');
+        return aSize - bSize;
+      })[0] || audioFormats[0];
+
+    const bitrateKbps = bestFormat.audioBitrate || 96; // 近似值
+    const bytesPerSecond = (bitrateKbps * 1000) / 8; // kbps -> bytes/s
+    const targetBytes = Math.floor(bytesPerSecond * clipSeconds * 1.2); // 20% 裕量
+
+    return new Promise<Buffer>((resolve, reject) => {
+      try {
+        const stream = ytdl(videoId, { format: bestFormat, quality: 'lowestaudio' });
+        const chunks: Buffer[] = [];
+        let downloaded = 0;
+
+        const finalize = () => {
+          try {
+            stream.removeAllListeners();
+          } catch {}
+          resolve(Buffer.concat(chunks));
+        };
+
+        stream.on('data', (chunk: Buffer) => {
+          chunks.push(chunk);
+          downloaded += chunk.length;
+          if (downloaded >= targetBytes) {
+            try { stream.destroy(); } catch {}
+            finalize();
+          }
+        });
+        stream.on('end', finalize);
+        stream.on('error', (err: any) => reject(err));
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  /**
    * 获取音频格式信息（用于预估下载时间）
    */
   static async getAudioFormatInfo(videoId: string): Promise<{

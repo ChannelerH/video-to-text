@@ -4,6 +4,9 @@ import { DeepgramService, DeepgramOptions } from './deepgram';
 export interface UnifiedTranscriptionOptions extends TranscriptionOptions {
   highAccuracyMode?: boolean;
   outputFormat?: 'json' | 'srt'; // 选择输出格式
+  // 语言探针：若 language 未指定/为 auto，则先用前 N 秒进行探测
+  languageProbeSeconds?: number; // 默认 10 秒
+  forceChinese?: boolean; // 前端已探针判定中文时强制走中文路径
 }
 
 interface TranscriptionStrategy {
@@ -82,21 +85,83 @@ export class UnifiedTranscriptionService {
   }
 
   /**
+   * Quick language probe using Deepgram (first N seconds)
+   */
+  async probeLanguage(audioUrl: string, options: UnifiedTranscriptionOptions): Promise<{ language: string; isChinese: boolean }> {
+    if (!this.deepgramService) {
+      // 无 Deepgram 时无法探针，回退到 unknown
+      return { language: options.language || 'unknown', isChinese: false };
+    }
+
+    const probeSeconds = Math.max(8, Math.min(12, options.languageProbeSeconds || 10));
+    try {
+      const res = await this.deepgramService.transcribeAudio(audioUrl, {
+        language: 'auto',
+        isPreview: false,
+        userTier: options.userTier,
+        highAccuracyMode: false,
+        probeSeconds
+      });
+
+      const detected = res.language || 'unknown';
+      const hasChinese = detected.toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(res.text || '');
+      console.log(`🧪 Language probe (${probeSeconds}s):`, { detected, hasChinese });
+      return { language: detected, isChinese: hasChinese };
+    } catch (e) {
+      console.warn('Language probe failed, falling back to default strategy:', e);
+      return { language: options.language || 'unknown', isChinese: false };
+    }
+  }
+
+  /**
    * Main transcription method with SLO-based fallback
    */
   async transcribeAudio(
     audioUrl: string,
     options: UnifiedTranscriptionOptions = {}
   ): Promise<TranscriptionResult> {
-    const strategy = this.getStrategy(options);
+    let strategy: TranscriptionStrategy;
     const startTime = Date.now();
     
-    console.log(`🚀 Transcription strategy:`);
+    // 语言探针：仅在 language 未指定或 auto 时进行
+    let isChinese = !!options.forceChinese;
+    if (!isChinese && (!options.language || options.language === 'auto')) {
+      const probe = await this.probeLanguage(audioUrl, options);
+      isChinese = probe.isChinese;
+    }
+
+    // 基于探针结果选择模型：中文 -> Whisper；非中文 -> Deepgram
+    if (isChinese) {
+      strategy = { primary: 'whisper', fallback: this.deepgramService ? 'deepgram' : null, sloTimeout: options.isPreview ? 60000 : 90000 };
+    } else if (this.deepgramService) {
+      strategy = { primary: 'deepgram', fallback: 'whisper', sloTimeout: options.isPreview ? 30000 : 60000 };
+    } else {
+      // 无 Deepgram 时全走 Whisper
+      strategy = { primary: 'whisper', fallback: null, sloTimeout: options.isPreview ? 60000 : 90000 };
+    }
+
+    console.log(`🚀 Transcription strategy (after probe):`);
     console.log(`  Primary: ${strategy.primary}`);
     console.log(`  Fallback: ${strategy.fallback || 'none'}`);
     console.log(`  SLO timeout: ${strategy.sloTimeout / 1000}s`);
     console.log(`  User tier: ${options.userTier || 'free'}`);
-    console.log(`  Language: ${options.language || 'auto'}`);
+    console.log(`  Language: ${options.language || 'auto'}${isChinese ? ' (Chinese detected)' : ''}`);
+
+    // 对中文：直接用 Whisper，不做 SLO 超时触发降级；仅在 Whisper 抛错时才降级
+    if (isChinese) {
+      try {
+        const result = await this.transcribeWithModel(audioUrl, options, 'whisper');
+        const duration = Date.now() - startTime;
+        console.log(`✅ whisper (Chinese) succeeded in ${duration / 1000}s`);
+        return result;
+      } catch (err) {
+        console.warn('⚠️ whisper failed for Chinese. Falling back to Deepgram if available...', err);
+        if (this.deepgramService) {
+          return await this.transcribeWithModel(audioUrl, options, 'deepgram');
+        }
+        throw err;
+      }
+    }
 
     try {
       // Try primary model with SLO timeout

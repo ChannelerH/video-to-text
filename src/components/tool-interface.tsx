@@ -35,6 +35,65 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [showSuccess, setShowSuccess] = useState(false);
   const router = useRouter();
   const locale = useLocale();
+  // Early banner when Chinese is detected via probe
+  const [showChineseUpgrade, setShowChineseUpgrade] = useState(false);
+
+  // Helpers: Chinese detection and formatting
+  const isChineseLangOrText = (lang?: string, text?: string) => {
+    if (lang && lang.toLowerCase().includes('zh')) return true;
+    if (!text) return false;
+    return /[\u4e00-\u9fff]/.test(text);
+  };
+  type Segment = { start: number; end: number; text: string };
+  const groupSegmentsToParagraphs = (segments: Segment[]) => {
+    const groups: { start: number; end: number; text: string }[] = [];
+    if (!segments || segments.length === 0) return groups;
+    let current: { start: number; end: number; texts: string[] } | null = null;
+    const maxCharsPerPara = 120;
+    const maxGapSeconds = 3;
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (!current) {
+        current = { start: seg.start, end: seg.end, texts: [seg.text.trim()] };
+        continue;
+      }
+      const prevEnd = current.end;
+      const gap = seg.start - prevEnd;
+      const currentLen = current.texts.join('').length;
+      if (gap > maxGapSeconds || currentLen > maxCharsPerPara) {
+        groups.push({ start: current.start, end: current.end, text: current.texts.join('') });
+        current = { start: seg.start, end: seg.end, texts: [seg.text.trim()] };
+      } else {
+        current.end = seg.end;
+        current.texts.push(seg.text.trim());
+      }
+    }
+    if (current) groups.push({ start: current.start, end: current.end, text: current.texts.join('') });
+    return groups;
+  };
+  const punctuateChineseParagraph = (raw: string) => {
+    let text = (raw || '').trim();
+    if (!text) return '';
+    text = text.replace(/\s+/g, '');
+    if (!/[。！？.!?]$/.test(text)) text += '。';
+    text = text.replace(/，{2,}/g, '，').replace(/。{2,}/g, '。');
+    text = text.replace(/\s*([，。！？；：、])\s*/g, '$1');
+    return text;
+  };
+
+  // Derived display text for the main transcription panel (punctuated for Chinese)
+  const displayText = useMemo(() => {
+    const data = (result && result.type === 'full' && result.data) ? result.data : null;
+    if (!data) return '';
+    const lang = data.transcription.language as string | undefined;
+    const rawText = data.transcription.text as string;
+    const segments = (data.transcription.segments || []) as Segment[];
+    const isZh = isChineseLangOrText(lang, rawText);
+    if (!isZh) return rawText || '';
+    const paragraphs = groupSegmentsToParagraphs(segments);
+    if (!paragraphs.length) return punctuateChineseParagraph(rawText);
+    return paragraphs.map(p => punctuateChineseParagraph(p.text)).join('\n\n');
+  }, [result]);
 
   const goToHistory = () => {
     const href = locale && locale !== 'en' ? `/${locale}/my-transcriptions` : `/my-transcriptions`;
@@ -108,7 +167,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       const action = isAuthenticated ? "transcribe" : "preview";
       console.log(`Using action: ${action} (authenticated: ${isAuthenticated})`);
       
-      let requestData;
+      let requestData: any;
       if (url) {
         // 检测URL类型
         const isYouTubeUrl = url.includes('youtube.com/watch') || 
@@ -129,6 +188,24 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           action: action,
           options: { formats: selectedFormats }
         };
+        // 提前进行语言探针：audio_url 与 youtube_url 都支持
+        if (urlType === 'audio_url' || urlType === 'youtube_url') {
+          try {
+            const probeResp = await fetch('/api/transcribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: urlType, content: url, action: 'probe', options: { languageProbeSeconds: 10 } })
+            });
+            const probe = await probeResp.json();
+            console.log('[Probe] urlType=%s result=', urlType, probe);
+            if (probe?.success && probe?.isChinese) {
+              console.log('[Probe] Chinese detected, showing upgrade banner and forcing Whisper');
+              setShowChineseUpgrade(true);
+              requestData.options.forceChinese = true;
+              requestData.options.languageProbeSeconds = 0;
+            }
+          } catch {}
+        }
       } else if (uploadedFileInfo) {
         const progressText = action === "preview" 
           ? t("progress.generating_preview")
@@ -140,12 +217,29 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           action: action,
           options: { formats: selectedFormats, r2Key: uploadedFileInfo.r2Key }
         };
+        // 已上传到 R2，可直接探针
+        try {
+          const probeResp = await fetch('/api/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'file_upload', content: uploadedFileInfo.replicateUrl, action: 'probe', options: { languageProbeSeconds: 10 } })
+          });
+          const probe = await probeResp.json();
+          console.log('[Probe] file_upload result=', probe);
+          if (probe?.success && probe?.isChinese) {
+            console.log('[Probe] Chinese detected for uploaded file, showing banner');
+            setShowChineseUpgrade(true);
+            requestData.options.forceChinese = true;
+            requestData.options.languageProbeSeconds = 0;
+          }
+        } catch {}
       } else {
         setProgress(t("errors.wait_for_upload"));
         setIsProcessing(false);
         return;
       }
 
+      console.log('[Main] Sending transcription request:', requestData);
       const response = await fetch("/api/transcribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -153,15 +247,21 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       });
 
       const result = await response.json();
-      console.log("API Response:", result);
+      console.log('[Main] API Response:', result?.success, result?.data ? 'full' : result?.preview ? 'preview' : 'none');
       
       if (result.success && result.data) {
         setResult({ type: "full", data: result.data });
         setProgress(t("progress.completed"));
+        if (showChineseUpgrade) {
+          setTimeout(() => setShowChineseUpgrade(false), 10000);
+        }
         setShowSuccess(true);
       } else if (result.success && result.preview) {
         setResult({ type: "preview", data: result.preview, authRequired: result.authRequired });
         setProgress(t("progress.preview_ready"));
+        if (showChineseUpgrade) {
+          setTimeout(() => setShowChineseUpgrade(false), 10000);
+        }
       } else {
         console.error('Transcription API error:', result.error);
         let userFriendlyError = '';
@@ -191,6 +291,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       setProgress(t("errors.general_error"));
     } finally {
       setIsProcessing(false);
+      console.log('[Main] Processing finished');
     }
   };
 
@@ -502,7 +603,39 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           </div>
         )}
 
-        {/* Progress Display */}
+        {/* Floating upgrade toast (visible immediately after probe) */}
+        {showChineseUpgrade && (
+          <div className="toast-floating pointer-events-none">
+            <div role="alert" aria-live="polite" className="pointer-events-auto px-4">
+              <div
+                className="flex items-start gap-3 rounded-xl border shadow-xl px-4 py-3 text-blue-50 transition-all duration-300"
+                style={{
+                  background: "rgba(30,58,138,0.75)", // indigo-900/75
+                  borderColor: "rgba(147,197,253,0.35)", // blue-300/35
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                <div className="mt-0.5">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="opacity-90">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M12 7.5v.01M12 10.5v6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div className="text-sm sm:text-base font-semibold">
+                  {t('progress.chinese_upgrade')}
+                </div>
+                <button
+                  onClick={() => setShowChineseUpgrade(false)}
+                  className="ml-2 text-blue-200 hover:text-white transition-colors"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {progress && (
           <div className="mt-8 flex flex-col items-center space-y-6 p-6 rounded-lg" style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)" }}>
             {isProcessing && <PyramidLoader size="medium" />}
@@ -519,6 +652,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                 </h3>
                 
                 <div className="space-y-4">
+                  {/* Early banner moved to progress area; no banner here */}
                   {/* Metadata */}
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
@@ -536,7 +670,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(result.data.transcription.text)}
+                        onClick={() => copyToClipboard(displayText || result.data.transcription.text)}
                         className=""
                       >
                         {copiedText ? (
@@ -553,28 +687,43 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                       </Button>
                     </div>
                     <div className="p-4 rounded-lg max-h-60 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                        {result.data.transcription.text}
-                      </p>
+                      {displayText.split('\n\n').map((p, i) => (
+                        <p key={i} className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{p}</p>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Segments with Timestamps */}
+                  {/* Segments with Timestamps (Chinese groups paragraphs) */}
                   {result.data.transcription.segments && result.data.transcription.segments.length > 0 && (
                     <div className="space-y-2">
                       <h4 className="font-medium" style={{ color: "#A7F3D0" }}>{t("results.timestamped_segments")}</h4>
                       <div className="p-4 rounded-lg max-h-60 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
                         <div className="space-y-2">
-                          {result.data.transcription.segments.map((segment: any, index: number) => (
-                            <div key={index} className="text-sm">
-                              <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>
-                                [{Math.floor(segment.start / 60)}:{String(Math.floor(segment.start % 60)).padStart(2, '0')} - {Math.floor(segment.end / 60)}:{String(Math.floor(segment.end % 60)).padStart(2, '0')}]
-                              </span>
-                              <span className="ml-2">
-                                {segment.text}
-                              </span>
-                            </div>
-                          ))}
+                          {(() => {
+                            const lang = result.data.transcription.language as string | undefined;
+                            const rawText = result.data.transcription.text as string;
+                            const segments = (result.data.transcription.segments || []) as Segment[];
+                            const isZh = isChineseLangOrText(lang, rawText);
+                            if (isZh) {
+                              const paras = groupSegmentsToParagraphs(segments);
+                              return paras.map((p, idx) => (
+                                <div key={idx} className="text-sm">
+                                  <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>
+                                    [{Math.floor(p.start / 60)}:{String(Math.floor(p.start % 60)).padStart(2, '0')} - {Math.floor(p.end / 60)}:{String(Math.floor(p.end % 60)).padStart(2, '0')}]
+                                  </span>
+                                  <span className="ml-2">{punctuateChineseParagraph(p.text)}</span>
+                                </div>
+                              ));
+                            }
+                            return segments.map((segment: Segment, index: number) => (
+                              <div key={index} className="text-sm">
+                                <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>
+                                  [{Math.floor(segment.start / 60)}:{String(Math.floor(segment.start % 60)).padStart(2, '0')} - {Math.floor(segment.end / 60)}:{String(Math.floor(segment.end % 60)).padStart(2, '0')}]
+                                </span>
+                                <span className="ml-2">{segment.text}</span>
+                              </div>
+                            ));
+                          })()}
                         </div>
                       </div>
                     </div>

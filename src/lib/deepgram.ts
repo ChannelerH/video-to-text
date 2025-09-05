@@ -6,6 +6,7 @@ export interface DeepgramOptions {
   isPreview?: boolean;
   highAccuracyMode?: boolean;
   outputFormat?: 'json' | 'srt'; // 输出格式选择
+  probeSeconds?: number; // 语言探针秒数（仅转前N秒）
 }
 
 interface DeepgramResponse {
@@ -95,8 +96,11 @@ export class DeepgramService {
         params.set('language', options.language);
       }
 
-      // For preview mode, limit to 90 seconds
-      if (options.isPreview) {
+      // For preview mode, limit to 90 seconds unless probeSeconds specified
+      if (options.probeSeconds && options.probeSeconds > 0) {
+        params.set('start', '0');
+        params.set('end', String(Math.max(1, Math.min(120, Math.floor(options.probeSeconds)))));
+      } else if (options.isPreview) {
         params.set('start', '0');
         params.set('end', '90');
       }
@@ -161,11 +165,13 @@ export class DeepgramService {
                             options.language || 
                             'unknown';
       
+      const srtText = this.generateSRTFromSegments(segments);
       const transcriptionResult: TranscriptionResult = {
         text: transcriptText,
         segments,
         language: detectedLanguage,
-        duration: result.metadata.duration
+        duration: result.metadata.duration,
+        srtText
       };
       
       if (this.DEBUG) {
@@ -283,10 +289,11 @@ export class DeepgramService {
         }
       });
 
-      if (currentSegment) {
+      if (currentSegment != null) {
         // Clean Chinese text before pushing the last segment
-        currentSegment.text = cleanChineseText(currentSegment.text);
-        segments.push(currentSegment);
+        const cs = currentSegment as TranscriptionSegment;
+        cs.text = cleanChineseText(cs.text);
+        segments.push(cs);
       }
     }
 

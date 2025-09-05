@@ -340,6 +340,7 @@
       "uploading": "正在上传文件到云存储...",
       "upload_success": "文件上传成功！准备转录。",
       "starting": "开始转录...",
+      "chinese_upgrade": "当前语言为中文，已自动升级为高级模型进行处理，可能会稍微慢一点，请稍候。",
       "generating_preview": "正在生成90秒预览...",
       "processing_youtube": "正在处理 YouTube 视频...",
       "processing_audio_url": "正在处理来自 URL 的音频文件...",

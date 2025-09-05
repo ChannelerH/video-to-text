@@ -20,6 +20,8 @@ export interface TranscriptionRequest {
     r2Key?: string; // 对于文件上传，传入 R2 对象键用于稳定缓存
     downloadOptions?: DownloadOptions; // YouTube 下载优化选项
     onDownloadProgress?: (progress: DownloadProgress) => void; // 下载进度回调
+    languageProbeSeconds?: number; // 语言探针秒数（前端可传 8-12）
+    forceChinese?: boolean; // 前端探针结果强制中文
   };
 }
 
@@ -1201,6 +1203,22 @@ export class TranscriptionService {
       json: this.transcriptionService.convertToJSON(transcription),
       md: this.transcriptionService.convertToMarkdown(transcription, title)
     };
+  }
+
+  /**
+   * 对直链音频/已上传文件进行语言探针
+   */
+  async probeLanguageFromUrl(audioUrl: string, options?: { userTier?: string; languageProbeSeconds?: number }): Promise<{ language: string; isChinese: boolean }> {
+    try {
+      const res = await this.transcriptionService.probeLanguage(audioUrl, {
+        userTier: options?.userTier,
+        languageProbeSeconds: Math.max(8, Math.min(12, options?.languageProbeSeconds || 10)),
+      } as any);
+      return res;
+    } catch (e) {
+      console.warn('Language probe failed:', e);
+      return { language: 'unknown', isChinese: false };
+    }
   }
 
   /**

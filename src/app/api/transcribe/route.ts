@@ -7,6 +7,8 @@ import { RateLimiter, PREVIEW_LIMITS } from '@/lib/rate-limiter';
 import { AbuseDetector } from '@/lib/abuse-detector';
 import { quotaTracker } from '@/services/quota-tracker';
 import { headers } from 'next/headers';
+import { CloudflareR2Service } from '@/lib/r2-upload';
+import { YouTubeService } from '@/lib/youtube';
 
 // 初始化服务 - 支持两个模型：Deepgram + OpenAI Whisper
 const transcriptionService = new TranscriptionService(
@@ -54,6 +56,53 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Invalid type. Must be youtube_url, file_upload, or audio_url' },
         { status: 400 }
       );
+    }
+
+    // 语言探针：前端可在转录前调用
+    if (action === 'probe') {
+      console.log('[API/probe] type=%s', type);
+      if (type === 'youtube_url') {
+        try {
+          const videoId = YouTubeService.validateAndParseUrl(content);
+          if (!videoId) {
+            return NextResponse.json({ success: true, language: 'unknown', isChinese: false, supported: false });
+          }
+          const videoInfo = await YouTubeService.getVideoInfo(videoId);
+          const hasZhCaption = !!videoInfo.captions?.some(c => (c.languageCode || '').toLowerCase().includes('zh'));
+          if (hasZhCaption) {
+            console.log('[API/probe] youtube zh caption detected');
+            return NextResponse.json({ success: true, supported: true, language: 'zh', isChinese: true });
+          }
+          // 标题含中文字符时，直接判定为中文（快速启用前端提示）
+          if (/[\u4e00-\u9fff]/.test(videoInfo.title || '')) {
+            console.log('[API/probe] youtube title contains CJK, treating as Chinese');
+            return NextResponse.json({ success: true, supported: true, language: 'zh', isChinese: true, heuristic: 'title' });
+          }
+          // 无字幕：下载一个短音频片段，上传到 R2，调用 Deepgram 探针
+          try {
+            const clip = await YouTubeService.downloadAudioClip(videoId, Math.max(8, Math.min(12, options.languageProbeSeconds || 10)));
+            const r2 = new CloudflareR2Service();
+            const uploaded = await r2.uploadFile(clip, `yt_probe_${videoId}.m4a`, 'audio/mp4', { folder: 'youtube-probe', expiresIn: 1, makePublic: true });
+            const probeRes = await transcriptionService.probeLanguageFromUrl(uploaded.url, { userTier: options.userTier, languageProbeSeconds: Math.max(8, Math.min(12, options.languageProbeSeconds || 10)) });
+            // 异步清理
+            setTimeout(() => r2.deleteFile(uploaded.key).catch(() => {}), 30000);
+            console.log('[API/probe] youtube clip deepgram result:', probeRes);
+            return NextResponse.json({ success: true, supported: true, ...probeRes });
+          } catch (probeError) {
+            console.warn('YouTube short clip probe failed:', probeError);
+            return NextResponse.json({ success: true, supported: true, language: 'unknown', isChinese: false });
+          }
+        } catch (e) {
+          console.warn('YouTube probe failed:', e);
+          return NextResponse.json({ success: true, language: 'unknown', isChinese: false, supported: false });
+        }
+      } else if (['audio_url', 'file_upload'].includes(type)) {
+        const audioUrl = content;
+        const res = await transcriptionService.probeLanguageFromUrl(audioUrl, { userTier: options.userTier, languageProbeSeconds: options.languageProbeSeconds });
+        console.log('[API/probe] audio/file deepgram result:', res);
+        return NextResponse.json({ success: true, supported: true, ...res });
+      }
+      return NextResponse.json({ success: true, language: 'unknown', isChinese: false, supported: false });
     }
 
     // 根据动作类型处理请求
