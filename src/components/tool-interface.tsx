@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { FileText, Download, Copy, Check, Code } from "lucide-react";
 import PyramidLoader from "@/components/ui/pyramid-loader";
@@ -37,6 +38,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const locale = useLocale();
   // Early banner when Chinese is detected via probe
   const [showChineseUpgrade, setShowChineseUpgrade] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // Helpers: Chinese detection and formatting
   const isChineseLangOrText = (lang?: string, text?: string) => {
@@ -604,14 +607,14 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         )}
 
         {/* Floating upgrade toast (visible immediately after probe) */}
-        {showChineseUpgrade && (
+        {mounted && showChineseUpgrade && createPortal(
           <div className="toast-floating pointer-events-none">
             <div role="alert" aria-live="polite" className="pointer-events-auto px-4">
               <div
                 className="flex items-start gap-3 rounded-xl border shadow-xl px-4 py-3 text-blue-50 transition-all duration-300"
                 style={{
-                  background: "rgba(30,58,138,0.75)", // indigo-900/75
-                  borderColor: "rgba(147,197,253,0.35)", // blue-300/35
+                  background: "rgba(30,58,138,0.75)",
+                  borderColor: "rgba(147,197,253,0.35)",
                   backdropFilter: "blur(8px)",
                 }}
               >
@@ -633,7 +636,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {progress && (
