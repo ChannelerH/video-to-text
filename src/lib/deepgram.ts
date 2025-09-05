@@ -96,14 +96,8 @@ export class DeepgramService {
         params.set('language', options.language);
       }
 
-      // For preview mode, limit to 90 seconds unless probeSeconds specified
-      if (options.probeSeconds && options.probeSeconds > 0) {
-        params.set('start', '0');
-        params.set('end', String(Math.max(1, Math.min(120, Math.floor(options.probeSeconds)))));
-      } else if (options.isPreview) {
-        params.set('start', '0');
-        params.set('end', '90');
-      }
+      // Note: Deepgram does not support partial transcription via start/end on the HTTP API.
+      // We perform clipping before calling this API when needed (probe/preview).
 
       if (this.DEBUG) {
         console.log(`🎯 Deepgram Nova-2 transcription starting...`);

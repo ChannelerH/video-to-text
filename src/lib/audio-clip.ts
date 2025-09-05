@@ -1,0 +1,71 @@
+import { spawn } from 'child_process';
+
+/**
+ * Create a WAV clip (16kHz mono PCM) of the first N seconds from a remote audio URL using ffmpeg.
+ * Tries ffmpeg-static first, then falls back to system ffmpeg.
+ */
+export async function createWavClipFromUrl(audioUrl: string, seconds: number = 10): Promise<Buffer> {
+  const clipSeconds = Math.max(1, Math.min(30, Math.floor(seconds || 10)));
+
+  // Resolve ffmpeg binary
+  let ffmpegPath: string | undefined;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    ffmpegPath = require('ffmpeg-static');
+  } catch {
+    ffmpegPath = 'ffmpeg';
+  }
+
+  return new Promise<Buffer>((resolve, reject) => {
+    try {
+      const safeUrlLog = (() => {
+        try {
+          const u = new URL(audioUrl);
+          return `${u.origin}${u.pathname}`;
+        } catch {
+          return '[non-url/opaque]';
+        }
+      })();
+      console.log(`[ffmpeg] Creating WAV clip: ${clipSeconds}s from ${safeUrlLog}`);
+      console.log(`[ffmpeg] Binary: ${ffmpegPath || 'ffmpeg (system PATH)'}`);
+      const args = [
+        '-hide_banner',
+        '-loglevel', 'error',
+        '-ss', '0',
+        '-t', String(clipSeconds),
+        '-i', audioUrl,
+        '-ar', '16000', // sample rate
+        '-ac', '1', // mono
+        '-f', 'wav',
+        '-acodec', 'pcm_s16le',
+        'pipe:1'
+      ];
+
+      const proc = spawn(ffmpegPath!, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+      const chunks: Buffer[] = [];
+      proc.stdout.on('data', (d) => chunks.push(d as Buffer));
+      const errChunks: Buffer[] = [];
+      proc.stderr.on('data', (d) => errChunks.push(d as Buffer));
+
+      proc.on('error', (err) => {
+        console.error('[ffmpeg] spawn failed:', err);
+        reject(new Error(`ffmpeg spawn failed: ${err.message}`));
+      });
+      proc.on('close', (code) => {
+        if (code === 0) {
+          const buf = Buffer.concat(chunks);
+          console.log(`[ffmpeg] Clip done (${clipSeconds}s) size=${buf.length} bytes`);
+          resolve(buf);
+        } else {
+          const stderr = Buffer.concat(errChunks).toString('utf8');
+          console.error(`[ffmpeg] exited with code ${code}:`, stderr);
+          reject(new Error(`ffmpeg exited with code ${code}: ${stderr}`));
+        }
+      });
+    } catch (e: any) {
+      console.error('[ffmpeg] run failed:', e);
+      reject(new Error(`Failed to run ffmpeg: ${e.message}`));
+    }
+  });
+}

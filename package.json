@@ -76,6 +76,7 @@
     "embla-carousel-react": "^8.5.1",
     "eslint-config-next": "^15.2.3",
     "framer-motion": "^11.15.0",
+    "ffmpeg-static": "^5.2.0",
     "fumadocs-core": "^15.6.3",
     "fumadocs-mdx": "^11.6.11",
     "fumadocs-ui": "^15.6.3",

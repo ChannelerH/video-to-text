@@ -331,7 +331,7 @@ export class TranscriptionService {
             const streamOptions = {
               ...downloadOptions,
               timeout: 120000, // 增加超时时间
-              retryAttempts: 5, // 更多重试次数
+              retryAttempts: 1,
               onProgress: request.options?.onDownloadProgress
             };
             
@@ -808,7 +808,7 @@ export class TranscriptionService {
     const baseOptions: DownloadOptions = {
       enableParallelDownload: true,
       timeout: 90000,
-      retryAttempts: 3,
+      retryAttempts: 1,
       retryDelay: 1000,
       cdnProxy: process.env.YOUTUBE_CDN_PROXY, // 使用 CDN 代理（如果配置了）
       onProgress: request.options?.onDownloadProgress || ((progress: DownloadProgress) => {
@@ -831,7 +831,7 @@ export class TranscriptionService {
         chunkSize: 2 * 1024 * 1024, // 2MB chunks for faster download
         maxConcurrentChunks: 8, // Maximum parallel connections
         timeout: 180000, // 3 minutes timeout for stability
-        retryAttempts: 5, // More retry attempts
+        retryAttempts: 1,
         retryDelay: 500, // Shorter retry delay
         ...request.options?.downloadOptions
       };
@@ -842,7 +842,7 @@ export class TranscriptionService {
         chunkSize: 1.5 * 1024 * 1024, // 1.5MB chunks
         maxConcurrentChunks: 6,
         timeout: 150000,
-        retryAttempts: 4,
+        retryAttempts: 1,
         retryDelay: 750,
         ...request.options?.downloadOptions
       };
@@ -853,7 +853,7 @@ export class TranscriptionService {
         chunkSize: 2 * 1024 * 1024, // Larger chunks for efficiency
         maxConcurrentChunks: 6, // Balanced parallel connections
         timeout: 180000, // Extended timeout
-        retryAttempts: 4,
+        retryAttempts: 1,
         retryDelay: 1000,
         ...request.options?.downloadOptions
       };
@@ -864,7 +864,7 @@ export class TranscriptionService {
         chunkSize: 1.5 * 1024 * 1024,
         maxConcurrentChunks: 5,
         timeout: 120000,
-        retryAttempts: 3,
+        retryAttempts: 1,
         retryDelay: 1000,
         ...request.options?.downloadOptions
       };
@@ -875,7 +875,7 @@ export class TranscriptionService {
         chunkSize: 1024 * 1024, // 1MB chunks
         maxConcurrentChunks: 4,
         timeout: 90000,
-        retryAttempts: 3,
+        retryAttempts: 1,
         retryDelay: 1000,
         ...request.options?.downloadOptions
       };
@@ -886,7 +886,7 @@ export class TranscriptionService {
         chunkSize: 512 * 1024, // 512KB chunks for quick start
         maxConcurrentChunks: 3, // Fewer connections for small files
         timeout: 60000,
-        retryAttempts: 2,
+        retryAttempts: 1,
         retryDelay: 1000,
         ...request.options?.downloadOptions
       };
@@ -1080,24 +1080,31 @@ export class TranscriptionService {
         );
       }
 
-      // 上传音频到 R2
+      // 上传原音频到 R2（临时），随后用 ffmpeg 从该 URL 生成 90s WAV 片段
       const audioFileName = `youtube_preview_${videoInfo.videoId}_${Date.now()}.m4a`;
       const uploadResult = await this.r2Service.uploadFile(
         audioBuffer,
         audioFileName,
         'audio/mp4',
-        {
-          folder: 'youtube-preview',
-          expiresIn: 1,
-          makePublic: true
-        }
+        { folder: 'youtube-preview-src', expiresIn: 1, makePublic: true }
       );
 
-      // 转录音频（预览模式使用快速模型）
-      console.log(`Starting preview transcription with URL: ${uploadResult.url}`);
+      // 生成 90 秒 WAV 片段
+      const { createWavClipFromUrl } = await import('./audio-clip');
+      console.log('[Preview] Clipping 90s WAV from uploaded YouTube audio (ffmpeg)');
+      const wavClip = await createWavClipFromUrl(uploadResult.url, 90);
+      const clipUpload = await this.r2Service.uploadFile(
+        wavClip,
+        `youtube_preview_clip_${videoInfo.videoId}_${Date.now()}.wav`,
+        'audio/wav',
+        { folder: 'youtube-preview', expiresIn: 1, makePublic: true }
+      );
+
+      // 转录音频（预览模式使用快速模型），仅对片段进行
+      console.log(`Starting preview transcription with URL: ${clipUpload.url}`);
       console.log(`Preview options: isPreview=true, userTier=${request.options?.userTier || 'pro'}`);
       
-      const transcription = await this.transcriptionService.transcribeAudio(uploadResult.url, {
+      const transcription = await this.transcriptionService.transcribeAudio(clipUpload.url, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier || 'pro', // 预览模式优先使用快速模型
         isPreview: true,
@@ -1110,6 +1117,7 @@ export class TranscriptionService {
       setTimeout(async () => {
         try {
           await this.r2Service.deleteFile(uploadResult.key);
+          await this.r2Service.deleteFile(clipUpload.key);
         } catch (error) {
           console.error('Failed to cleanup preview audio:', error);
         }
@@ -1160,29 +1168,36 @@ export class TranscriptionService {
    */
   private async generateFilePreview(request: TranscriptionRequest): Promise<TranscriptionResponse> {
     try {
-      // 对于文件上传，我们需要进行完整转录然后截取90秒预览
-      console.log('Generating file preview by full transcription (using fast model)...');
-      
-      // 预览模式使用快速模型
-      const transcription = await this.transcriptionService.transcribeAudio(request.content, {
+      // 改为：先对原始 URL 生成 90s WAV 片段，再仅对片段转录
+      console.log('Generating file preview by clipping 90s WAV probe...');
+      const { createWavClipFromUrl } = await import('./audio-clip');
+      console.log('[Preview] Clipping 90s WAV from file/audio URL (ffmpeg)');
+      const wavClip = await createWavClipFromUrl(request.content, 90);
+
+      const clipUpload = await this.r2Service.uploadFile(
+        wavClip,
+        `file_preview_clip_${Date.now()}.wav`,
+        'audio/wav',
+        { folder: 'file-preview', expiresIn: 1, makePublic: true }
+      );
+
+      const transcription = await this.transcriptionService.transcribeAudio(clipUpload.url, {
         language: request.options?.language || 'auto',
-        userTier: request.options?.userTier || 'pro', // 预览模式优先使用快速模型
+        userTier: request.options?.userTier || 'pro',
         isPreview: true,
-        fallbackEnabled: request.options?.fallbackEnabled !== false, // 预览默认启用降级
+        fallbackEnabled: request.options?.fallbackEnabled !== false,
         outputFormat: request.options?.outputFormat || 'json',
         highAccuracyMode: request.options?.highAccuracyMode
       });
 
-      // 从完整转录中提取90秒预览
+      setTimeout(() => this.r2Service.deleteFile(clipUpload.key).catch(() => {}), 30000);
+
       const preview = this.extractPreview(transcription, {
         txt: transcription.text,
         srt: this.transcriptionService.convertToSRT(transcription)
       });
 
-      return {
-        success: true,
-        preview
-      };
+      return { success: true, preview };
     } catch (error) {
       console.error('File preview generation failed:', error);
       return {
@@ -1210,13 +1225,33 @@ export class TranscriptionService {
    */
   async probeLanguageFromUrl(audioUrl: string, options?: { userTier?: string; languageProbeSeconds?: number }): Promise<{ language: string; isChinese: boolean }> {
     try {
-      const res = await this.transcriptionService.probeLanguage(audioUrl, {
+      const seconds = Math.max(8, Math.min(12, options?.languageProbeSeconds || 10));
+      console.log(`[Probe] Start creating ${seconds}s WAV clip for language detection`);
+      // Create short WAV clip via ffmpeg
+      const { createWavClipFromUrl } = await import('./audio-clip');
+      const wavClip = await createWavClipFromUrl(audioUrl, seconds);
+
+      // Upload to R2 (short-lived)
+      console.log(`[Probe] Uploading WAV clip to R2 (size=${wavClip.length} bytes)`);
+      const uploaded = await this.r2Service.uploadFile(
+        wavClip,
+        `probe_${Date.now()}.wav`,
+        'audio/wav',
+        { folder: 'probe-clips', expiresIn: 1, makePublic: true }
+      );
+
+      // Call probe on the clip URL (no further clipping needed)
+      console.log('[Probe] Calling Deepgram language probe on clip URL');
+      const res = await this.transcriptionService.probeLanguage(uploaded.url, {
         userTier: options?.userTier,
-        languageProbeSeconds: Math.max(8, Math.min(12, options?.languageProbeSeconds || 10)),
       } as any);
+
+      // Schedule cleanup
+      setTimeout(() => this.r2Service.deleteFile(uploaded.key).catch(() => {}), 30000);
+      console.log('[Probe] Deepgram result:', res);
       return res;
     } catch (e) {
-      console.warn('Language probe failed:', e);
+      console.warn('Language probe (wav clip) failed:', e);
       return { language: 'unknown', isChinese: false };
     }
   }

@@ -53,7 +53,7 @@ export async function premiumOptimizedDownload(videoId: string) {
     chunkSize: 2 * 1024 * 1024, // 2MB chunks for premium users
     maxConcurrentChunks: 8, // More parallel connections
     timeout: 120000, // 2 minutes timeout
-    retryAttempts: 5, // More retry attempts
+    retryAttempts: 1,
     retryDelay: 500,
     cdnProxy: process.env.YOUTUBE_CDN_PROXY, // Use CDN proxy if available
     onProgress: (progress: DownloadProgress) => {
@@ -106,7 +106,7 @@ export async function robustDownloadWithFallbacks(videoId: string) {
       return await YouTubeService.downloadAudioWithYtdlStream(videoId, {
         onProgress: progressCallback,
         timeout: 90000,
-        retryAttempts: 3
+        retryAttempts: 1
       });
     } catch (streamError) {
       console.warn('Stream download failed:', streamError);
@@ -154,7 +154,7 @@ export async function optimizedTranscription(youtubeUrl: string, userId?: string
         chunkSize: 1.5 * 1024 * 1024, // 1.5MB chunks
         maxConcurrentChunks: 6,
         timeout: 90000,
-        retryAttempts: 3
+        retryAttempts: 1
       }
     }
   });
