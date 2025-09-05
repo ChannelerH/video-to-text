@@ -319,7 +319,7 @@ export class YouTubeService {
       chunkSize = 1024 * 1024, // 1MB chunks
       maxConcurrentChunks = 4,
       timeout = 60000,
-      retryAttempts = 3,
+      retryAttempts = 1,
       retryDelay = 1000,
       cdnProxy,
       onProgress,

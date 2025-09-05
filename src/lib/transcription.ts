@@ -1,5 +1,6 @@
 import { YouTubeService, VideoInfo, DownloadOptions, DownloadProgress } from './youtube';
-import { ReplicateService, TranscriptionResult } from './replicate';
+import { TranscriptionResult } from './replicate';
+import { UnifiedTranscriptionService } from './unified-transcription';
 import { transcriptionCache, CacheEntry } from './cache';
 import { CloudflareR2Service } from './r2-upload';
 import crypto from 'crypto';
@@ -13,6 +14,8 @@ export interface TranscriptionRequest {
     userTier?: string;
     isPreview?: boolean; // 是否为预览请求
     fallbackEnabled?: boolean; // 是否启用降级
+    highAccuracyMode?: boolean; // Pro用户高准确度模式
+    outputFormat?: 'json' | 'srt'; // Deepgram输出格式
     formats?: string[]; // ['txt', 'srt', 'vtt', 'json', 'md']
     r2Key?: string; // 对于文件上传，传入 R2 对象键用于稳定缓存
     downloadOptions?: DownloadOptions; // YouTube 下载优化选项
@@ -38,11 +41,11 @@ export interface TranscriptionResponse {
 }
 
 export class TranscriptionService {
-  private replicateService: ReplicateService;
+  private transcriptionService: UnifiedTranscriptionService;
   private r2Service: CloudflareR2Service;
 
-  constructor(replicateApiToken: string) {
-    this.replicateService = new ReplicateService(replicateApiToken);
+  constructor(replicateApiToken: string, deepgramApiKey?: string) {
+    this.transcriptionService = new UnifiedTranscriptionService(replicateApiToken, deepgramApiKey);
     this.r2Service = new CloudflareR2Service();
   }
 
@@ -221,7 +224,7 @@ export class TranscriptionService {
   private async processYouTubeAudioTranscription(videoInfo: VideoInfo, request: TranscriptionRequest): Promise<TranscriptionResponse> {
     try {
       // 估算成本
-      const estimatedCost = this.replicateService.estimateCost(videoInfo.duration);
+      const estimatedCost = this.transcriptionService.estimateCost(videoInfo.duration);
       console.log(`Estimated transcription cost: $${estimatedCost.toFixed(4)}`);
 
       // 首先检查视频是否适合优化下载（带重试）
@@ -406,10 +409,12 @@ export class TranscriptionService {
 
       // 使用 R2 URL 进行转录
       console.log('Starting Replicate transcription with R2 URL...');
-      const transcription = await this.replicateService.transcribeAudio(uploadResult.url, {
+      const transcription = await this.transcriptionService.transcribeAudio(uploadResult.url, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier, // 传递用户等级信息
-        fallbackEnabled: request.options?.fallbackEnabled
+        fallbackEnabled: request.options?.fallbackEnabled,
+        outputFormat: request.options?.outputFormat || 'json',
+        highAccuracyMode: request.options?.highAccuracyMode
       });
 
       // 生成不同格式
@@ -494,7 +499,7 @@ export class TranscriptionService {
             transcription: cached.transcriptionData,
             formats: cached.formats || {},
             fromCache: true,
-            estimatedCost: this.replicateService.estimateCost(cached.duration || 60)
+            estimatedCost: this.transcriptionService.estimateCost(cached.duration || 60)
           }
         };
       }
@@ -523,10 +528,12 @@ export class TranscriptionService {
 
       // 5. 使用 R2 URL 进行转录
       console.log('Starting Replicate transcription with R2 URL...');
-      const transcription = await this.replicateService.transcribeAudio(uploadResult.url, {
+      const transcription = await this.transcriptionService.transcribeAudio(uploadResult.url, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier, // 传递用户等级信息
-        fallbackEnabled: request.options?.fallbackEnabled
+        fallbackEnabled: request.options?.fallbackEnabled,
+        outputFormat: request.options?.outputFormat || 'json',
+        highAccuracyMode: request.options?.highAccuracyMode
       });
 
       // 6. 生成不同格式
@@ -562,7 +569,7 @@ export class TranscriptionService {
         }
       }, 60000); // 1分钟后清理
 
-      const estimatedCost = this.replicateService.estimateCost(
+      const estimatedCost = this.transcriptionService.estimateCost(
         transcription.segments?.length ? 
           Math.max(...transcription.segments.map((s: any) => s.end)) : 60
       );
@@ -908,14 +915,16 @@ export class TranscriptionService {
 
     try {
       // 进行转录（根据用户等级选择模型）
-      const transcription = await this.replicateService.transcribeAudio(filePath, {
+      const transcription = await this.transcriptionService.transcribeAudio(filePath, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier, // 传递用户等级信息
-        fallbackEnabled: request.options?.fallbackEnabled
+        fallbackEnabled: request.options?.fallbackEnabled,
+        outputFormat: request.options?.outputFormat || 'json',
+        highAccuracyMode: request.options?.highAccuracyMode
       });
 
       // 估算成本
-      const estimatedCost = this.replicateService.estimateCost(transcription.duration);
+      const estimatedCost = this.transcriptionService.estimateCost(transcription.duration);
 
       // 生成不同格式
       const formats = await this.generateFormats(transcription);
@@ -1086,11 +1095,13 @@ export class TranscriptionService {
       console.log(`Starting preview transcription with URL: ${uploadResult.url}`);
       console.log(`Preview options: isPreview=true, userTier=${request.options?.userTier || 'pro'}`);
       
-      const transcription = await this.replicateService.transcribeAudio(uploadResult.url, {
+      const transcription = await this.transcriptionService.transcribeAudio(uploadResult.url, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier || 'pro', // 预览模式优先使用快速模型
         isPreview: true,
-        fallbackEnabled: request.options?.fallbackEnabled !== false // 预览默认启用降级
+        fallbackEnabled: request.options?.fallbackEnabled !== false, // 预览默认启用降级
+        outputFormat: request.options?.outputFormat || 'json',
+        highAccuracyMode: request.options?.highAccuracyMode
       });
 
       // 异步清理临时文件
@@ -1105,7 +1116,7 @@ export class TranscriptionService {
       // 提取90秒预览
       const preview = this.extractPreview(transcription, {
         txt: transcription.text,
-        srt: this.replicateService.convertToSRT(transcription)
+        srt: this.transcriptionService.convertToSRT(transcription)
       });
 
       return { success: true, preview };
@@ -1151,17 +1162,19 @@ export class TranscriptionService {
       console.log('Generating file preview by full transcription (using fast model)...');
       
       // 预览模式使用快速模型
-      const transcription = await this.replicateService.transcribeAudio(request.content, {
+      const transcription = await this.transcriptionService.transcribeAudio(request.content, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier || 'pro', // 预览模式优先使用快速模型
         isPreview: true,
-        fallbackEnabled: request.options?.fallbackEnabled !== false // 预览默认启用降级
+        fallbackEnabled: request.options?.fallbackEnabled !== false, // 预览默认启用降级
+        outputFormat: request.options?.outputFormat || 'json',
+        highAccuracyMode: request.options?.highAccuracyMode
       });
 
       // 从完整转录中提取90秒预览
       const preview = this.extractPreview(transcription, {
         txt: transcription.text,
-        srt: this.replicateService.convertToSRT(transcription)
+        srt: this.transcriptionService.convertToSRT(transcription)
       });
 
       return {
@@ -1182,11 +1195,11 @@ export class TranscriptionService {
    */
   private async generateFormats(transcription: TranscriptionResult, title?: string): Promise<Record<string, string>> {
     return {
-      txt: this.replicateService.convertToPlainText(transcription),
-      srt: this.replicateService.convertToSRT(transcription),
-      vtt: this.replicateService.convertToVTT(transcription),
-      json: this.replicateService.convertToJSON(transcription),
-      md: this.replicateService.convertToMarkdown(transcription, title)
+      txt: this.transcriptionService.convertToPlainText(transcription),
+      srt: this.transcriptionService.convertToSRT(transcription),
+      vtt: this.transcriptionService.convertToVTT(transcription),
+      json: this.transcriptionService.convertToJSON(transcription),
+      md: this.transcriptionService.convertToMarkdown(transcription, title)
     };
   }
 
@@ -1195,7 +1208,7 @@ export class TranscriptionService {
    */
   private extractPreview(transcription: TranscriptionResult, formats: Record<string, string>): NonNullable<TranscriptionResponse['preview']> {
     // 使用优化后的标点符号处理
-    const optimizedText = this.replicateService.convertToPlainText(transcription);
+    const optimizedText = this.transcriptionService.convertToPlainText(transcription);
     
     return {
       text: this.truncateText(optimizedText, 90),

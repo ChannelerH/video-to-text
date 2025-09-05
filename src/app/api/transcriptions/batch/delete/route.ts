@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const ids: string[] = Array.isArray(body?.job_ids) ? body.job_ids : [];
   if (ids.length === 0) return NextResponse.json({ success:false, error: 'empty' }, { status: 400 });
-  await db.update(transcriptions)
+  await db().update(transcriptions)
     .set({ deleted: true })
     .where(and(eq(transcriptions.user_uuid, user_uuid), inArray(transcriptions.job_id, ids)));
   return NextResponse.json({ success: true, count: ids.length });

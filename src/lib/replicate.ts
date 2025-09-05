@@ -15,6 +15,7 @@ export interface TranscriptionResult {
   segments: TranscriptionSegment[];
   language: string;
   duration: number;
+  srtText?: string; // 原始 SRT 格式文本，带时间戳
 }
 
 export interface TranscriptionSegment {
