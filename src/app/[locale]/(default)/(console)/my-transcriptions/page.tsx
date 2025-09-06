@@ -6,6 +6,7 @@ import { Table as TableSlotType } from "@/types/slots/table";
 import { TableColumn } from "@/types/blocks/table";
 import Actions from "@/components/console/transcriptions/actions";
 import TranscriptionsTable from "@/components/console/transcriptions/table";
+import { headers as nextHeaders, cookies } from "next/headers";
 
 export default async function Page({ searchParams }: { searchParams?: Promise<{ page?: string; q?: string }> }) {
   const t = await getTranslations();
@@ -21,7 +22,17 @@ export default async function Page({ searchParams }: { searchParams?: Promise<{ 
   const offset = (page - 1) * limit;
   const q = s.q || '';
   const qs = new URLSearchParams({ limit: String(limit), offset: String(offset), ...(q ? { q } : {}) }).toString();
-  const res = await fetch(`${process.env.NEXT_PUBLIC_WEB_URL}/api/transcriptions?${qs}`, { cache: 'no-store' });
+  // 构造与当前请求同源的绝对地址，确保 SSR 可携带 Cookie
+  const h = await nextHeaders();
+  const host = h.get('x-forwarded-host') || h.get('host') || 'localhost:3000';
+  const proto = h.get('x-forwarded-proto') || 'http';
+  const base = `${proto}://${host}`;
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+  const res = await fetch(`${base}/api/transcriptions?${qs}`, {
+    cache: 'no-store',
+    headers: { cookie: cookieHeader }
+  });
   const { success, data, total } = await res.json();
   const rows = success ? data : [];
   const totalPages = Math.max(Math.ceil((total || 0) / limit), 1);

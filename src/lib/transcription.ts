@@ -450,6 +450,30 @@ export class TranscriptionService {
         }
       }, 60000); // 1分钟后清理
 
+      // 写入数据库（仅登录用户）
+      if (request.options?.userId) {
+        try {
+          const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
+          let jobId = crypto.randomUUID();
+          const row = await createOrReuseTranscription({
+            job_id: jobId,
+            user_uuid: request.options?.userId || "",
+            source_type: 'youtube_url',
+            source_hash: videoInfo.videoId,
+            source_url: request.content,
+            title: videoInfo.title,
+            language: transcription.language,
+            duration_sec: transcription.duration,
+            cost_minutes: Math.ceil(transcription.duration/60),
+            status: 'completed'
+          });
+          jobId = (row as any).job_id || jobId;
+          await upsertTranscriptionFormats(jobId, formats);
+        } catch (e) {
+          console.warn('DB write skipped:', e);
+        }
+      }
+
       return {
         success: true,
         data: {
