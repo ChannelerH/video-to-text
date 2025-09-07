@@ -30,6 +30,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<string>("");
   const [result, setResult] = useState<any>(null);
+  const [refining, setRefining] = useState(false);
+  const [useAIRefine, setUseAIRefine] = useState(false);
+  const [refinedText, setRefinedText] = useState<string | null>(null);
   const [uploadedFileInfo, setUploadedFileInfo] = useState<any>(null);
   const [copiedText, setCopiedText] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -78,10 +81,35 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const punctuateChineseParagraph = (raw: string) => {
     let text = (raw || '').trim();
     if (!text) return '';
-    text = text.replace(/\s+/g, '');
-    if (!/[。！？.!?]$/.test(text)) text += '。';
-    text = text.replace(/，{2,}/g, '，').replace(/。{2,}/g, '。');
-    text = text.replace(/\s*([，。！？；：、])\s*/g, '$1');
+    // 1) 统一空白
+    text = text.replace(/[\t\r\f]+/g, ' ').replace(/\u00A0/g, ' ').replace(/\s{2,}/g, ' ');
+    // 2) 将中文内部多余空格去除
+    text = text.replace(/([\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])/g, '$1');
+    // 3) 英文/数字与中文之间加空格（pangu 风格）
+    text = text
+      .replace(/([\u4e00-\u9fff])([A-Za-z0-9])/g, '$1 $2')
+      .replace(/([A-Za-z0-9])([\u4e00-\u9fff])/g, '$1 $2');
+    // 4) ASCII 标点 -> 中文标点（仅在中字符邻域）
+    text = text
+      .replace(/([\u4e00-\u9fff])\s*,\s*/g, '$1，')
+      .replace(/([\u4e00-\u9fff])\s*\.\s*/g, '$1。')
+      .replace(/([\u4e00-\u9fff])\s*;\s*/g, '$1；')
+      .replace(/([\u4e00-\u9fff])\s*:\s*/g, '$1：')
+      .replace(/([\u4e00-\u9fff])\s*!\s*/g, '$1！')
+      .replace(/([\u4e00-\u9fff])\s*\?\s*/g, '$1？');
+    // 5) 引号与括号归一
+    text = text
+      .replace(/"([^"]+)"/g, '“$1”')
+      .replace(/'([^']+)'/g, '‘$1’')
+      .replace(/\(/g, '（').replace(/\)/g, '）');
+    // 6) 压缩重复标点
+    text = text.replace(/，{2,}/g, '，').replace(/。{2,}/g, '。').replace(/！{2,}/g, '！').replace(/？{2,}/g, '？');
+    // 7) 去除标点两侧空格
+    text = text.replace(/\s*([，。！？；：、“”‘’（）：])\s*/g, '$1');
+    // 8) 句末补 ending（中文句子）
+    if (/[\u4e00-\u9fffA-Za-z0-9]$/.test(text) && !/[。！？！？.!?]$/.test(text)) {
+      text += '。';
+    }
     return text;
   };
 
@@ -93,11 +121,42 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     const rawText = data.transcription.text as string;
     const segments = (data.transcription.segments || []) as Segment[];
     const isZh = isChineseLangOrText(lang, rawText);
-    if (!isZh) return rawText || '';
+    if (!isZh) return (useAIRefine && refinedText) ? refinedText : (rawText || '');
+    // 优先显示 AI 润色结果
+    if (useAIRefine && refinedText) return refinedText;
     const paragraphs = groupSegmentsToParagraphs(segments);
     if (!paragraphs.length) return punctuateChineseParagraph(rawText);
     return paragraphs.map(p => punctuateChineseParagraph(p.text)).join('\n\n');
-  }, [result]);
+  }, [result, useAIRefine, refinedText]);
+
+  // 调用后端 AI 润色
+  const refineText = async () => {
+    const data = (result && result.type === 'full' && result.data) ? result.data : null;
+    if (!data) return;
+    const lang = data.transcription.language as string | undefined;
+    const raw = displayText || data.transcription.text || '';
+    if (!raw.trim()) return;
+    try {
+      setRefining(true);
+      setRefinedText(null);
+      const resp = await fetch('/api/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: raw, language: lang || 'auto' })
+      });
+      const json = await resp.json();
+      if (json?.success && json?.text) {
+        setRefinedText(json.text);
+      } else {
+        // 保底：如果后端未配置，直接使用本地规则化
+        setRefinedText(raw);
+      }
+    } catch {
+      setRefinedText(raw);
+    } finally {
+      setRefining(false);
+    }
+  };
 
   const goToHistory = () => {
     const href = locale && locale !== 'en' ? `/${locale}/my-transcriptions` : `/my-transcriptions`;
@@ -553,6 +612,11 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
+          <div className="url-help-text">
+            <span className="text-xs text-gray-400">{t("url_help_text")}</span>
+            <span className="text-xs text-gray-500 ml-2">•</span>
+            <span className="text-xs text-gray-500 ml-2">{t("url_not_supported")}</span>
+          </div>
         </div>
 
         {/* Export Format Selection */}
@@ -697,6 +761,29 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           </>
                         )}
                       </Button>
+                      {/* AI Refine toggle for Chinese */}
+                      {isChineseLangOrText(result.data.transcription.language as any, result.data.transcription.text) && (
+                        <div className="flex items-center ml-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={refining}
+                            onClick={() => { setUseAIRefine(true); refineText(); }}
+                          >
+                            {refining ? 'Refining…' : (useAIRefine ? 'Re‑refine' : 'AI润色')}
+                          </Button>
+                          {useAIRefine && !refining && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="ml-1"
+                              onClick={() => { setUseAIRefine(false); setRefinedText(null); }}
+                            >
+                              取消
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="p-4 rounded-lg max-h-60 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
                       {displayText.split('\n\n').map((p, i) => (

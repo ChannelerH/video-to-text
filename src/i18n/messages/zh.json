@@ -323,8 +323,10 @@
   "tool_interface": {
     "upload_tip": "拖放文件到此处或点击浏览",
     "supported_formats": "支持 MP3、M4A、WAV、OGG、MP4 格式",
-    "url_placeholder": "粘贴 YouTube 链接或直接音频/视频 URL（例如：https://example.com/audio.mp3）...",
-    "audio_url_placeholder": "粘贴直接音频文件 URL（例如：https://example.com/audio.mp3、.wav、.ogg）...",
+    "url_placeholder": "粘贴 YouTube 链接 (youtube.com, youtu.be) 或音频直链 (MP3/WAV/M4A/OGG，最大100MB)...",
+    "audio_url_placeholder": "粘贴音频直链：MP3/M4A/WAV/OGG/FLAC (需https://，最大100MB)...",
+    "url_help_text": "支持：YouTube视频、音频文件直链 (MP3, M4A, WAV, OGG, FLAC)",
+    "url_not_supported": "不支持：Vimeo、Spotify、Google Drive、需要登录的链接",
     "export_formats": "导出格式",
     "start_transcription": "开始转录",
     "processing": "处理中...",

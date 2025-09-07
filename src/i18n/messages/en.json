@@ -467,8 +467,10 @@
   "tool_interface": {
     "upload_tip": "Drop your file here or click to browse",
     "supported_formats": "MP3, M4A, WAV, OGG, MP4 supported",
-    "url_placeholder": "Paste a YouTube link or direct audio/video URL (e.g., https://example.com/audio.mp3)...",
-    "audio_url_placeholder": "Paste a direct audio file URL (e.g., https://example.com/audio.mp3, .wav, .ogg)...",
+    "url_placeholder": "Paste YouTube link (youtube.com, youtu.be) or direct audio URL (MP3/WAV/M4A/OGG, max 100MB)...",
+    "audio_url_placeholder": "Paste direct audio URL: MP3/M4A/WAV/OGG/FLAC (https://, max 100MB)...",
+    "url_help_text": "Supported: YouTube videos, direct audio files (MP3, M4A, WAV, OGG, FLAC)",
+    "url_not_supported": "Not supported: Vimeo, Spotify, Google Drive, or authenticated links",
     "export_formats": "Export Formats",
     "start_transcription": "Start Transcription",
     "processing": "Processing...",
