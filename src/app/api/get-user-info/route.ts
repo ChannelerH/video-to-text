@@ -1,35 +1,30 @@
-import { respData, respErr, respJson } from "@/lib/resp";
+import { NextRequest, NextResponse } from 'next/server';
+import { getUserInfoWithTier } from '@/services/user';
+import { auth } from '@/auth';
 
-import { findUserByUuid } from "@/models/user";
-import { getUserUuid } from "@/services/user";
-import { getUserCredits } from "@/services/credit";
-import { User } from "@/types/user";
+// simple 60s in-memory cache keyed by user_uuid
+const cache = new Map<string, { ts: number; data: any }>();
 
-export async function POST(req: Request) {
+export async function POST(_req: NextRequest) {
   try {
-    const user_uuid = await getUserUuid();
-    if (!user_uuid) {
-      return respJson(-2, "no auth");
+    const data = await getUserInfoWithTier();
+    // derive key
+    const key = data?.user?.uuid || 'anon';
+    const now = Date.now();
+    const cached = cache.get(key);
+    if (cached && (now - cached.ts) < 60_000) {
+      return NextResponse.json({ code: 0, message: 'ok', data: cached.data });
     }
-
-    const dbUser = await findUserByUuid(user_uuid);
-    if (!dbUser) {
-      return respErr("user not exist");
-    }
-
-    const userCredits = await getUserCredits(user_uuid);
-
-    const admin_emails = process.env.ADMIN_EMAILS?.split(",");
-
-    const user = {
-      ...(dbUser as unknown as User),
-      credits: userCredits,
-      is_admin: !!admin_emails?.includes(dbUser.email),
-    };
-
-    return respData(user);
-  } catch (e) {
-    console.log("get user info failed: ", e);
-    return respErr("get user info failed");
+    cache.set(key, { ts: now, data });
+    return NextResponse.json({ code: 0, message: 'ok', data });
+  } catch (e: any) {
+    // Fallback to NextAuth session to keep UI stable (avatar, nickname)
+    try {
+      const session = await auth();
+      if (session && (session as any).user) {
+        return NextResponse.json({ code: 0, message: 'ok', data: { user: (session as any).user, userTier: 'free' } });
+      }
+    } catch {}
+    return NextResponse.json({ code: 1, message: e?.message || 'failed' }, { status: 500 });
   }
 }

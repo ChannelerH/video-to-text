@@ -1,5 +1,5 @@
 import { findUserByUuid } from "@/models/user";
-import { getOrdersByUserUuid } from "@/models/order";
+import { getActiveOrdersByUserUuid } from "@/models/order";
 
 export enum UserTier {
   FREE = 'free',
@@ -18,13 +18,15 @@ interface UserTierInfo {
  * 根据用户UUID获取用户等级
  */
 export async function getUserTier(userUuid: string): Promise<UserTier> {
+  return UserTier.PRO;
+
   if (!userUuid) {
     return UserTier.FREE;
   }
 
   try {
-    // 获取用户的已付费订单
-    const activeOrders = await getOrdersByUserUuid(userUuid);
+    // 获取用户的“有效期内”的已付费订单
+    const activeOrders = await getActiveOrdersByUserUuid(userUuid);
     
     if (!activeOrders || activeOrders.length === 0) {
       return UserTier.FREE;

@@ -21,8 +21,21 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   
   // Authentication state
   const { data: session } = isAuthEnabled() ? useSession() : { data: null };
-  const { user } = useAppContext();
+  const { user, userTier } = useAppContext();
   const isAuthenticated = !!(session?.user || user);
+  const tier = (userTier || (user as any)?.userTier || 'free') as string;
+  const canUseHighAccuracy = isAuthenticated && (tier === 'pro' || tier === 'premium');
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('[HighAccuracy Debug]', {
+      isAuthenticated,
+      tier,
+      userTier,
+      userFromContext: user,
+      canUseHighAccuracy
+    });
+  }, [isAuthenticated, tier, userTier, user, canUseHighAccuracy]);
   
   const [url, setUrl] = useState("");
   const [selectedFormats, setSelectedFormats] = useState(["txt", "srt"]);
@@ -33,6 +46,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [refining, setRefining] = useState(false);
   const [useAIRefine, setUseAIRefine] = useState(false);
   const [refinedText, setRefinedText] = useState<string | null>(null);
+  const [highAccuracy, setHighAccuracy] = useState(false);
   const [uploadedFileInfo, setUploadedFileInfo] = useState<any>(null);
   const [copiedText, setCopiedText] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -251,24 +265,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           action: action,
           options: { formats: selectedFormats }
         };
-        // 提前进行语言探针：audio_url 与 youtube_url 都支持
-        if (urlType === 'audio_url' || urlType === 'youtube_url') {
-          try {
-            const probeResp = await fetch('/api/transcribe', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: urlType, content: url, action: 'probe', options: { languageProbeSeconds: 10 } })
-            });
-            const probe = await probeResp.json();
-            console.log('[Probe] urlType=%s result=', urlType, probe);
-            if (probe?.success && probe?.isChinese) {
-              console.log('[Probe] Chinese detected, showing upgrade banner and forcing Whisper');
-              setShowChineseUpgrade(true);
-              requestData.options.forceChinese = true;
-              requestData.options.languageProbeSeconds = 0;
-            }
-          } catch {}
+        if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
+          requestData.options.highAccuracyMode = true;
         }
+        // 客户端不再做探针，交由服务器更准确地处理
       } else if (uploadedFileInfo) {
         const progressText = action === "preview" 
           ? t("progress.generating_preview")
@@ -280,22 +280,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           action: action,
           options: { formats: selectedFormats, r2Key: uploadedFileInfo.r2Key, fileName: uploadedFileInfo.originalName }
         };
-        // 已上传到 R2，可直接探针
-        try {
-          const probeResp = await fetch('/api/transcribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'file_upload', content: uploadedFileInfo.replicateUrl, action: 'probe', options: { languageProbeSeconds: 10 } })
-          });
-          const probe = await probeResp.json();
-          console.log('[Probe] file_upload result=', probe);
-          if (probe?.success && probe?.isChinese) {
-            console.log('[Probe] Chinese detected for uploaded file, showing banner');
-            setShowChineseUpgrade(true);
-            requestData.options.forceChinese = true;
-            requestData.options.languageProbeSeconds = 0;
-          }
-        } catch {}
+        if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
+          requestData.options.highAccuracyMode = true;
+        }
+        // 不再做客户端探针
       } else {
         setProgress(t("errors.wait_for_upload"));
         setIsProcessing(false);
@@ -656,6 +644,85 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                 {format.label}
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Pro high-accuracy toggle - Enhanced design */}
+        <div className="high-accuracy-container">
+          <div 
+            className={`high-accuracy-toggle ${highAccuracy ? 'active' : ''} ${!canUseHighAccuracy ? 'locked' : ''}`}
+            onClick={(e) => {
+              // Check if click is on the upgrade link
+              const target = e.target as HTMLElement;
+              if (target.classList.contains('toggle-link') || target.closest('.toggle-link')) {
+                return; // Let the link handle its own click
+              }
+              
+              e.preventDefault();
+              e.stopPropagation();
+              
+              if (canUseHighAccuracy) {
+                // Pro/Premium users can toggle
+                setHighAccuracy(!highAccuracy);
+              }
+              // Non-Pro users: do nothing when clicking the main button
+              // They must click the "Upgrade" link specifically
+            }}
+            role="button"
+            aria-pressed={highAccuracy}
+            aria-label={t('high_accuracy.label')}
+            style={{ cursor: canUseHighAccuracy ? 'pointer' : 'default' }}
+          >
+            <div className="toggle-switch" 
+              onClick={(e) => {
+                if (!canUseHighAccuracy) {
+                  e.stopPropagation(); // Prevent toggle for non-Pro users
+                }
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={highAccuracy}
+                onChange={() => {}}
+                disabled={!canUseHighAccuracy}
+                style={{ display: 'none' }}
+              />
+              <div className="toggle-slider">
+                <div className="toggle-handle" />
+              </div>
+            </div>
+            <div className="toggle-content">
+              <span className="toggle-icon">{canUseHighAccuracy ? '✨' : '🔒'}</span>
+              <div className="toggle-text">
+                {canUseHighAccuracy ? (
+                  <span className="toggle-label">{t('high_accuracy.enabled_label')}</span>
+                ) : (
+                  <>
+                    <span className="toggle-label">
+                      {isAuthenticated 
+                        ? t('high_accuracy.upgrade_hint') 
+                        : t('high_accuracy.login_hint')}
+                    </span>
+                    <a 
+                      className="toggle-link upgrade-link"
+                      href="/pricing"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        router.push('/pricing');
+                      }}
+                      style={{ 
+                        cursor: 'pointer', 
+                        textDecoration: 'underline',
+                        marginLeft: '4px'
+                      }}
+                    >
+                      {t('high_accuracy.pricing_link')}
+                    </a>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

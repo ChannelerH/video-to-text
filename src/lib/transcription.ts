@@ -130,14 +130,20 @@ export class TranscriptionService {
 
     console.log(`Video info: ${videoInfo.title} (${videoInfo.duration}s)`);
 
-    // 4. 检查是否有现有字幕
+    // 4/5. 并行竞赛：若有字幕，字幕快速尝试（1s），否则直接走音频
     if (videoInfo.captions && videoInfo.captions.length > 0) {
       console.log(`[YouTube] Found ${videoInfo.captions.length} caption tracks`);
-      return await this.processYouTubeCaptions(videoInfo, request);
+      const captionTask = this.downloadCaptionBundle(videoInfo, request);
+      const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 1000));
+      const quick = await Promise.race([captionTask, timeout]);
+      if (quick && (quick as any).success) {
+        // 用带持久化的完整流程，保持一致
+        return await this.processYouTubeCaptions(videoInfo, request);
+      }
+      // 否则进入音频转录
+      return await this.processYouTubeAudioTranscription(videoInfo, request);
     }
 
-    // 5. 如果没有字幕，进行音频转录
-    console.log('No captions found, proceeding with audio transcription');
     return await this.processYouTubeAudioTranscription(videoInfo, request);
   }
 
@@ -247,6 +253,31 @@ export class TranscriptionService {
       console.error('Caption processing failed, falling back to audio transcription:', error);
       return await this.processYouTubeAudioTranscription(videoInfo, request);
     }
+  }
+
+  // 快速下载字幕+SRT，仅用于竞赛，不做持久化
+  private async downloadCaptionBundle(videoInfo: VideoInfo, request: TranscriptionRequest): Promise<TranscriptionResponse | null> {
+    try {
+      const bestCaption = YouTubeService.selectBestCaption(
+        videoInfo.captions!,
+        request.options?.language ? [request.options.language] : ['en', 'en-US']
+      );
+      if (!bestCaption) return null;
+      const captionText = await YouTubeService.downloadCaption(bestCaption.url);
+      const captionSRT = await YouTubeService.convertCaptionToSRT(bestCaption.url);
+      if ((!captionText || captionText.trim().length === 0) && (!captionSRT || captionSRT.trim().length === 0)) {
+        return null;
+      }
+      const transcription: TranscriptionResult = {
+        text: captionText || '',
+        segments: [],
+        language: bestCaption.languageCode,
+        duration: videoInfo.duration
+      };
+      const formats = await this.generateFormats(transcription, videoInfo.title);
+      if (captionSRT) formats.srt = captionSRT;
+      return { success: true, data: { transcription, formats, videoInfo, fromCache: false, estimatedCost: 0 } };
+    } catch { return null; }
   }
 
   /**

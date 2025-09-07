@@ -525,6 +525,13 @@
       "sign_in": "Sign in to unlock full",
       "download_disabled": "Download disabled in preview"
     },
-    "social_proof": "★★★★★ 4.8 | 1000+ conversions | 12 countries"
+    "social_proof": "★★★★★ 4.8 | 1000+ conversions | 12 countries",
+    "high_accuracy": {
+      "label": "High accuracy",
+      "enabled_label": "More accurate transcription (Whisper)",
+      "login_hint": "Sign in to enable more accurate transcription (Pro)",
+      "upgrade_hint": "More accurate transcription (Pro)",
+      "pricing_link": "Upgrade"
+    }
   }
 }

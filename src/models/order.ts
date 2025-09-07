@@ -1,6 +1,6 @@
 import { orders } from "@/db/schema";
 import { db } from "@/db";
-import { asc, desc, eq, gte } from "drizzle-orm";
+import { asc, desc, eq, gte, sql } from "drizzle-orm";
 import { and } from "drizzle-orm";
 
 export enum OrderStatus {
@@ -142,6 +142,36 @@ export async function getOrdersByUserUuid(
     .where(
       and(eq(orders.user_uuid, user_uuid), eq(orders.status, OrderStatus.Paid))
     )
+    .orderBy(desc(orders.created_at));
+
+  return data;
+}
+
+/**
+ * 获取用户“有效期内”的订单（用于权限/等级判断）
+ * 判定规则：
+ * - 已支付 AND (
+ *   expired_at IS NULL  // 终身/永久
+ *   OR expired_at > now()
+ *   OR sub_period_end > now()  // 订阅周期仍未到期（单位：秒）
+ * )
+ */
+export async function getActiveOrdersByUserUuid(
+  user_uuid: string
+): Promise<(typeof orders.$inferSelect)[] | undefined> {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const data = await db()
+    .select()
+    .from(orders)
+    .where(and(
+      eq(orders.user_uuid, user_uuid),
+      eq(orders.status, OrderStatus.Paid),
+      sql`(
+        ${orders.expired_at} IS NULL
+        OR ${orders.expired_at} > NOW()
+        OR (${orders.sub_period_end} IS NOT NULL AND ${orders.sub_period_end}::bigint > ${nowSec})
+      )`
+    ))
     .orderBy(desc(orders.created_at));
 
   return data;

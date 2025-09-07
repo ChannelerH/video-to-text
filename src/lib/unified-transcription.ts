@@ -123,6 +123,17 @@ export class UnifiedTranscriptionService {
     let strategy: TranscriptionStrategy;
     const startTime = Date.now();
     
+    // Pro/Premium + high accuracy (non-preview): force Whisper before any probe/strategy
+    if ((options.userTier === 'pro' || options.userTier === 'premium')
+      && options.highAccuracyMode
+      && !options.isPreview) {
+      console.log('🎯 High accuracy mode: Using Whisper directly');
+      const result = await this.transcribeWithModel(audioUrl, options, 'whisper');
+      const duration = Date.now() - startTime;
+      console.log(`✅ whisper (High accuracy) succeeded in ${Math.round(duration / 1000)}s`);
+      return result;
+    }
+    
     // 语言探针：仅在 language 未指定或 auto 时进行
     let isChinese = !!options.forceChinese;
     if (!isChinese && (!options.language || options.language === 'auto')) {

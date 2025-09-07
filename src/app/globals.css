@@ -361,6 +361,39 @@ body::after {
 .dark .format-chip:hover{border-color:rgba(139,92,246,.35);box-shadow:0 5px 15px rgba(139,92,246,.18)}
 .dark .format-chip.selected{background:rgba(6,255,165,.12);border-color:rgba(6,255,165,.52);color:#fff;box-shadow:0 0 0 1px rgba(6,255,165,.38)}
 
+/* High accuracy toggle - Premium feature highlight */
+.high-accuracy-container{margin:1.5rem 0;display:flex;justify-content:center}
+.high-accuracy-toggle{position:relative;display:flex;align-items:center;gap:0.75rem;padding:0.875rem 1.5rem;background:linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.1));border:1px solid rgba(139,92,246,0.3);border-radius:50px;cursor:pointer;transition:all 0.2s cubic-bezier(0.4,0,0.2,1);user-select:none;will-change:transform}
+.high-accuracy-toggle:hover{background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(236,72,153,0.15));border-color:rgba(139,92,246,0.5);transform:translateY(-2px);box-shadow:0 8px 25px rgba(139,92,246,0.25)}
+.high-accuracy-toggle:active{transform:scale(0.98);transition:transform 0.1s ease}
+.high-accuracy-toggle.active{background:linear-gradient(135deg,rgba(139,92,246,0.25),rgba(236,72,153,0.2));border-color:#8b5cf6;box-shadow:0 0 30px rgba(139,92,246,0.3),inset 0 0 20px rgba(139,92,246,0.1)}
+.high-accuracy-toggle.locked{opacity:0.85;cursor:pointer}
+.high-accuracy-toggle.locked:hover{transform:scale(1.02);box-shadow:0 8px 25px rgba(236,72,153,0.3)}
+.high-accuracy-toggle.locked:active{transform:scale(0.98)}
+
+/* Toggle switch component */
+.toggle-switch{position:relative;width:48px;height:26px}
+.toggle-slider{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.1);border-radius:34px;transition:background 0.3s ease}
+.toggle-handle{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:white;border-radius:50%;transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);box-shadow:0 2px 8px rgba(0,0,0,0.2)}
+.high-accuracy-toggle.active .toggle-handle{transform:translateX(22px);background:linear-gradient(135deg,#8b5cf6,#ec4899)}
+.high-accuracy-toggle.active .toggle-slider{background:rgba(139,92,246,0.3)}
+
+/* Toggle content */
+.toggle-content{display:flex;align-items:center;gap:0.5rem}
+.toggle-icon{font-size:1.25rem;filter:drop-shadow(0 0 8px currentColor)}
+.toggle-text{display:flex;flex-direction:column;gap:0.125rem}
+.toggle-label{color:#fff;font-size:0.875rem;font-weight:500;letter-spacing:0.025em}
+.toggle-link{color:rgba(255,255,255,0.7);font-size:0.75rem;transition:color 0.15s;text-decoration:none !important}
+.toggle-link.upgrade-link{color:#8b5cf6;font-weight:500;text-decoration:underline !important;display:inline-block;padding:2px 4px;border-radius:4px;transition:all 0.2s}
+.toggle-link.upgrade-link:hover{color:#a855f7 !important;background:rgba(139,92,246,0.1);transform:translateY(-1px)}
+.high-accuracy-toggle.locked{cursor:default !important}
+.high-accuracy-toggle.locked:hover{transform:none}
+
+/* Dark mode adjustments */
+.dark .high-accuracy-toggle{background:linear-gradient(135deg,rgba(139,92,246,0.08),rgba(6,255,165,0.08));border-color:rgba(6,255,165,0.3)}
+.dark .high-accuracy-toggle:hover{background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(6,255,165,0.12));border-color:rgba(6,255,165,0.5)}
+.dark .high-accuracy-toggle.active{background:linear-gradient(135deg,rgba(6,255,165,0.2),rgba(139,92,246,0.15));border-color:#06ffa5;box-shadow:0 0 30px rgba(6,255,165,0.25)}
+
 .balloon-button{background:linear-gradient(135deg,#a855f7 0%,#ec4899 100%);box-shadow:0 10px 24px rgba(236,72,153,.3),inset 0 -2px 0 rgba(0,0,0,.2)}
 .balloon-button:hover{animation:pulseGlow 1.2s ease-in-out}
 @keyframes pulseGlow{0%{box-shadow:0 0 18px rgba(236,72,153,.3)}50%{box-shadow:0 0 34px rgba(236,72,153,.55)}100%{box-shadow:0 0 18px rgba(236,72,153,.3)}}
