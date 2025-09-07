@@ -65,6 +65,38 @@
   100% { opacity: 0; transform: translateY(-8px); }
 }
 
+/* ===== Sonner Toaster overrides for clarity on dark background ===== */
+.toaster [data-sonner-toast] {
+  border-radius: 12px !important;
+  border: 1px solid rgba(148,163,184,0.25) !important;
+  background: rgba(17,24,39,0.85) !important; /* slate-900/85 */
+  color: #E5E7EB !important; /* text-slate-200 */
+  backdrop-filter: blur(8px);
+}
+
+.toaster [data-sonner-toast][data-type="success"] {
+  border-color: rgba(16,185,129,0.35) !important; /* emerald-500/35 */
+  background: rgba(6,95,70,0.6) !important;       /* emerald-900/60 */
+  color: #D1FAE5 !important;                      /* emerald-100 */
+}
+
+.toaster [data-sonner-toast][data-type="error"] {
+  border-color: rgba(248,113,113,0.4) !important; /* red-400/40 */
+  background: rgba(127,29,29,0.7) !important;     /* red-900/70 */
+  color: #FEE2E2 !important;                      /* red-100 */
+}
+
+.toaster [data-sonner-toast][data-type="warning"] {
+  border-color: rgba(251,191,36,0.4) !important;  /* amber-400/40 */
+  background: rgba(120,53,15,0.7) !important;     /* amber-900/70 */
+  color: #FEF3C7 !important;                      /* amber-100 */
+}
+
+.toaster [data-sonner-toast] [data-title],
+.toaster [data-sonner-toast] [data-description] {
+  color: inherit !important;
+}
+
 /* ===== 统一Section布局 ===== */
 .design-section {
   position: relative;

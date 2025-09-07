@@ -155,6 +155,7 @@
   },
   "my_transcriptions": {
     "title": "我的转录",
+    "subtitle": "管理您的转录历史和下载",
     "description": "仅保存转录结果（TXT/SRT/VTT/JSON/MD），不长期保存原始音视频。",
     "empty": "暂无转录记录",
     "search_placeholder": "搜索标题或链接",

@@ -218,7 +218,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           type: "file_upload",
           content: uploadedFileInfo.replicateUrl,
           action: action,
-          options: { formats: selectedFormats, r2Key: uploadedFileInfo.r2Key }
+          options: { formats: selectedFormats, r2Key: uploadedFileInfo.r2Key, fileName: uploadedFileInfo.originalName }
         };
         // 已上传到 R2，可直接探针
         try {

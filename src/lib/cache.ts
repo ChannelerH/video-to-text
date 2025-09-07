@@ -20,6 +20,7 @@ export interface CacheEntry {
   // 元数据
   originalUrl?: string;
   videoTitle?: string;
+  fileName?: string;
   language: string;
   duration: number;
   fileSize?: number;
@@ -77,6 +78,7 @@ export class TranscriptionCache {
     metadata: {
       originalUrl?: string;
       videoTitle?: string;
+      fileName?: string;
       fileSize?: number;
       userTier?: string;
       r2Key?: string;
@@ -108,6 +110,7 @@ export class TranscriptionCache {
       formats,
       originalUrl: metadata.originalUrl,
       videoTitle: metadata.videoTitle,
+      fileName: metadata.fileName,
       language: transcriptionData.language,
       duration: transcriptionData.duration,
       fileSize: metadata.fileSize,

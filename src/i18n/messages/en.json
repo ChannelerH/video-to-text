@@ -300,6 +300,7 @@
   },
   "my_transcriptions": {
     "title": "My Transcriptions",
+    "subtitle": "Manage your transcription history and downloads",
     "description": "Only results (TXT/SRT/VTT/JSON/MD) are stored; raw media is not kept.",
     "empty": "No transcriptions yet",
     "search_placeholder": "Search title or URL",

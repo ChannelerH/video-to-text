@@ -9,6 +9,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { FileText, FileCode, FileJson, FileDown, RefreshCw, Trash2, RotateCcw } from "lucide-react";
 
 export default function Actions({ row, i18n }: { row: any; i18n: any }) {
   const [busy, setBusy] = useState(false);
@@ -62,47 +63,158 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
 
   const base = `/api/transcriptions/${row.job_id}/file`;
 
+  const download = async (format: string) => {
+    try {
+      const res = await fetch(`${base}?format=${format}`);
+      if (!res.ok) {
+        if (res.status === 404) {
+          toast.error(`${format.toUpperCase()} not available for this job`);
+          return;
+        }
+        toast.error(`Download failed (${res.status})`);
+        return;
+      }
+      const buf = await res.arrayBuffer();
+      const blob = new Blob([buf], { type: res.headers.get('Content-Type') || 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const cd = res.headers.get('Content-Disposition') || '';
+      const match = cd.match(/filename\*=UTF-8''([^;]+)/);
+      const filename = match ? decodeURIComponent(match[1]) : `${row.title || row.job_id}.${format}`;
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(`Download error: ${e.message}`);
+    }
+  };
+
+  // 格式图标映射
+  const formatIcons = {
+    txt: FileText,
+    srt: FileCode,
+    vtt: FileCode,
+    json: FileJson,
+    md: FileDown
+  };
+
   return (
-    <div className="flex flex-wrap gap-2 text-sm items-center">
-      <a className="text-primary hover:underline" href={`${base}?format=txt`}>TXT</a>
-      <a className="text-primary hover:underline" href={`${base}?format=srt`}>SRT</a>
-      <a className="text-primary hover:underline" href={`${base}?format=vtt`}>VTT</a>
-      <a className="text-primary hover:underline" href={`${base}?format=json`}>JSON</a>
-      <a className="text-primary hover:underline" href={`${base}?format=md`}>MD</a>
-      <button onClick={onRerun} disabled={busy || row.source_type==='file_upload'} className="text-blue-400 hover:underline disabled:opacity-50">{i18n.rerun}</button>
-      <button onClick={() => setOpen(true)} disabled={busy} className="text-red-400 hover:underline disabled:opacity-50">{i18n.delete}</button>
+    <div className="space-y-3">
+      {/* 下载格式按钮组 */}
+      <div className="flex flex-wrap gap-2">
+        {['txt', 'srt', 'vtt', 'json', 'md'].map((format) => {
+          const Icon = formatIcons[format as keyof typeof formatIcons] || FileDown;
+          return (
+            <button
+              key={format}
+              onClick={() => download(format)}
+              className="
+                inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                bg-secondary/50 hover:bg-secondary text-secondary-foreground
+                transition-all duration-200 text-xs font-medium
+                hover:scale-105 hover:shadow-sm
+              "
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {format.toUpperCase()}
+            </button>
+          );
+        })}
+      </div>
 
-      {showUndo && (
+      {/* 操作按钮组 */}
+      <div className="flex items-center gap-2">
         <button
-          onClick={async () => {
-            setUndoing(true);
-            try {
-              const res = await fetch(`/api/transcriptions/${row.job_id}/restore`, { method: 'POST' });
-              if (!res.ok) throw new Error('restore failed');
-              toast.success(i18n.undo_success);
-              setShowUndo(false);
-            } catch {
-              toast.error(i18n.undo_failed);
-            } finally {
-              setUndoing(false);
-            }
-          }}
-          className="text-emerald-400 hover:underline disabled:opacity-50"
-          disabled={undoing}
+          onClick={onRerun}
+          disabled={busy || row.source_type === 'file_upload'}
+          className="
+            inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+            bg-blue-500/10 hover:bg-blue-500/20 text-blue-600
+            transition-all duration-200 text-xs font-medium
+            disabled:opacity-50 disabled:cursor-not-allowed
+            hover:scale-105 hover:shadow-sm
+          "
         >
-          {i18n.undo}
+          <RefreshCw className="w-3.5 h-3.5" />
+          {i18n.rerun}
         </button>
-      )}
+        
+        <button
+          onClick={() => setOpen(true)}
+          disabled={busy}
+          className="
+            inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+            bg-red-500/10 hover:bg-red-500/20 text-red-600
+            transition-all duration-200 text-xs font-medium
+            disabled:opacity-50 disabled:cursor-not-allowed
+            hover:scale-105 hover:shadow-sm
+          "
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          {i18n.delete}
+        </button>
 
+        {showUndo && (
+          <button
+            onClick={async () => {
+              setUndoing(true);
+              try {
+                const res = await fetch(`/api/transcriptions/${row.job_id}/restore`, { method: 'POST' });
+                if (!res.ok) throw new Error('restore failed');
+                toast.success(i18n.undo_success);
+                setShowUndo(false);
+              } catch {
+                toast.error(i18n.undo_failed);
+              } finally {
+                setUndoing(false);
+              }
+            }}
+            className="
+              inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+              bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600
+              transition-all duration-200 text-xs font-medium
+              disabled:opacity-50 disabled:cursor-not-allowed
+              hover:scale-105 hover:shadow-sm animate-pulse
+            "
+            disabled={undoing}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            {i18n.undo}
+          </button>
+        )}
+      </div>
+
+      {/* 删除确认对话框 */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{i18n.confirm_title}</DialogTitle>
-            <DialogDescription>{i18n.confirm_desc}</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-500" />
+              {i18n.confirm_title}
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              {i18n.confirm_desc}
+            </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end gap-3 mt-4">
-            <button className="design-btn-secondary" onClick={() => setOpen(false)}>{i18n.cancel}</button>
-            <button className="design-btn-primary" onClick={onDelete} disabled={busy}>{i18n.confirm}</button>
+          <div className="flex justify-end gap-3 mt-6">
+            <button 
+              className="
+                px-4 py-2 rounded-lg bg-secondary hover:bg-secondary/80
+                transition-colors duration-200 text-sm font-medium
+              " 
+              onClick={() => setOpen(false)}
+            >
+              {i18n.cancel}
+            </button>
+            <button 
+              className="
+                px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white
+                transition-colors duration-200 text-sm font-medium
+                disabled:opacity-50 disabled:cursor-not-allowed
+              " 
+              onClick={onDelete} 
+              disabled={busy}
+            >
+              {i18n.confirm}
+            </button>
           </div>
         </DialogContent>
       </Dialog>

@@ -1,9 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { getUserUuid } from "@/services/user";
-import TableSlot from "@/components/console/slots/table";
-import { Table as TableSlotType } from "@/types/slots/table";
-import { TableColumn } from "@/types/blocks/table";
 import Actions from "@/components/console/transcriptions/actions";
 import TranscriptionsTable from "@/components/console/transcriptions/table";
 import { headers as nextHeaders, cookies } from "next/headers";
@@ -37,61 +34,90 @@ export default async function Page({ searchParams }: { searchParams?: Promise<{ 
   const rows = success ? data : [];
   const totalPages = Math.max(Math.ceil((total || 0) / limit), 1);
 
-  const columns: TableColumn[] = [
-    { name: "created_at", title: t("my_transcriptions.table.created_at"), type: "time" },
-    { name: "title", title: t("my_transcriptions.table.title") },
-    { name: "source_type", title: t("my_transcriptions.table.source"), callback: (r: any) => t(`my_transcriptions.source.${r.source_type}`) },
-    { name: "duration_sec", title: t("my_transcriptions.table.duration"), callback: (r: any) => `${Math.round(r.duration_sec/60)}m` },
-    {
-      name: "job_id",
-      title: t("my_transcriptions.table.actions"),
-      callback: (r: any) => <Actions row={r} i18n={{
-        rerun: t('my_transcriptions.actions.rerun'),
-        delete: t('my_transcriptions.actions.delete'),
-        confirm_delete: t('my_transcriptions.actions.confirm_delete'),
-        confirm_title: t('my_transcriptions.actions.confirm_title'),
-        confirm_desc: t('my_transcriptions.actions.confirm_desc'),
-        cancel: t('my_transcriptions.actions.cancel'),
-        confirm: t('my_transcriptions.actions.confirm'),
-        delete_failed: t('my_transcriptions.actions.delete_failed'),
-        rerun_ok: t('my_transcriptions.actions.rerun_ok'),
-        rerun_failed: t('my_transcriptions.actions.rerun_failed'),
-        rerun_file_hint: t('my_transcriptions.actions.rerun_file_hint'),
-        undo: t('my_transcriptions.actions.undo'),
-        undo_success: t('my_transcriptions.actions.undo_success'),
-        undo_failed: t('my_transcriptions.actions.undo_failed'),
-      }} />
-    },
-  ];
+  // 合并为一个操作区 + 表格（TranscriptionsTable 自带操作按钮与表头）
 
-  const table: TableSlotType = {
-    title: t("my_transcriptions.title"),
-    description: t("my_transcriptions.description"),
-    columns,
-    data: rows,
-    empty_message: t("my_transcriptions.empty"),
-  };
-
-  // Search + Pagination UI
+  // Search + Pagination UI with modern design
   const searchForm = (
-    <form className="mb-4 flex gap-2" action="/my-transcriptions">
-      <input name="q" defaultValue={q} placeholder={t('my_transcriptions.search_placeholder')} className="px-3 py-2 rounded-md bg-muted text-sm w-64" />
-      <button className="design-btn-secondary" type="submit">{t('my_transcriptions.search')}</button>
+    <form className="mb-6" action="/my-transcriptions">
+      <div className="relative max-w-md">
+        <input 
+          name="q" 
+          defaultValue={q} 
+          placeholder={t('my_transcriptions.search_placeholder')} 
+          className="
+            w-full px-4 py-3 pl-12 rounded-xl 
+            bg-background border border-border/50 
+            focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20
+            transition-all duration-200 text-sm
+            placeholder:text-muted-foreground/60
+          " 
+        />
+        <div className="absolute left-4 top-1/2 -translate-y-1/2">
+          <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <button 
+          className="
+            absolute right-2 top-1/2 -translate-y-1/2
+            px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground
+            transition-colors duration-200 text-sm font-medium
+          " 
+          type="submit"
+        >
+          {t('my_transcriptions.search')}
+        </button>
+      </div>
     </form>
   );
 
   const pagination = (
-    <div className="mt-4 flex gap-3 items-center">
-      <a className={`text-primary hover:underline ${page<=1?'pointer-events-none opacity-50':''}`} href={`/my-transcriptions?${new URLSearchParams({ ...(q?{q}:{}), page: String(Math.max(page-1,1)) }).toString()}`}>{t('my_transcriptions.prev')}</a>
-      <span className="text-sm text-muted-foreground">{page} / {totalPages}</span>
-      <a className={`text-primary hover:underline ${page>=totalPages?'pointer-events-none opacity-50':''}`} href={`/my-transcriptions?${new URLSearchParams({ ...(q?{q}:{}), page: String(Math.min(page+1,totalPages)) }).toString()}`}>{t('my_transcriptions.next')}</a>
+    <div className="mt-8 flex justify-center">
+      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/30 border border-border/50">
+        <a 
+          className={`
+            px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium
+            ${page <= 1 
+              ? 'pointer-events-none opacity-50 text-muted-foreground' 
+              : 'hover:bg-background hover:shadow-sm text-foreground'
+            }
+          `} 
+          href={`/my-transcriptions?${new URLSearchParams({ ...(q?{q}:{}), page: String(Math.max(page-1,1)) }).toString()}`}
+        >
+          ← {t('my_transcriptions.prev')}
+        </a>
+        
+        <div className="px-4 py-2 text-sm font-medium text-muted-foreground">
+          <span className="text-foreground">{page}</span> / {totalPages}
+        </div>
+        
+        <a 
+          className={`
+            px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium
+            ${page >= totalPages 
+              ? 'pointer-events-none opacity-50 text-muted-foreground' 
+              : 'hover:bg-background hover:shadow-sm text-foreground'
+            }
+          `} 
+          href={`/my-transcriptions?${new URLSearchParams({ ...(q?{q}:{}), page: String(Math.min(page+1,totalPages)) }).toString()}`}
+        >
+          {t('my_transcriptions.next')} →
+        </a>
+      </div>
     </div>
   );
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-7xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">{t('my_transcriptions.title') || 'My Transcriptions'}</h1>
+        <p className="text-muted-foreground">
+          {t('my_transcriptions.subtitle') || 'Manage your transcription history and downloads'}
+        </p>
+      </div>
+      
       {searchForm}
-      <TableSlot {...table} />
+      
       <TranscriptionsTable rows={rows} t={{
         select_all: t('my_transcriptions.select_all'),
         clear: t('my_transcriptions.clear'),
@@ -109,7 +135,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<{ 
         source_audio_url: t('my_transcriptions.source.audio_url'),
         source_file_upload: t('my_transcriptions.source.file_upload'),
       }} />
-      {pagination}
+      
+      {rows.length > 0 && pagination}
     </div>
   );
 }

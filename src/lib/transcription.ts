@@ -952,8 +952,8 @@ export class TranscriptionService {
       // 估算成本
       const estimatedCost = this.transcriptionService.estimateCost(transcription.duration);
 
-      // 生成不同格式
-      const formats = await this.generateFormats(transcription);
+      // 生成不同格式（为上传文件使用原始文件名作为标题）
+      const formats = await this.generateFormats(transcription, (request.options as any)?.fileName || 'uploaded file');
 
       // 缓存结果
       await transcriptionCache.set(
@@ -962,7 +962,8 @@ export class TranscriptionService {
         transcription,
         formats,
         {
-          userTier: request.options?.userTier
+          userTier: request.options?.userTier,
+          fileName: (request.options as any)?.fileName
         },
         { userId: request.options?.userId }
       );
@@ -978,7 +979,7 @@ export class TranscriptionService {
             source_type: 'file_upload',
             source_hash: fileHash,
             source_url: filePath,
-            title: 'uploaded file',
+            title: (request.options as any)?.fileName || 'uploaded file',
             language: transcription.language,
             duration_sec: transcription.duration,
             cost_minutes: Math.ceil(transcription.duration/60),
