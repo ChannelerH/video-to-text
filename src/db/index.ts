@@ -19,9 +19,11 @@ export function db() {
   // Node.js environment with connection pool configuration
   const client = postgres(databaseUrl, {
     prepare: false,
-    max: 10, // Maximum connections in pool
-    idle_timeout: 30, // Idle connection timeout (seconds)
-    connect_timeout: 10, // Connection timeout (seconds)
+    max: Number(process.env.DB_POOL_MAX || 10), // Maximum connections in pool
+    idle_timeout: Number(process.env.DB_IDLE_TIMEOUT || 60), // seconds
+    connect_timeout: Number(process.env.DB_CONNECT_TIMEOUT || 20), // seconds
+    keep_alive: Number(process.env.DB_KEEPALIVE || 1),
+    ssl: process.env.DB_SSL === 'require' || process.env.DB_SSL === 'true' ? 'require' : undefined,
   });
   dbInstance = drizzle({ client });
 

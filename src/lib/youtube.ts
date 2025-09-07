@@ -142,14 +142,7 @@ export class YouTubeService {
    */
   static async downloadCaption(captionUrl: string): Promise<string> {
     try {
-      const response = await fetch(captionUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to download caption: ${response.statusText}`);
-      }
-      
-      const xmlContent = await response.text();
-      
-      // 解析 YouTube 的 XML 字幕格式并转换为纯文本
+      const xmlContent = await this.fetchCaptionXML(captionUrl);
       const textContent = this.parseXMLCaptions(xmlContent);
       return textContent;
     } catch (error) {
@@ -896,23 +889,29 @@ export class YouTubeService {
    * 解析 XML 字幕为纯文本
    */
   private static parseXMLCaptions(xmlContent: string): string {
-    // 简单的XML解析，提取文本内容
-    const textRegex = /<text[^>]*>([^<]+)<\/text>/g;
-    const matches = [];
-    let match;
-
+    // 兼容 srv1/srv3：允许内嵌标签，统一抽取纯文本
+    const textRegex = /<text[^>]*>([\s\S]*?)<\/text>/g;
+    const chunks: string[] = [];
+    let match: RegExpExecArray | null;
     while ((match = textRegex.exec(xmlContent)) !== null) {
-      // 解码HTML实体
-      const text = match[1]
+      const inner = match[1]
+        .replace(/<br\s*\/>/gi, '\n')
+        .replace(/<[^>]+>/g, '');
+      const decoded = inner
         .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'");
-      matches.push(text.trim());
+        .replace(/&#39;/g, "'")
+        .replace(/&#10;|&#x0A;/g, '\n');
+      const normalized = decoded
+        .replace(/\s+\n/g, '\n')
+        .replace(/\n\s+/g, '\n')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+      if (normalized) chunks.push(normalized);
     }
-
-    return matches.join(' ');
+    return chunks.join(' ');
   }
 
   /**
@@ -920,11 +919,7 @@ export class YouTubeService {
    */
   static async convertCaptionToSRT(captionUrl: string): Promise<string> {
     try {
-      // 添加格式参数以获取带时间戳的字幕
-      const timedCaptionUrl = captionUrl + '&fmt=srv3';
-      const response = await fetch(timedCaptionUrl);
-      const xmlContent = await response.text();
-
+      const xmlContent = await this.fetchCaptionXML(captionUrl);
       return this.parseXMLToSRT(xmlContent);
     } catch (error) {
       console.error('Error converting caption to SRT:', error);
@@ -933,10 +928,55 @@ export class YouTubeService {
   }
 
   /**
+   * 带重试和兜底策略的字幕 XML 获取
+   * 顺序：baseUrl+fmt=srv3 -> baseUrl+fmt=srv1 -> timedtext?lang=..&v=..&fmt=srv3(或srv1)
+   */
+  private static async fetchCaptionXML(captionUrl: string): Promise<string> {
+    const tryFetch = async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) return '';
+      const text = await res.text();
+      return text || '';
+    };
+
+    // 1) baseUrl + fmt=srv3
+    const hasFmt = /[?&]fmt=/.test(captionUrl);
+    const urlSrv3 = hasFmt ? captionUrl : `${captionUrl}${captionUrl.includes('?') ? '&' : '?'}fmt=srv3`;
+    let xml = await tryFetch(urlSrv3);
+    if (xml && xml.length > 0) return xml;
+
+    // 2) baseUrl + fmt=srv1
+    const urlSrv1 = hasFmt ? captionUrl : `${captionUrl}${captionUrl.includes('?') ? '&' : '?'}fmt=srv1`;
+    xml = await tryFetch(urlSrv1);
+    if (xml && xml.length > 0) return xml;
+
+    // 3) Rebuild via timedtext endpoint
+    try {
+      const u = new URL(captionUrl);
+      const lang = u.searchParams.get('lang') || u.searchParams.get('lang_code') || 'en';
+      const v = u.searchParams.get('v') || '';
+      const kind = u.searchParams.get('kind') || '';
+      const timed = new URL('https://www.youtube.com/api/timedtext');
+      timed.searchParams.set('lang', lang);
+      if (v) timed.searchParams.set('v', v);
+      if (kind) timed.searchParams.set('kind', kind);
+      timed.searchParams.set('fmt', 'srv3');
+      xml = await tryFetch(timed.toString());
+      if (xml && xml.length > 0) return xml;
+
+      timed.searchParams.set('fmt', 'srv1');
+      xml = await tryFetch(timed.toString());
+      if (xml && xml.length > 0) return xml;
+    } catch {}
+
+    return '';
+  }
+
+  /**
    * 解析 XML 字幕为 SRT 格式
    */
   private static parseXMLToSRT(xmlContent: string): string {
-    const textRegex = /<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]+)<\/text>/g;
+    const textRegex = /<text start="([^"]+)" dur="([^"]+)"[^>]*>([\s\S]*?)<\/text>/g;
     const srtEntries = [];
     let match;
     let index = 1;
@@ -946,12 +986,19 @@ export class YouTubeService {
       const duration = parseFloat(match[2]);
       const endTime = startTime + duration;
       
-      const text = match[3]
+      const inner = match[3]
+        .replace(/<br\s*\/>/gi, '\n')
+        .replace(/<[^>]+>/g, '');
+      const text = inner
         .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
+        .replace(/&#10;|&#x0A;/g, '\n')
+        .replace(/\s+\n/g, '\n')
+        .replace(/\n\s+/g, '\n')
+        .replace(/\s{2,}/g, ' ')
         .trim();
 
       const startSRT = this.secondsToSRTTime(startTime);

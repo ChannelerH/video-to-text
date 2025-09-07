@@ -51,18 +51,25 @@ export class TranscriptionService {
     this.r2Service = new CloudflareR2Service();
   }
 
+  // Timing helper for stage logging
+  private async time<T>(label: string, p: Promise<T>): Promise<T> {
+    const s = Date.now();
+    try { return await p; } finally { console.log(`[Stage] ${label} ${Date.now() - s}ms`); }
+  }
+
   /**
    * 主要的转录处理函数
    */
   async processTranscription(request: TranscriptionRequest): Promise<TranscriptionResponse> {
     try {
-      if (request.type === 'youtube_url') {
-        return await this.processYouTubeTranscription(request);
-      } else if (request.type === 'audio_url') {
-        return await this.processAudioUrlTranscription(request);
-      } else {
-        return await this.processFileTranscription(request);
-      }
+      const overallStart = Date.now();
+      const res = request.type === 'youtube_url'
+        ? await this.processYouTubeTranscription(request)
+        : request.type === 'audio_url'
+          ? await this.processAudioUrlTranscription(request)
+          : await this.processFileTranscription(request);
+      console.log(`[Stage] overall.${request.type} ${Date.now() - overallStart}ms`);
+      return res;
     } catch (error) {
       console.error('Transcription error:', error);
       return {
@@ -87,12 +94,11 @@ export class TranscriptionService {
       };
     }
 
-    console.log(`Processing YouTube video: ${videoId}`);
+    // begin youtube processing
 
     // 2. 检查缓存
     const cachedEntry = await transcriptionCache.get('youtube', videoId);
-    if (cachedEntry) {
-      console.log(`Cache hit for YouTube video: ${videoId}`);
+    if (cachedEntry && (cachedEntry.transcriptionData?.text || '').trim().length > 0) {
       return {
         success: true,
         data: {
@@ -107,12 +113,14 @@ export class TranscriptionService {
           fromCache: true
         }
       };
+    } else if (cachedEntry) {
+      await transcriptionCache.delete('youtube', videoId).catch(() => {});
     }
 
     // 3. 获取视频信息
     let videoInfo: VideoInfo;
     try {
-      videoInfo = await YouTubeService.getVideoInfo(videoId);
+      videoInfo = await this.time('youtube.get_info', YouTubeService.getVideoInfo(videoId));
     } catch (error) {
       return {
         success: false,
@@ -124,7 +132,7 @@ export class TranscriptionService {
 
     // 4. 检查是否有现有字幕
     if (videoInfo.captions && videoInfo.captions.length > 0) {
-      console.log(`Found ${videoInfo.captions.length} caption tracks`);
+      console.log(`[YouTube] Found ${videoInfo.captions.length} caption tracks`);
       return await this.processYouTubeCaptions(videoInfo, request);
     }
 
@@ -147,11 +155,32 @@ export class TranscriptionService {
         return await this.processYouTubeAudioTranscription(videoInfo, request);
       }
 
-      console.log(`Using caption: ${bestCaption.name} (${bestCaption.languageCode})`);
-
       // 下载字幕
-      const captionText = await YouTubeService.downloadCaption(bestCaption.url);
-      const captionSRT = await YouTubeService.convertCaptionToSRT(bestCaption.url);
+      let captionText = await this.time('youtube.captions.text', YouTubeService.downloadCaption(bestCaption.url));
+      const captionSRT = await this.time('youtube.captions.srt', YouTubeService.convertCaptionToSRT(bestCaption.url));
+      if ((!captionText || captionText.trim().length === 0) && captionSRT && captionSRT.length > 0) {
+        try {
+          const srtLines = captionSRT.split('\n');
+          const textLines: string[] = [];
+          for (const line of srtLines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            if (/^\d+$/.test(trimmed)) continue;
+            if (trimmed.includes('-->')) continue;
+            textLines.push(trimmed);
+          }
+          const rebuilt = textLines.join(' ').replace(/\s{2,}/g, ' ').trim();
+          if (rebuilt) captionText = rebuilt;
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // 构造转录结果（若字幕仍为空，则回退到音频转录）
+      if ((!captionText || captionText.trim().length === 0) && (!captionSRT || captionSRT.trim().length === 0)) {
+        console.warn('[YouTube][Caption] Empty caption content after fetch; falling back to audio transcription');
+        return await this.processYouTubeAudioTranscription(videoInfo, request);
+      }
 
       // 构造转录结果
       const transcription: TranscriptionResult = {
@@ -162,11 +191,11 @@ export class TranscriptionService {
       };
 
       // 生成不同格式
-      const formats = await this.generateFormats(transcription, videoInfo.title);
+      const formats = await this.time('formats.generate', this.generateFormats(transcription, videoInfo.title));
       formats.srt = captionSRT; // 使用 YouTube 原生的 SRT
 
       // 缓存结果
-      await transcriptionCache.set(
+      await this.time('cache.set', transcriptionCache.set(
         'youtube',
         videoInfo.videoId,
         transcription,
@@ -177,7 +206,7 @@ export class TranscriptionService {
           userTier: request.options?.userTier
         },
         { userId: request.options?.userId }
-      );
+      ));
 
       let jobId = crypto.randomUUID();
 
@@ -185,7 +214,7 @@ export class TranscriptionService {
       if (request.options?.userId) {
         try {
           const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
-          const row = await createOrReuseTranscription({
+          const row = await this.time('db.write', createOrReuseTranscription({
             job_id: jobId,
             user_uuid: request.options?.userId || "",
             source_type: 'youtube_url',
@@ -196,11 +225,11 @@ export class TranscriptionService {
             duration_sec: videoInfo.duration,
             cost_minutes: Math.ceil(videoInfo.duration/60),
             status: 'completed'
-          });
+          }));
           jobId = (row as any).job_id || jobId;
-          await upsertTranscriptionFormats(jobId, formats);
+          await this.time('db.write_formats', upsertTranscriptionFormats(jobId, formats));
         } catch (e) {
-          console.warn('DB write skipped:', e);
+          // ignore
         }
       }
 
@@ -277,6 +306,7 @@ export class TranscriptionService {
       const maxAttempts = 3;
 
       // 带重试的下载逻辑
+      const _dlStart = Date.now();
       while (downloadAttempts < maxAttempts) {
         downloadAttempts++;
         
@@ -307,7 +337,7 @@ export class TranscriptionService {
               videoInfo.videoId,
               enhancedOptions
             );
-            console.log(`Optimized download completed: ${audioBuffer.length} bytes`);
+            // optimized download completed
             break; // 成功，退出循环
           } else {
             throw new Error('Video not optimized for parallel download, skipping to fallback');
@@ -339,14 +369,14 @@ export class TranscriptionService {
               videoInfo.videoId,
               streamOptions
             );
-            console.log(`ytdl-core stream download completed: ${audioBuffer.length} bytes`);
+            // ytdl-core download completed
             break;
           } catch (streamError) {
             console.warn('Stream download failed:', streamError);
             
             // 最终降级到传统方法（带重试）
             try {
-              console.log('Using legacy download method as final fallback...');
+              // final legacy fallback
               downloadMethod = 'legacy';
               
               // 使用改进的 getAudioStreamUrl 方法（带重试）
@@ -356,7 +386,7 @@ export class TranscriptionService {
               const controller = new AbortController();
               const timeout = setTimeout(() => controller.abort(), 120000); // 增加超时时间到120秒
               
-              console.log('Fetching audio from stream URL...');
+              // fetching stream URL
               const audioResponse = await fetch(audioStreamUrl, {
                 signal: controller.signal,
                 headers: {
@@ -372,10 +402,10 @@ export class TranscriptionService {
               }
               
               const contentLength = audioResponse.headers.get('content-length');
-              console.log(`Legacy download starting: ${contentLength ? Math.round(parseInt(contentLength) / 1024 / 1024 * 100) / 100 + 'MB' : 'unknown size'}`);
+              // legacy download starting
               
               audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
-              console.log(`Legacy download completed: ${Math.round(audioBuffer.length / 1024 / 1024 * 100) / 100}MB`);
+              // legacy download completed
               break;
             } catch (legacyError: any) {
               console.error(`Legacy download failed (attempt ${downloadAttempts}):`, legacyError.message);
@@ -391,13 +421,13 @@ export class TranscriptionService {
       if (!audioBuffer!) {
         throw new Error('Failed to download audio after all attempts');
       }
+      console.log(`[Stage] youtube.download_audio ${Date.now() - _dlStart}ms`);
 
       // 生成临时文件名，包含下载方法信息用于调试
       const audioFileName = `youtube_${videoInfo.videoId}_${downloadMethod}_${Date.now()}.m4a`;
       
       // 上传音频到 Cloudflare R2
-      console.log('Uploading audio to Cloudflare R2...');
-      const uploadResult = await this.r2Service.uploadFile(
+      const uploadResult = await this.time('r2.upload', this.r2Service.uploadFile(
         audioBuffer,
         audioFileName,
         'audio/mp4', // YouTube 音频流通常是 M4A/MP4 格式
@@ -406,24 +436,22 @@ export class TranscriptionService {
           expiresIn: 2, // 2小时后自动删除
           makePublic: true
         }
-      );
-      console.log(`Audio uploaded to R2: ${uploadResult.key} (${Math.round(audioBuffer.length / 1024 / 1024)}MB)`);
+      ));
 
       // 使用 R2 URL 进行转录
-      console.log('Starting Replicate transcription with R2 URL...');
-      const transcription = await this.transcriptionService.transcribeAudio(uploadResult.url, {
+      const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(uploadResult.url, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier, // 传递用户等级信息
         fallbackEnabled: request.options?.fallbackEnabled,
         outputFormat: request.options?.outputFormat || 'json',
         highAccuracyMode: request.options?.highAccuracyMode
-      });
+      }));
 
       // 生成不同格式
-      const formats = await this.generateFormats(transcription, videoInfo.title);
+      const formats = await this.time('formats.generate', this.generateFormats(transcription, videoInfo.title));
 
       // 缓存结果
-      await transcriptionCache.set(
+      await this.time('cache.set', transcriptionCache.set(
         'youtube',
         videoInfo.videoId,
         transcription,
@@ -435,7 +463,7 @@ export class TranscriptionService {
           r2Key: uploadResult.key // 保存 R2 key 用于后续清理
         },
         { userId: request.options?.userId }
-      );
+      ));
 
       // 记录下载方法用于分析（通过日志）
       console.log(`Transcription cached with download method: ${downloadMethod}`);
@@ -503,7 +531,7 @@ export class TranscriptionService {
       console.log(`Processing audio URL: ${url}`);
       
       // 1. 检测音频链接有效性和类型
-      const audioInfo = await this.detectAudioUrl(url);
+      const audioInfo = await this.time('audio.detect', this.detectAudioUrl(url));
       if (!audioInfo.isValid) {
         return {
           success: false,
@@ -531,16 +559,14 @@ export class TranscriptionService {
       }
 
       // 3. 下载音频文件
-      console.log('Downloading audio file...');
-      const audioBuffer = await this.downloadAudioFromUrl(url, audioInfo);
+      const audioBuffer = await this.time('audio.download', this.downloadAudioFromUrl(url, audioInfo));
       console.log(`Audio downloaded: ${Math.round(audioBuffer.length / 1024 / 1024 * 100) / 100}MB`);
 
       // 4. 上传到 R2
       const fileExtension = this.getFileExtensionFromContentType(audioInfo.contentType || 'audio/mpeg');
       const audioFileName = `audio_${Date.now()}.${fileExtension}`;
       
-      console.log('Uploading audio to R2...');
-      const uploadResult = await this.r2Service.uploadFile(
+      const uploadResult = await this.time('r2.upload', this.r2Service.uploadFile(
         audioBuffer,
         audioFileName,
         audioInfo.contentType || 'audio/mpeg',
@@ -549,24 +575,23 @@ export class TranscriptionService {
           expiresIn: 2, // 2小时后自动删除
           makePublic: true
         }
-      );
+      ));
       console.log(`Audio uploaded to R2: ${uploadResult.key} (${Math.round(audioBuffer.length / 1024 / 1024)}MB)`);
 
       // 5. 使用 R2 URL 进行转录
-      console.log('Starting Replicate transcription with R2 URL...');
-      const transcription = await this.transcriptionService.transcribeAudio(uploadResult.url, {
+      const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(uploadResult.url, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier, // 传递用户等级信息
         fallbackEnabled: request.options?.fallbackEnabled,
         outputFormat: request.options?.outputFormat || 'json',
         highAccuracyMode: request.options?.highAccuracyMode
-      });
+      }));
 
       // 6. 生成不同格式
-      const formats = await this.generateFormats(transcription, audioInfo.filename || 'audio');
+      const formats = await this.time('formats.generate', this.generateFormats(transcription, audioInfo.filename || 'audio'));
 
       // 7. 缓存结果
-      await transcriptionCache.set(
+      await this.time('cache.set', transcriptionCache.set(
         'audio_url',
         urlHash,
         transcription,
@@ -583,7 +608,7 @@ export class TranscriptionService {
           r2Key: uploadResult.key
         },
         { userId: request.options?.userId }
-      );
+      ));
 
       // 8. 异步清理 R2 文件
       setTimeout(async () => {
@@ -605,7 +630,7 @@ export class TranscriptionService {
         try {
           const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
           let jobId = crypto.randomUUID();
-          const row = await createOrReuseTranscription({
+          const row = await this.time('db.write', createOrReuseTranscription({
             job_id: jobId,
             user_uuid: request.options?.userId || "",
             source_type: 'audio_url',
@@ -616,9 +641,9 @@ export class TranscriptionService {
             duration_sec: transcription.duration,
             cost_minutes: Math.ceil(transcription.duration/60),
             status: 'completed'
-          });
+          }));
           jobId = (row as any).job_id || jobId;
-          await upsertTranscriptionFormats(jobId, formats);
+          await this.time('db.write_formats', upsertTranscriptionFormats(jobId, formats));
         } catch (e) {
           console.warn('DB write skipped:', e);
         }
@@ -684,6 +709,7 @@ export class TranscriptionService {
 
       const contentType = response.headers.get('content-type') || '';
       const contentLength = response.headers.get('content-length');
+      console.log('[AudioURL] HEAD OK type=%s length=%s', contentType, contentLength || 'unknown');
 
       // 检查内容类型
       const supportedTypes = [
@@ -921,12 +947,14 @@ export class TranscriptionService {
    * 处理文件上传转录
    */
   private async processFileTranscription(request: TranscriptionRequest): Promise<TranscriptionResponse> {
+    console.log('[File] Begin file/url transcription');
     const filePath = request.content;
     // 生成稳定的缓存键：优先使用 R2 对象键；否则使用去除查询参数后的 URL 作为键
     const fileHash = this.deriveCacheKeyForFile(filePath, request.options?.r2Key);
     
     // 检查缓存
     const cachedEntry = await transcriptionCache.get('user_file', fileHash, request.options?.userId);
+    console.log('[File] Cache lookup key=%s hit=%s', fileHash, !!cachedEntry);
     if (cachedEntry) {
       console.log(`Cache hit for file: ${fileHash}`);
       return {
@@ -941,22 +969,22 @@ export class TranscriptionService {
 
     try {
       // 进行转录（根据用户等级选择模型）
-      const transcription = await this.transcriptionService.transcribeAudio(filePath, {
+      const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(filePath, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier, // 传递用户等级信息
         fallbackEnabled: request.options?.fallbackEnabled,
         outputFormat: request.options?.outputFormat || 'json',
         highAccuracyMode: request.options?.highAccuracyMode
-      });
+      }));
 
       // 估算成本
       const estimatedCost = this.transcriptionService.estimateCost(transcription.duration);
 
       // 生成不同格式（为上传文件使用原始文件名作为标题）
-      const formats = await this.generateFormats(transcription, (request.options as any)?.fileName || 'uploaded file');
+      const formats = await this.time('formats.generate', this.generateFormats(transcription, (request.options as any)?.fileName || 'uploaded file'));
 
       // 缓存结果
-      await transcriptionCache.set(
+      await this.time('cache.set', transcriptionCache.set(
         'user_file',
         fileHash,
         transcription,
@@ -966,14 +994,14 @@ export class TranscriptionService {
           fileName: (request.options as any)?.fileName
         },
         { userId: request.options?.userId }
-      );
+      ));
 
       // 写入数据库（仅登录用户）
       if (request.options?.userId) {
         try {
           const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
           let jobId = crypto.randomUUID();
-          const row = await createOrReuseTranscription({
+          const row = await this.time('db.write', createOrReuseTranscription({
             job_id: jobId,
             user_uuid: request.options?.userId || "",
             source_type: 'file_upload',
@@ -984,11 +1012,11 @@ export class TranscriptionService {
             duration_sec: transcription.duration,
             cost_minutes: Math.ceil(transcription.duration/60),
             status: 'completed'
-          });
+          }));
           jobId = (row as any).job_id || jobId;
-          await upsertTranscriptionFormats(jobId, formats);
+          await this.time('db.write_formats', upsertTranscriptionFormats(jobId, formats));
         } catch(e) {
-          console.warn('DB write skipped:', e);
+          // ignore
         }
       }
 
@@ -1040,6 +1068,7 @@ export class TranscriptionService {
     // 检查缓存中是否有完整转录
     const cachedEntry = await transcriptionCache.get('youtube', videoId);
     if (cachedEntry) {
+      console.log('[Preview][YouTube] Full transcription cache present, extracting preview');
       const preview = this.extractPreview(cachedEntry.transcriptionData, cachedEntry.formats);
       return {
         success: true,
@@ -1048,12 +1077,14 @@ export class TranscriptionService {
     }
 
     // 获取视频信息
+    console.log('[Preview][YouTube] Fetching video info');
     const videoInfo = await YouTubeService.getVideoInfo(videoId);
     
     // 如果有字幕，快速生成预览
     if (videoInfo.captions && videoInfo.captions.length > 0) {
       const bestCaption = YouTubeService.selectBestCaption(videoInfo.captions);
       if (bestCaption) {
+        console.log('[Preview][YouTube] Using caption for preview:', bestCaption.languageCode);
         const captionText = await YouTubeService.downloadCaption(bestCaption.url);
         const captionSRT = await YouTubeService.convertCaptionToSRT(bestCaption.url);
         

@@ -41,6 +41,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+
   // Helpers: Chinese detection and formatting
   const isChineseLangOrText = (lang?: string, text?: string) => {
     if (lang && lang.toLowerCase().includes('zh')) return true;
@@ -242,16 +243,22 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         return;
       }
 
-      console.log('[Main] Sending transcription request:', requestData);
+      // send request
       const response = await fetch("/api/transcribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestData)
       });
+      let result: any = null;
+      try {
+        result = await response.json();
+      } catch (e) {
+        console.error('[Main] Failed to parse JSON:', e);
+        setProgress('Failed to parse server response. Please try again.');
+        setIsProcessing(false);
+        return;
+      }
 
-      const result = await response.json();
-      console.log('[Main] API Response:', result?.success, result?.data ? 'full' : result?.preview ? 'preview' : 'none');
-      
       if (result.success && result.data) {
         setResult({ type: "full", data: result.data });
         setProgress(t("progress.completed"));
@@ -265,6 +272,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         if (showChineseUpgrade) {
           setTimeout(() => setShowChineseUpgrade(false), 10000);
         }
+      } else if (result?.success && !result?.data && !result?.preview) {
+        setProgress('Received empty success response. Please try again or refresh.');
       } else {
         console.error('Transcription API error:', result.error);
         let userFriendlyError = '';
@@ -294,7 +303,6 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       setProgress(t("errors.general_error"));
     } finally {
       setIsProcessing(false);
-      console.log('[Main] Processing finished');
     }
   };
 

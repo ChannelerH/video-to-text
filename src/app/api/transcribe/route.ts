@@ -73,12 +73,7 @@ export async function POST(request: NextRequest) {
             console.log('[API/probe] youtube zh caption detected');
             return NextResponse.json({ success: true, supported: true, language: 'zh', isChinese: true });
           }
-          // 标题含中文字符时，直接判定为中文（快速启用前端提示）
-          if (/[\u4e00-\u9fff]/.test(videoInfo.title || '')) {
-            console.log('[API/probe] youtube title contains CJK, treating as Chinese');
-            return NextResponse.json({ success: true, supported: true, language: 'zh', isChinese: true, heuristic: 'title' });
-          }
-          // 无字幕：下载一个短音频片段，上传到 R2，调用 Deepgram 探针
+          // 无字幕：下载一个短音频片段，上传到 R2，调用 Deepgram 探针（不再使用标题启发式判定语言）
           try {
             const clip = await YouTubeService.downloadAudioClip(videoId, Math.max(8, Math.min(12, options.languageProbeSeconds || 10)));
             const r2 = new CloudflareR2Service();
@@ -165,15 +160,15 @@ export async function POST(request: NextRequest) {
         console.warn(`High severity abuse detected for ${identifier}:`, abuseSignals);
       }
       
-      console.log(`Generating preview for ${type}: ${content} (Rate limit: ${rateCheck.remaining} remaining)`);
-      
       // 生成预览，使用降级策略
       try {
+        const _previewStart = Date.now();
         const result = await transcriptionService.generatePreview({
           type,
           content,
           options: { ...options, isPreview: true, fallbackEnabled: true }
         });
+        console.log(`[API] preview ${type} done in ${Date.now()-_previewStart}ms (success=${result?.success})`);
         
         return NextResponse.json({
           ...result,
@@ -214,11 +209,13 @@ export async function POST(request: NextRequest) {
           );
         }
         
+        const _previewStart = Date.now();
         const result = await transcriptionService.generatePreview({ 
           type, 
           content, 
           options: { ...options, isPreview: true, fallbackEnabled: true }
         });
+        console.log(`[API] preview unauth ${type} done in ${Date.now()-_previewStart}ms (success=${result?.success})`);
         
         return NextResponse.json({ 
           ...result, 
@@ -252,10 +249,8 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      console.log(`Processing transcription for ${type}: ${content} (User tier: ${userTier})`);
-      console.log(`Quota status: ${quotaStatus.remaining.monthlyMinutes} minutes remaining`);
-      
       // 处理转录，启用降级
+      const _procStart = Date.now();
       const result = await transcriptionService.processTranscription({
         type,
         content,
@@ -266,6 +261,7 @@ export async function POST(request: NextRequest) {
           fallbackEnabled: true  // 为付费用户也启用降级保证服务可用性
         }
       });
+      console.log(`[API] transcribe ${type} done in ${Date.now()-_procStart}ms (success=${result?.success}, fromCache=${result?.data?.fromCache ?? false})`);
       
       // 记录使用情况（按真实转录时长）
       const durationSec = result?.data?.transcription?.duration || 0;

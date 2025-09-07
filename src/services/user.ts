@@ -103,10 +103,17 @@ export async function getUserInfo() {
   if (!user_uuid) {
     return;
   }
-
-  const user = await findUserByUuid(user_uuid);
-
-  return user;
+  // Guard against slow/failed DB connections: timeout + swallow errors
+  try {
+    const user = await Promise.race([
+      findUserByUuid(user_uuid),
+      new Promise<undefined>((_, reject) => setTimeout(() => reject(new Error('db-timeout')), Number(process.env.DB_USERINFO_TIMEOUT || 8000)))
+    ]) as any;
+    return user;
+  } catch (e) {
+    console.warn('getUserInfo: DB fetch failed or timed out', e);
+    return undefined;
+  }
 }
 
 /**
