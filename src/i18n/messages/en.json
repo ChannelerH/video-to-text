@@ -531,7 +531,8 @@
       "enabled_label": "More accurate transcription (Whisper)",
       "login_hint": "Sign in to enable more accurate transcription (Pro)",
       "upgrade_hint": "More accurate transcription (Pro)",
-      "pricing_link": "Upgrade"
+      "pricing_link": "Upgrade",
+      "speed_hint": "Higher accuracy, slightly slower"
     }
   }
 }

@@ -57,6 +57,12 @@ export class TranscriptionService {
     try { return await p; } finally { console.log(`[Stage] ${label} ${Date.now() - s}ms`); }
   }
 
+  // Distinguish cache variant by behavior (e.g., Pro high-accuracy on/off)
+  private variantSuffix(options?: TranscriptionRequest['options']): string {
+    const ha = !!(options?.highAccuracyMode && options?.userTier === 'pro');
+    return ha ? ':ha1' : ':ha0';
+  }
+
   /**
    * 主要的转录处理函数
    */
@@ -97,8 +103,45 @@ export class TranscriptionService {
     // begin youtube processing
 
     // 2. 检查缓存
-    const cachedEntry = await transcriptionCache.get('youtube', videoId);
+    const variant = this.variantSuffix(request.options);
+    const cachedEntry = await transcriptionCache.get('youtube', videoId + variant);
     if (cachedEntry && (cachedEntry.transcriptionData?.text || '').trim().length > 0) {
+      // 命中缓存：如遇中文但历史缓存未润色，则进行一次就地升级（保持时间戳不变）
+      try {
+        const tr = { ...cachedEntry.transcriptionData } as any;
+        const isZh = (tr.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(tr.text || '');
+        if (isZh) {
+          const { refineTextIfChinese, localPunctuateSegmentsIfChinese } = await import('./refine');
+          const refined = await refineTextIfChinese(tr.text, tr.language);
+          if (refined && refined !== tr.text) { tr.text = refined; console.log('[Refine] cache text upgraded (youtube)'); }
+          try {
+            const changed = localPunctuateSegmentsIfChinese(tr.segments as any, tr.language);
+            if (changed) console.log(`[Refine] cache segments normalized (youtube): ${changed}`);
+          } catch {}
+          // 重新生成格式并覆盖缓存
+          const upgradedFormats = await this.generateFormats(tr, cachedEntry.videoTitle || videoInfo.title);
+          await transcriptionCache.set('youtube', videoId + variant, tr, upgradedFormats, {
+            originalUrl: request.content,
+            videoTitle: cachedEntry.videoTitle || videoInfo.title,
+            userTier: request.options?.userTier
+          }, { userId: request.options?.userId });
+          return {
+            success: true,
+            data: {
+              transcription: tr,
+              formats: upgradedFormats,
+              videoInfo: {
+                videoId,
+                title: cachedEntry.videoTitle || '',
+                duration: cachedEntry.duration,
+                thumbnails: []
+              },
+              fromCache: true
+            }
+          };
+        }
+      } catch {}
+
       return {
         success: true,
         data: {
@@ -114,7 +157,7 @@ export class TranscriptionService {
         }
       };
     } else if (cachedEntry) {
-      await transcriptionCache.delete('youtube', videoId).catch(() => {});
+      await transcriptionCache.delete('youtube', videoId + variant).catch(() => {});
     }
 
     // 3. 获取视频信息
@@ -196,14 +239,21 @@ export class TranscriptionService {
         duration: videoInfo.duration
       };
 
-      // 生成不同格式
-      const formats = await this.time('formats.generate', this.generateFormats(transcription, videoInfo.title));
-      formats.srt = captionSRT; // 使用 YouTube 原生的 SRT
+      // 中文：同步润色文本（用于展示与下载；SRT 仍用原生字幕）
+      try {
+        const { refineTextIfChinese } = await import('./refine');
+        const refined = await refineTextIfChinese(transcription.text, transcription.language);
+        if (refined) { transcription.text = refined; console.log('[Refine] text refined (audio)'); }
+      } catch {}
 
-      // 缓存结果
+      // 生成不同格式（TXT/MD/JSON 使用润色后的 text；SRT 使用 YouTube 原生）
+      const formats = await this.time('formats.generate', this.generateFormats(transcription, videoInfo.title));
+      formats.srt = captionSRT;
+
+      // 缓存结果（保存润色后的文本）
       await this.time('cache.set', transcriptionCache.set(
         'youtube',
-        videoInfo.videoId,
+        videoInfo.videoId + this.variantSuffix(request.options),
         transcription,
         formats,
         {
@@ -224,7 +274,7 @@ export class TranscriptionService {
             job_id: jobId,
             user_uuid: request.options?.userId || "",
             source_type: 'youtube_url',
-            source_hash: videoInfo.videoId,
+            source_hash: videoInfo.videoId + this.variantSuffix(request.options),
             source_url: request.content,
             title: videoInfo.title,
             language: transcription.language,
@@ -478,13 +528,31 @@ export class TranscriptionService {
         highAccuracyMode: request.options?.highAccuracyMode
       }));
 
+      // 中文：同步润色文本（影响展示/下载；时间戳保留）
+      try {
+        const { refineTextIfChinese, localPunctuateSegmentsIfChinese } = await import('./refine');
+        const refined = await refineTextIfChinese(transcription.text, transcription.language);
+        if (refined) { transcription.text = refined; console.log('[Refine] text refined (file)'); }
+        // 保留时间戳：仅对 segments 文本做本地规则化，不改变时间
+        try {
+          const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
+          if (changed) console.log(`[Refine] segments normalized (audio): ${changed}`);
+          // 若全文标点稀少，则用段落文本重建全文（不改时间戳）
+          const punctCount = (transcription.text.match(/[，。！？；：]/g) || []).length;
+          if (changed && punctCount < Math.max(3, Math.floor((transcription.segments?.length || 0) / 4))) {
+            const rebuilt = (transcription.segments as any[]).map(s => String(s.text || '').trim()).join('');
+            if (rebuilt) { transcription.text = rebuilt; console.log('[Refine] text rebuilt from segments (audio)'); }
+          }
+        } catch {}
+      } catch {}
+
       // 生成不同格式
       const formats = await this.time('formats.generate', this.generateFormats(transcription, videoInfo.title));
 
       // 缓存结果
       await this.time('cache.set', transcriptionCache.set(
         'youtube',
-        videoInfo.videoId,
+        videoInfo.videoId + this.variantSuffix(request.options),
         transcription,
         formats,
         {
@@ -509,7 +577,7 @@ export class TranscriptionService {
         }
       }, 60000); // 1分钟后清理
 
-      // 写入数据库（仅登录用户）
+      // 写入数据库（仅登录用户，保存润色后的文本）
       if (request.options?.userId) {
         try {
           const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
@@ -518,7 +586,7 @@ export class TranscriptionService {
             job_id: jobId,
             user_uuid: request.options?.userId || "",
             source_type: 'youtube_url',
-            source_hash: videoInfo.videoId,
+            source_hash: videoInfo.videoId + this.variantSuffix(request.options),
             source_url: request.content,
             title: videoInfo.title,
             language: transcription.language,
@@ -574,10 +642,39 @@ export class TranscriptionService {
 
       // 2. 检查缓存（基于 URL hash）
       const urlHash = crypto.createHash('sha256').update(url).digest('hex');
-      const cached = await transcriptionCache.get('audio_url', urlHash);
+      const cached = await transcriptionCache.get('audio_url', urlHash + this.variantSuffix(request.options));
       
       if (cached) {
         console.log('Audio transcription found in cache');
+        // 升级中文缓存（若未润色）
+        try {
+          const tr = { ...cached.transcriptionData } as any;
+          const isZh = (tr.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(tr.text || '');
+          if (isZh) {
+            const { refineTextIfChinese, localPunctuateSegmentsIfChinese } = await import('./refine');
+            const refined = await refineTextIfChinese(tr.text, tr.language);
+            if (refined && refined !== tr.text) { tr.text = refined; console.log('[Refine] cache text upgraded (audio_url)'); }
+            try {
+              const changed = localPunctuateSegmentsIfChinese(tr.segments as any, tr.language);
+              if (changed) console.log(`[Refine] cache segments normalized (audio_url): ${changed}`);
+            } catch {}
+            const upgradedFormats = await this.generateFormats(tr, cached.fileName || 'audio');
+            await transcriptionCache.set('audio_url', urlHash + this.variantSuffix(request.options), tr, upgradedFormats, {
+              originalUrl: url,
+              audioInfo: cached as any,
+              userTier: request.options?.userTier
+            }, { userId: request.options?.userId });
+            return {
+              success: true,
+              data: {
+                transcription: tr,
+                formats: upgradedFormats,
+                fromCache: true,
+                estimatedCost: this.transcriptionService.estimateCost(cached.duration || 60)
+              }
+            };
+          }
+        } catch {}
         return {
           success: true,
           data: {
@@ -618,13 +715,29 @@ export class TranscriptionService {
         highAccuracyMode: request.options?.highAccuracyMode
       }));
 
-      // 6. 生成不同格式
+      // 6. 中文：润色与段落标点（保留时间戳）
+      try {
+        const { refineTextIfChinese, localPunctuateSegmentsIfChinese } = await import('./refine');
+        const refined = await refineTextIfChinese(transcription.text, transcription.language);
+        if (refined) { transcription.text = refined; console.log('[Refine] text refined (audio_url)'); }
+        try {
+          const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
+          if (changed) console.log(`[Refine] segments normalized (audio_url): ${changed}`);
+          const punctCount = (transcription.text.match(/[，。！？；：]/g) || []).length;
+          if (changed && punctCount < Math.max(3, Math.floor((transcription.segments?.length || 0) / 4))) {
+            const rebuilt = (transcription.segments as any[]).map(s => String(s.text || '').trim()).join('');
+            if (rebuilt) { transcription.text = rebuilt; console.log('[Refine] text rebuilt from segments (audio_url)'); }
+          }
+        } catch {}
+      } catch {}
+
+      // 7. 生成不同格式
       const formats = await this.time('formats.generate', this.generateFormats(transcription, audioInfo.filename || 'audio'));
 
-      // 7. 缓存结果
+      // 8. 缓存结果
       await this.time('cache.set', transcriptionCache.set(
         'audio_url',
-        urlHash,
+        urlHash + this.variantSuffix(request.options),
         transcription,
         formats,
         {
@@ -641,7 +754,7 @@ export class TranscriptionService {
         { userId: request.options?.userId }
       ));
 
-      // 8. 异步清理 R2 文件
+      // 9. 异步清理 R2 文件
       setTimeout(async () => {
         try {
           await this.r2Service.deleteFile(uploadResult.key);
@@ -656,7 +769,7 @@ export class TranscriptionService {
           Math.max(...transcription.segments.map((s: any) => s.end)) : 60
       );
 
-      // 8. 写入数据库（仅登录用户）
+      // 10. 写入数据库（仅登录用户）
       if (request.options?.userId) {
         try {
           const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
@@ -665,7 +778,7 @@ export class TranscriptionService {
             job_id: jobId,
             user_uuid: request.options?.userId || "",
             source_type: 'audio_url',
-            source_hash: urlHash,
+            source_hash: urlHash + this.variantSuffix(request.options),
             source_url: url,
             title: audioInfo.filename,
             language: transcription.language,
@@ -984,10 +1097,37 @@ export class TranscriptionService {
     const fileHash = this.deriveCacheKeyForFile(filePath, request.options?.r2Key);
     
     // 检查缓存
-    const cachedEntry = await transcriptionCache.get('user_file', fileHash, request.options?.userId);
+    const cachedEntry = await transcriptionCache.get('user_file', fileHash + this.variantSuffix(request.options), request.options?.userId);
     console.log('[File] Cache lookup key=%s hit=%s', fileHash, !!cachedEntry);
     if (cachedEntry) {
       console.log(`Cache hit for file: ${fileHash}`);
+      // 升级中文缓存（若未润色）
+      try {
+        const tr = { ...cachedEntry.transcriptionData } as any;
+        const isZh = (tr.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(tr.text || '');
+        if (isZh) {
+          const { refineTextIfChinese, localPunctuateSegmentsIfChinese } = await import('./refine');
+          const refined = await refineTextIfChinese(tr.text, tr.language);
+          if (refined && refined !== tr.text) { tr.text = refined; console.log('[Refine] cache text upgraded (file)'); }
+          try {
+            const changed = localPunctuateSegmentsIfChinese(tr.segments as any, tr.language);
+            if (changed) console.log(`[Refine] cache segments normalized (file): ${changed}`);
+          } catch {}
+          const upgradedFormats = await this.generateFormats(tr, (request.options as any)?.fileName || 'uploaded file');
+          await transcriptionCache.set('user_file', fileHash + this.variantSuffix(request.options), tr, upgradedFormats, {
+            userTier: request.options?.userTier,
+            fileName: (request.options as any)?.fileName
+          }, { userId: request.options?.userId });
+          return {
+            success: true,
+            data: {
+              transcription: tr,
+              formats: upgradedFormats,
+              fromCache: true
+            }
+          };
+        }
+      } catch {}
       return {
         success: true,
         data: {
@@ -1008,16 +1148,32 @@ export class TranscriptionService {
         highAccuracyMode: request.options?.highAccuracyMode
       }));
 
+      // 中文：同步润色文本（影响展示/下载；时间戳保留）
+      try {
+        const { refineTextIfChinese, localPunctuateSegmentsIfChinese } = await import('./refine');
+        const refined = await refineTextIfChinese(transcription.text, transcription.language);
+        if (refined) transcription.text = refined;
+        try {
+          const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
+          if (changed) console.log(`[Refine] segments normalized (file): ${changed}`);
+          const punctCount = (transcription.text.match(/[，。！？；：]/g) || []).length;
+          if (changed && punctCount < Math.max(3, Math.floor((transcription.segments?.length || 0) / 4))) {
+            const rebuilt = (transcription.segments as any[]).map(s => String(s.text || '').trim()).join('');
+            if (rebuilt) { transcription.text = rebuilt; console.log('[Refine] text rebuilt from segments (file)'); }
+          }
+        } catch {}
+      } catch {}
+
       // 估算成本
       const estimatedCost = this.transcriptionService.estimateCost(transcription.duration);
 
       // 生成不同格式（为上传文件使用原始文件名作为标题）
       const formats = await this.time('formats.generate', this.generateFormats(transcription, (request.options as any)?.fileName || 'uploaded file'));
 
-      // 缓存结果
+      // 缓存结果（保存润色后的文本）
       await this.time('cache.set', transcriptionCache.set(
         'user_file',
-        fileHash,
+        fileHash + this.variantSuffix(request.options),
         transcription,
         formats,
         {
@@ -1036,7 +1192,7 @@ export class TranscriptionService {
             job_id: jobId,
             user_uuid: request.options?.userId || "",
             source_type: 'file_upload',
-            source_hash: fileHash,
+            source_hash: fileHash + this.variantSuffix(request.options),
             source_url: filePath,
             title: (request.options as any)?.fileName || 'uploaded file',
             language: transcription.language,

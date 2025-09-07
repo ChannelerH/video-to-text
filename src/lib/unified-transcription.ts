@@ -124,7 +124,7 @@ export class UnifiedTranscriptionService {
     const startTime = Date.now();
     
     // Pro/Premium + high accuracy (non-preview): force Whisper before any probe/strategy
-    if ((options.userTier === 'pro' || options.userTier === 'premium')
+    if ((options.userTier === 'pro')
       && options.highAccuracyMode
       && !options.isPreview) {
       console.log('🎯 High accuracy mode: Using Whisper directly');
@@ -141,9 +141,14 @@ export class UnifiedTranscriptionService {
       isChinese = probe.isChinese;
     }
 
-    // 基于探针结果选择模型：中文 -> Whisper；非中文 -> Deepgram
+    // 基于探针结果选择模型
     if (isChinese) {
-      strategy = { primary: 'whisper', fallback: this.deepgramService ? 'deepgram' : null, sloTimeout: options.isPreview ? 60000 : 90000 };
+      // 特殊规则：Pro 用户未开启高精度时，中文也默认走 Deepgram；其他订阅用户中文默认 Whisper
+      if (options.userTier === 'pro' && !options.highAccuracyMode && this.deepgramService) {
+        strategy = { primary: 'deepgram', fallback: 'whisper', sloTimeout: options.isPreview ? 30000 : 60000 };
+      } else {
+        strategy = { primary: 'whisper', fallback: this.deepgramService ? 'deepgram' : null, sloTimeout: options.isPreview ? 60000 : 90000 };
+      }
     } else if (this.deepgramService) {
       strategy = { primary: 'deepgram', fallback: 'whisper', sloTimeout: options.isPreview ? 30000 : 60000 };
     } else {
@@ -158,8 +163,8 @@ export class UnifiedTranscriptionService {
     console.log(`  User tier: ${options.userTier || 'free'}`);
     console.log(`  Language: ${options.language || 'auto'}${isChinese ? ' (Chinese detected)' : ''}`);
 
-    // 对中文：直接用 Whisper，不做 SLO 超时触发降级；仅在 Whisper 抛错时才降级
-    if (isChinese) {
+    // 中文特殊执行路径：当策略为 Whisper 时，直接执行 Whisper；否则按下方统一 SLO 机制
+    if (isChinese && strategy.primary === 'whisper') {
       try {
         const result = await this.transcribeWithModel(audioUrl, options, 'whisper');
         const duration = Date.now() - startTime;
@@ -313,6 +318,38 @@ export class UnifiedTranscriptionService {
    * Convert transcription to plain text
    */
   convertToPlainText(transcription: TranscriptionResult): string {
+    try {
+      const isZh = (transcription.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(transcription.text || '');
+      if (isZh) {
+        const raw = (transcription.text || '').trim();
+        const cjkCount = (raw.match(/[\u4e00-\u9fff]/g) || []).length;
+        const punctCount = (raw.match(/[，。！？；：]/g) || []).length;
+        const hasEnoughPunct = punctCount >= Math.max(6, Math.floor(cjkCount / 40));
+        const splitSentences = (t: string) => t
+          .replace(/([。！？；])(”|’|）|】)?/g, (_m, p1, p2) => `${p1}${p2 || ''}\n`)
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+        if (hasEnoughPunct) return splitSentences(raw);
+        // 否则回退到 segments 拼接 + 轻量规范，确保可读
+        if (Array.isArray(transcription.segments) && transcription.segments.length > 0) {
+          const joined = transcription.segments.map(s => String(s.text || '').trim()).join('');
+          const normalized = joined
+            .replace(/[\t\r\f]+/g, ' ').replace(/\u00A0/g, ' ').replace(/\s{2,}/g, ' ')
+            .replace(/([\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])/g, '$1')
+            .replace(/([\u4e00-\u9fff])([A-Za-z0-9])/g, '$1 $2')
+            .replace(/([A-Za-z0-9])([\u4e00-\u9fff])/g, '$1 $2')
+            .replace(/([\u4e00-\u9fff])\s*,\s*/g, '$1，')
+            .replace(/([\u4e00-\u9fff])\s*\.\s*/g, '$1。')
+            .replace(/([\u4e00-\u9fff])\s*;\s*/g, '$1；')
+            .replace(/([\u4e00-\u9fff])\s*:\s*/g, '$1：')
+            .replace(/([\u4e00-\u9fff])\s*!\s*/g, '$1！')
+            .replace(/([\u4e00-\u9fff])\s*\?\s*/g, '$1？')
+            .replace(/\s*([，。！？；：、“”‘’（）：])\s*/g, '$1')
+            .trim();
+          return splitSentences(normalized);
+        }
+      }
+    } catch {}
     return transcription.text.trim();
   }
 

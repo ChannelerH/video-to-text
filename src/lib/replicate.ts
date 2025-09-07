@@ -373,10 +373,15 @@ export class ReplicateService {
    */
   convertToPlainText(transcription: TranscriptionResult): string {
     let text = transcription.text.trim();
-    
     // 标点符号优化
     text = this.optimizePunctuation(text);
-    
+    // 中文：按句分行，增强可读性（不改词）
+    if ((transcription.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(text)) {
+      text = text
+        .replace(/([。！？；])(”|’|）|】)?/g, (_m, p1, p2) => `${p1}${p2 || ''}\n`)
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
     return text;
   }
 

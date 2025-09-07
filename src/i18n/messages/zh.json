@@ -387,7 +387,8 @@
       "enabled_label": "更精准转换（Whisper）",
       "login_hint": "登录后可使用更精准转换（Pro）",
       "upgrade_hint": "更精准转换（Pro）",
-      "pricing_link": "去升级"
+      "pricing_link": "去升级",
+      "speed_hint": "精度更高，速度稍慢"
     }
   },
   "why_choose_us": {

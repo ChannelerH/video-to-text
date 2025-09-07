@@ -43,9 +43,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<string>("");
   const [result, setResult] = useState<any>(null);
-  const [refining, setRefining] = useState(false);
-  const [useAIRefine, setUseAIRefine] = useState(false);
-  const [refinedText, setRefinedText] = useState<string | null>(null);
+  // AI refine button removed; backend runs optional refinement automatically for Chinese
   const [highAccuracy, setHighAccuracy] = useState(false);
   const [uploadedFileInfo, setUploadedFileInfo] = useState<any>(null);
   const [copiedText, setCopiedText] = useState<boolean>(false);
@@ -70,7 +68,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     const groups: { start: number; end: number; text: string }[] = [];
     if (!segments || segments.length === 0) return groups;
     let current: { start: number; end: number; texts: string[] } | null = null;
-    const maxCharsPerPara = 120;
+    const maxCharsPerPara = 80; // 更短的段落，便于阅读
     const maxGapSeconds = 3;
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i];
@@ -86,6 +84,12 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         current = { start: seg.start, end: seg.end, texts: [seg.text.trim()] };
       } else {
         current.end = seg.end;
+        const prev = current.texts[current.texts.length - 1] || '';
+        const prevEndsWithPunct = /[。！？…]$/.test(prev) || /[”’）】]$/.test(prev) || /[.!?]$/.test(prev);
+        // 更积极：当停顿>=1.0s 时，在拼接处补一个逗号（仅显示层，不改源数据）
+        if (!prevEndsWithPunct && gap >= 1.0) {
+          current.texts[current.texts.length - 1] = prev + '，';
+        }
         current.texts.push(seg.text.trim());
       }
     }
@@ -120,11 +124,19 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     text = text.replace(/，{2,}/g, '，').replace(/。{2,}/g, '。').replace(/！{2,}/g, '！').replace(/？{2,}/g, '？');
     // 7) 去除标点两侧空格
     text = text.replace(/\s*([，。！？；：、“”‘’（）：])\s*/g, '$1');
-    // 8) 句末补 ending（中文句子）
-    if (/[\u4e00-\u9fffA-Za-z0-9]$/.test(text) && !/[。！？！？.!?]$/.test(text)) {
-      text += '。';
-    }
+    // 8) 保守策略：不按纯长度随机注入标点；句末不强制补标点
     return text;
+  };
+
+  // Split Chinese text into one sentence per line using punctuation boundaries
+  const splitChineseSentences = (raw: string) => {
+    let t = (raw || '').trim();
+    if (!t) return '';
+    // Insert line breaks after sentence-ending punctuation with optional closing quotes/brackets
+    t = t.replace(/([。！？；])(”|’|）|】)?/g, (_m, p1, p2) => `${p1}${p2 || ''}\n`);
+    // Collapse excessive blank lines
+    t = t.replace(/\n{3,}/g, '\n\n').trim();
+    return t;
   };
 
   // Derived display text for the main transcription panel (punctuated for Chinese)
@@ -135,42 +147,17 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     const rawText = data.transcription.text as string;
     const segments = (data.transcription.segments || []) as Segment[];
     const isZh = isChineseLangOrText(lang, rawText);
-    if (!isZh) return (useAIRefine && refinedText) ? refinedText : (rawText || '');
-    // 优先显示 AI 润色结果
-    if (useAIRefine && refinedText) return refinedText;
+    if (!isZh) return rawText || '';
+    // 若 LLM 已给出足够标点，优先使用 refined 文本（并按句分行显示）
+    const cjkCount = (rawText.match(/[\u4e00-\u9fff]/g) || []).length;
+    const punctCount = (rawText.match(/[，。！？；：]/g) || []).length;
+    const hasEnoughPunct = punctCount >= Math.max(6, Math.floor(cjkCount / 40));
+    if (hasEnoughPunct) return splitChineseSentences(rawText);
+    // 否则使用分段聚合 + 本地句读
     const paragraphs = groupSegmentsToParagraphs(segments);
-    if (!paragraphs.length) return punctuateChineseParagraph(rawText);
-    return paragraphs.map(p => punctuateChineseParagraph(p.text)).join('\n\n');
-  }, [result, useAIRefine, refinedText]);
-
-  // 调用后端 AI 润色
-  const refineText = async () => {
-    const data = (result && result.type === 'full' && result.data) ? result.data : null;
-    if (!data) return;
-    const lang = data.transcription.language as string | undefined;
-    const raw = displayText || data.transcription.text || '';
-    if (!raw.trim()) return;
-    try {
-      setRefining(true);
-      setRefinedText(null);
-      const resp = await fetch('/api/refine', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: raw, language: lang || 'auto' })
-      });
-      const json = await resp.json();
-      if (json?.success && json?.text) {
-        setRefinedText(json.text);
-      } else {
-        // 保底：如果后端未配置，直接使用本地规则化
-        setRefinedText(raw);
-      }
-    } catch {
-      setRefinedText(raw);
-    } finally {
-      setRefining(false);
-    }
-  };
+    if (!paragraphs.length) return splitChineseSentences(punctuateChineseParagraph(rawText));
+    return paragraphs.map(p => splitChineseSentences(punctuateChineseParagraph(p.text))).join('\n\n');
+  }, [result]);
 
   const goToHistory = () => {
     const href = locale && locale !== 'en' ? `/${locale}/my-transcriptions` : `/my-transcriptions`;
@@ -695,7 +682,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
               <span className="toggle-icon">{canUseHighAccuracy ? '✨' : '🔒'}</span>
               <div className="toggle-text">
                 {canUseHighAccuracy ? (
-                  <span className="toggle-label">{t('high_accuracy.enabled_label')}</span>
+                  <>
+                    <span className="toggle-label">{t('high_accuracy.enabled_label')}</span>
+                    <span className="toggle-hint">{t('high_accuracy.speed_hint')}</span>
+                  </>
                 ) : (
                   <>
                     <span className="toggle-label">
@@ -828,29 +818,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           </>
                         )}
                       </Button>
-                      {/* AI Refine toggle for Chinese */}
-                      {isChineseLangOrText(result.data.transcription.language as any, result.data.transcription.text) && (
-                        <div className="flex items-center ml-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={refining}
-                            onClick={() => { setUseAIRefine(true); refineText(); }}
-                          >
-                            {refining ? 'Refining…' : (useAIRefine ? 'Re‑refine' : 'AI润色')}
-                          </Button>
-                          {useAIRefine && !refining && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="ml-1"
-                              onClick={() => { setUseAIRefine(false); setRefinedText(null); }}
-                            >
-                              取消
-                            </Button>
-                          )}
-                        </div>
-                      )}
+                      {/* AI refine button removed: backend runs optional refine automatically */}
                     </div>
                     <div className="p-4 rounded-lg max-h-60 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
                       {displayText.split('\n\n').map((p, i) => (

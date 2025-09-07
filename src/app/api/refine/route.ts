@@ -21,11 +21,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, text: trimmed });
     }
 
-    // Build a conservative prompt: do not change meaning, only punctuation/spacing; no translation
-    const system = 'You are a strict copy editor. Only normalize punctuation, sentence breaks, and CJK/Latin spacing. Do not translate, do not add or remove content.';
-    const user = `Language: ${language}\nRules:\n- If Chinese: use Chinese punctuation（，。！？；：、“”‘’）; remove extra spaces inside Chinese; add spaces between Chinese and Latin/number; keep names and numbers.\n- If not Chinese, keep original punctuation (light cleanup only).\n- Do not change meaning; return plain text only.\n\nText:\n${trimmed}`;
+    // Build a precise prompt: restore punctuation and sentence boundaries, keep wording
+    const system = 'You are a strict copy editor. Restore proper punctuation and sentence boundaries. Only adjust punctuation, line breaks, and CJK/Latin spacing. Do not translate; do not add or remove words.';
+    const user = `Language: ${language}\nRules:\n- If Chinese: use Chinese punctuation（，。！？；：、“”‘’）; remove extra spaces inside Chinese; add spaces between Chinese and Latin/number; add missing commas/periods based on natural syntax; keep names and numbers.\n- If not Chinese, keep original punctuation (light cleanup only).\n- Return plain text only.\n\nText:\n${trimmed}`;
 
     // OpenAI‑compatible chat completions
+    console.log(`[API/refine] calling LLM provider base=${apiBase} model=${model}`);
     const resp = await fetch(`${apiBase}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -57,4 +58,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: e?.message || 'Internal error' }, { status: 500 });
   }
 }
-
