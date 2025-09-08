@@ -103,6 +103,12 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     if (current) groups.push({ start: current.start, end: current.end, text: current.texts.join('') });
     return groups;
   };
+  const formatTs = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    const ms = Math.round((s - Math.floor(s)) * 1000);
+    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+  };
   const punctuateChineseParagraph = (raw: string) => {
     let text = (raw || '').trim();
     if (!text) return '';
@@ -155,15 +161,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     const segments = (data.transcription.segments || []) as Segment[];
     const isZh = isChineseLangOrText(lang, rawText);
     if (!isZh) return rawText || '';
-    // 若 LLM 已给出足够标点，优先使用 refined 文本（并按句分行显示）
-    const cjkCount = (rawText.match(/[\u4e00-\u9fff]/g) || []).length;
-    const punctCount = (rawText.match(/[，。！？；：]/g) || []).length;
-    const hasEnoughPunct = punctCount >= Math.max(6, Math.floor(cjkCount / 40));
-    if (hasEnoughPunct) return splitChineseSentences(rawText);
-    // 否则使用分段聚合 + 本地句读
-    const paragraphs = groupSegmentsToParagraphs(segments);
-    if (!paragraphs.length) return splitChineseSentences(punctuateChineseParagraph(rawText));
-    return paragraphs.map(p => splitChineseSentences(punctuateChineseParagraph(p.text))).join('\n\n');
+    // 后端已做本地断句与规范化，这里直接按句分行展示后端文本
+    return splitChineseSentences(rawText || '');
   }, [result]);
 
   const goToHistory = () => {
@@ -878,21 +877,19 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                             const segments = (result.data.transcription.segments || []) as Segment[];
                             const isZh = isChineseLangOrText(lang, rawText);
                             if (isZh) {
-                              const paras = groupSegmentsToParagraphs(segments);
-                              return paras.map((p, idx) => (
-                                <div key={idx} className="text-sm">
+                              // Use sentence-level refined segments for finer timestamps; lightly punctuate each line.
+                              return segments.map((segment: Segment, index: number) => (
+                                <div key={index} className="text-sm">
                                   <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>
-                                    [{Math.floor(p.start / 60)}:{String(Math.floor(p.start % 60)).padStart(2, '0')} - {Math.floor(p.end / 60)}:{String(Math.floor(p.end % 60)).padStart(2, '0')}]
+                                    [{formatTs(segment.start)} - {formatTs(segment.end)}]
                                   </span>
-                                  <span className="ml-2">{punctuateChineseParagraph(p.text)}</span>
+                                  <span className="ml-2">{punctuateChineseParagraph(segment.text)}</span>
                                 </div>
                               ));
                             }
                             return segments.map((segment: Segment, index: number) => (
                               <div key={index} className="text-sm">
-                                <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>
-                                  [{Math.floor(segment.start / 60)}:{String(Math.floor(segment.start % 60)).padStart(2, '0')} - {Math.floor(segment.end / 60)}:{String(Math.floor(segment.end % 60)).padStart(2, '0')}]
-                                </span>
+                                <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>[{formatTs(segment.start)} - {formatTs(segment.end)}]</span>
                                 <span className="ml-2">{segment.text}</span>
                               </div>
                             ));

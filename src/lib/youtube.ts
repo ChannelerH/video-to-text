@@ -320,9 +320,9 @@ export class YouTubeService {
     } = options;
 
     try {
-      // 获取最优音频格式
+      // 获取最优音频格式：为保证识别准确率，优先选择较高比特率
       const audioFormat = await this.selectOptimizedAudioFormat(videoId, { 
-        preferSmallSize: true 
+        preferSmallSize: false 
       });
 
       console.log(`Selected audio format: ${audioFormat.mimeType}, ${audioFormat.bitrate}kbps, ${audioFormat.contentLength ? Math.round(audioFormat.contentLength / 1024 / 1024) + 'MB' : 'unknown size'}`);

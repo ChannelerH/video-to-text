@@ -3,6 +3,10 @@ import { TranscriptionResult } from './replicate';
 import { UnifiedTranscriptionService } from './unified-transcription';
 import { transcriptionCache, CacheEntry } from './cache';
 import { CloudflareR2Service } from './r2-upload';
+import { localChinesePunctuate, localPunctuateSegmentsIfChinese, rebuildTextFromSegments } from './refine-local';
+import { refineSegmentsFineGrained } from './segmentation';
+import { punctuateTextLLM } from './punctuate-llm';
+import { fixLatinNoise, fixLatinNoiseInSegments } from './lexicon-fix';
 import crypto from 'crypto';
 
 export interface TranscriptionRequest {
@@ -203,13 +207,24 @@ export class TranscriptionService {
         duration: videoInfo.duration
       };
 
-      // 保留原始文本，不进行额外润色
+      // 本地中文规范化（仅文本，不改原始 SRT）+ 英文术语修复 + 可选LLM标点增强
+      try {
+        const isZh = (transcription.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(transcription.text || '');
+        let t = transcription.text || '';
+        if (isZh) t = localChinesePunctuate(t);
+        // 尝试 LLM 标点增强（不改词）
+        try {
+          const llm = await punctuateTextLLM(t, { language: 'zh' });
+          if (llm) t = llm;
+        } catch {}
+        transcription.text = fixLatinNoise(t);
+      } catch {}
 
-      // 生成不同格式（TXT/MD/JSON 使用润色后的 text；SRT 使用 YouTube 原生）
+      // 生成不同格式（TXT/MD/JSON 使用处理后的 text；SRT 使用 YouTube 原生）
       const formats = await this.time('formats.generate', this.generateFormats(transcription, videoInfo.title));
       formats.srt = captionSRT;
 
-      // 缓存结果（保存润色后的文本）
+      // 缓存结果（保存处理后的文本）
       await this.time('cache.set', transcriptionCache.set(
         'youtube',
         videoInfo.videoId + this.variantSuffix(request.options),
@@ -479,15 +494,37 @@ export class TranscriptionService {
       ));
 
       // 使用 R2 URL 进行转录
+      const preferredLang = request.options?.language || (/[\u4e00-\u9fff]/.test(videoInfo.title) ? 'zh' : 'auto');
       const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(uploadResult.url, {
-        language: request.options?.language || 'auto',
+        language: preferredLang,
         userTier: request.options?.userTier, // 传递用户等级信息
         fallbackEnabled: request.options?.fallbackEnabled,
         outputFormat: request.options?.outputFormat || 'json',
         highAccuracyMode: request.options?.highAccuracyMode
       }));
 
-      // 不进行额外润色；保持 segments 与文本原样（显示/导出层做轻量处理）
+      // 本地中文规范化：段内标点与句末补全（不改时间戳）并重建全文 + 英文术语修复 + 可选LLM标点增强
+      try {
+        const isZh = (transcription.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(transcription.text || '');
+        if (isZh) {
+          const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
+          if (changed) console.log(`[Punct] youtube_audio.segments normalized: ${changed}`);
+          let t = changed
+            ? rebuildTextFromSegments(transcription.segments as any)
+            : localChinesePunctuate(transcription.text || '');
+          try {
+            const llm = await punctuateTextLLM(t, { language: 'zh' });
+            if (llm) { console.log('[Punct][LLM] youtube_audio applied'); t = llm; }
+          } catch {}
+          fixLatinNoiseInSegments(transcription.segments as any);
+          const finalText = fixLatinNoise(t);
+          if (finalText !== t) console.log('[Punct] youtube_audio.lexicon fixed');
+          transcription.text = finalText;
+        }
+      } catch {}
+
+      // 进一步细分段落（句子级时间戳），提升时间戳颗粒度
+      try { refineSegmentsFineGrained(transcription); } catch {}
 
       // 生成不同格式
       const formats = await this.time('formats.generate', this.generateFormats(transcription, videoInfo.title));
@@ -629,10 +666,33 @@ export class TranscriptionService {
         highAccuracyMode: request.options?.highAccuracyMode
       }));
 
-      // 6. 生成不同格式
+      // 6. 本地中文规范化（如适用）+ 英文术语修复 + 可选LLM标点增强
+      try {
+        const isZh = (transcription.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(transcription.text || '');
+        if (isZh) {
+          const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
+          if (changed) console.log(`[Punct] audio_url.segments normalized: ${changed}`);
+          let t = changed
+            ? rebuildTextFromSegments(transcription.segments as any)
+            : localChinesePunctuate(transcription.text || '');
+          try {
+            const llm = await punctuateTextLLM(t, { language: 'zh' });
+            if (llm) { console.log('[Punct][LLM] audio_url applied'); t = llm; }
+          } catch {}
+          fixLatinNoiseInSegments(transcription.segments as any);
+          const finalText = fixLatinNoise(t);
+          if (finalText !== t) console.log('[Punct] audio_url.lexicon fixed');
+          transcription.text = finalText;
+        }
+      } catch {}
+
+      // 进一步细分段落（句子级时间戳），提升时间戳颗粒度
+      try { refineSegmentsFineGrained(transcription); } catch {}
+
+      // 7. 生成不同格式
       const formats = await this.time('formats.generate', this.generateFormats(transcription, audioInfo.filename || 'audio'));
 
-      // 7. 缓存结果
+      // 8. 缓存结果
       await this.time('cache.set', transcriptionCache.set(
         'audio_url',
         urlHash + this.variantSuffix(request.options),
@@ -1019,7 +1079,28 @@ export class TranscriptionService {
         highAccuracyMode: request.options?.highAccuracyMode
       }));
 
-      // 不进行额外润色；保持文本与段落原样（显示/导出层处理）
+      // 本地中文规范化（如适用）+ 英文术语修复 + 可选LLM标点增强
+      try {
+        const isZh = (transcription.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(transcription.text || '');
+        if (isZh) {
+          const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
+          if (changed) console.log(`[Punct] file_upload.segments normalized: ${changed}`);
+          let t = changed
+            ? rebuildTextFromSegments(transcription.segments as any)
+            : localChinesePunctuate(transcription.text || '');
+          try {
+            const llm = await punctuateTextLLM(t, { language: 'zh' });
+            if (llm) { console.log('[Punct][LLM] file_upload applied'); t = llm; }
+          } catch {}
+          fixLatinNoiseInSegments(transcription.segments as any);
+          const finalText = fixLatinNoise(t);
+          if (finalText !== t) console.log('[Punct] file_upload.lexicon fixed');
+          transcription.text = finalText;
+        }
+      } catch {}
+
+      // 进一步细分段落（句子级时间戳），提升时间戳颗粒度
+      try { refineSegmentsFineGrained(transcription); } catch {}
 
       // 估算成本
       const estimatedCost = this.transcriptionService.estimateCost(transcription.duration);
@@ -1027,7 +1108,7 @@ export class TranscriptionService {
       // 生成不同格式（为上传文件使用原始文件名作为标题）
       const formats = await this.time('formats.generate', this.generateFormats(transcription, (request.options as any)?.fileName || 'uploaded file'));
 
-      // 缓存结果（保存当前文本）
+      // 缓存结果（保存处理后的文本）
       await this.time('cache.set', transcriptionCache.set(
         'user_file',
         fileHash + this.variantSuffix(request.options),

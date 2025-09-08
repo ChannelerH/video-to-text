@@ -70,6 +70,7 @@ export class DeepgramService {
     options: DeepgramOptions = {}
   ): Promise<TranscriptionResult> {
     try {
+      
       // Build query parameters
       const params = new URLSearchParams({
         model: 'nova-2', // Using Nova-2 as specified
@@ -226,20 +227,44 @@ export class DeepgramService {
         // 移除中文和英文之间的多余空格（保留一个）
         text = text.replace(/([^\x00-\xff])\s+([a-zA-Z])/g, '$1 $2');
         text = text.replace(/([a-zA-Z])\s+([^\x00-\xff])/g, '$1 $2');
+        // ASCII 标点 -> 中文标点（在中文邻域）
+        text = text
+          .replace(/([\u4e00-\u9fff])\s*,\s*/g, '$1，')
+          .replace(/([\u4e00-\u9fff])\s*\.\s*/g, '$1。')
+          .replace(/([\u4e00-\u9fff])\s*;\s*/g, '$1；')
+          .replace(/([\u4e00-\u9fff])\s*:\s*/g, '$1：')
+          .replace(/([\u4e00-\u9fff])\s*!\s*/g, '$1！')
+          .replace(/([\u4e00-\u9fff])\s*\?\s*/g, '$1？');
+        // 引号与括号归一
+        text = text.replace(/"([^"]+)"/g, '“$1”').replace(/'([^']+)'/g, '‘$1’')
+                   .replace(/\(/g, '（').replace(/\)/g, '）');
       }
       return text;
+    };
+
+    // Reconstruct sentence text using words within the sentence window
+    const sentenceTextFromWords = (start: number, end: number): string | null => {
+      if (!alternative.words || !Array.isArray(alternative.words)) return null;
+      const words = alternative.words.filter((w: any) => typeof w.start === 'number' && typeof w.end === 'number' && w.start >= start - 0.02 && w.end <= end + 0.02);
+      if (!words.length) return null;
+      const joined = words.map((w: any) => w.punctuated_word || w.word).join(' ');
+      return cleanChineseText(joined);
     };
 
     // Use paragraphs if available
     if (alternative.paragraphs?.paragraphs) {
       alternative.paragraphs.paragraphs.forEach((paragraph: any, pIndex: number) => {
         paragraph.sentences.forEach((sentence: any, sIndex: number) => {
+          const rebuilt = sentenceTextFromWords(sentence.start, sentence.end) || cleanChineseText(sentence.text);
+          if (rebuilt !== sentence.text) {
+            console.log(`[Punct][DG] sentence rebuilt with words: ${sentence.start.toFixed(2)}-${sentence.end.toFixed(2)} len=${rebuilt.length}`);
+          }
           segments.push({
             id: pIndex * 100 + sIndex,
             seek: 0,
             start: sentence.start,
             end: sentence.end,
-            text: cleanChineseText(sentence.text),
+            text: rebuilt,
             tokens: [],
             temperature: 0,
             avg_logprob: alternative.confidence || 0,
