@@ -56,6 +56,13 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  // Helper to display and auto-hide the Chinese upgrade toast
+  const showChineseToast = () => {
+    setShowChineseUpgrade(true);
+    // Auto-hide after 10s
+    setTimeout(() => setShowChineseUpgrade(false), 10000);
+  };
+
 
   // Helpers: Chinese detection and formatting
   const isChineseLangOrText = (lang?: string, text?: string) => {
@@ -255,7 +262,19 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
           requestData.options.highAccuracyMode = true;
         }
-        // 客户端不再做探针，交由服务器更准确地处理
+        // 轻量语言探针（不阻塞主流程）：若判定中文，立刻展示升级提示
+        try {
+          // Show immediately; if probe says not Chinese, hide it
+          showChineseToast();
+          fetch('/api/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: urlType, content: url, action: 'probe', options: { userTier: tier, languageProbeSeconds: 10 } })
+          })
+          .then(r => r.json())
+          .then(res => { if (res?.success) { if (!res?.isChinese) setShowChineseUpgrade(false); } })
+          .catch(() => {});
+        } catch {}
       } else if (uploadedFileInfo) {
         const progressText = action === "preview" 
           ? t("progress.generating_preview")
@@ -270,7 +289,18 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
           requestData.options.highAccuracyMode = true;
         }
-        // 不再做客户端探针
+        // 轻量语言探针（不阻塞主流程）
+        try {
+          showChineseToast();
+          fetch('/api/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'file_upload', content: uploadedFileInfo.replicateUrl, action: 'probe', options: { userTier: tier, languageProbeSeconds: 10 } })
+          })
+          .then(r => r.json())
+          .then(res => { if (res?.success) { if (!res?.isChinese) setShowChineseUpgrade(false); } })
+          .catch(() => {});
+        } catch {}
       } else {
         setProgress(t("errors.wait_for_upload"));
         setIsProcessing(false);
@@ -294,18 +324,24 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       }
 
       if (result.success && result.data) {
+        try {
+          const lang = result.data?.transcription?.language as string;
+          const raw = result.data?.transcription?.text as string;
+          const isZh = (lang && lang.toLowerCase().includes('zh')) || /[\u4e00-\u9fff]/.test(raw || '');
+          if (isZh) showChineseToast(); else setShowChineseUpgrade(false);
+        } catch {}
         setResult({ type: "full", data: result.data });
         setProgress(t("progress.completed"));
-        if (showChineseUpgrade) {
-          setTimeout(() => setShowChineseUpgrade(false), 10000);
-        }
         setShowSuccess(true);
       } else if (result.success && result.preview) {
+        try {
+          const lang = (result.preview as any)?.language as string;
+          const raw = (result.preview as any)?.text as string;
+          const isZh = (lang && lang.toLowerCase().includes('zh')) || /[\u4e00-\u9fff]/.test(raw || '');
+          if (isZh) showChineseToast(); else setShowChineseUpgrade(false);
+        } catch {}
         setResult({ type: "preview", data: result.preview, authRequired: result.authRequired });
         setProgress(t("progress.preview_ready"));
-        if (showChineseUpgrade) {
-          setTimeout(() => setShowChineseUpgrade(false), 10000);
-        }
       } else if (result?.success && !result?.data && !result?.preview) {
         setProgress('Received empty success response. Please try again or refresh.');
       } else {
@@ -737,7 +773,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
 
         {/* Floating upgrade toast (visible immediately after probe) */}
         {mounted && showChineseUpgrade && createPortal(
-          <div className="toast-floating pointer-events-none">
+          <div 
+            className="toast-floating pointer-events-none"
+            style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999, width: 'auto', maxWidth: '92vw' }}
+          >
             <div role="alert" aria-live="polite" className="pointer-events-auto px-4">
               <div
                 className="flex items-start gap-3 rounded-xl border shadow-xl px-4 py-3 text-blue-50 transition-all duration-300"
