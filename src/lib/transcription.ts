@@ -358,7 +358,8 @@ export class TranscriptionService {
       let audioBuffer: Buffer;
       let downloadMethod = 'optimized';
       let downloadAttempts = 0;
-      const maxAttempts = 3;
+      // Speed-up: try optimized downloader only once, then fallback fast to ytdl/legacy
+      const maxAttempts = 1;
 
       // 带重试的下载逻辑
       const _dlStart = Date.now();
@@ -400,13 +401,7 @@ export class TranscriptionService {
         } catch (optimizedError) {
           console.warn(`Optimized download failed (attempt ${downloadAttempts}):`, optimizedError);
           
-          // 如果还有重试机会，等待后重试
-          if (downloadAttempts < maxAttempts) {
-            const retryDelay = Math.min(1000 * Math.pow(2, downloadAttempts - 1), 5000); // 指数退避
-            console.log(`Waiting ${retryDelay}ms before retry...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            continue;
-          }
+          // 不再长时间重试优化下载，直接降级
           
           // 尝试 ytdl-core 流式下载作为降级方案
           try {
@@ -1431,34 +1426,35 @@ export class TranscriptionService {
    * 对直链音频/已上传文件进行语言探针
    */
   async probeLanguageFromUrl(audioUrl: string, options?: { userTier?: string; languageProbeSeconds?: number }): Promise<{ language: string; isChinese: boolean }> {
-    try {
-      const seconds = Math.max(8, Math.min(12, options?.languageProbeSeconds || 10));
-      console.log(`[Probe] Start creating ${seconds}s WAV clip for language detection`);
-      // Create short WAV clip via ffmpeg
+    // One quick attempt (8–10s), then a single retry (12s) if result unknown/failed.
+    const attempt = async (sec: number) => {
+      console.log(`[Probe] Start creating ${sec}s WAV clip for language detection`);
       const { createWavClipFromUrl } = await import('./audio-clip');
-      const wavClip = await createWavClipFromUrl(audioUrl, seconds);
-
-      // Upload to R2 (short-lived)
-      console.log(`[Probe] Uploading WAV clip to R2 (size=${wavClip.length} bytes)`);
+      const wavClip = await createWavClipFromUrl(audioUrl, sec);
       const uploaded = await this.r2Service.uploadFile(
         wavClip,
-        `probe_${Date.now()}.wav`,
+        `probe_${Date.now()}_${sec}.wav`,
         'audio/wav',
         { folder: 'probe-clips', expiresIn: 1, makePublic: true }
       );
+      try {
+        const res = await this.transcriptionService.probeLanguage(uploaded.url, { userTier: options?.userTier } as any);
+        console.log('[Probe] Deepgram result:', res);
+        return res;
+      } finally {
+        setTimeout(() => this.r2Service.deleteFile(uploaded.key).catch(() => {}), 30000);
+      }
+    };
 
-      // Call probe on the clip URL (no further clipping needed)
-      console.log('[Probe] Calling Deepgram language probe on clip URL');
-      const res = await this.transcriptionService.probeLanguage(uploaded.url, {
-        userTier: options?.userTier,
-      } as any);
-
-      // Schedule cleanup
-      setTimeout(() => this.r2Service.deleteFile(uploaded.key).catch(() => {}), 30000);
-      console.log('[Probe] Deepgram result:', res);
-      return res;
+    try {
+      const firstSec = Math.max(8, Math.min(10, options?.languageProbeSeconds || 10));
+      const res1 = await attempt(firstSec);
+      if (res1.language !== 'unknown' || res1.isChinese) return res1;
+      // retry once with 12s clip
+      const res2 = await attempt(12);
+      return res2;
     } catch (e) {
-      console.warn('Language probe (wav clip) failed:', e);
+      console.warn('Language probe failed:', e);
       return { language: 'unknown', isChinese: false };
     }
   }

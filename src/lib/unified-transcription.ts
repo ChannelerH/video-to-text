@@ -36,13 +36,13 @@ export class UnifiedTranscriptionService {
   private getStrategy(options: UnifiedTranscriptionOptions): TranscriptionStrategy {
     const { userTier, isPreview, highAccuracyMode } = options;
     
-    // Pro users with high accuracy mode: direct to Whisper
+    // Only PRO + highAccuracy may use Whisper directly
     if (userTier === 'pro' && highAccuracyMode && !isPreview) {
-      console.log('🎯 High accuracy mode: Using Whisper directly');
+      console.log('🎯 High accuracy mode (PRO): Using Whisper directly');
       return {
         primary: 'whisper',
         fallback: null,
-        sloTimeout: 60000 // 60 seconds for Whisper
+        sloTimeout: 60000
       };
     }
 
@@ -77,9 +77,10 @@ export class UnifiedTranscriptionService {
       sloTimeout = Math.min(sloTimeout, 15000); // Max 15 seconds for preview
     }
 
+    // Default: everyone uses Deepgram. Non‑PRO users never auto‑fallback to Whisper.
     return {
       primary: 'deepgram',
-      fallback: 'whisper',
+      fallback: userTier === 'pro' && !isPreview ? 'whisper' : null,
       sloTimeout
     };
   }
@@ -141,18 +142,11 @@ export class UnifiedTranscriptionService {
       isChinese = probe.isChinese;
     }
 
-    // 基于探针结果选择模型
-    if (isChinese) {
-      // 特殊规则：Pro 用户未开启高精度时，中文也默认走 Deepgram；其他订阅用户中文默认 Whisper
-      if (options.userTier === 'pro' && !options.highAccuracyMode && this.deepgramService) {
-        strategy = { primary: 'deepgram', fallback: 'whisper', sloTimeout: options.isPreview ? 30000 : 60000 };
-      } else {
-        strategy = { primary: 'whisper', fallback: this.deepgramService ? 'deepgram' : null, sloTimeout: options.isPreview ? 60000 : 90000 };
-      }
-    } else if (this.deepgramService) {
-      strategy = { primary: 'deepgram', fallback: 'whisper', sloTimeout: options.isPreview ? 30000 : 60000 };
+    // 基于探针结果选择模型：非 PRO 一律 Deepgram（若可用）。只有 PRO+highAccuracy 才使用 Whisper。
+    if (this.deepgramService) {
+      strategy = { primary: 'deepgram', fallback: (options.userTier === 'pro' && !options.isPreview) ? 'whisper' : null, sloTimeout: options.isPreview ? 30000 : 60000 };
     } else {
-      // 无 Deepgram 时全走 Whisper
+      // Deepgram 不可用时，统一走 Whisper（兜底）
       strategy = { primary: 'whisper', fallback: null, sloTimeout: options.isPreview ? 60000 : 90000 };
     }
 
@@ -163,15 +157,15 @@ export class UnifiedTranscriptionService {
     console.log(`  User tier: ${options.userTier || 'free'}`);
     console.log(`  Language: ${options.language || 'auto'}${isChinese ? ' (Chinese detected)' : ''}`);
 
-    // 中文特殊执行路径：当策略为 Whisper 时，直接执行 Whisper；否则按下方统一 SLO 机制
-    if (isChinese && strategy.primary === 'whisper') {
+    // 仅当明确选择 Whisper（PRO+高精度或无 Deepgram）时走 Whisper 特殊路径
+    if (strategy.primary === 'whisper') {
       try {
         const result = await this.transcribeWithModel(audioUrl, options, 'whisper');
         const duration = Date.now() - startTime;
-        console.log(`✅ whisper (Chinese) succeeded in ${duration / 1000}s`);
+        console.log(`✅ whisper succeeded in ${duration / 1000}s`);
         return result;
       } catch (err) {
-        console.warn('⚠️ whisper failed for Chinese. Falling back to Deepgram if available...', err);
+        console.warn('⚠️ whisper failed. Falling back to Deepgram if available...', err);
         if (this.deepgramService) {
           return await this.transcribeWithModel(audioUrl, options, 'deepgram');
         }

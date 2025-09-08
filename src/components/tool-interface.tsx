@@ -24,7 +24,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const { user, userTier } = useAppContext();
   const isAuthenticated = !!(session?.user || user);
   const tier = (userTier || (user as any)?.userTier || 'free') as string;
-  const canUseHighAccuracy = isAuthenticated && (tier === 'pro' || tier === 'premium');
+  const canUseHighAccuracy = isAuthenticated && (tier === 'pro');
   
   // Debug logging
   useEffect(() => {
