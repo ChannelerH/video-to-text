@@ -26,6 +26,7 @@ export interface TranscriptionRequest {
     onDownloadProgress?: (progress: DownloadProgress) => void; // 下载进度回调
     languageProbeSeconds?: number; // 语言探针秒数（前端可传 8-12）
     forceChinese?: boolean; // 前端探针结果强制中文
+    skipCaptions?: boolean; // 跳过YouTube字幕，直接音频转录
   };
 }
 
@@ -144,18 +145,27 @@ export class TranscriptionService {
 
     console.log(`Video info: ${videoInfo.title} (${videoInfo.duration}s)`);
 
-    // 4/5. 并行竞赛：若有字幕，字幕快速尝试（1s），否则直接走音频
-    if (videoInfo.captions && videoInfo.captions.length > 0) {
+    // 4/5. 字幕处理策略：可通过环境变量或用户等级控制
+    const skipCaptions = process.env.SKIP_YOUTUBE_CAPTIONS === 'true' || 
+                         request.options?.skipCaptions === true;
+    
+    if (!skipCaptions && videoInfo.captions && videoInfo.captions.length > 0) {
       console.log(`[YouTube] Found ${videoInfo.captions.length} caption tracks`);
       const captionTask = this.downloadCaptionBundle(videoInfo, request);
-      const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 1000));
+      const timeout = new Promise<null>(resolve => setTimeout(() => {
+        console.log('[TEST][YT-001] caption.timeout.1s');
+        resolve(null);
+      }, 1000)); // 减少到1秒，更快失败
       const quick = await Promise.race([captionTask, timeout]);
       if (quick && (quick as any).success) {
         // 用带持久化的完整流程，保持一致
         return await this.processYouTubeCaptions(videoInfo, request);
       }
+      console.log('[TEST][YT-001] caption.skipped.timeout_or_empty');
       // 否则进入音频转录
       return await this.processYouTubeAudioTranscription(videoInfo, request);
+    } else if (skipCaptions && videoInfo.captions && videoInfo.captions.length > 0) {
+      console.log(`[YouTube] Skipping ${videoInfo.captions.length} caption tracks (config: SKIP_YOUTUBE_CAPTIONS)`);
     }
 
     return await this.processYouTubeAudioTranscription(videoInfo, request);
@@ -363,13 +373,13 @@ export class TranscriptionService {
       console.log('[TEST][DL-001] download.options', {
         enableParallel: downloadOptions.enableParallelDownload,
         chunkSize: downloadOptions.chunkSize,
-        concurrency: downloadOptions.concurrency
+        maxConcurrentChunks: downloadOptions.maxConcurrentChunks
       });
 
       let audioBuffer: Buffer;
       let downloadMethod = 'optimized';
       let downloadAttempts = 0;
-      // Speed-up: try optimized downloader only once, then fallback fast to ytdl/legacy
+      // 快速失败：只尝试一次优化下载，失败立即降级
       const maxAttempts = 1;
 
       // 带重试的下载逻辑
@@ -410,10 +420,9 @@ export class TranscriptionService {
             throw new Error('Video not optimized for parallel download, skipping to fallback');
           }
         } catch (optimizedError) {
-          console.warn(`Optimized download failed (attempt ${downloadAttempts}):`, optimizedError);
+          console.warn(`Optimized download failed, immediately falling back:`, optimizedError);
           
-          // 不再长时间重试优化下载，直接降级
-          
+          // 立即降级到 ytdl-core，不重试
           // 尝试 ytdl-core 流式下载作为降级方案
           try {
             console.log('[TEST][DL-002] fallback.ytdl');
@@ -462,7 +471,6 @@ export class TranscriptionService {
                 throw new Error(`Legacy download failed: ${audioResponse.status} ${audioResponse.statusText}`);
               }
               
-              const contentLength = audioResponse.headers.get('content-length');
               // legacy download starting
               
               audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
@@ -982,6 +990,9 @@ export class TranscriptionService {
   ): DownloadOptions {
     const userTier = request.options?.userTier || 'pro';
     
+    // 速度优先模式：通过环境变量启用更激进的下载参数
+    const speedMode = process.env.YOUTUBE_SPEED_MODE === 'true';
+    
     // 基础选项，包含 CDN 代理支持
     const baseOptions: DownloadOptions = {
       enableParallelDownload: true,
@@ -1006,32 +1017,32 @@ export class TranscriptionService {
       // 高级用户：最激进的优化设置
       return {
         ...baseOptions,
-        chunkSize: 2 * 1024 * 1024, // 2MB chunks for faster download
-        maxConcurrentChunks: 8, // Maximum parallel connections
-        timeout: 180000, // 3 minutes timeout for stability
-        retryAttempts: 1,
-        retryDelay: 500, // Shorter retry delay
+        chunkSize: speedMode ? 4 * 1024 * 1024 : 2 * 1024 * 1024, // 速度模式4MB，否则2MB
+        maxConcurrentChunks: speedMode ? 12 : 8, // 速度模式12并发，否则8并发
+        timeout: 180000, // 3分钟超时
+        retryAttempts: speedMode ? 1 : 2, // 速度模式不重试
+        retryDelay: 300, // 更短的重试延迟
         ...request.options?.downloadOptions
       };
     } else if (userTier === 'pro') {
       // 专业用户：高性能设置
       return {
         ...baseOptions,
-        chunkSize: 1.5 * 1024 * 1024, // 1.5MB chunks
-        maxConcurrentChunks: 6,
+        chunkSize: speedMode ? 3 * 1024 * 1024 : 1.5 * 1024 * 1024, // 速度模式3MB，否则1.5MB
+        maxConcurrentChunks: speedMode ? 10 : 6, // 速度模式10并发，否则6并发
         timeout: 150000,
-        retryAttempts: 1,
-        retryDelay: 750,
+        retryAttempts: speedMode ? 1 : 2, // 速度模式不重试
+        retryDelay: 500,
         ...request.options?.downloadOptions
       };
     } else if (videoDuration > 3600) {
       // 超过1小时的长视频：优化大文件下载
       return {
         ...baseOptions,
-        chunkSize: 2 * 1024 * 1024, // Larger chunks for efficiency
-        maxConcurrentChunks: 6, // Balanced parallel connections
-        timeout: 180000, // Extended timeout
-        retryAttempts: 1,
+        chunkSize: speedMode ? 4 * 1024 * 1024 : 2 * 1024 * 1024, // 速度模式4MB块
+        maxConcurrentChunks: speedMode ? 10 : 6, // 速度模式10并发
+        timeout: 180000, // 延长超时
+        retryAttempts: speedMode ? 0 : 1,
         retryDelay: 1000,
         ...request.options?.downloadOptions
       };

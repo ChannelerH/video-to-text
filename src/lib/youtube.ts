@@ -68,11 +68,12 @@ export class YouTubeService {
    * 获取视频信息和字幕
    */
   static async getVideoInfo(videoId: string, retryCount = 0): Promise<VideoInfo> {
-    const maxRetries = 3;
-    const baseDelay = 1000;
+    // 速度优化：减少重试次数和延迟
+    const maxRetries = process.env.YOUTUBE_SPEED_MODE === 'true' ? 1 : 2; // 速度模式只重试1次
+    const baseDelay = 500; // 500ms基础延迟（原为1秒）
     
     try {
-      console.log(`Getting video info (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+      console.log(`[YouTube] Getting video info (attempt ${retryCount + 1}/${maxRetries + 1})...`);
       
       const info = await ytdl.getInfo(videoId, {
         requestOptions: {
@@ -127,8 +128,8 @@ export class YouTubeService {
                             error.message?.includes('No playable formats found');
       
       if (isNetworkError && retryCount < maxRetries) {
-        const delay = baseDelay * Math.pow(2, retryCount);
-        console.log(`Network/format error detected, retrying in ${delay}ms...`);
+        const delay = Math.min(baseDelay * Math.pow(1.5, retryCount), 2000); // 更快的重试，最多2秒
+        console.log(`[YouTube] Network error, retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.getVideoInfo(videoId, retryCount + 1);
       }
