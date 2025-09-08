@@ -1,38 +1,97 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Actions from "@/components/console/transcriptions/actions";
 import { toast } from "sonner";
 import { FileAudio, Clock, Calendar, Download, Trash2, CheckCircle2, Circle } from "lucide-react";
 
 export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }) {
+  const searchParams = useSearchParams();
+  const [localRows, setLocalRows] = useState<any[]>(rows || []);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [listLoading, setListLoading] = useState(false); // overlay for grid only
+  const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const toggle = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }));
-  const all = rows.map((r) => r.job_id);
+  const all = localRows.map((r) => r.job_id);
   const selectedIds = all.filter((id) => selected[id]);
 
   const batchDelete = async () => {
     if (selectedIds.length === 0) return;
-    const res = await fetch('/api/transcriptions/batch/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_ids: selectedIds }) });
-    if (res.ok) {
-      toast.success(t.deleted_ok);
-      location.reload();
-    } else {
-      toast.error(t.deleted_fail);
-    }
+    setDeleting(true); setListLoading(true);
+    try {
+      const res = await fetch('/api/transcriptions/batch/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_ids: selectedIds }) });
+      if (res.ok) {
+        toast.success(t.deleted_ok);
+        // remove selected cards locally, no global reload
+        setLocalRows(rs => rs.filter(r => !selectedIds.includes(r.job_id)));
+        setSelected({});
+      } else {
+        toast.error(t.deleted_fail);
+      }
+    } finally { setDeleting(false); setListLoading(false); }
   };
 
   const exportZip = async () => {
     if (selectedIds.length === 0) return;
-    const res = await fetch('/api/transcriptions/batch/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_ids: selectedIds }) });
-    if (!res.ok) { toast.error(t.export_fail); return; }
-    const blob = await res.arrayBuffer();
-    const url = URL.createObjectURL(new Blob([blob], { type: 'application/zip' }));
-    const a = document.createElement('a');
-    a.href = url; a.download = 'transcriptions.zip'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    toast.success(t.export_ok);
+    try {
+      setExporting(true); setListLoading(true);
+      const res = await fetch('/api/transcriptions/batch/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_ids: selectedIds })
+      });
+      if (!res.ok) { toast.error(t.export_fail); return; }
+      const blob = await res.blob();
+      if (!blob || blob.size === 0) { toast.error(t.export_fail); return; }
+      const fname = `transcriptions_${new Date().toISOString().replace(/[:T]/g,'-').split('.')[0]}.zip`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      toast.success(t.export_ok || 'ZIP ready');
+    } catch (e) {
+      console.error('Export ZIP error:', e);
+      toast.error(t.export_fail);
+    } finally { setExporting(false); setListLoading(false); }
   };
+
+  // Listen to search event to only show grid loading
+  // A client search bar will dispatch CustomEvent('transcriptions:search') before navigation
+  useEffect(() => {
+    const handler = () => setListLoading(true);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('transcriptions:search', handler);
+      // soft delete / finalize / restore
+      const soft = (e: any) => {
+        // optional: could dim card; keeping simple to avoid visual churn
+      };
+      const fin = (e: any) => {
+        const id = e?.detail?.jobId;
+        if (!id) return;
+        setLocalRows((rs) => rs.filter((r) => r.job_id !== id));
+        setSelected((s) => { const n = { ...s }; delete n[id]; return n; });
+      };
+      const restore = (e: any) => {
+        // nothing to do; card still visible because we didn't remove it yet for soft delete
+      };
+      window.addEventListener('tx:softDelete', soft);
+      window.addEventListener('tx:finalizeDelete', fin);
+      window.addEventListener('tx:restore', restore);
+      return () => {
+        window.removeEventListener('transcriptions:search', handler);
+        window.removeEventListener('tx:softDelete', soft);
+        window.removeEventListener('tx:finalizeDelete', fin);
+        window.removeEventListener('tx:restore', restore);
+      };
+    }
+  }, []);
+
+  // When query changes or new rows arrive, clear the overlay
+  useEffect(() => {
+    setListLoading(false);
+  }, [searchParams?.toString(), localRows.length]);
 
   // 格式化来源显示
   const getSourceDisplay = (sourceType: string) => {
@@ -57,6 +116,18 @@ export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }
     } else {
       return `${secs}s`;
     }
+  };
+
+  // 格式化创建时间（精确到秒，24小时制）
+  const formatCreatedAt = (value: string | number | Date) => {
+    const d = new Date(value);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${y}/${m}/${day} ${hh}:${mm}:${ss}`;
   };
 
   return (
@@ -112,8 +183,14 @@ export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }
       </div>
 
       {/* 转录历史卡片网格 */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {rows.map((r) => {
+      <div className="relative">
+        {listLoading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-xl">
+            <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          </div>
+        )}
+        <div className={`grid gap-4 md:grid-cols-2 lg:grid-cols-3 ${listLoading ? 'pointer-events-none select-none opacity-95' : ''}`}> 
+        {localRows.map((r) => {
           const sourceInfo = getSourceDisplay(r.source_type);
           const isSelected = !!selected[r.job_id];
           const isHovered = hoveredCard === r.job_id;
@@ -167,7 +244,7 @@ export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }
                 <div className="space-y-2 mb-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    <span>{new Date(r.created_at).toLocaleDateString()}</span>
+                    <span>{formatCreatedAt(r.created_at)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4" />
@@ -207,10 +284,11 @@ export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }
             </div>
           );
         })}
+        </div>
       </div>
 
       {/* 空状态 */}
-      {rows.length === 0 && (
+      {localRows.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <FileAudio className="w-16 h-16 text-muted-foreground/30 mb-4" />
           <p className="text-lg font-medium text-muted-foreground mb-2">

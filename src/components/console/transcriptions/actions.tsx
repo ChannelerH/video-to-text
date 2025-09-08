@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,32 +12,45 @@ import { toast } from "sonner";
 import { FileText, FileCode, FileJson, FileDown, RefreshCw, Trash2, RotateCcw } from "lucide-react";
 
 export default function Actions({ row, i18n }: { row: any; i18n: any }) {
-  const [busy, setBusy] = useState(false);
+  const [rerunning, setRerunning] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
+  const deleteTimerRef = useRef<any>(null);
 
   const onDelete = async () => {
-    setBusy(true);
+    setDeleting(true);
+    // Close dialog immediately to avoid perceived freeze
+    setOpen(false);
     try {
       const res = await fetch(`/api/transcriptions/${row.job_id}`, { method: 'DELETE' });
       if (res.ok) {
         setShowUndo(true);
+        // notify table: soft delete (show undo on card)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('tx:softDelete', { detail: { jobId: row.job_id } }));
+        }
         // auto hide undo after 6s
-        setTimeout(() => setShowUndo(false), 6000);
-        toast.success(i18n.deleted_ok);
+        deleteTimerRef.current = setTimeout(() => {
+          setShowUndo(false);
+          // finalize removal (card disappears)
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('tx:finalizeDelete', { detail: { jobId: row.job_id } }));
+          }
+        }, 6000);
+        toast.success(i18n.deleted_ok || 'Deleted');
       } else {
-        toast.error(i18n.delete_failed);
+        toast.error(i18n.delete_failed || 'Delete failed');
       }
     } finally {
-      setBusy(false);
-      setOpen(false);
+      setDeleting(false);
     }
   };
 
   const onRerun = async () => {
     if (!row.source_url) return;
-    setBusy(true);
+    setRerunning(true);
     try {
       if (row.source_type === 'file_upload') {
         alert(i18n.rerun_file_hint);
@@ -49,15 +62,14 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
         action: 'transcribe',
         options: { formats: ['txt','srt','vtt','json','md'] }
       };
+      toast.message(i18n.rerun_ok);
       const res = await fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
-      if (data?.success) {
-        toast.success(i18n.rerun_ok);
-      } else {
+      if (!data?.success) {
         toast.error(i18n.rerun_failed);
       }
     } finally {
-      setBusy(false);
+      setRerunning(false);
     }
   };
 
@@ -124,7 +136,7 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
       <div className="flex items-center gap-2">
         <button
           onClick={onRerun}
-          disabled={busy || row.source_type === 'file_upload'}
+          disabled={rerunning || row.source_type === 'file_upload'}
           className="
             inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
             bg-blue-500/10 hover:bg-blue-500/20 text-blue-600
@@ -133,13 +145,13 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
             hover:scale-105 hover:shadow-sm
           "
         >
-          <RefreshCw className="w-3.5 h-3.5" />
-          {i18n.rerun}
+          <RefreshCw className={`w-3.5 h-3.5 ${rerunning ? 'animate-spin' : ''}`} />
+          {rerunning ? 'Re-running…' : i18n.rerun}
         </button>
         
         <button
           onClick={() => setOpen(true)}
-          disabled={busy}
+          disabled={deleting}
           className="
             inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
             bg-red-500/10 hover:bg-red-500/20 text-red-600
@@ -159,10 +171,14 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
               try {
                 const res = await fetch(`/api/transcriptions/${row.job_id}/restore`, { method: 'POST' });
                 if (!res.ok) throw new Error('restore failed');
-                toast.success(i18n.undo_success);
+                toast.success(i18n.undo_success || 'Restored');
                 setShowUndo(false);
+                if (deleteTimerRef.current) { clearTimeout(deleteTimerRef.current); deleteTimerRef.current = null; }
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('tx:restore', { detail: { jobId: row.job_id } }));
+                }
               } catch {
-                toast.error(i18n.undo_failed);
+                toast.error(i18n.undo_failed || 'Restore failed');
               } finally {
                 setUndoing(false);
               }
@@ -211,7 +227,7 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
                 disabled:opacity-50 disabled:cursor-not-allowed
               " 
               onClick={onDelete} 
-              disabled={busy}
+              disabled={deleting}
             >
               {i18n.confirm}
             </button>
