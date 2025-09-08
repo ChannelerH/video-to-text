@@ -156,6 +156,7 @@ export class UnifiedTranscriptionService {
     console.log(`  SLO timeout: ${strategy.sloTimeout / 1000}s`);
     console.log(`  User tier: ${options.userTier || 'free'}`);
     console.log(`  Language: ${options.language || 'auto'}${isChinese ? ' (Chinese detected)' : ''}`);
+    console.log('[TEST][YT-003/HA-001] strategy', { primary: strategy.primary, fallback: strategy.fallback, highAccuracy: options.highAccuracyMode, userTier: options.userTier, isPreview: options.isPreview });
 
     // 仅当明确选择 Whisper（PRO+高精度或无 Deepgram）时走 Whisper 特殊路径
     if (strategy.primary === 'whisper') {
@@ -189,10 +190,12 @@ export class UnifiedTranscriptionService {
     } catch (error) {
       const duration = Date.now() - startTime;
       console.warn(`⚠️ ${strategy.primary} failed after ${duration / 1000}s:`, (error as Error).message);
+      console.warn('[TEST][YT-003] slo_exceeded_or_failed', { primary: strategy.primary, durationMs: duration });
 
       // Try fallback if available
       if (strategy.fallback && options.fallbackEnabled !== false) {
         console.log(`🔄 Falling back to ${strategy.fallback}...`);
+        console.log('[TEST][YT-003] fallback.start', { fallback: strategy.fallback });
         
         try {
           const fallbackResult = await this.transcribeWithModel(
@@ -203,11 +206,13 @@ export class UnifiedTranscriptionService {
           
           const totalDuration = Date.now() - startTime;
           console.log(`✅ ${strategy.fallback} fallback succeeded in ${totalDuration / 1000}s total`);
+          console.log('[TEST][YT-003] fallback.ok', { totalSec: totalDuration / 1000 });
           
           return fallbackResult;
           
         } catch (fallbackError) {
           console.error(`❌ ${strategy.fallback} fallback also failed:`, fallbackError);
+          console.error('[TEST][YT-003] fallback.failed');
           throw new Error('All transcription models failed. Please try again later.');
         }
       }

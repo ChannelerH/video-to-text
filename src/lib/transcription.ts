@@ -98,6 +98,7 @@ export class TranscriptionService {
     // 1. 验证和解析 YouTube URL
     const videoId = YouTubeService.validateAndParseUrl(url);
     if (!videoId) {
+      console.warn('[TEST][ERR-001] invalid_youtube_url', { url });
       return {
         success: false,
         error: 'Invalid YouTube URL'
@@ -110,6 +111,7 @@ export class TranscriptionService {
     const variant = this.variantSuffix(request.options);
     const cachedEntry = await transcriptionCache.get('youtube', videoId + variant);
     if (cachedEntry && (cachedEntry.transcriptionData?.text || '').trim().length > 0) {
+      console.log('[TEST][CACHE-001] youtube.cache.hit', { videoId, variant });
       return {
         success: true,
         data: {
@@ -125,6 +127,7 @@ export class TranscriptionService {
         }
       };
     } else if (cachedEntry) {
+      console.log('[CACHE] youtube.cache.stale', { videoId, variant });
       await transcriptionCache.delete('youtube', videoId + variant).catch(() => {});
     }
 
@@ -206,6 +209,7 @@ export class TranscriptionService {
         language: bestCaption.languageCode,
         duration: videoInfo.duration
       };
+      console.log('[TEST][YT-001] captions.used', { videoId: videoInfo.videoId, lang: transcription.language, duration: transcription.duration });
 
       // 本地中文规范化（仅文本，不改原始 SRT）+ 英文术语修复 + 可选LLM标点增强
       try {
@@ -223,6 +227,7 @@ export class TranscriptionService {
       // 生成不同格式（TXT/MD/JSON 使用处理后的 text；SRT 使用 YouTube 原生）
       const formats = await this.time('formats.generate', this.generateFormats(transcription, videoInfo.title));
       formats.srt = captionSRT;
+      console.log('[TEST][FMT-001] formats.fromCaptions', { txt: !!formats.txt, srt: !!formats.srt, vtt: !!formats.vtt, json: !!formats.json, md: !!formats.md });
 
       // 缓存结果（保存处理后的文本）
       await this.time('cache.set', transcriptionCache.set(
@@ -237,6 +242,7 @@ export class TranscriptionService {
         },
         { userId: request.options?.userId }
       ));
+      console.log('[CACHE] youtube.cache.set', { videoId: videoInfo.videoId, variant: this.variantSuffix(request.options) });
 
       let jobId = crypto.randomUUID();
 
@@ -317,11 +323,11 @@ export class TranscriptionService {
       let optimizationInfo;
       try {
         optimizationInfo = await YouTubeService.isVideoOptimizedForFastDownload(videoInfo.videoId);
-        console.log('Video optimization status:', {
-          isOptimized: optimizationInfo.isOptimized,
-          reasons: optimizationInfo.reasons?.slice(0, 2), // 只显示前2个原因
-          recommendations: optimizationInfo.recommendations?.slice(0, 2)
-        });
+      console.log('Video optimization status:', {
+        isOptimized: optimizationInfo.isOptimized,
+        reasons: optimizationInfo.reasons?.slice(0, 2), // 只显示前2个原因
+        recommendations: optimizationInfo.recommendations?.slice(0, 2)
+      });
       } catch (error: any) {
         console.warn('Failed to check optimization status after retries:', error.message);
         // 在无法检查优化状态时，默认尝试优化下载
@@ -354,6 +360,11 @@ export class TranscriptionService {
 
       // 设置优化的下载选项
       const downloadOptions = this.createOptimizedDownloadOptions(request, videoInfo.duration);
+      console.log('[TEST][DL-001] download.options', {
+        enableParallel: downloadOptions.enableParallelDownload,
+        chunkSize: downloadOptions.chunkSize,
+        concurrency: downloadOptions.concurrency
+      });
 
       let audioBuffer: Buffer;
       let downloadMethod = 'optimized';
@@ -405,7 +416,7 @@ export class TranscriptionService {
           
           // 尝试 ytdl-core 流式下载作为降级方案
           try {
-            console.log('Falling back to ytdl-core streaming...');
+            console.log('[TEST][DL-002] fallback.ytdl');
             downloadMethod = 'ytdl-stream';
             
             const streamOptions = {
@@ -422,7 +433,7 @@ export class TranscriptionService {
             // ytdl-core download completed
             break;
           } catch (streamError) {
-            console.warn('Stream download failed:', streamError);
+            console.warn('[TEST][DL-002] fallback.ytdl.failed', streamError);
             
             // 最终降级到传统方法（带重试）
             try {
@@ -497,6 +508,7 @@ export class TranscriptionService {
         outputFormat: request.options?.outputFormat || 'json',
         highAccuracyMode: request.options?.highAccuracyMode
       }));
+      console.log('[TEST][YT-002] model.used', { model: 'deepgram_or_whisper_decided_above' });
 
       // 本地中文规范化：段内标点与句末补全（不改时间戳）并重建全文 + 英文术语修复 + 可选LLM标点增强
       try {
@@ -531,6 +543,7 @@ export class TranscriptionService {
 
       // 生成不同格式
       const formats = await this.time('formats.generate', this.generateFormats(transcription, videoInfo.title));
+      console.log('[TEST][FMT-001] formats.generated', { txt: !!formats.txt, srt: !!formats.srt, vtt: !!formats.vtt, json: !!formats.json, md: !!formats.md });
 
       // 缓存结果
       await this.time('cache.set', transcriptionCache.set(
@@ -546,6 +559,7 @@ export class TranscriptionService {
         },
         { userId: request.options?.userId }
       ));
+      console.log('[CACHE] youtube.cache.set.audio');
 
       // 记录下载方法用于分析（通过日志）
       console.log(`Transcription cached with download method: ${downloadMethod}`);
@@ -668,6 +682,7 @@ export class TranscriptionService {
         outputFormat: request.options?.outputFormat || 'json',
         highAccuracyMode: request.options?.highAccuracyMode
       }));
+      console.log('[TEST][HA-001] transcribe.audio_url.completed', { duration: transcription.duration, language: transcription.language });
 
       // 6. 本地中文规范化（如适用）+ 英文术语修复 + 可选LLM标点增强
       try {
@@ -701,6 +716,7 @@ export class TranscriptionService {
 
       // 7. 生成不同格式
       const formats = await this.time('formats.generate', this.generateFormats(transcription, audioInfo.filename || 'audio'));
+      console.log('[TEST][FMT-001] formats.generated', { txt: !!formats.txt, srt: !!formats.srt, vtt: !!formats.vtt, json: !!formats.json, md: !!formats.md });
 
       // 8. 缓存结果
       await this.time('cache.set', transcriptionCache.set(

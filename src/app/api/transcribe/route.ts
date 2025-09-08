@@ -27,6 +27,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { type, content, options = {}, action = 'transcribe' } = body;
     const user_uuid = await getUserUuid();
+    console.log('[API] /api/transcribe POST', {
+      action,
+      type,
+      hasUser: !!user_uuid,
+      userTierOpt: options?.userTier,
+      highAccuracyOpt: options?.highAccuracyMode,
+      previewAllowAnon: process.env.PREVIEW_ALLOW_ANON
+    });
     
     // 获取请求信息用于防滥用
     const headersList = await headers();
@@ -102,6 +110,7 @@ export async function POST(request: NextRequest) {
 
     // 根据动作类型处理请求
     if (action === 'preview') {
+      console.log('[TEST][PREV-001] preview.start', { type, hasUser: !!user_uuid });
       // 预览请求的防滥用检查
       const identifier = user_uuid || `${clientIp}_${fingerprint}`;
       
@@ -168,6 +177,7 @@ export async function POST(request: NextRequest) {
           content,
           options: { ...options, isPreview: true, fallbackEnabled: true }
         });
+        console.log('[TEST][PREV-001] preview.ok', { duration: result?.preview?.duration, hasText: !!result?.preview?.text, hasSrt: !!result?.preview?.srt });
         console.log(`[API] preview ${type} done in ${Date.now()-_previewStart}ms (success=${result?.success})`);
         
         return NextResponse.json({
@@ -180,7 +190,7 @@ export async function POST(request: NextRequest) {
           }
         });
       } catch (error) {
-        console.error('Preview generation failed with fallback:', error);
+        console.error('[TEST][PREV-001] preview.failed', error);
         // 如果两个模型都失败，返回错误
         return NextResponse.json(
           { success: false, error: 'Preview generation temporarily unavailable' },
@@ -190,7 +200,7 @@ export async function POST(request: NextRequest) {
     } else {
       // 未登录：只返回90秒预览，不执行完整转录且不存储
       if (!user_uuid) {
-        console.log(`Unauthenticated full transcription request; returning preview only.`);
+        console.log('[API] unauthenticated full request -> preview only');
         
         // 应用相同的速率限制
         const identifier = `${clientIp}_${fingerprint}`;
@@ -215,6 +225,7 @@ export async function POST(request: NextRequest) {
           content, 
           options: { ...options, isPreview: true, fallbackEnabled: true }
         });
+        console.log('[TEST][PREV-001] preview.unauth.ok', { duration: result?.preview?.duration });
         console.log(`[API] preview unauth ${type} done in ${Date.now()-_previewStart}ms (success=${result?.success})`);
         
         return NextResponse.json({ 
@@ -261,6 +272,7 @@ export async function POST(request: NextRequest) {
           fallbackEnabled: true  // 为付费用户也启用降级保证服务可用性
         }
       });
+      console.log('[API] transcribe.completed', { success: result?.success, fromCache: result?.data?.fromCache, duration: result?.data?.transcription?.duration, language: result?.data?.transcription?.language });
       console.log(`[API] transcribe ${type} done in ${Date.now()-_procStart}ms (success=${result?.success}, fromCache=${result?.data?.fromCache ?? false})`);
       
       // 记录使用情况（按真实转录时长）

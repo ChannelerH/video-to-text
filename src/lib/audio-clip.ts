@@ -53,6 +53,7 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
         '-acodec', 'pcm_s16le',
         'pipe:1'
       ];
+      console.log('[TEST][LANG-001/PREV-001] ffmpeg.args', args.join(' '));
 
       const proc = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
