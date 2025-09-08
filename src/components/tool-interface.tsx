@@ -54,10 +54,14 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   // Early banner when Chinese is detected via probe
   const [showChineseUpgrade, setShowChineseUpgrade] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // Avoid duplicate Chinese upgrade toast per run
+  const [zhBannerShown, setZhBannerShown] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   // Helper to display and auto-hide the Chinese upgrade toast
   const showChineseToast = () => {
+    if (zhBannerShown) return; // prevent duplicate toasts within the same run
+    setZhBannerShown(true);
     setShowChineseUpgrade(true);
     // Auto-hide after 10s
     setTimeout(() => setShowChineseUpgrade(false), 10000);
@@ -228,6 +232,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       return;
     }
 
+    // reset duplicate-guard and any previous banner for a new run
+    setZhBannerShown(false);
+    setShowChineseUpgrade(false);
     setIsProcessing(true);
     setProgress(t("progress.starting"));
     setResult(null);
@@ -271,7 +278,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             body: JSON.stringify({ type: urlType, content: url, action: 'probe', options: { userTier: tier, languageProbeSeconds: 10 } })
           })
           .then(r => r.json())
-          .then(res => { if (res?.success) { if (!res?.isChinese) setShowChineseUpgrade(false); } })
+          .then(res => { if (res?.success) { if (!res?.isChinese) { setShowChineseUpgrade(false); setZhBannerShown(false); } } })
           .catch(() => {});
         } catch {}
       } else if (uploadedFileInfo) {
@@ -297,7 +304,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             body: JSON.stringify({ type: 'file_upload', content: uploadedFileInfo.replicateUrl, action: 'probe', options: { userTier: tier, languageProbeSeconds: 10 } })
           })
           .then(r => r.json())
-          .then(res => { if (res?.success) { if (!res?.isChinese) setShowChineseUpgrade(false); } })
+          .then(res => { if (res?.success) { if (!res?.isChinese) { setShowChineseUpgrade(false); setZhBannerShown(false); } } })
           .catch(() => {});
         } catch {}
       } else {

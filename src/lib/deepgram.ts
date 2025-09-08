@@ -133,12 +133,13 @@ export class DeepgramService {
       const channel = result.results.channels[0];
       const alternative = channel.alternatives[0];
       
-      if (!alternative || !alternative.transcript) {
-        throw new Error('No transcription content from Deepgram');
+      // 当 transcript 为空时，尽量从 paragraphs/words 重建，避免直接抛错（用于语言探针尤为重要）
+      let transcriptText = (alternative && alternative.transcript) || '';
+      if (!alternative) {
+        console.warn('[Deepgram] Missing alternatives; returning minimal result');
       }
       
       // 处理中文转录结果中的空格问题
-      let transcriptText = alternative.transcript;
       
       // 检测是否为中文（包含中文字符）
       const containsChinese = /[\u4e00-\u9fff]/.test(transcriptText);
@@ -151,12 +152,12 @@ export class DeepgramService {
         transcriptText = transcriptText.replace(/([a-zA-Z])\s+([^\x00-\xff])/g, '$1 $2');
       }
       
-      // Convert to segments
-      const segments = this.convertToSegments(alternative);
+      // Convert to segments（若无 alternative，返回空数组）
+      const segments = alternative ? this.convertToSegments(alternative) : [];
       
       // Detect primary language
       let detectedLanguage = channel.detected_language || 
-                            alternative.languages?.[0] || 
+                            alternative?.languages?.[0] || 
                             options.language || 
                             'unknown';
       

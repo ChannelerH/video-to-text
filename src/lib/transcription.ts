@@ -4,7 +4,7 @@ import { UnifiedTranscriptionService } from './unified-transcription';
 import { transcriptionCache, CacheEntry } from './cache';
 import { CloudflareR2Service } from './r2-upload';
 import { localChinesePunctuate, localPunctuateSegmentsIfChinese, rebuildTextFromSegments } from './refine-local';
-import { refineSegmentsFineGrained } from './segmentation';
+import { alignSentencesWithSegments } from './sentence-align';
 import { punctuateTextLLM } from './punctuate-llm';
 import { fixLatinNoise, fixLatinNoiseInSegments } from './lexicon-fix';
 import crypto from 'crypto';
@@ -523,8 +523,16 @@ export class TranscriptionService {
         }
       } catch {}
 
-      // 进一步细分段落（句子级时间戳），提升时间戳颗粒度
-      try { refineSegmentsFineGrained(transcription); } catch {}
+      // 对齐最终文本句子到模型时间戳：按句展示且时间准确（合并原段，不按比例切）
+      try {
+        transcription.segments = alignSentencesWithSegments(
+          transcription.text,
+          transcription.segments as any,
+          transcription.language
+        );
+        // Ensure SRT/VTT regenerated from updated sentence-level segments
+        (transcription as any).srtText = undefined;
+      } catch {}
 
       // 生成不同格式
       const formats = await this.time('formats.generate', this.generateFormats(transcription, videoInfo.title));
@@ -686,8 +694,15 @@ export class TranscriptionService {
         }
       } catch {}
 
-      // 进一步细分段落（句子级时间戳），提升时间戳颗粒度
-      try { refineSegmentsFineGrained(transcription); } catch {}
+      // 对齐最终文本句子到模型时间戳
+      try {
+        transcription.segments = alignSentencesWithSegments(
+          transcription.text,
+          transcription.segments as any,
+          transcription.language
+        );
+        (transcription as any).srtText = undefined;
+      } catch {}
 
       // 7. 生成不同格式
       const formats = await this.time('formats.generate', this.generateFormats(transcription, audioInfo.filename || 'audio'));
@@ -1099,8 +1114,15 @@ export class TranscriptionService {
         }
       } catch {}
 
-      // 进一步细分段落（句子级时间戳），提升时间戳颗粒度
-      try { refineSegmentsFineGrained(transcription); } catch {}
+      // 对齐最终文本句子到模型时间戳
+      try {
+        transcription.segments = alignSentencesWithSegments(
+          transcription.text,
+          transcription.segments as any,
+          transcription.language
+        );
+        (transcription as any).srtText = undefined;
+      } catch {}
 
       // 估算成本
       const estimatedCost = this.transcriptionService.estimateCost(transcription.duration);
