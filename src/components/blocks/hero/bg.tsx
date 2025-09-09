@@ -1,7 +1,7 @@
 export default function Bg() {
   return (
     <div className="cosmos fixed inset-0 -z-50">
-      <div className="aurora" />
+      {/* <div className="aurora" /> */}
       <div className="tech-grid" />
 
       {/* Mesh gradient blobs for depth */}

@@ -59,13 +59,23 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   useEffect(() => { setMounted(true); }, []);
 
   // Helper to display and auto-hide the Chinese upgrade toast
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
   const showChineseToast = () => {
     if (zhBannerShown) return; // prevent duplicate toasts within the same run
     setZhBannerShown(true);
     setShowChineseUpgrade(true);
     // Auto-hide after 10s
-    setTimeout(() => setShowChineseUpgrade(false), 10000);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setShowChineseUpgrade(false), 10000);
   };
+  
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
 
   // Helpers: Chinese detection and formatting
@@ -468,11 +478,46 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   })), []);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const visualizerRef = useRef<HTMLDivElement | null>(null);
+  const [isVisible, setIsVisible] = useState(true);
+
+  // Performance optimization: Pause animations when not visible
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          setIsVisible(entry.isIntersecting);
+          // Pause/resume CSS animations
+          if (entry.isIntersecting) {
+            container.style.animationPlayState = 'running';
+            container.querySelectorAll('*').forEach((el) => {
+              if (el instanceof HTMLElement) {
+                el.style.animationPlayState = 'running';
+              }
+            });
+          } else {
+            container.style.animationPlayState = 'paused';
+            container.querySelectorAll('*').forEach((el) => {
+              if (el instanceof HTMLElement) {
+                el.style.animationPlayState = 'paused';
+              }
+            });
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   // Elastic/parallax effect for the whole upload container on hover
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container || !isVisible) return;
 
     let isHovering = false;
     let rect = container.getBoundingClientRect();
@@ -482,8 +527,16 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       rect = container.getBoundingClientRect();
     };
 
+    let lastMoveTime = 0;
+    const throttleMs = 32; // ~30fps instead of 60fps
+    
     const onMouseMove = (e: MouseEvent) => {
       if (!isHovering) return;
+      
+      const now = Date.now();
+      if (now - lastMoveTime < throttleMs) return;
+      lastMoveTime = now;
+      
       if (raf) cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const centerX = rect.left + rect.width / 2;
