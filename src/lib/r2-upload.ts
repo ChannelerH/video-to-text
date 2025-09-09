@@ -170,4 +170,62 @@ export class CloudflareR2Service {
       return `https://pub-${this.bucketName}.r2.dev/${key}`;
     }
   }
+
+  /**
+   * 生成预签名上传URL，允许客户端直接上传到R2
+   */
+  async getPresignedUploadUrl(
+    key: string,
+    contentType: string,
+    options: {
+      expiresIn?: number; // 秒
+      metadata?: Record<string, string>;
+    } = {}
+  ): Promise<string> {
+    const { expiresIn = 3600, metadata = {} } = options;
+    
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: contentType,
+      Metadata: {
+        ...metadata,
+        'upload-method': 'presigned-url',
+        'upload-time': new Date().toISOString()
+      }
+    });
+
+    // 生成预签名URL
+    const presignedUrl = await getSignedUrl(this.s3Client, command, { 
+      expiresIn,
+      signableHeaders: new Set(['content-type']) // 确保content-type必须匹配
+    });
+
+    return presignedUrl;
+  }
+
+  /**
+   * 生成预签名下载URL
+   */
+  async getPresignedDownloadUrl(
+    key: string,
+    options: {
+      expiresIn?: number; // 秒
+      responseContentDisposition?: string;
+    } = {}
+  ): Promise<string> {
+    const { expiresIn = 3600, responseContentDisposition } = options;
+    
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ResponseContentDisposition: responseContentDisposition
+    });
+
+    const presignedUrl = await getSignedUrl(this.s3Client, command, { 
+      expiresIn 
+    });
+
+    return presignedUrl;
+  }
 }

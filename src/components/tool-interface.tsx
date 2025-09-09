@@ -56,6 +56,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [uploadedFileInfo, setUploadedFileInfo] = useState<any>(null);
   const [copiedText, setCopiedText] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadXhrRef = useRef<XMLHttpRequest | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const router = useRouter();
   const locale = useLocale();
@@ -238,13 +239,20 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     console.log('[DEBUG] handleFileChange called, file:', selectedFile?.name);
     
     if (selectedFile) {
+      // 如果有正在进行的上传，先中断它
+      if (uploadXhrRef.current) {
+        console.log('[DEBUG] Aborting previous upload');
+        uploadXhrRef.current.abort();
+        uploadXhrRef.current = null;
+      }
+      
       setFile(selectedFile);
       setUrl("");
       setUploadedFileInfo(null); // 清除之前的上传信息
       setResult(null); // 清除之前的转录结果
       setProgressInfo({ stage: null, percentage: 0, message: '' }); // 清除进度信息
       
-      // 立即上传文件到 R2
+      // 立即上传文件到 R2（使用预签名URL直接上传）
       setProgress(t("progress.uploading"));
       setUploadProgress(0);
       
@@ -257,12 +265,40 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       });
       
       try {
-        const formData = new FormData();
-        formData.append("file", selectedFile);
-        formData.append("mode", mode);
+        // Step 1: 获取预签名上传URL
+        const presignedResponse = await fetch("/api/upload/presigned", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: selectedFile.name,
+            fileType: selectedFile.type,
+            fileSize: selectedFile.size,
+            mode: mode
+          })
+        });
 
-        // 使用 XMLHttpRequest 来跟踪上传进度
+        if (!presignedResponse.ok) {
+          throw new Error(`Failed to get upload URL: ${presignedResponse.statusText}`);
+        }
+
+        const presignedData = await presignedResponse.json();
+        
+        if (!presignedData.success) {
+          throw new Error(presignedData.error || 'Failed to get upload URL');
+        }
+
+        const { uploadUrl, key, publicUrl, downloadUrl } = presignedData.data;
+        
+        setProgressInfo({
+          stage: 'upload',
+          percentage: 5,
+          message: 'Uploading file...',
+          estimatedTime: estimateUploadTime(selectedFile.size)
+        });
+
+        // Step 2: 使用预签名URL直接上传到R2
         const xhr = new XMLHttpRequest();
+        uploadXhrRef.current = xhr; // 保存引用以便能够中断
         
         // 先定义startTime，这样进度事件处理器才能访问到
         const startTime = Date.now();
@@ -271,21 +307,21 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         const uploadPromise = new Promise((resolve, reject) => {
           xhr.upload.addEventListener("progress", (event) => {
             if (event.lengthComputable) {
-              // 上传进度只占总进度的90%，剩余10%留给服务器处理
               const uploadPercent = Math.round((event.loaded / event.total) * 100);
-              const adjustedPercent = Math.round((event.loaded / event.total) * 90);
               setUploadProgress(uploadPercent);
               
-              // 当上传到服务器完成时（100%），显示90%进度并提示正在处理
+              // 直接上传到R2，显示真实进度
               if (uploadPercent === 100) {
                 setProgressInfo({
                   stage: 'upload',
-                  percentage: 90,
-                  message: 'Uploading to cloud storage...',
-                  estimatedTime: '~10s'
+                  percentage: 100,
+                  message: 'Upload completed!',
+                  estimatedTime: '0s'
                 });
-                setProgress('Uploading to cloud storage...');
+                setProgress('Upload completed!');
               } else {
+                // 从5%开始（因为前5%用于获取URL）
+                const adjustedPercent = 5 + Math.round((event.loaded / event.total) * 95);
                 setProgressInfo({
                   stage: 'upload',
                   percentage: adjustedPercent,
@@ -296,92 +332,152 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             }
           });
 
-          // 监听readyState变化，更精确地跟踪状态
-          xhr.addEventListener("readystatechange", () => {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-              if (xhr.status === 200) {
-                try {
-                  // 服务器处理完成，显示100%
-                  setProgressInfo({
-                    stage: 'upload',
-                    percentage: 100,
-                    message: 'Upload completed!',
-                    estimatedTime: '0s'
-                  });
-                  const result = JSON.parse(xhr.responseText);
-                  resolve(result);
-                } catch (e) {
-                  reject(new Error("Failed to parse response"));
-                }
-              } else if (xhr.status > 0) {
-                // status > 0 表示收到了响应（0表示网络错误）
-                reject(new Error(`Upload failed with status ${xhr.status}`));
-              }
+          xhr.addEventListener("load", () => {
+            // R2上传成功（200或204）
+            if (xhr.status === 200 || xhr.status === 204) {
+              setProgressInfo({
+                stage: 'upload',
+                percentage: 100,
+                message: 'Upload completed!',
+                estimatedTime: '0s'
+              });
+              resolve({ success: true });
+            } else {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
             }
           });
 
-          xhr.addEventListener("error", () => reject(new Error("Upload failed")));
-          xhr.addEventListener("abort", () => reject(new Error("Upload cancelled")));
-          
-          // 超时处理也需要reject Promise
-          xhr.addEventListener("timeout", () => {
-            console.error('Upload timeout');
-            reject(new Error("Upload timeout"));
+          xhr.addEventListener("error", () => {
+            console.error('Direct upload failed, likely CORS issue');
+            reject(new Error("CORS error - Please configure R2 CORS policy"));
           });
+          xhr.addEventListener("abort", () => reject(new Error("USER_CANCELLED")));
+          xhr.addEventListener("timeout", () => reject(new Error("Upload timeout")));
         });
 
-        xhr.open("POST", "/api/upload");
+        // 配置直接上传到R2
+        xhr.open("PUT", uploadUrl);
+        xhr.setRequestHeader("Content-Type", selectedFile.type);
+        
         // 设置超时时间为10分钟（对于大文件）
         xhr.timeout = 600000; // 10 minutes
-        xhr.send(formData);
-
-        let uploadResult;
-        try {
-          uploadResult = await uploadPromise as any;
-          console.log('[DEBUG] Upload result:', uploadResult);
-        } catch (uploadError) {
-          console.error('[DEBUG] Upload promise error:', uploadError);
-          // 如果是超时或网络错误，提供更友好的提示
-          if (uploadError instanceof Error) {
-            if (uploadError.message.includes('timeout')) {
-              setProgress('Upload timed out. The file might be too large or your connection is slow.');
-            } else {
-              setProgress(`Upload failed: ${uploadError.message}`);
-            }
-          }
-          setFile(null);
-          setProgressInfo({ stage: null, percentage: 0, message: '' });
-          setUploadProgress(0);
-          
-          // 上传Promise失败后也要重置文件输入控件
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-          return;
-        }
         
-        if (uploadResult && uploadResult.success) {
-          setUploadedFileInfo(uploadResult.data);
+        // 直接发送文件内容
+        xhr.send(selectedFile);
+
+        // 等待上传完成
+        try {
+          await uploadPromise;
+          console.log('[DEBUG] Direct upload to R2 successful');
+          
+          // 上传成功，清除XHR引用
+          uploadXhrRef.current = null;
+          
+          // 上传成功，保存文件信息
+          const uploadedInfo = {
+            key: key,
+            replicateUrl: downloadUrl || publicUrl, // 使用预签名下载URL（如果可用）用于转录
+            r2Key: key,
+            originalName: selectedFile.name,
+            fileType: selectedFile.type,
+            fileSize: selectedFile.size,
+            uploadMethod: 'presigned-url'
+          };
+          
+          setUploadedFileInfo(uploadedInfo);
           setProgress(t("progress.upload_success"));
           setProgressInfo({ stage: null, percentage: 0, message: '' });
           setUploadProgress(0);
-          console.log('[DEBUG] Upload success, uploadedFileInfo set:', uploadResult.data);
+          console.log('[DEBUG] Upload success, uploadedFileInfo set:', uploadedInfo);
           
-          // 上传成功后重置文件输入控件
+          // 注意：不要清除 setFile(selectedFile)，因为我们需要显示文件信息
+          // 只清除文件输入控件的值，以便可以重新选择同一个文件
           if (fileInputRef.current) {
             fileInputRef.current.value = '';
           }
-        } else {
-          const errorMsg = uploadResult?.error || 'Unknown upload error';
-          setProgress(`Upload failed: ${errorMsg}`);
-          setFile(null); // 清除文件选择
-          setProgressInfo({ stage: null, percentage: 0, message: '' });
-          setUploadProgress(0);
-          console.log('[DEBUG] Upload failed:', errorMsg);
+        } catch (uploadError) {
+          console.error('[DEBUG] Direct upload error:', uploadError);
           
-          // 上传失败后也重置文件输入控件
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+          // 清除XHR引用
+          uploadXhrRef.current = null;
+          
+          // 如果是用户主动取消，不显示错误，只清理状态
+          if (uploadError instanceof Error && uploadError.message === 'USER_CANCELLED') {
+            console.log('[DEBUG] Upload cancelled by user');
+            setProgress("");
+            setProgressInfo({ stage: null, percentage: 0, message: '' });
+            setUploadProgress(0);
+            return;
+          }
+          
+          // 如果是CORS错误，尝试回退到传统上传方式
+          if (uploadError instanceof Error && uploadError.message.includes('CORS')) {
+            console.log('CORS error detected, falling back to traditional upload...');
+            setProgress('Uploading file...');
+            
+            // 回退到传统上传
+            try {
+              setProgressInfo({
+                stage: 'upload',
+                percentage: 10,
+                message: 'Uploading file...',
+                estimatedTime: estimateUploadTime(selectedFile.size) 
+              });
+              
+              const formData = new FormData();
+              formData.append("file", selectedFile);
+              formData.append("mode", mode);
+              
+              const uploadResponse = await fetch("/api/upload", {
+                method: "POST",
+                body: formData
+              });
+              
+              const uploadResult = await uploadResponse.json();
+              
+              if (uploadResult.success) {
+                setUploadedFileInfo(uploadResult.data);
+                setProgress(t("progress.upload_success"));
+                setProgressInfo({ stage: null, percentage: 0, message: '' });
+                setUploadProgress(0);
+                console.log('[DEBUG] Fallback upload success');
+                
+                // 保持file状态，只清除input的值
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+              } else {
+                throw new Error(uploadResult.error || 'Fallback upload failed');
+              }
+            } catch (fallbackError) {
+              console.error('Fallback upload also failed:', fallbackError);
+              setProgress('Upload failed. Please try again.');
+              setFile(null);
+              setProgressInfo({ stage: null, percentage: 0, message: '' });
+              setUploadProgress(0);
+              
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
+              return;
+            }
+          } else {
+            // 其他错误
+            if (uploadError instanceof Error) {
+              if (uploadError.message.includes('timeout')) {
+                setProgress('Upload timed out. The file might be too large or your connection is slow.');
+              } else {
+                setProgress(`Upload failed: ${uploadError.message}`);
+              }
+            }
+            setFile(null);
+            setProgressInfo({ stage: null, percentage: 0, message: '' });
+            setUploadProgress(0);
+            
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            return;
           }
         }
       } catch (error) {
@@ -1037,12 +1133,24 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                
+                // 如果有正在进行的上传，中断它
+                if (uploadXhrRef.current) {
+                  uploadXhrRef.current.abort();
+                  uploadXhrRef.current = null;
+                }
+                
                 setFile(null);
                 setUploadedFileInfo(null);
                 setUrl("");
                 setResult(null);
                 setProgress("");
                 setProgressInfo({ stage: null, percentage: 0, message: '' });
+                setUploadProgress(0);
+                // 重置文件输入框的值，这样可以重新选择同一个文件
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
               }}
               className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-colors"
               type="button"
