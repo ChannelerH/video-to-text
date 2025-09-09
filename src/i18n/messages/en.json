@@ -528,7 +528,8 @@
       "banner": "Unauthenticated: showing 90s preview",
       "message": "Sign in to run full transcription and save results to your history.",
       "sign_in": "Sign in to unlock full",
-      "download_disabled": "Download disabled in preview"
+      "download_disabled": "Download disabled in preview",
+      "download_preview": "Download preview"
     },
     "social_proof": "★★★★★ 4.8 | 1000+ conversions | 12 countries",
     "high_accuracy": {

@@ -384,7 +384,8 @@
       "banner": "未登录：仅展示 90 秒预览",
       "message": "登录后可进行完整转录，并将结果保存到历史记录。",
       "sign_in": "登录解锁完整结果",
-      "download_disabled": "预览模式不可下载"
+      "download_disabled": "预览模式不可下载",
+      "download_preview": "下载预览"
     },
     "social_proof": "★★★★★ 4.8 | 1000+ 次转换 | 覆盖 12 个国家",
     "high_accuracy": {
