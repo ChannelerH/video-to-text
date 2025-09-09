@@ -1238,7 +1238,7 @@ export class TranscriptionService {
     const cachedEntry = await transcriptionCache.get('youtube', videoId);
     if (cachedEntry) {
       console.log('[Preview][YouTube] Full transcription cache present, extracting preview');
-      const preview = this.extractPreview(cachedEntry.transcriptionData, cachedEntry.formats);
+      const preview = await this.extractPreview(cachedEntry.transcriptionData, cachedEntry.formats);
       return {
         success: true,
         preview
@@ -1261,8 +1261,31 @@ export class TranscriptionService {
         if (captionText && captionText.trim().length > 0) {
           // 字幕有内容，使用字幕预览
           console.log('[Preview][YouTube] Using caption preview (text length:', captionText.length, ')');
+          
+          // 检测是否为中文内容并应用LLM润色
+          let processedText = captionText;
+          try {
+            const isZh = (bestCaption.languageCode || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(captionText);
+            if (isZh) {
+              console.log('[Preview][YouTube] Detected Chinese caption, applying LLM refinement');
+              // 先截取预览长度，然后润色
+              const previewText = this.truncateText(captionText, 90);
+              const refined = await punctuateTextLLM(previewText, { 
+                language: 'zh',
+                isPreview: true,
+                maxTokens: 500
+              } as any);
+              if (refined) {
+                console.log('[Preview][YouTube] Caption LLM refinement applied successfully');
+                processedText = refined;
+              }
+            }
+          } catch (error) {
+            console.warn('[Preview][YouTube] Caption LLM refinement failed:', error);
+          }
+          
           const preview = {
-            text: this.truncateText(captionText, 90),
+            text: this.truncateText(processedText, 90),
             srt: this.truncateSRT(captionSRT, 90),
             duration: 90
           };
@@ -1360,7 +1383,7 @@ export class TranscriptionService {
       }, 30000);
 
       // 提取90秒预览
-      const preview = this.extractPreview(transcription, {
+      const preview = await this.extractPreview(transcription, {
         txt: transcription.text,
         srt: this.transcriptionService.convertToSRT(transcription)
       });
@@ -1429,7 +1452,7 @@ export class TranscriptionService {
 
       setTimeout(() => this.r2Service.deleteFile(clipUpload.key).catch(() => {}), 30000);
 
-      const preview = this.extractPreview(transcription, {
+      const preview = await this.extractPreview(transcription, {
         txt: transcription.text,
         srt: this.transcriptionService.convertToSRT(transcription)
       });
@@ -1497,9 +1520,34 @@ export class TranscriptionService {
   /**
    * 从完整转录中提取预览
    */
-  private extractPreview(transcription: TranscriptionResult, formats: Record<string, string>): NonNullable<TranscriptionResponse['preview']> {
+  private async extractPreview(transcription: TranscriptionResult, formats: Record<string, string>): Promise<NonNullable<TranscriptionResponse['preview']>> {
     // 使用优化后的标点符号处理
-    const optimizedText = this.transcriptionService.convertToPlainText(transcription);
+    let optimizedText = this.transcriptionService.convertToPlainText(transcription);
+    
+    // 检测是否为中文内容并应用LLM润色
+    try {
+      const isZh = (transcription.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(optimizedText);
+      if (isZh) {
+        console.log('[Preview] Detected Chinese content, applying LLM refinement for preview');
+        // 先截取预览长度，然后润色（避免处理过长文本）
+        const previewText = this.truncateText(optimizedText, 90);
+        
+        // 应用LLM润色，使用预览专用配置（限制token数量）
+        const refined = await punctuateTextLLM(previewText, { 
+          language: 'zh',
+          isPreview: true,  // 标记为预览，可能使用更快的模型或更低的token限制
+          maxTokens: 500    // 限制token数量以加快处理速度
+        } as any);
+        
+        if (refined) {
+          console.log('[Preview] LLM refinement applied successfully');
+          optimizedText = refined;
+        }
+      }
+    } catch (error) {
+      console.warn('[Preview] LLM refinement failed, using original text:', error);
+      // 失败时使用原始文本，不影响预览生成
+    }
     
     return {
       text: this.truncateText(optimizedText, 90),

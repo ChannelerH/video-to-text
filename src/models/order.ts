@@ -158,7 +158,7 @@ export async function getOrdersByUserUuid(
  */
 export async function getActiveOrdersByUserUuid(
   user_uuid: string
-): Promise<(typeof orders.$inferSelect)[] | undefined> {
+): Promise<(typeof orders.$inferSelect)[]> {
   const nowSec = Math.floor(Date.now() / 1000);
   const data = await db()
     .select()
