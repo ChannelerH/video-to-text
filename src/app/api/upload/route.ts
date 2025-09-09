@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CloudflareR2Service } from '@/lib/r2-upload';
 
+// 配置API路由以支持大文件上传
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60秒超时
+
 // 支持的文件类型
 const SUPPORTED_VIDEO_TYPES = [
   'video/mp4',

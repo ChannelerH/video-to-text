@@ -27,6 +27,13 @@ export interface TranscriptionRequest {
     languageProbeSeconds?: number; // 语言探针秒数（前端可传 8-12）
     forceChinese?: boolean; // 前端探针结果强制中文
     skipCaptions?: boolean; // 跳过YouTube字幕，直接音频转录
+    streamProgress?: boolean; // 是否启用流式进度更新
+    onProgress?: (progress: {
+      stage: 'download' | 'transcribe' | 'process';
+      percentage: number;
+      message: string;
+      estimatedTime?: string;
+    }) => void; // 总体进度回调
   };
 }
 
@@ -68,12 +75,73 @@ export class TranscriptionService {
     return ha ? ':ha1' : ':ha0';
   }
 
+  // Helper method to estimate total processing time based on video duration
+  private estimateProcessingTime(durationInSeconds: number): string {
+    // durationInSeconds: 视频的总时长（秒）
+    // Based on experience: ~3s per minute of video for download + transcription
+    const estimatedSeconds = Math.ceil(durationInSeconds / 60) * 3;
+    
+    if (estimatedSeconds < 60) {
+      return `~${estimatedSeconds}s`;
+    } else if (estimatedSeconds < 3600) {
+      const minutes = Math.floor(estimatedSeconds / 60);
+      const seconds = estimatedSeconds % 60;
+      return seconds > 0 ? `~${minutes}m ${seconds}s` : `~${minutes}m`;
+    } else {
+      const hours = Math.floor(estimatedSeconds / 3600);
+      const minutes = Math.floor((estimatedSeconds % 3600) / 60);
+      return minutes > 0 ? `~${hours}h ${minutes}m` : `~${hours}h`;
+    }
+  }
+
+  // Helper method to estimate remaining time based on progress
+  private estimateRemainingTime(durationInSeconds: number, currentProgress: number): string {
+    // durationInSeconds: 视频的总时长（秒）
+    // currentProgress: 当前进度百分比 (0-100)
+    
+    // 特殊处理95%的情况，避免显示0s让用户困惑
+    if (currentProgress >= 95 && currentProgress < 100) {
+      return '~5s';
+    }
+    
+    const totalEstimatedSeconds = Math.ceil(durationInSeconds / 60) * 3;
+    const remainingSeconds = Math.ceil(totalEstimatedSeconds * (100 - currentProgress) / 100);
+    
+    // 确保最小显示时间，避免显示0s
+    if (remainingSeconds <= 0) {
+      return '< 1s';
+    }
+    
+    if (remainingSeconds < 60) {
+      return `~${remainingSeconds}s`;
+    } else if (remainingSeconds < 3600) {
+      const minutes = Math.floor(remainingSeconds / 60);
+      const seconds = remainingSeconds % 60;
+      return seconds > 0 ? `~${minutes}m ${seconds}s` : `~${minutes}m`;
+    } else {
+      const hours = Math.floor(remainingSeconds / 3600);
+      const minutes = Math.floor((remainingSeconds % 3600) / 60);
+      return minutes > 0 ? `~${hours}h ${minutes}m` : `~${hours}h`;
+    }
+  }
+
   /**
    * 主要的转录处理函数
    */
   async processTranscription(request: TranscriptionRequest): Promise<TranscriptionResponse> {
     try {
       const overallStart = Date.now();
+      const onProgress = request.options?.onProgress;
+      
+      // Report initial progress
+      if (onProgress) {
+        onProgress({
+          stage: 'download',
+          percentage: 0,
+          message: 'Initializing...'
+        });
+      }
+      
       const res = request.type === 'youtube_url'
         ? await this.processYouTubeTranscription(request)
         : request.type === 'audio_url'
@@ -382,6 +450,17 @@ export class TranscriptionService {
       // 快速失败：只尝试一次优化下载，失败立即降级
       const maxAttempts = 1;
 
+      // Report download phase
+      if (request.options?.onProgress) {
+        const estimatedTime = this.estimateProcessingTime(videoInfo.duration);
+        request.options.onProgress({
+          stage: 'download',
+          percentage: 10,
+          message: 'Downloading audio...',
+          estimatedTime
+        });
+      }
+
       // 带重试的下载逻辑
       const _dlStart = Date.now();
       while (downloadAttempts < maxAttempts) {
@@ -492,6 +571,16 @@ export class TranscriptionService {
       }
       console.log(`[Stage] youtube.download_audio ${Date.now() - _dlStart}ms`);
 
+      // Report transcription phase
+      if (request.options?.onProgress) {
+        request.options.onProgress({
+          stage: 'transcribe',
+          percentage: 40,
+          message: 'Transcribing audio...',
+          estimatedTime: this.estimateRemainingTime(videoInfo.duration, 40)
+        });
+      }
+
       // 生成临时文件名，包含下载方法信息用于调试
       const audioFileName = `youtube_${videoInfo.videoId}_${downloadMethod}_${Date.now()}.m4a`;
       
@@ -549,9 +638,29 @@ export class TranscriptionService {
         (transcription as any).srtText = undefined;
       } catch {}
 
+      // Report formatting phase
+      if (request.options?.onProgress) {
+        request.options.onProgress({
+          stage: 'process',
+          percentage: 85,
+          message: 'Generating formats...',
+          estimatedTime: this.estimateRemainingTime(videoInfo.duration, 85)
+        });
+      }
+
       // 生成不同格式
       const formats = await this.time('formats.generate', this.generateFormats(transcription, videoInfo.title));
       console.log('[TEST][FMT-001] formats.generated', { txt: !!formats.txt, srt: !!formats.srt, vtt: !!formats.vtt, json: !!formats.json, md: !!formats.md });
+
+      // Report near completion
+      if (request.options?.onProgress) {
+        request.options.onProgress({
+          stage: 'process',
+          percentage: 95,
+          message: 'Finalizing...',
+          estimatedTime: '~5s'
+        });
+      }
 
       // 缓存结果
       await this.time('cache.set', transcriptionCache.set(
@@ -604,6 +713,16 @@ export class TranscriptionService {
         } catch (e) {
           console.warn('DB write skipped:', e);
         }
+      }
+
+      // Report 100% completion
+      if (request.options?.onProgress) {
+        request.options.onProgress({
+          stage: 'process',
+          percentage: 100,
+          message: 'Completed',
+          estimatedTime: '0s'
+        });
       }
 
       return {
@@ -1107,6 +1226,16 @@ export class TranscriptionService {
     }
 
     try {
+      // Report transcription start
+      if (request.options?.onProgress) {
+        request.options.onProgress({
+          stage: 'transcribe',
+          percentage: 10,
+          message: 'Starting transcription...',
+          estimatedTime: '~30s' // 文件已上传，估算30秒转录时间
+        });
+      }
+
       // 进行转录（根据用户等级选择模型）
       const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(filePath, {
         language: request.options?.language || 'auto',
@@ -1115,6 +1244,16 @@ export class TranscriptionService {
         outputFormat: request.options?.outputFormat || 'json',
         highAccuracyMode: request.options?.highAccuracyMode
       }));
+
+      // Report processing phase
+      if (request.options?.onProgress) {
+        request.options.onProgress({
+          stage: 'transcribe',
+          percentage: 50,
+          message: 'Processing audio...',
+          estimatedTime: '~15s'
+        });
+      }
 
       // 本地中文规范化（如适用）+ 英文术语修复 + 可选LLM标点增强
       try {
@@ -1145,6 +1284,16 @@ export class TranscriptionService {
         );
         (transcription as any).srtText = undefined;
       } catch {}
+
+      // Report formatting phase
+      if (request.options?.onProgress) {
+        request.options.onProgress({
+          stage: 'process',
+          percentage: 85,
+          message: 'Generating formats...',
+          estimatedTime: '~5s'
+        });
+      }
 
       // 估算成本
       const estimatedCost = this.transcriptionService.estimateCost(transcription.duration);
@@ -1187,6 +1336,16 @@ export class TranscriptionService {
         } catch(e) {
           // ignore
         }
+      }
+
+      // Report completion
+      if (request.options?.onProgress) {
+        request.options.onProgress({
+          stage: 'process',
+          percentage: 100,
+          message: 'Completed',
+          estimatedTime: '0s'
+        });
       }
 
       return {

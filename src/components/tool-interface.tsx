@@ -43,6 +43,14 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<string>("");
   const [result, setResult] = useState<any>(null);
+  // Progress tracking
+  const [progressInfo, setProgressInfo] = useState<{
+    stage: 'upload' | 'download' | 'transcribe' | 'process' | null;
+    percentage: number;
+    message: string;
+    estimatedTime?: string;
+  }>({ stage: null, percentage: 0, message: '' });
+  const [uploadProgress, setUploadProgress] = useState(0);
   // AI refine button removed; backend runs optional refinement automatically for Chinese
   const [highAccuracy, setHighAccuracy] = useState(false);
   const [uploadedFileInfo, setUploadedFileInfo] = useState<any>(null);
@@ -69,6 +77,27 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     // setShowChineseUpgrade(true);
     // if (timerRef.current) clearTimeout(timerRef.current);
     // timerRef.current = setTimeout(() => setShowChineseUpgrade(false), 10000);
+  };
+
+  // Estimate processing time based on duration
+  const estimateProcessingTime = (durationInSeconds: number): string => {
+    // Based on experience:
+    // - Download: ~0.5-1 second per minute of video
+    // - Transcription: ~0.2-0.3 second per minute for Deepgram
+    // - Post-processing: ~2-5 seconds fixed
+    const minutes = durationInSeconds / 60;
+    const downloadTime = minutes * 0.7; // Average download time
+    const transcribeTime = minutes * 0.25; // Average transcription time
+    const processTime = 3; // Fixed post-processing
+    const totalSeconds = Math.ceil(downloadTime + transcribeTime + processTime);
+    
+    if (totalSeconds < 60) {
+      return `${totalSeconds} seconds`;
+    } else {
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      return secs > 0 ? `${mins}m ${secs}s` : `${mins} minutes`;
+    }
   };
   
   // Clean up timer on unmount
@@ -205,41 +234,182 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement> | { target: { files: FileList | null } }) => {
     const selectedFile = event.target.files?.[0] || null;
+    
+    console.log('[DEBUG] handleFileChange called, file:', selectedFile?.name);
+    
     if (selectedFile) {
       setFile(selectedFile);
       setUrl("");
+      setUploadedFileInfo(null); // 清除之前的上传信息
+      setResult(null); // 清除之前的转录结果
+      setProgressInfo({ stage: null, percentage: 0, message: '' }); // 清除进度信息
       
       // 立即上传文件到 R2
       setProgress(t("progress.uploading"));
+      setUploadProgress(0);
+      
+      // 显示上传进度
+      setProgressInfo({
+        stage: 'upload',
+        percentage: 0,
+        message: 'Uploading file...',
+        estimatedTime: estimateUploadTime(selectedFile.size)
+      });
+      
       try {
         const formData = new FormData();
         formData.append("file", selectedFile);
         formData.append("mode", mode);
 
-        const uploadResponse = await fetch("/api/upload", {
-          method: "POST",
-          body: formData
+        // 使用 XMLHttpRequest 来跟踪上传进度
+        const xhr = new XMLHttpRequest();
+        
+        // 先定义startTime，这样进度事件处理器才能访问到
+        const startTime = Date.now();
+        
+        // 创建一个 Promise 来处理异步上传
+        const uploadPromise = new Promise((resolve, reject) => {
+          xhr.upload.addEventListener("progress", (event) => {
+            if (event.lengthComputable) {
+              // 上传进度只占总进度的90%，剩余10%留给服务器处理
+              const uploadPercent = Math.round((event.loaded / event.total) * 100);
+              const adjustedPercent = Math.round((event.loaded / event.total) * 90);
+              setUploadProgress(uploadPercent);
+              
+              // 当上传到服务器完成时（100%），显示90%进度并提示正在处理
+              if (uploadPercent === 100) {
+                setProgressInfo({
+                  stage: 'upload',
+                  percentage: 90,
+                  message: 'Uploading to cloud storage...',
+                  estimatedTime: '~10s'
+                });
+                setProgress('Uploading to cloud storage...');
+              } else {
+                setProgressInfo({
+                  stage: 'upload',
+                  percentage: adjustedPercent,
+                  message: `Uploading: ${formatBytes(event.loaded)} / ${formatBytes(event.total)}`,
+                  estimatedTime: estimateRemainingUploadTime(event.loaded, event.total, Date.now() - startTime)
+                });
+              }
+            }
+          });
+
+          // 监听readyState变化，更精确地跟踪状态
+          xhr.addEventListener("readystatechange", () => {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+              if (xhr.status === 200) {
+                try {
+                  // 服务器处理完成，显示100%
+                  setProgressInfo({
+                    stage: 'upload',
+                    percentage: 100,
+                    message: 'Upload completed!',
+                    estimatedTime: '0s'
+                  });
+                  const result = JSON.parse(xhr.responseText);
+                  resolve(result);
+                } catch (e) {
+                  reject(new Error("Failed to parse response"));
+                }
+              } else if (xhr.status > 0) {
+                // status > 0 表示收到了响应（0表示网络错误）
+                reject(new Error(`Upload failed with status ${xhr.status}`));
+              }
+            }
+          });
+
+          xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+          xhr.addEventListener("abort", () => reject(new Error("Upload cancelled")));
+          
+          // 超时处理也需要reject Promise
+          xhr.addEventListener("timeout", () => {
+            console.error('Upload timeout');
+            reject(new Error("Upload timeout"));
+          });
         });
 
-        const uploadResult = await uploadResponse.json();
-        if (uploadResult.success) {
+        xhr.open("POST", "/api/upload");
+        // 设置超时时间为10分钟（对于大文件）
+        xhr.timeout = 600000; // 10 minutes
+        xhr.send(formData);
+
+        let uploadResult;
+        try {
+          uploadResult = await uploadPromise as any;
+          console.log('[DEBUG] Upload result:', uploadResult);
+        } catch (uploadError) {
+          console.error('[DEBUG] Upload promise error:', uploadError);
+          // 如果是超时或网络错误，提供更友好的提示
+          if (uploadError instanceof Error) {
+            if (uploadError.message.includes('timeout')) {
+              setProgress('Upload timed out. The file might be too large or your connection is slow.');
+            } else {
+              setProgress(`Upload failed: ${uploadError.message}`);
+            }
+          }
+          setFile(null);
+          setProgressInfo({ stage: null, percentage: 0, message: '' });
+          setUploadProgress(0);
+          
+          // 上传Promise失败后也要重置文件输入控件
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+        
+        if (uploadResult && uploadResult.success) {
           setUploadedFileInfo(uploadResult.data);
           setProgress(t("progress.upload_success"));
+          setProgressInfo({ stage: null, percentage: 0, message: '' });
+          setUploadProgress(0);
+          console.log('[DEBUG] Upload success, uploadedFileInfo set:', uploadResult.data);
+          
+          // 上传成功后重置文件输入控件
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
         } else {
-          setProgress(`Upload failed: ${uploadResult.error}`);
+          const errorMsg = uploadResult?.error || 'Unknown upload error';
+          setProgress(`Upload failed: ${errorMsg}`);
           setFile(null); // 清除文件选择
+          setProgressInfo({ stage: null, percentage: 0, message: '' });
+          setUploadProgress(0);
+          console.log('[DEBUG] Upload failed:', errorMsg);
+          
+          // 上传失败后也重置文件输入控件
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
         }
       } catch (error) {
         console.error("Upload error:", error);
         setProgress(t("errors.upload_failed"));
         setFile(null); // 清除文件选择
+        setProgressInfo({ stage: null, percentage: 0, message: '' });
+        setUploadProgress(0);
+        
+        // 出错后重置文件输入控件
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     }
   };
 
   const handleTranscribe = async () => {
+    console.log('[DEBUG] handleTranscribe called, url:', url, 'uploadedFileInfo:', uploadedFileInfo, 'file:', file?.name);
+    
+    // 检查是否有URL或已上传的文件
     if (!url && !uploadedFileInfo) {
-      setProgress(t("upload_required"));
+      // 如果有选择的文件但还没上传完成，提示等待
+      if (file) {
+        setProgress(t("errors.wait_for_upload"));
+      } else {
+        setProgress(t("upload_required"));
+      }
       return;
     }
 
@@ -249,6 +419,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     setIsProcessing(true);
     setProgress(t("progress.starting"));
     setResult(null);
+    setProgressInfo({ stage: null, percentage: 0, message: '' });
 
     try {
       // Determine action based on authentication status
@@ -324,20 +495,94 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         return;
       }
 
-      // send request
-      const response = await fetch("/api/transcribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestData)
-      });
+      // Add streamProgress flag for authenticated users
+      if (isAuthenticated && requestData) {
+        requestData.options = { ...requestData.options, streamProgress: true };
+      }
+
+      // Send request with SSE support for authenticated users
       let result: any = null;
-      try {
-        result = await response.json();
-      } catch (e) {
-        console.error('[Main] Failed to parse JSON:', e);
-        setProgress('Failed to parse server response. Please try again.');
-        setIsProcessing(false);
-        return;
+      
+      if (isAuthenticated && requestData?.options?.streamProgress) {
+        // Use EventSource for progress updates
+        const response = await fetch("/api/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestData)
+        });
+
+        if (response.headers.get('content-type')?.includes('text/event-stream')) {
+          // Handle SSE response
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          if (reader) {
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    try {
+                      const data = JSON.parse(line.slice(6));
+                      
+                      if (data.type === 'progress') {
+                        setProgressInfo({
+                          stage: data.stage,
+                          percentage: data.percentage,
+                          message: data.message,
+                          estimatedTime: data.estimatedTime
+                        });
+                        setProgress(data.message);
+                      } else if (data.type === 'complete') {
+                        result = data.result;
+                        break;
+                      } else if (data.type === 'error') {
+                        throw new Error(data.error);
+                      }
+                    } catch (e) {
+                      console.error('Failed to parse SSE data:', e);
+                    }
+                  }
+                }
+              }
+            } finally {
+              reader.releaseLock();
+            }
+          }
+        } else {
+          // Non-SSE response, parse as JSON
+          try {
+            result = await response.json();
+          } catch (e) {
+            console.error('[Main] Failed to parse JSON:', e);
+            setProgress('Failed to parse server response. Please try again.');
+            setIsProcessing(false);
+            return;
+          }
+        }
+      } else {
+        // Non-authenticated or preview request
+        const response = await fetch("/api/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestData)
+        });
+        
+        try {
+          result = await response.json();
+        } catch (e) {
+          console.error('[Main] Failed to parse JSON:', e);
+          setProgress('Failed to parse server response. Please try again.');
+          setIsProcessing(false);
+          return;
+        }
       }
 
       if (result.success && result.data) {
@@ -350,6 +595,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         setResult({ type: "full", data: result.data });
         setProgress(t("progress.completed"));
         setShowSuccess(true);
+        // Clear progress bar after completion
+        setTimeout(() => {
+          setProgressInfo({ stage: null, percentage: 0, message: '' });
+        }, 1000);
       } else if (result.success && result.preview) {
         try {
           const lang = (result.preview as any)?.language as string;
@@ -471,6 +720,77 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     mode === "video"
       ? t("url_placeholder")
       : t("audio_url_placeholder");
+
+  // Format bytes to human-readable format
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  // Estimate upload time based on file size (assume 5 Mbps upload speed)
+  const estimateUploadTime = (fileSize: number): string => {
+    const uploadSpeedBytesPerSecond = 5 * 1024 * 1024 / 8; // 5 Mbps = 0.625 MB/s
+    const seconds = Math.ceil(fileSize / uploadSpeedBytesPerSecond);
+    
+    if (seconds < 60) {
+      return `~${seconds}s`;
+    } else {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return remainingSeconds > 0 ? `~${minutes}m ${remainingSeconds}s` : `~${minutes}m`;
+    }
+  };
+
+  // Estimate remaining upload time based on progress
+  const estimateRemainingUploadTime = (loaded: number, total: number, elapsedMs: number): string => {
+    if (loaded === 0 || elapsedMs === 0) return 'Calculating...';
+    
+    const uploadSpeed = loaded / (elapsedMs / 1000); // bytes per second
+    const remaining = total - loaded;
+    let secondsRemaining = Math.ceil(remaining / uploadSpeed);
+    
+    // 加上服务器处理时间的估算（约10秒）
+    if (loaded / total > 0.8) {
+      secondsRemaining += 10; // 接近完成时，加上R2上传时间
+    }
+    
+    if (secondsRemaining < 60) {
+      return `~${secondsRemaining}s`;
+    } else {
+      const minutes = Math.floor(secondsRemaining / 60);
+      const seconds = secondsRemaining % 60;
+      return seconds > 0 ? `~${minutes}m ${seconds}s` : `~${minutes}m`;
+    }
+  };
+
+  // Format duration from seconds to human-readable format
+  const formatDuration = (seconds: number): string => {
+    const totalSeconds = Math.round(seconds);
+    
+    if (totalSeconds < 60) {
+      return `${totalSeconds} seconds`;
+    } else if (totalSeconds < 3600) {
+      const minutes = Math.floor(totalSeconds / 60);
+      const remainingSeconds = totalSeconds % 60;
+      if (remainingSeconds === 0) {
+        return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+      }
+      return `${minutes}min ${remainingSeconds}s`;
+    } else {
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const remainingSeconds = totalSeconds % 60;
+      
+      let result = `${hours}h`;
+      if (minutes > 0) result += ` ${minutes}min`;
+      if (remainingSeconds > 0 && minutes === 0) result += ` ${remainingSeconds}s`;
+      
+      return result;
+    }
+  };
 
   // Build visualizer bars once with stable heights for SSR
   const bars = useMemo(() => Array.from({ length: 30 }, (_, i) => ({
@@ -718,7 +1038,11 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
               onClick={(e) => {
                 e.stopPropagation();
                 setFile(null);
+                setUploadedFileInfo(null);
                 setUrl("");
+                setResult(null);
+                setProgress("");
+                setProgressInfo({ stage: null, percentage: 0, message: '' });
               }}
               className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-colors"
               type="button"
@@ -744,6 +1068,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                 setUrl(e.target.value);
                 if (e.target.value) {
                   setFile(null); // Clear file when URL is entered
+                  setUploadedFileInfo(null); // Clear upload info
+                  setResult(null); // Clear previous results
+                  setProgressInfo({ stage: null, percentage: 0, message: '' });
                 }
               }}
               disabled={!!file} // Disable URL input when file is selected
@@ -914,6 +1241,41 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         {progress && (
           <div className="mt-8 flex flex-col items-center space-y-6 p-6 rounded-lg" style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)" }}>
             {isProcessing && <PyramidLoader size="medium" />}
+            
+            {/* Progress Bar */}
+            {progressInfo.stage && progressInfo.percentage > 0 && (
+              <div className="w-full max-w-md space-y-3">
+                <div className="flex justify-between text-sm" style={{ color: "#94A3B8" }}>
+                  <span>{progressInfo.message}</span>
+                  <span className="flex items-center gap-2">
+                    <span>{progressInfo.percentage}%</span>
+                    {progressInfo.estimatedTime && (
+                      <span className="text-xs opacity-75">(Est. {progressInfo.estimatedTime})</span>
+                    )}
+                  </span>
+                </div>
+                <div className="relative h-3 rounded-full overflow-hidden" style={{ background: "rgba(30,41,59,0.5)" }}>
+                  <div 
+                    className="absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out"
+                    style={{ 
+                      width: `${progressInfo.percentage}%`,
+                      background: "linear-gradient(90deg, #3B82F6, #A855F7)"
+                    }}
+                  >
+                    <div className="absolute inset-0 opacity-30" style={{
+                      background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
+                      animation: "shimmer 2s infinite"
+                    }} />
+                  </div>
+                </div>
+                {progressInfo.estimatedTime && (
+                  <div className="text-center text-xs" style={{ color: "#64748B" }}>
+                    Estimated time remaining: {progressInfo.estimatedTime}
+                  </div>
+                )}
+              </div>
+            )}
+            
             <p className="text-sm text-center" style={{ color: "#BFDBFE" }}>{progress}</p>
           </div>
         )}
@@ -934,7 +1296,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                       <span className="font-medium">{t("results.language")}</span> {result.data.transcription.language}
                     </div>
                     <div>
-                      <span className="font-medium">{t("results.duration")}</span> {Math.round(result.data.transcription.duration)}s
+                      <span className="font-medium">{t("results.duration")}</span> {formatDuration(result.data.transcription.duration)}
                     </div>
                   </div>
 

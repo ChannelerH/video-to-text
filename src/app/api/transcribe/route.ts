@@ -260,7 +260,94 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // 处理转录，启用降级
+      // 如果客户端支持SSE，使用流式响应
+      if (options.streamProgress) {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          async start(controller) {
+            try {
+              // 发送初始进度
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'progress',
+                stage: 'download',
+                percentage: 0,
+                message: 'Starting download...'
+              })}\n\n`));
+
+              const _procStart = Date.now();
+              
+              // 处理转录，启用降级，传入进度回调
+              const result = await transcriptionService.processTranscription({
+                type,
+                content,
+                options: { 
+                  ...options, 
+                  userId: user_uuid, 
+                  userTier,
+                  fallbackEnabled: true,
+                  onProgress: (progress: any) => {
+                    // 发送进度更新
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                      type: 'progress',
+                      ...progress
+                    })}\n\n`));
+                  }
+                }
+              });
+              
+              console.log('[API] transcribe.completed', { success: result?.success, fromCache: result?.data?.fromCache, duration: result?.data?.transcription?.duration, language: result?.data?.transcription?.language });
+              console.log(`[API] transcribe ${type} done in ${Date.now()-_procStart}ms (success=${result?.success}, fromCache=${result?.data?.fromCache ?? false})`);
+              
+              // 记录使用情况（按真实转录时长）
+              const durationSec = result?.data?.transcription?.duration || 0;
+              if (result.success && durationSec > 0) {
+                const actualMinutes = durationSec / 60;
+                await quotaTracker.recordUsage(user_uuid, actualMinutes, userTier);
+              }
+              
+              // 发送100%完成进度
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'progress',
+                stage: 'process',
+                percentage: 100,
+                message: 'Completed',
+                estimatedTime: '0s'
+              })}\n\n`));
+              
+              // 发送最终结果
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'complete',
+                result: {
+                  ...result,
+                  quotaInfo: {
+                    tier: userTier,
+                    remaining: quotaStatus.remaining
+                  }
+                }
+              })}\n\n`));
+              
+              controller.close();
+            } catch (error) {
+              console.error('Stream error:', error);
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'error',
+                error: error instanceof Error ? error.message : 'Processing failed'
+              })}\n\n`));
+              controller.close();
+            }
+          }
+        });
+
+        return new Response(stream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+          },
+        });
+      }
+
+      // 非流式响应（向后兼容）
       const _procStart = Date.now();
       const result = await transcriptionService.processTranscription({
         type,

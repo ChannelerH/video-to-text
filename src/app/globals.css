@@ -208,6 +208,12 @@ pre {
   100% { background-position: 200% 50%; }
 }
 
+/* Progress bar shimmer effect */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
 /* Download button hover effects */
 .download-format-btn {
   position: relative;
