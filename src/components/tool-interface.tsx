@@ -58,16 +58,17 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [zhBannerShown, setZhBannerShown] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  // Helper to display and auto-hide the Chinese upgrade toast
+  // Helper to display and auto-hide the Chinese upgrade toast (disabled)
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
   const showChineseToast = () => {
-    if (zhBannerShown) return; // prevent duplicate toasts within the same run
-    setZhBannerShown(true);
-    setShowChineseUpgrade(true);
-    // Auto-hide after 10s
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setShowChineseUpgrade(false), 10000);
+    // Disabled - no longer showing Chinese detection banner
+    return;
+    // if (zhBannerShown) return;
+    // setZhBannerShown(true);
+    // setShowChineseUpgrade(true);
+    // if (timerRef.current) clearTimeout(timerRef.current);
+    // timerRef.current = setTimeout(() => setShowChineseUpgrade(false), 10000);
   };
   
   // Clean up timer on unmount
@@ -908,42 +909,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           </div>
         )}
 
-        {/* Floating upgrade toast (visible immediately after probe) */}
-        {mounted && showChineseUpgrade && createPortal(
-          <div 
-            className="toast-floating pointer-events-none"
-            style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999, width: 'auto', maxWidth: '92vw' }}
-          >
-            <div role="alert" aria-live="polite" className="pointer-events-auto px-4">
-              <div
-                className="flex items-start gap-3 rounded-xl border shadow-xl px-4 py-3 text-blue-50 transition-all duration-300"
-                style={{
-                  background: "rgba(30,58,138,0.75)",
-                  borderColor: "rgba(147,197,253,0.35)",
-                  backdropFilter: "blur(8px)",
-                }}
-              >
-                <div className="mt-0.5">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="opacity-90">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="M12 7.5v.01M12 10.5v6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                </div>
-                <div className="text-sm sm:text-base font-semibold">
-                  {t('progress.chinese_upgrade')}
-                </div>
-                <button
-                  onClick={() => setShowChineseUpgrade(false)}
-                  className="ml-2 text-blue-200 hover:text-white transition-colors"
-                  aria-label="Close"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+        {/* Chinese detection toast - Disabled */}
 
         {progress && (
           <div className="mt-8 flex flex-col items-center space-y-6 p-6 rounded-lg" style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)" }}>
