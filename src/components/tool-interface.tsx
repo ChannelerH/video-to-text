@@ -407,6 +407,32 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     }
   };
 
+  const downloadPreview = () => {
+    if (!result?.data || result.type !== 'preview') return;
+
+    try {
+      // 添加预览标记
+      const previewMarker = `[PREVIEW - First 90 seconds only]\n[完整版预览 - 仅前90秒]\n\n`;
+      const watermark = `\n\n---\n[This is a preview of the first 90 seconds. Sign in for full transcription.]\n[这是前90秒的预览。登录以获取完整转录。]`;
+      
+      const content = previewMarker + (result.data.text || '') + watermark;
+      const fileName = 'preview_90s.txt';
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Preview download error:', error);
+    }
+  };
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -595,40 +621,84 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         </div>
 
         {/* Upload Zone */}
-        <div
-          className="upload-zone"
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onMouseMove={onMouseMoveZone}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={getAcceptTypes()}
-            onChange={handleFileChange}
-            style={{ display: "none" }}
-          />
-          <div className="upload-icon">📊</div>
-          <div className="upload-title">{t("upload_tip")}</div>
-          <div className="upload-desc">
-            {file ? `${file.name} • ${(file.size / (1024 * 1024)).toFixed(1)} MB` : t("supported_formats")}
+        <div className="relative">
+          <div
+            className={`upload-zone ${url ? 'disabled' : ''}`}
+            onDrop={url ? undefined : onDrop}
+            onDragOver={url ? undefined : onDragOver}
+            onDragLeave={url ? undefined : onDragLeave}
+            onMouseMove={url ? undefined : onMouseMoveZone}
+            onClick={() => !url && fileInputRef.current?.click()}
+            style={{ 
+              opacity: url ? 0.5 : 1,
+              cursor: url ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={getAcceptTypes()}
+              onChange={handleFileChange}
+              style={{ display: "none" }}
+            />
+            <div className="upload-icon">📊</div>
+            <div className="upload-title">
+              {url ? t("upload_disabled_url") : file ? t("click_to_replace") : t("upload_tip")}
+            </div>
+            <div className="upload-desc">
+              {file ? `${file.name} • ${(file.size / (1024 * 1024)).toFixed(1)} MB` : t("supported_formats")}
+            </div>
           </div>
+          
+          {/* Clear file button - as a small X icon in corner */}
+          {file && !url && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setFile(null);
+                setUrl("");
+              }}
+              className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-colors"
+              type="button"
+              aria-label={t("clear_file")}
+            >
+              ×
+            </button>
+          )}
         </div>
 
         {/* Subtle separator (remove heavy divider) */}
         <p className="my-4 text-center text-sm opacity-80">{t("or")}</p>
 
         {/* URL input */}
-        <div className="url-section">
-          <input
-            type="text"
-            className="url-input"
-            placeholder={getPlaceholder()}
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-          />
+        <div className="url-section" style={{ opacity: file ? 0.5 : 1 }}>
+          <div className="relative">
+            <input
+              type="text"
+              className="url-input"
+              placeholder={file ? t("url_disabled_file") : getPlaceholder()}
+              value={url}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                if (e.target.value) {
+                  setFile(null); // Clear file when URL is entered
+                }
+              }}
+              disabled={!!file} // Disable URL input when file is selected
+              style={{ cursor: file ? 'not-allowed' : 'text', paddingRight: url ? '60px' : '16px' }}
+            />
+            {url && !file && (
+              <button
+                onClick={() => {
+                  setUrl("");
+                }}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300 text-sm"
+                type="button"
+              >
+                {t("clear")}
+              </button>
+            )}
+          </div>
           <div className="url-help-text">
             <span className="text-xs text-gray-400">{t("url_help_text")}</span>
             <span className="text-xs text-gray-500 ml-2">•</span>
@@ -953,7 +1023,12 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                 </div>
                 <div className="mt-4 flex gap-2">
                   <a className="design-btn-primary" href="/auth/signin">{t('preview.sign_in')}</a>
-                  <button className="design-btn-secondary cursor-not-allowed opacity-70" disabled>{t('preview.download_disabled')}</button>
+                  <button 
+                    className="design-btn-secondary"
+                    onClick={() => downloadPreview()}
+                  >
+                    {t('preview.download_preview')} (90s)
+                  </button>
                 </div>
               </div>
             </div>

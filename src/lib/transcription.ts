@@ -1249,32 +1249,39 @@ export class TranscriptionService {
     console.log('[Preview][YouTube] Fetching video info');
     const videoInfo = await YouTubeService.getVideoInfo(videoId);
     
-    // 如果有字幕，快速生成预览
+    // 如果有字幕，尝试快速生成预览
     if (videoInfo.captions && videoInfo.captions.length > 0) {
       const bestCaption = YouTubeService.selectBestCaption(videoInfo.captions);
       if (bestCaption) {
-        console.log('[Preview][YouTube] Using caption for preview:', bestCaption.languageCode);
+        console.log('[Preview][YouTube] Trying caption for preview:', bestCaption.languageCode);
         const captionText = await YouTubeService.downloadCaption(bestCaption.url);
         const captionSRT = await YouTubeService.convertCaptionToSRT(bestCaption.url);
         
-        const preview = {
-          text: this.truncateText(captionText, 90),
-          srt: this.truncateSRT(captionSRT, 90),
-          duration: 90
-        };
-
-        return { success: true, preview };
+        // 检查字幕内容是否为空
+        if (captionText && captionText.trim().length > 0) {
+          // 字幕有内容，使用字幕预览
+          console.log('[Preview][YouTube] Using caption preview (text length:', captionText.length, ')');
+          const preview = {
+            text: this.truncateText(captionText, 90),
+            srt: this.truncateSRT(captionSRT, 90),
+            duration: 90
+          };
+          return { success: true, preview };
+        } else {
+          // 字幕为空，记录并继续到音频预览
+          console.log('[Preview][YouTube] Caption empty, will try audio preview fallback');
+        }
       }
     }
 
-    // 如果没有字幕，尝试进行音频转录生成预览（使用降级机制）
+    // 如果没有字幕或字幕为空，尝试进行音频转录生成预览（使用降级机制）
     // 但是对于未登录用户，我们应该限制这个功能避免成本过高
     const isAuthenticated = request.options?.userId ? true : false;
     
-    // 如果未登录且没有字幕，根据开关决定是否允许匿名预览
+    // 如果未登录，根据开关决定是否允许匿名预览
     const allowAnonPreview = process.env.PREVIEW_ALLOW_ANON === '1' || process.env.PREVIEW_ALLOW_ANON === 'true';
     if (!isAuthenticated && !allowAnonPreview) {
-      console.log('Unauthenticated user without captions - skipping audio transcription');
+      console.log('[Preview][YouTube] Unauthenticated user - audio preview disabled by config');
       return {
         success: true,
         preview: {
@@ -1285,11 +1292,11 @@ export class TranscriptionService {
       };
     }
     if (!isAuthenticated && allowAnonPreview) {
-      console.log('Anonymous preview allowed by PREVIEW_ALLOW_ANON; proceeding with 90s clip transcription');
+      console.log('[Preview][YouTube] Anonymous preview allowed by PREVIEW_ALLOW_ANON=true');
     }
     
     try {
-      console.log('No captions found, attempting audio transcription with fallback...');
+      console.log('[Preview][YouTube] Starting audio transcription fallback...');
       
       // 使用完整的下载逻辑（包含降级机制）
       const downloadOptions = this.createOptimizedDownloadOptions(request, videoInfo.duration);
@@ -1358,6 +1365,7 @@ export class TranscriptionService {
         srt: this.transcriptionService.convertToSRT(transcription)
       });
 
+      console.log('[Preview][YouTube] Audio preview generated successfully');
       return { success: true, preview };
     } catch (error) {
       console.error('YouTube preview generation failed with all methods:', error);
