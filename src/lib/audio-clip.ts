@@ -22,9 +22,10 @@ function resolveFfmpegPath(): string {
   return 'ffmpeg'; // Fallback to system ffmpeg in PATH
 }
 
-export async function createWavClipFromUrl(audioUrl: string, seconds: number = 10): Promise<Buffer> {
+export async function createWavClipFromUrl(audioUrl: string, seconds: number = 10, startOffset: number = 0): Promise<Buffer> {
   // Allow up to 120s to support 90s preview; probes typically pass 8–12s
   const clipSeconds = Math.max(1, Math.min(120, Math.floor(seconds || 10)));
+  const offsetSeconds = Math.max(0, Math.floor(startOffset || 0));
 
   // Resolve ffmpeg binary
   const ffmpegPath = resolveFfmpegPath();
@@ -39,12 +40,12 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
           return '[non-url/opaque]';
         }
       })();
-      console.log(`[ffmpeg] Creating WAV clip: ${clipSeconds}s from ${safeUrlLog}`);
+      console.log(`[ffmpeg] Creating WAV clip: ${clipSeconds}s from ${safeUrlLog} (offset: ${offsetSeconds}s)`);
       console.log(`[ffmpeg] Binary: ${ffmpegPath || 'ffmpeg (system PATH)'}`);
       const args = [
         '-hide_banner',
         '-loglevel', 'error',
-        '-ss', '0',
+        '-ss', String(offsetSeconds),
         '-t', String(clipSeconds),
         '-i', audioUrl,
         '-ar', '16000', // sample rate

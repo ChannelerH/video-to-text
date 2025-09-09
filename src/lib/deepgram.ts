@@ -139,6 +139,15 @@ export class DeepgramService {
         console.warn('[Deepgram] Missing alternatives; returning minimal result');
       }
       
+      // 如果 transcript 完全为空，记录警告
+      if (!transcriptText || transcriptText.trim().length === 0) {
+        console.warn('[Deepgram] Empty transcript returned. This may indicate:');
+        console.warn('  - Audio quality issues');
+        console.warn('  - Language detection problems');
+        console.warn('  - Silent or very quiet audio');
+        console.warn(`  - Detected language: ${channel.detected_language || 'unknown'}`);
+      }
+      
       // 处理中文转录结果中的空格问题
       
       // 检测是否为中文（包含中文字符）

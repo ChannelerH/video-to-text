@@ -1037,10 +1037,25 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                     </div>
                   )}
                   
-                  {/* Download Buttons */}
-                  <div className="space-y-2">
-                    <h4 className="font-medium" style={{ color: "#A7F3D0" }}>{t("results.download_options")}</h4>
-                    <div className="flex flex-wrap gap-2">
+                  {/* Download Buttons - Enhanced */}
+                  <div className="download-section mt-6 p-4 rounded-lg" style={{ 
+                    background: 'linear-gradient(135deg, rgba(34,211,238,0.05) 0%, rgba(168,85,247,0.05) 100%)',
+                    border: '1px solid rgba(168,85,247,0.2)'
+                  }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Download className="w-5 h-5" style={{ color: "#A7F3D0" }} />
+                      <h4 className="font-semibold text-lg" style={{ color: "#A7F3D0" }}>
+                        {t("results.download_options")}
+                      </h4>
+                      <span className="text-xs px-2 py-1 rounded-full" style={{ 
+                        background: 'rgba(16,185,129,0.1)', 
+                        color: '#10b981',
+                        border: '1px solid rgba(16,185,129,0.2)'
+                      }}>
+                        {Object.keys(result.data.formats).length} formats
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
                       {Object.keys(result.data.formats).map((format) => {
                         const id = format.toLowerCase();
                         const IconComp = id === 'json' ? Code : (id === 'txt' || id === 'md') ? FileText : Download;
@@ -1048,14 +1063,20 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           <Button
                             key={format}
                             variant="outline"
-                            size="sm"
+                            size="default"
                             onClick={() => downloadFormat(format)}
-                            className="inline-flex items-center"
+                            className="download-format-btn group relative overflow-hidden transition-all hover:scale-105"
+                            style={{
+                              background: 'rgba(0,0,0,0.4)',
+                              border: '1px solid rgba(168,85,247,0.3)',
+                              padding: '10px 20px'
+                            }}
                           >
-                            <span className={`fmt-icon fmt-${id}`}>
+                            <span className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className={`fmt-icon fmt-${id} relative`}>
                               <IconComp className="fmt-icon-svg" />
                             </span>
-                            {format.toUpperCase()}
+                            <span className="relative font-medium">{format.toUpperCase()}</span>
                           </Button>
                         );
                       })}

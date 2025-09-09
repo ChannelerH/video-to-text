@@ -172,25 +172,52 @@ pre {
 .format-chip:hover{transform:translateY(-3px) scale(1.05);border-color:rgba(0,212,255,.5);color:#ffffff;box-shadow:0 5px 15px rgba(0,212,255,.2)}
 .format-chip.selected{background:rgba(0,212,255,.2);border-color:rgba(0,212,255,.6);color:#ffffff;transform:scale(1.02);box-shadow:0 0 0 1px rgba(0,212,255,.5),0 0 20px rgba(0,212,255,.3)}
 
-/* Colored icons for export formats */
-.fmt-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:6px;margin-right:8px;box-shadow:0 0 10px rgba(59,130,246,.22);transition:transform .2s ease, box-shadow .2s ease}
-.fmt-icon svg{width:12px;height:12px;color:#fff}
-.fmt-txt{background:linear-gradient(135deg,#22d3ee,#3b82f6)}
-.fmt-srt{background:linear-gradient(135deg,#8b5cf6,#ec4899)}
-.fmt-vtt{background:linear-gradient(135deg,#06b6d4,#a855f7)}
-.fmt-md{background:linear-gradient(135deg,#f59e0b,#f97316)}
-.fmt-json{background:linear-gradient(135deg,#10b981,#06b6d4)}
+/* Colored icons for export formats - Enhanced for better visibility */
+.fmt-icon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:8px;margin-right:10px;box-shadow:0 0 15px rgba(59,130,246,.35);transition:all .3s ease}
+.fmt-icon svg{width:14px;height:14px;color:#fff}
+.fmt-txt{background:linear-gradient(135deg,#22d3ee,#3b82f6);box-shadow:0 0 15px rgba(34,211,238,.4)}
+.fmt-srt{background:linear-gradient(135deg,#8b5cf6,#ec4899);box-shadow:0 0 15px rgba(139,92,246,.4)}
+.fmt-vtt{background:linear-gradient(135deg,#06b6d4,#a855f7);box-shadow:0 0 15px rgba(168,85,247,.4)}
+.fmt-md{background:linear-gradient(135deg,#f59e0b,#f97316);box-shadow:0 0 15px rgba(245,158,11,.4)}
+.fmt-json{background:linear-gradient(135deg,#10b981,#06b6d4);box-shadow:0 0 15px rgba(16,185,129,.4)}
+.download-format-btn:hover .fmt-icon{transform:scale(1.15) rotate(5deg);box-shadow:0 0 25px rgba(139,92,246,.6)}
 .format-chip:hover .fmt-icon{transform:scale(1.12);box-shadow:0 0 14px rgba(139,92,246,.28)}
 .format-chip.selected .fmt-icon{box-shadow:0 0 18px rgba(168,85,247,.45), 0 0 22px rgba(236,72,153,.32)}
 
-/* Colored icons for export formats */
-.fmt-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:6px;margin-right:8px;box-shadow:0 0 10px rgba(59,130,246,.22)}
-.fmt-icon svg{width:12px;height:12px;color:#fff}
-.fmt-txt{background:linear-gradient(135deg,#22d3ee,#3b82f6)}
-.fmt-srt{background:linear-gradient(135deg,#8b5cf6,#ec4899)}
-.fmt-vtt{background:linear-gradient(135deg,#06b6d4,#a855f7)}
-.fmt-md{background:linear-gradient(135deg,#f59e0b,#f97316)}
-.fmt-json{background:linear-gradient(135deg,#10b981,#06b6d4)}
+/* Download section enhancement with subtle pulse */
+.download-section {
+  position: relative;
+  overflow: hidden;
+}
+.download-section::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(90deg, rgba(168,85,247,0.3), rgba(34,211,238,0.3), rgba(168,85,247,0.3));
+  background-size: 200% 100%;
+  animation: downloadBorderFlow 3s linear infinite;
+  border-radius: 8px;
+  z-index: -1;
+  opacity: 0.5;
+}
+@keyframes downloadBorderFlow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+/* Download button hover effects */
+.download-format-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.download-format-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 10px 25px rgba(168,85,247,0.25);
+}
 
 /* Balloon button - Ultimate neon supernova effect */
 .balloon-button-container{display:flex;justify-content:center;margin-top:50px;height:140px;position:relative}

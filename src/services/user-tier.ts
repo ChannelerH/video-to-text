@@ -18,14 +18,14 @@ interface UserTierInfo {
  * 根据用户UUID获取用户等级
  */
 export async function getUserTier(userUuid: string): Promise<UserTier> {
-  return UserTier.PRO;
+  return UserTier.FREE;
 
   if (!userUuid) {
     return UserTier.FREE;
   }
 
   try {
-    // 获取用户的“有效期内”的已付费订单
+    // 获取用户的"有效期内"的已付费订单
     const activeOrders = await getActiveOrdersByUserUuid(userUuid);
     
     if (!activeOrders || activeOrders.length === 0) {

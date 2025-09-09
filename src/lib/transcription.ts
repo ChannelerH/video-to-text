@@ -1350,7 +1350,7 @@ export class TranscriptionService {
 
       // 生成 90 秒 WAV 片段
       const { createWavClipFromUrl } = await import('./audio-clip');
-      console.log('[Preview] Clipping 90s WAV from uploaded YouTube audio (ffmpeg)');
+      
       const wavClip = await createWavClipFromUrl(uploadResult.url, 90);
       const clipUpload = await this.r2Service.uploadFile(
         wavClip,
@@ -1483,15 +1483,16 @@ export class TranscriptionService {
   /**
    * 对直链音频/已上传文件进行语言探针
    */
-  async probeLanguageFromUrl(audioUrl: string, options?: { userTier?: string; languageProbeSeconds?: number }): Promise<{ language: string; isChinese: boolean }> {
+  async probeLanguageFromUrl(audioUrl: string, options?: { userTier?: string; languageProbeSeconds?: number; startOffset?: number }): Promise<{ language: string; isChinese: boolean }> {
     // One quick attempt (8–10s), then a single retry (12s) if result unknown/failed.
-    const attempt = async (sec: number) => {
-      console.log(`[Probe] Start creating ${sec}s WAV clip for language detection`);
+    const attempt = async (sec: number, offset: number = 0) => {
+      console.log(`[Probe] Start creating ${sec}s WAV clip for language detection (offset: ${offset}s)`);
       const { createWavClipFromUrl } = await import('./audio-clip');
-      const wavClip = await createWavClipFromUrl(audioUrl, sec);
+      // 使用偏移量来跳过视频开头（可能有音乐或静音）
+      const wavClip = await createWavClipFromUrl(audioUrl, sec, offset);
       const uploaded = await this.r2Service.uploadFile(
         wavClip,
-        `probe_${Date.now()}_${sec}.wav`,
+        `probe_${Date.now()}_${sec}_${offset}.wav`,
         'audio/wav',
         { folder: 'probe-clips', expiresIn: 1, makePublic: true }
       );
@@ -1506,10 +1507,46 @@ export class TranscriptionService {
 
     try {
       const firstSec = Math.max(8, Math.min(10, options?.languageProbeSeconds || 10));
-      const res1 = await attempt(firstSec);
-      if (res1.language !== 'unknown' || res1.isChinese) return res1;
-      // retry once with 12s clip
-      const res2 = await attempt(12);
+      // 第一次尝试：从开头开始
+      const res1 = await attempt(firstSec, 0);
+      if (res1.isChinese || (res1.language !== 'unknown' && res1.language !== 'en' && res1.language !== 'nl')) {
+        return res1;
+      }
+      
+      // 第二次尝试：跳过前30秒（避开可能的片头音乐）
+      console.log('[Probe] First attempt inconclusive, trying with 30s offset...');
+      const res2 = await attempt(12, 30);
+      if (res2.isChinese || res2.language === 'zh') {
+        return res2;
+      }
+      
+      // 第三次尝试：如果前两次都失败，尝试90秒位置（跳过1分30秒的片头音乐）
+      if (!res2.isChinese && res2.language !== 'zh') {
+        console.log('[Probe] Second attempt still inconclusive, trying with 90s offset...');
+        const res3 = await attempt(15, 90);
+        if (res3.isChinese || res3.language === 'zh') {
+          return res3;
+        }
+        
+        // 第四次尝试：如果还是失败，尝试120秒位置（2分钟）
+        if (!res3.isChinese && res3.language !== 'zh') {
+          console.log('[Probe] Third attempt failed, trying with 120s offset...');
+          const res4 = await attempt(15, 120);
+          if (res4.isChinese || res4.language === 'zh') {
+            return res4;
+          }
+          
+          // 返回最有可能准确的结果
+          if (res4.language !== 'unknown') return res4;
+          if (res3.language !== 'unknown') return res3;
+        }
+        
+        // 如果所有尝试都失败，返回最后的结果
+        if (res3.language !== 'unknown') return res3;
+        if (res2.language !== 'unknown') return res2;
+        if (res1.language !== 'unknown') return res1;
+      }
+      
       return res2;
     } catch (e) {
       console.warn('Language probe failed:', e);
