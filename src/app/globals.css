@@ -173,8 +173,8 @@ pre {
 .format-chip.selected{background:rgba(0,212,255,.2);border-color:rgba(0,212,255,.6);color:#ffffff;transform:scale(1.02);box-shadow:0 0 0 1px rgba(0,212,255,.5),0 0 20px rgba(0,212,255,.3)}
 
 /* Colored icons for export formats - Enhanced for better visibility */
-.fmt-icon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:8px;margin-right:10px;box-shadow:0 0 15px rgba(59,130,246,.35);transition:all .3s ease}
-.fmt-icon svg{width:14px;height:14px;color:#fff}
+.fmt-icon{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;margin-right:12px;box-shadow:0 0 15px rgba(59,130,246,.35);transition:all .3s ease}
+.fmt-icon svg{width:16px;height:16px;color:#fff}
 .fmt-txt{background:linear-gradient(135deg,#22d3ee,#3b82f6);box-shadow:0 0 15px rgba(34,211,238,.4)}
 .fmt-srt{background:linear-gradient(135deg,#8b5cf6,#ec4899);box-shadow:0 0 15px rgba(139,92,246,.4)}
 .fmt-vtt{background:linear-gradient(135deg,#06b6d4,#a855f7);box-shadow:0 0 15px rgba(168,85,247,.4)}

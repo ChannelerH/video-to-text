@@ -1028,13 +1028,14 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           <Button
                             key={format}
                             variant="outline"
-                            size="default"
+                            size="lg"
                             onClick={() => downloadFormat(format)}
                             className="download-format-btn group relative overflow-hidden transition-all hover:scale-105"
                             style={{
                               background: 'rgba(0,0,0,0.4)',
                               border: '1px solid rgba(168,85,247,0.3)',
-                              padding: '10px 20px'
+                              padding: '14px 28px',
+                              fontSize: '16px'
                             }}
                           >
                             <span className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity" />
