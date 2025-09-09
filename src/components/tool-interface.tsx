@@ -38,7 +38,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   }, [isAuthenticated, tier, userTier, user, canUseHighAccuracy]);
   
   const [url, setUrl] = useState("");
-  const [selectedFormats, setSelectedFormats] = useState(["txt", "srt"]);
+  const [selectedFormats, setSelectedFormats] = useState(["txt", "srt", "vtt", "md", "json"]);
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<string>("");
@@ -1043,7 +1043,6 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                     border: '1px solid rgba(168,85,247,0.2)'
                   }}>
                     <div className="flex items-center gap-2 mb-3">
-                      <Download className="w-5 h-5" style={{ color: "#A7F3D0" }} />
                       <h4 className="font-semibold text-lg" style={{ color: "#A7F3D0" }}>
                         {t("results.download_options")}
                       </h4>
