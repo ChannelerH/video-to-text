@@ -57,6 +57,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [copiedText, setCopiedText] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadXhrRef = useRef<XMLHttpRequest | null>(null);
+  const isAbortingRef = useRef<boolean>(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const router = useRouter();
   const locale = useLocale();
@@ -239,10 +240,15 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     console.log('[DEBUG] handleFileChange called, file:', selectedFile?.name);
     
     if (selectedFile) {
-      // 如果有正在进行的上传，先中断它
+      // 如果有正在进行的上传，先中断它（静默处理，不报错）
       if (uploadXhrRef.current) {
         console.log('[DEBUG] Aborting previous upload');
-        uploadXhrRef.current.abort();
+        isAbortingRef.current = true; // 标记为主动中断
+        try {
+          uploadXhrRef.current.abort();
+        } catch (e) {
+          // 忽略中断错误
+        }
         uploadXhrRef.current = null;
       }
       
@@ -299,6 +305,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         // Step 2: 使用预签名URL直接上传到R2
         const xhr = new XMLHttpRequest();
         uploadXhrRef.current = xhr; // 保存引用以便能够中断
+        isAbortingRef.current = false; // 重置中断标志
         
         // 先定义startTime，这样进度事件处理器才能访问到
         const startTime = Date.now();
@@ -396,19 +403,20 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             fileInputRef.current.value = '';
           }
         } catch (uploadError) {
-          console.error('[DEBUG] Direct upload error:', uploadError);
-          
           // 清除XHR引用
           uploadXhrRef.current = null;
           
-          // 如果是用户主动取消，不显示错误，只清理状态
-          if (uploadError instanceof Error && uploadError.message === 'USER_CANCELLED') {
-            console.log('[DEBUG] Upload cancelled by user');
+          // 如果是用户主动取消（通过标志判断），不显示错误，只清理状态
+          if (isAbortingRef.current || (uploadError instanceof Error && uploadError.message === 'USER_CANCELLED')) {
+            console.log('[DEBUG] Upload cancelled by user (silent)');
+            isAbortingRef.current = false; // 重置标志
             setProgress("");
             setProgressInfo({ stage: null, percentage: 0, message: '' });
             setUploadProgress(0);
             return;
           }
+          
+          console.error('[DEBUG] Direct upload error:', uploadError);
           
           // 如果是CORS错误，尝试回退到传统上传方式
           if (uploadError instanceof Error && uploadError.message.includes('CORS')) {
@@ -1136,6 +1144,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                 
                 // 如果有正在进行的上传，中断它
                 if (uploadXhrRef.current) {
+                  isAbortingRef.current = true; // 标记为主动中断
                   uploadXhrRef.current.abort();
                   uploadXhrRef.current = null;
                 }
