@@ -472,9 +472,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       : t("audio_url_placeholder");
 
   // Build visualizer bars once with stable heights for SSR
-  const bars = useMemo(() => Array.from({ length: 60 }, (_, i) => ({
+  const bars = useMemo(() => Array.from({ length: 30 }, (_, i) => ({
     height: 30 + (i % 20), // 预定义高度避免SSR不匹配
-    delay: i * 0.03
+    delay: i * 0.06
   })), []);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const visualizerRef = useRef<HTMLDivElement | null>(null);
@@ -669,7 +669,15 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         {/* Audio visualizer */}
         <div className="audio-visualizer" ref={visualizerRef}>
           {bars.map((bar, i) => (
-            <div key={i} className="audio-bar" style={{ height: `${bar.height}px`, animationDelay: `${bar.delay}s` }} />
+            <div 
+              key={i} 
+              className="audio-bar" 
+              style={{ 
+                '--bar-height': `${bar.height}px`,
+                height: `${bar.height}px`,
+                animationDelay: `${bar.delay}s` 
+              } as React.CSSProperties} 
+            />
           ))}
         </div>
 
