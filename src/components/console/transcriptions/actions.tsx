@@ -17,6 +17,7 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
   const [open, setOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
+  const [downloadingFormats, setDownloadingFormats] = useState<Set<string>>(new Set());
   const deleteTimerRef = useRef<any>(null);
 
   const onDelete = async () => {
@@ -76,7 +77,13 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
   const base = `/api/transcriptions/${row.job_id}/file`;
 
   const download = async (format: string) => {
+    // 设置loading状态
+    setDownloadingFormats(prev => new Set(prev).add(format));
+    
     try {
+      // 添加小延迟让用户看到loading效果
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const res = await fetch(`${base}?format=${format}`);
       if (!res.ok) {
         if (res.status === 404) {
@@ -96,6 +103,13 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
       a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     } catch (e: any) {
       toast.error(`Download error: ${e.message}`);
+    } finally {
+      // 清除loading状态
+      setDownloadingFormats(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(format);
+        return newSet;
+      });
     }
   };
 
@@ -118,15 +132,26 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
             <button
               key={format}
               onClick={() => download(format)}
-              className="
+              disabled={downloadingFormats.has(format)}
+              className={`
                 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                bg-secondary/50 hover:bg-secondary text-secondary-foreground
                 transition-all duration-200 text-xs font-medium
-                hover:scale-105 hover:shadow-sm
-              "
+                ${downloadingFormats.has(format) 
+                  ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300 cursor-not-allowed' 
+                  : 'bg-secondary/50 hover:bg-secondary text-secondary-foreground hover:scale-105 hover:shadow-sm'}
+              `}
             >
-              <Icon className="w-3.5 h-3.5" />
-              {format.toUpperCase()}
+              {downloadingFormats.has(format) ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-purple-300/30 border-t-purple-300 rounded-full animate-spin" />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <>
+                  <Icon className="w-3.5 h-3.5" />
+                  {format.toUpperCase()}
+                </>
+              )}
             </button>
           );
         })}
