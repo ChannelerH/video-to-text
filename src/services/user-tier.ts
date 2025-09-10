@@ -8,17 +8,77 @@ export enum UserTier {
   PREMIUM = 'premium'
 }
 
+// Feature access matrix for different tiers
+export interface TierFeatures {
+  // Smart Features
+  timestamps: boolean;           // 时间戳
+  basicSegmentation: boolean;    // 基础分段
+  aiChapters: boolean;          // AI章节
+  aiSummary: boolean;           // AI摘要
+  speakerIdentification: boolean; // 说话人识别
+  
+  // Other Features
+  batchProcessing: boolean;     // 批量处理
+  apiAccess: boolean;           // API访问
+  priorityQueue: boolean;       // 优先队列 (TODO: 第一版暂不启用)
+}
+
 interface UserTierInfo {
   tier: UserTier;
   displayName: string;
   features: string[];
+  featureAccess: TierFeatures;
 }
+
+// Feature access configuration for each tier
+export const TIER_FEATURES: Record<UserTier, TierFeatures> = {
+  [UserTier.FREE]: {
+    timestamps: true,
+    basicSegmentation: false,
+    aiChapters: true,
+    aiSummary: false,
+    speakerIdentification: false,
+    batchProcessing: false,
+    apiAccess: false,
+    priorityQueue: false, // TODO: 第一版暂不启用
+  },
+  [UserTier.BASIC]: {
+    timestamps: true,
+    basicSegmentation: true,
+    aiChapters: true,
+    aiSummary: true,
+    speakerIdentification: false,
+    batchProcessing: false,
+    apiAccess: false,
+    priorityQueue: false, // TODO: 第一版暂不启用
+  },
+  [UserTier.PRO]: {
+    timestamps: true,
+    basicSegmentation: true,
+    aiChapters: true,
+    aiSummary: true,
+    speakerIdentification: true,
+    batchProcessing: true,
+    apiAccess: true,
+    priorityQueue: false, // TODO: 第一版暂不启用，原本应为 true
+  },
+  [UserTier.PREMIUM]: {
+    timestamps: true,
+    basicSegmentation: true,
+    aiChapters: true,
+    aiSummary: true,
+    speakerIdentification: true,
+    batchProcessing: true,
+    apiAccess: true,
+    priorityQueue: false, // TODO: 第一版暂不启用，原本应为 true
+  }
+};
 
 /**
  * 根据用户UUID获取用户等级
  */
 export async function getUserTier(userUuid: string): Promise<UserTier> {
-  return UserTier.FREE;
+  return UserTier.PRO;
 
   if (!userUuid) {
     return UserTier.FREE;
@@ -67,21 +127,24 @@ export function getUserTierInfo(tier: UserTier): UserTierInfo {
       return {
         tier,
         displayName: 'Premium',
-        features: ['Incredibly Fast Processing (4s)', 'Unlimited Hours', 'Priority Support']
+        features: ['Incredibly Fast Processing (4s)', 'Unlimited Hours', 'Priority Support'],
+        featureAccess: TIER_FEATURES[tier]
       };
       
     case UserTier.PRO:
       return {
         tier,
         displayName: 'Professional', 
-        features: ['Incredibly Fast Processing (4s)', '20 Hours/Month', 'All Formats']
+        features: ['Incredibly Fast Processing (4s)', '20 Hours/Month', 'All Formats'],
+        featureAccess: TIER_FEATURES[tier]
       };
       
     case UserTier.BASIC:
       return {
         tier,
         displayName: 'Basic',
-        features: ['Standard Processing (8min)', '5 Hours/Month', 'Basic Formats']
+        features: ['Standard Processing (8min)', '5 Hours/Month', 'Basic Formats'],
+        featureAccess: TIER_FEATURES[tier]
       };
       
     case UserTier.FREE:
@@ -89,7 +152,8 @@ export function getUserTierInfo(tier: UserTier): UserTierInfo {
       return {
         tier,
         displayName: 'Free',
-        features: ['90s Preview Only', 'Fast Preview Processing']
+        features: ['90s Preview Only', 'Fast Preview Processing'],
+        featureAccess: TIER_FEATURES[UserTier.FREE]
       };
   }
 }
@@ -106,4 +170,21 @@ export function hasAccess(userTier: UserTier, requiredTier: UserTier): boolean {
   };
   
   return tierLevels[userTier] >= tierLevels[requiredTier];
+}
+
+/**
+ * Check if user has access to a specific feature
+ */
+export function hasFeature(userTier: UserTier, feature: keyof TierFeatures): boolean {
+  return TIER_FEATURES[userTier][feature];
+}
+
+/**
+ * Get the minimum tier required for a feature
+ */
+export function getRequiredTierForFeature(feature: keyof TierFeatures): UserTier | null {
+  if (TIER_FEATURES[UserTier.FREE][feature]) return UserTier.FREE;
+  if (TIER_FEATURES[UserTier.BASIC][feature]) return UserTier.BASIC;
+  if (TIER_FEATURES[UserTier.PRO][feature]) return UserTier.PRO;
+  return null;
 }

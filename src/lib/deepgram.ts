@@ -130,8 +130,16 @@ export class DeepgramService {
       }
       
       // Parse response
-      const channel = result.results.channels[0];
-      const alternative = channel.alternatives[0];
+      const channel = result.results?.channels?.[0];
+      if (!channel) {
+        console.warn('[Deepgram] No channels in response');
+        return {
+          success: true,
+          transcription: { text: '', segments: [], language: 'unknown', duration: 0 }
+        };
+      }
+      
+      const alternative = channel.alternatives?.[0];
       
       // 当 transcript 为空时，尽量从 paragraphs/words 重建，避免直接抛错（用于语言探针尤为重要）
       let transcriptText = (alternative && alternative.transcript) || '';

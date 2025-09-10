@@ -12,6 +12,8 @@ import { useSession } from "next-auth/react";
 import { useAppContext } from "@/contexts/app";
 import { isAuthEnabled } from "@/lib/auth";
 import { MultipartUploader } from "@/lib/multipart-upload";
+import { UpgradeModal } from "@/components/upgrade-modal";
+import { ToastNotification, useToast } from "@/components/toast-notification";
 
 interface ToolInterfaceProps {
   mode?: "video" | "audio";
@@ -44,6 +46,12 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<string>("");
   const [result, setResult] = useState<any>(null);
+  const [upgradeModal, setUpgradeModal] = useState<{
+    isOpen: boolean;
+    requiredTier: 'basic' | 'pro';
+    feature: string;
+  }>({ isOpen: false, requiredTier: 'basic', feature: '' });
+  const { toast, showToast, hideToast } = useToast();
   // Progress tracking
   const [progressInfo, setProgressInfo] = useState<{
     stage: 'upload' | 'download' | 'transcribe' | 'process' | null;
@@ -67,6 +75,13 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [mounted, setMounted] = useState(false);
   // Avoid duplicate Chinese upgrade toast per run
   const [zhBannerShown, setZhBannerShown] = useState(false);
+  const [generatedChapters, setGeneratedChapters] = useState<any[]>([]);
+  const [generatedSummary, setGeneratedSummary] = useState<string>("");
+  const [copiedChapters, setCopiedChapters] = useState<boolean>(false);
+  const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
+  const [copiedSegments, setCopiedSegments] = useState<boolean>(false);
+  const [generatingChapters, setGeneratingChapters] = useState<boolean>(false);
+  const [generatingSummary, setGeneratingSummary] = useState<boolean>(false);
   useEffect(() => { setMounted(true); }, []);
 
   // Helper to display and auto-hide the Chinese upgrade toast (disabled)
@@ -611,6 +626,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     setProgress(t("progress.starting"));
     setResult(null);
     setProgressInfo({ stage: null, percentage: 0, message: '' });
+    setGeneratedChapters([]);
+    setGeneratedSummary("");
 
     try {
       // Determine action based on authentication status
@@ -1541,7 +1558,30 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                   {/* Segments with Timestamps (Chinese groups paragraphs) */}
                   {result.data.transcription.segments && result.data.transcription.segments.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="font-medium" style={{ color: "#A7F3D0" }}>{t("results.timestamped_segments")}</h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium" style={{ color: "#A7F3D0" }}>{t("results.timestamped_segments")}</h4>
+                        <button
+                          onClick={() => {
+                            const segments = result.data.transcription.segments || [];
+                            const segmentsText = segments.map((seg: any) => {
+                              const startTime = `${Math.floor(seg.start / 60).toString().padStart(2, '0')}:${(seg.start % 60).toFixed(3).padStart(6, '0')}`;
+                              const endTime = `${Math.floor(seg.end / 60).toString().padStart(2, '0')}:${(seg.end % 60).toFixed(3).padStart(6, '0')}`;
+                              return `[${startTime} - ${endTime}] ${seg.text}`;
+                            }).join('\n');
+                            navigator.clipboard.writeText(segmentsText);
+                            setCopiedSegments(true);
+                            setTimeout(() => setCopiedSegments(false), 2000);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-all hover:bg-white/10"
+                          style={{ color: copiedSegments ? '#10b981' : '#9ca3af' }}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          <span>{copiedSegments ? t("results.copied") : t("results.copy")}</span>
+                        </button>
+                      </div>
                       <div className="p-4 rounded-lg max-h-60 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
                         <div className="space-y-2">
                           {(() => {
@@ -1571,6 +1611,242 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Smart Features Section (Basic/Pro) */}
+                  <div className="smart-features-section mt-6 p-4 rounded-lg" style={{ 
+                    background: 'linear-gradient(135deg, rgba(168,85,247,0.05) 0%, rgba(34,211,238,0.05) 100%)',
+                    border: '1px solid rgba(168,85,247,0.2)'
+                  }}>
+                    <div className="flex items-center gap-2 mb-4">
+                      <h4 className="font-semibold text-lg" style={{ color: "#A7F3D0" }}>
+                        {t("results.smart_features")}
+                      </h4>
+                      <span className="text-xs px-2 py-1 rounded-full" style={{ 
+                        background: 'rgba(168,85,247,0.1)', 
+                        color: '#a855f7',
+                        border: '1px solid rgba(168,85,247,0.2)'
+                      }}>
+                        {t("results.pro_features")}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* Generate Chapters Button */}
+                      <button
+                        onClick={async () => {
+                          if (!result.data?.transcription?.segments || generatingChapters) return;
+                          
+                          setGeneratingChapters(true);
+                          try {
+                            // Use a dummy jobId since we don't need to persist chapters yet
+                            const jobId = 'temp-' + Date.now();
+                            console.log('Generating chapters for segments:', result.data.transcription.segments.length);
+                            const response = await fetch(`/api/transcriptions/${jobId}/chapters`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                segments: result.data.transcription.segments,
+                                options: { language: result.data.transcription.language }
+                              })
+                            });
+                            
+                            const data = await response.json();
+                            if (data.success) {
+                              console.log('Chapters generated:', data.data.chapters);
+                              // Show success toast
+                              showToast('success', t("results.chapters_generated"), t("results.chapters_generated_desc"));
+                              // Store chapters in state for display
+                              setGeneratedChapters(data.data.chapters);
+                            } else if (response.status === 403) {
+                              // Show upgrade modal
+                              setUpgradeModal({
+                                isOpen: true,
+                                requiredTier: data.requiredTier || 'basic',
+                                feature: t("results.generate_chapters")
+                              });
+                            } else {
+                              showToast('error', t("results.generation_failed"), data.error || t("results.try_again_later"));
+                            }
+                          } catch (error) {
+                            console.error('Error generating chapters:', error);
+                            showToast('error', t("results.generation_failed"), t("results.check_connection"));
+                          } finally {
+                            setGeneratingChapters(false);
+                          }
+                        }}
+                        disabled={generatingChapters}
+                        className="flex items-center justify-center gap-2 p-3 rounded-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        style={{
+                          background: 'rgba(0,0,0,0.4)',
+                          border: '1px solid rgba(168,85,247,0.3)',
+                        }}
+                      >
+                        {generatingChapters ? (
+                          <>
+                            <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>{t("results.generating")}</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                            <span>{t("results.generate_chapters")}</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Generate Summary Button */}
+                      <button
+                        onClick={async () => {
+                          if (!result.data?.transcription?.segments || generatingSummary) return;
+                          
+                          setGeneratingSummary(true);
+                          try {
+                            // Use a dummy jobId since we don't need to persist summary yet
+                            const jobId = 'temp-' + Date.now();
+                            console.log('Generating summary for segments:', result.data.transcription.segments.length);
+                            const response = await fetch(`/api/transcriptions/${jobId}/summary`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                segments: result.data.transcription.segments,
+                                options: { language: result.data.transcription.language }
+                              })
+                            });
+                            
+                            const data = await response.json();
+                            if (data.success) {
+                              console.log('Summary generated:', data.data.summary);
+                              // Show success toast
+                              showToast('success', t("results.summary_generated"), t("results.summary_generated_desc"));
+                              // Store summary in state for display
+                              setGeneratedSummary(data.data.summary);
+                            } else if (response.status === 403) {
+                              // Show upgrade modal
+                              setUpgradeModal({
+                                isOpen: true,
+                                requiredTier: 'pro',
+                                feature: t("results.generate_summary")
+                              });
+                            } else {
+                              showToast('error', t("results.generation_failed"), data.error || t("results.try_again_later"));
+                            }
+                          } catch (error) {
+                            console.error('Error generating summary:', error);
+                            showToast('error', t("results.generation_failed"), t("results.check_connection"));
+                          } finally {
+                            setGeneratingSummary(false);
+                          }
+                        }}
+                        disabled={generatingSummary}
+                        className="flex items-center justify-center gap-2 p-3 rounded-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        style={{
+                          background: 'rgba(0,0,0,0.4)',
+                          border: '1px solid rgba(34,211,238,0.3)',
+                        }}
+                      >
+                        {generatingSummary ? (
+                          <>
+                            <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>{t("results.generating")}</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span>{t("results.generate_summary")}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Feature descriptions */}
+                    <div className="mt-3 text-xs text-gray-400">
+                      <p>{t("results.smart_features_desc")}</p>
+                    </div>
+                    
+                    {/* Display Generated Chapters */}
+                    {generatedChapters.length > 0 && (
+                      <div className="mt-4 p-3 rounded-lg" style={{ 
+                        background: 'rgba(0,0,0,0.3)',
+                        border: '1px solid rgba(168,85,247,0.2)'
+                      }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium" style={{ color: '#a855f7' }}>
+                            {t("results.chapters")}
+                          </h5>
+                          <button
+                            onClick={() => {
+                              const chaptersText = generatedChapters
+                                .map(ch => `${Math.floor(ch.startTime / 60)}:${String(Math.floor(ch.startTime % 60)).padStart(2, '0')} - ${ch.title}`)
+                                .join('\n');
+                              navigator.clipboard.writeText(chaptersText);
+                              setCopiedChapters(true);
+                              setTimeout(() => setCopiedChapters(false), 2000);
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-all hover:bg-white/10"
+                            style={{ color: copiedChapters ? '#10b981' : '#9ca3af' }}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            <span>{copiedChapters ? t("results.copied") : t("results.copy")}</span>
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {generatedChapters.map((chapter, idx) => (
+                            <div key={idx} className="flex items-start gap-2 text-sm">
+                              <span className="text-gray-400" style={{ minWidth: '60px' }}>
+                                {Math.floor(chapter.startTime / 60)}:{String(Math.floor(chapter.startTime % 60)).padStart(2, '0')}
+                              </span>
+                              <span className="text-gray-200">{chapter.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Display Generated Summary */}
+                    {generatedSummary && (
+                      <div className="mt-4 p-3 rounded-lg" style={{ 
+                        background: 'rgba(0,0,0,0.3)',
+                        border: '1px solid rgba(34,211,238,0.2)'
+                      }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium" style={{ color: '#22d3ee' }}>
+                            {t("results.summary")}
+                          </h5>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(generatedSummary);
+                              setCopiedSummary(true);
+                              setTimeout(() => setCopiedSummary(false), 2000);
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-all hover:bg-white/10"
+                            style={{ color: copiedSummary ? '#10b981' : '#9ca3af' }}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            <span>{copiedSummary ? t("results.copied") : t("results.copy")}</span>
+                          </button>
+                        </div>
+                        <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+                          {generatedSummary}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                   
                   {/* Download Buttons - Enhanced */}
                   <div className="download-section mt-6 p-4 rounded-lg" style={{ 
@@ -1667,6 +1943,22 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           </div>
         </div>
       </div>
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={upgradeModal.isOpen}
+        onClose={() => setUpgradeModal({ ...upgradeModal, isOpen: false })}
+        requiredTier={upgradeModal.requiredTier}
+        feature={upgradeModal.feature}
+      />
+      
+      {/* Toast Notification */}
+      <ToastNotification
+        type={toast.type}
+        title={toast.title}
+        message={toast.message}
+        isOpen={toast.isOpen}
+        onClose={hideToast}
+      />
     </div>
   );
 }

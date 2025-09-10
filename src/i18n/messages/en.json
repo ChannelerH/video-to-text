@@ -6,7 +6,7 @@
   },
   "stats": {
     "daily_processed": "Daily Processed",
-    "accuracy_rate": "Accuracy Rate", 
+    "accuracy_rate": "Accuracy Rate",
     "average_speed": "Average Speed",
     "online_users": "Online Users",
     "industry_average": "(Industry Avg: {value})",
@@ -31,7 +31,7 @@
     "transcription_result": "Transcription Result",
     "completion_time": "Completed in just 30 seconds",
     "input": "Input",
-    "output": "Output", 
+    "output": "Output",
     "processing_time": "Time taken",
     "accuracy": "Accuracy",
     "video_duration": "5:23 Video",
@@ -55,7 +55,7 @@
         "sample_text": "Welcome to this technical tutorial..."
       },
       {
-        "id": "chinese", 
+        "id": "chinese",
         "title": "Chinese Dialogue",
         "video_info": {
           "duration": "10-minute project discussion meeting",
@@ -67,7 +67,7 @@
       },
       {
         "id": "code",
-        "title": "Code Tutorial", 
+        "title": "Code Tutorial",
         "video_info": {
           "duration": "15-minute Python programming tutorial",
           "speaker": "Single",
@@ -108,7 +108,7 @@
     "per_month": "/month",
     "yearly_total": "= {currency}{amount}/year",
     "yourNeeds": "📊 Your Requirements",
-    "monthlyHours": "Monthly transcription volume", 
+    "monthlyHours": "Monthly transcription volume",
     "hours": "hours",
     "traditionalWay": "Legacy Method",
     "hiringCost": "Outsourcing costs",
@@ -117,7 +117,7 @@
     "waitingTime": "Delivery timeline",
     "waitingRange": "3–5 days",
     "usingUs": "V2TX Solution",
-    "serviceCost": "Monthly subscription", 
+    "serviceCost": "Monthly subscription",
     "processingTime": "Processing overhead",
     "onlyNeedCheck": "Quality assurance & fine-tuning only",
     "getResult": "Delivery time",
@@ -126,7 +126,7 @@
     "perMonth": "/month",
     "youWillSave": "💎 Cost Optimization Results",
     "monthlySavings": "Monthly cost reduction",
-    "yearlySavings": "Annual savings", 
+    "yearlySavings": "Annual savings",
     "roi": "ROI percentage",
     "timeSaved": "Time efficiency gain",
     "equivalentTo": "≈ ",
@@ -214,7 +214,7 @@
             "description": "Enhance learning experience with multilingual support"
           },
           {
-            "title": "Convert lecture recordings to text notes", 
+            "title": "Convert lecture recordings to text notes",
             "description": "Convenient for review and knowledge organization"
           },
           {
@@ -225,7 +225,7 @@
       },
       {
         "title": "Content Creation",
-        "subtitle": "Content Creation", 
+        "subtitle": "Content Creation",
         "cases": [
           {
             "title": "Convert YouTube videos to blog articles",
@@ -484,7 +484,7 @@
     "formats": {
       "txt": "TXT",
       "srt": "SRT",
-      "vtt": "VTT", 
+      "vtt": "VTT",
       "md": "Markdown",
       "json": "JSON"
     },
@@ -506,10 +506,28 @@
       "language": "Language:",
       "duration": "Duration:",
       "transcription_text": "Transcription Text:",
+      "copy": "Copy",
+      "copied": "Copied!",
       "timestamped_segments": "Timestamped Segments:",
       "download_options": "Download Your Transcription",
-      "copy": "Copy",
-      "copied": "Copied!"
+      "smart_features": "Smart Features",
+      "pro_features": "Pro Features",
+      "generate_chapters": "Generate Chapters",
+      "generate_summary": "Generate Summary",
+      "chapters_generated": "Chapters generated successfully!",
+      "summary_generated": "Summary generated successfully!",
+      "upgrade_required_basic": "🔒 This feature requires Basic subscription",
+      "upgrade_required_pro": "👑 This premium feature requires Pro subscription",
+      "smart_features_desc": "AI-powered features to enhance your transcription experience",
+      "upgrade_prompt": "Would you like to view our pricing plans?",
+      "generation_failed": "Unable to generate at this moment. Please try again later.",
+      "chapters_generated_desc": "Your chapters have been created and are ready to view",
+      "summary_generated_desc": "Your summary has been generated successfully",
+      "try_again_later": "Please try again in a few moments",
+      "check_connection": "Please check your internet connection and try again",
+      "chapters": "Chapters",
+      "summary": "Summary",
+      "generating": "Generating..."
     },
     "errors": {
       "upload_failed": "Upload failed. Please try again.",
@@ -540,5 +558,37 @@
       "pricing_link": "Upgrade",
       "speed_hint": "Higher accuracy, slightly slower"
     }
+  },
+  "tiers": {
+    "features": {
+      "timestamps": "Timestamps",
+      "basicSegmentation": "Basic Segmentation",
+      "aiChapters": "AI Chapters",
+      "aiSummary": "AI Summary",
+      "speakerIdentification": "Speaker Identification",
+      "batchProcessing": "Batch Processing",
+      "apiAccess": "API Access",
+      "priorityQueue": "Priority Queue"
+    },
+    "upgrade": {
+      "title": "Upgrade Required",
+      "description": "This feature requires {tier} subscription",
+      "button": "Upgrade to {tier}",
+      "free": "Free",
+      "basic": "Basic",
+      "pro": "Pro",
+      "premium": "Premium"
+    }
+  },
+  "results": {
+    "smart_features": "Smart Features",
+    "pro_features": "Pro Features",
+    "generate_chapters": "Generate Chapters",
+    "generate_summary": "Generate Summary",
+    "chapters_generated": "Chapters generated successfully!",
+    "summary_generated": "Summary generated successfully!",
+    "upgrade_required_basic": "This feature requires Basic subscription or higher",
+    "upgrade_required_pro": "This feature requires Pro subscription or higher",
+    "smart_features_desc": "AI-powered features to enhance your transcription experience"
   }
 }

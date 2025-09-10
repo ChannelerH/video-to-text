@@ -3,12 +3,14 @@ import { TranscriptionService } from '@/lib/transcription';
 import { transcriptionCache } from '@/lib/cache';
 import { getUserUuid } from '@/services/user';
 import { getUserTier } from '@/services/user-tier';
+// import { hasFeature } from '@/services/user-tier'; // TODO: 队列功能暂时不启用
 import { RateLimiter, PREVIEW_LIMITS } from '@/lib/rate-limiter';
 import { AbuseDetector } from '@/lib/abuse-detector';
 import { quotaTracker } from '@/services/quota-tracker';
 import { headers } from 'next/headers';
 import { CloudflareR2Service } from '@/lib/r2-upload';
 import { YouTubeService } from '@/lib/youtube';
+// import { PriorityQueueManager } from '@/lib/priority-queue'; // TODO: 队列功能暂时不启用
 
 // 初始化服务 - 支持两个模型：Deepgram + OpenAI Whisper
 const transcriptionService = new TranscriptionService(
@@ -241,6 +243,28 @@ export async function POST(request: NextRequest) {
       // 获取用户等级
       const userTier = await getUserTier(user_uuid);
       
+      // Add job to priority queue if user has priority queue feature
+      // TODO: 第一版暂时不启用队列功能，后续根据需求再开启
+      let queueInfo = null;
+      // if (hasFeature(userTier, 'priorityQueue')) {
+      //   const jobId = PriorityQueueManager.addJob({
+      //     userId: user_uuid,
+      //     userTier,
+      //     type: 'transcription',
+      //     data: { type, content, options },
+      //     status: 'pending'
+      //   });
+      //   
+      //   queueInfo = {
+      //     jobId,
+      //     position: PriorityQueueManager.getQueuePosition(jobId),
+      //     estimatedWait: PriorityQueueManager.getEstimatedWaitTime(userTier),
+      //     priority: userTier
+      //   };
+      //   
+      //   console.log(`[API] Job ${jobId} added to priority queue for ${userTier} user`);
+      // }
+      
       // 检查用户配额
       const estimatedMinutes = 10; // 估算的转录时长，实际应根据音频长度计算
       const quotaStatus = await quotaTracker.checkQuota(user_uuid, userTier, estimatedMinutes);
@@ -375,6 +399,7 @@ export async function POST(request: NextRequest) {
           tier: userTier,
           remaining: quotaStatus.remaining
         }
+        // ...(queueInfo && { queueInfo })  // TODO: 队列功能暂时不启用
       });
     }
   } catch (error) {
