@@ -1078,11 +1078,11 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         const distance = Math.sqrt(dx * dx + dy * dy);
         const maxDistance = 400;
         const strength = Math.min(distance / maxDistance, 1);
-        const translateX = dx * 0.015 * strength;
-        const translateY = dy * 0.015 * strength;
-        const rotateX = -(dy * 0.008) * strength;
-        const rotateY = (dx * 0.008) * strength;
-        const scale = 1 + strength * 0.008;
+        const translateX = dx * 0.008 * strength;  // 减小位移：0.015 -> 0.008
+        const translateY = dy * 0.008 * strength;  // 减小位移：0.015 -> 0.008
+        const rotateX = -(dy * 0.004) * strength;  // 减小倾斜：0.008 -> 0.004
+        const rotateY = (dx * 0.004) * strength;   // 减小倾斜：0.008 -> 0.004
+        const scale = 1 + strength * 0.005;        // 减小缩放：0.008 -> 0.005
         container.style.transform = `perspective(1200px) translate(${translateX}px, ${translateY}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(${scale})`;
       });
     };
