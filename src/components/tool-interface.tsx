@@ -11,6 +11,7 @@ import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { useAppContext } from "@/contexts/app";
 import { isAuthEnabled } from "@/lib/auth";
+import { MultipartUploader } from "@/lib/multipart-upload";
 
 interface ToolInterfaceProps {
   mode?: "video" | "audio";
@@ -271,6 +272,92 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       });
       
       try {
+        // 判断是否使用分片上传（50MB以上）
+        if (MultipartUploader.shouldUseMultipart(selectedFile.size)) {
+          console.log('[DEBUG] Using multipart upload for large file:', selectedFile.name);
+          
+          // 使用分片上传
+          const uploader = new MultipartUploader();
+          const abortController = new AbortController();
+          const startTime = Date.now();
+          
+          // 保存abort controller以便能够取消
+          uploadXhrRef.current = { abort: () => abortController.abort() } as any;
+          
+          try {
+            const uploadResult = await uploader.upload({
+            file: selectedFile,
+            abortSignal: abortController.signal,
+            onProgress: (percentage, uploadedBytes, totalBytes) => {
+              setUploadProgress(Math.round(percentage * 100) / 100); // 保留两位小数
+              setProgressInfo({
+                stage: 'upload',
+                percentage: Math.round(percentage * 100) / 100, // 保留两位小数
+                message: `Uploading: ${formatBytes(uploadedBytes)} / ${formatBytes(totalBytes)}`,
+                estimatedTime: percentage > 0 ? 
+                  estimateRemainingUploadTime(uploadedBytes, totalBytes, Date.now() - startTime) : 
+                  'Calculating...'
+              });
+            },
+            onPartComplete: (partNumber, totalParts) => {
+              console.log(`[Multipart] Part ${partNumber}/${totalParts} completed`);
+            }
+            });
+            
+            // 清除引用
+            uploadXhrRef.current = null;
+            
+            // 保存上传结果
+            setUploadedFileInfo({
+              key: uploadResult.key,
+              replicateUrl: uploadResult.replicateUrl,
+              r2Key: uploadResult.key,
+              originalName: selectedFile.name,
+              fileType: selectedFile.type,
+              fileSize: selectedFile.size,
+              uploadMethod: 'multipart'
+            });
+            
+            setProgress(t("progress.upload_success"));
+            setProgressInfo({ stage: null, percentage: 0, message: '' });
+            setUploadProgress(0);
+            console.log('[DEBUG] Multipart upload success');
+          
+            // 清除文件输入
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            
+            return; // 分片上传完成，返回
+          } catch (multipartError) {
+            // 清除引用
+            uploadXhrRef.current = null;
+            
+            // 检查是否是用户取消
+            if (isAbortingRef.current || (multipartError instanceof Error && multipartError.message === 'Upload aborted')) {
+              console.log('[DEBUG] Multipart upload cancelled by user');
+              isAbortingRef.current = false;
+              setProgress("");
+              setProgressInfo({ stage: null, percentage: 0, message: '' });
+              setUploadProgress(0);
+              return;
+            }
+            
+            // 其他错误
+            console.error('[DEBUG] Multipart upload error:', multipartError);
+            setProgress(`Upload failed: ${multipartError instanceof Error ? multipartError.message : 'Unknown error'}`);
+            setFile(null);
+            setProgressInfo({ stage: null, percentage: 0, message: '' });
+            setUploadProgress(0);
+            
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            return;
+          }
+        }
+        
+        // 小文件使用原来的直接上传方式
         // Step 1: 获取预签名上传URL
         const presignedResponse = await fetch("/api/upload/presigned", {
           method: "POST",
@@ -831,7 +918,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    const value = bytes / Math.pow(k, i);
+    // 保留2位小数，但如果是整数则不显示小数
+    const formatted = value % 1 === 0 ? value.toString() : value.toFixed(2);
+    return formatted + ' ' + sizes[i];
   };
 
   // Estimate upload time based on file size (assume 5 Mbps upload speed)
@@ -1365,7 +1455,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                 <div className="flex justify-between text-sm" style={{ color: "#94A3B8" }}>
                   <span>{progressInfo.message}</span>
                   <span className="flex items-center gap-2">
-                    <span>{progressInfo.percentage}%</span>
+                    <span>{progressInfo.percentage.toFixed(2)}%</span>
                     {progressInfo.estimatedTime && (
                       <span className="text-xs opacity-75">(Est. {progressInfo.estimatedTime})</span>
                     )}
