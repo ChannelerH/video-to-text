@@ -12,22 +12,22 @@ import { redirect } from 'next/navigation';
 import { getUserTier, UserTier } from '@/services/user-tier';
 
 interface PageProps {
-  params: { locale: string };
-  searchParams?: { page?: string; q?: string };
+  params: Promise<{ locale: string }>;
+  searchParams?: Promise<{ page?: string; q?: string }>;
 }
 
 export default async function TranscriptionsPage({ 
   params,
   searchParams 
 }: PageProps) {
-  const { locale } = params;
+  const { locale } = await params;
   const user_uuid = await getUserUuid();
   
   if (!user_uuid) {
     redirect(`/${locale}/auth/signin`);
   }
 
-  const s = (searchParams || ({} as any)) as { page?: string; q?: string };
+  const s = (await (searchParams || Promise.resolve({} as any))) as { page?: string; q?: string };
   const q = s.q?.trim() || '';
   const rawPage = Number(s.page);
   const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;

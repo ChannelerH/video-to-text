@@ -1544,74 +1544,84 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         {/* Results Display */}
           {result && result.type === 'full' && result.data && (
             <>
-            {/* Action Buttons - Save to Dashboard & View Mode Toggle */}
+            {/* Action Buttons - Better UX with descriptions */}
             {result.data.transcription.segments && result.data.transcription.segments.length > 0 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-                {/* Save to Dashboard */}
+              <div className="flex flex-col gap-6 mb-8">
                 {isAuthenticated ? (
-                  <Link 
-                    href={`/${locale}/dashboard/transcriptions`}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 
-                      text-white rounded-lg hover:opacity-90 transition-opacity"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                    {t('view_in_dashboard')}
-                  </Link>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Primary action - Advanced Editor */}
+                    {result.data.jobId && (
+                      <div className="group relative bg-gradient-to-br from-purple-600/10 to-pink-600/10 rounded-xl border border-purple-500/20 p-6 hover:border-purple-500/40 transition-all">
+                        <Link 
+                          href={`/${locale}/dashboard/editor/${result.data.jobId}`}
+                          className="block"
+                        >
+                          <div className="flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 shadow-lg">
+                              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
+                                {t('advanced_editor')}
+                              </h3>
+                              <p className="text-sm text-gray-400">
+                                {t('advanced_editor_desc')}
+                              </p>
+                            </div>
+                            <svg className="w-5 h-5 text-gray-500 group-hover:text-purple-400 transform group-hover:translate-x-1 transition-all mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                        </Link>
+                      </div>
+                    )}
+                    
+                    {/* Secondary action - Dashboard */}
+                    <div className="group relative bg-gray-800/20 rounded-xl border border-gray-700/50 p-6 hover:border-gray-600 transition-all">
+                      <Link 
+                        href={`/${locale}/dashboard/transcriptions`}
+                        className="block"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="p-3 rounded-lg bg-gray-800 shadow-lg">
+                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-gray-300 transition-colors">
+                              {t('view_all_transcriptions')}
+                            </h3>
+                            <p className="text-sm text-gray-400">
+                              {t('view_all_transcriptions_desc')}
+                            </p>
+                          </div>
+                          <svg className="w-5 h-5 text-gray-500 group-hover:text-gray-400 transform group-hover:translate-x-1 transition-all mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </Link>
+                    </div>
+                  </div>
                 ) : (
-                  <button
-                    onClick={() => router.push('/auth/signin')}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                        d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                    </svg>
-                    {t('sign_in_to_save')}
-                  </button>
+                  <div className="text-center py-8 px-6 bg-gray-800/20 rounded-xl border border-gray-700/50">
+                    <p className="text-gray-400 mb-4">{t('sign_in_to_access_features')}</p>
+                    <button
+                      onClick={() => router.push('/auth/signin')}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:opacity-90 transition-all hover:scale-105 font-medium"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                          d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                      </svg>
+                      {t('sign_in_to_save')}
+                    </button>
+                  </div>
                 )}
-                
-                {/* View Mode Toggle */}
-                <div className="inline-flex p-1 rounded-full bg-black/30 backdrop-blur-xl border border-purple-500/20">
-                  <button
-                    onClick={() => setViewMode('simple')}
-                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
-                      viewMode === 'simple' 
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                      </svg>
-                      {t('view_mode.simple')}
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setViewMode('editor');
-                      // Set audio URL if not already set
-                      if ((uploadedFileInfo?.publicUrl || uploadedFileInfo?.replicateUrl) && !audioUrl) {
-                        setAudioUrl(uploadedFileInfo.publicUrl || uploadedFileInfo.replicateUrl);
-                      }
-                    }}
-                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
-                      viewMode === 'editor' 
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                      {t('view_mode.editor')}
-                    </span>
-                  </button>
-                </div>
               </div>
             )}
             

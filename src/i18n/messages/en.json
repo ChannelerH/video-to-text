@@ -576,11 +576,14 @@
       "export_failed": "Export failed",
       "export_desc": "Export your transcription with chapters, summary, and table of contents"
     },
-    "view_mode": {
-      "simple": "Simple View",
-      "editor": "Editor View"
-    },
     "view_in_dashboard": "View in Dashboard",
+    "edit_transcription": "Edit Transcription",
+    "advanced_editor": "Advanced Editor",
+    "advanced_editor_desc": "Edit transcription with timestamps, chapters, and export options",
+    "view_all_transcriptions": "View All Transcriptions",
+    "view_all_transcriptions_desc": "Manage and organize all your transcriptions in one place",
+    "go_to_dashboard": "Go to Dashboard",
+    "sign_in_to_access_features": "Sign in to access advanced editing features and save your transcriptions",
     "sign_in_to_save": "Sign in to save",
     "editor": {
       "show_chapters": "Show chapters",
