@@ -305,16 +305,16 @@ export default function ThreeColumnEditor({
     }
   }, [isPlaying, waveformReady]);
 
-  // Sync time when jumping
-  useEffect(() => {
-    if (!wavesurferRef.current || !waveformReady) return;
+  // Sync time when jumping - DISABLED as it interferes with seeking
+  // useEffect(() => {
+  //   if (!wavesurferRef.current || !waveformReady) return;
     
-    const wsTime = wavesurferRef.current.getCurrentTime();
-    if (Math.abs(wsTime - currentTime) > 0.5) {
-      dlog('Effect: setTime to store currentTime', { wsTime, currentTime });
-      wavesurferRef.current.setTime(currentTime);
-    }
-  }, [currentTime, waveformReady]);
+  //   const wsTime = wavesurferRef.current.getCurrentTime();
+  //   if (Math.abs(wsTime - currentTime) > 0.5) {
+  //     dlog('Effect: setTime to store currentTime', { wsTime, currentTime });
+  //     wavesurferRef.current.setTime(currentTime);
+  //   }
+  // }, [currentTime, waveformReady]);
 
   // Helper: scroll transcript to segment index
   const scrollToSegmentIndex = (idx: number) => {
@@ -874,7 +874,7 @@ export default function ThreeColumnEditor({
           <div className="p-4 border-b border-gray-800">
             <h4 className="text-sm font-medium text-white">Transcript</h4>
             <p className="text-xs text-gray-500 mt-1">
-              {segments.length} segments • Click to jump
+              {segments.length} segments • Click to position
             </p>
           </div>
           
@@ -887,44 +887,36 @@ export default function ThreeColumnEditor({
                   key={idx}
                   data-segment={idx}
                   onClick={() => {
-                    // Jump to segment and start playing
+                    // Jump to segment position (without auto-playing)
                     const ws = wavesurferRef.current;
                     const dur = ws?.getDuration?.() || duration || 0;
                     const t = Math.max(0, segment.start);
                     
-                    // Set time position
+                    // Set time position in store (critical for play button to know where to start)
                     setCurrentTime(t);
                     
                     // Highlight segment immediately
                     setManualHighlightIdx(idx);
                     scrollToSegmentIndex(idx);
                     
-                    // Seek and play within user gesture
+                    // Seek wavesurfer to position
                     if (ws && dur > 0) {
                       try {
-                        ws.seekTo(t / dur);
-                        // Direct play() call within user gesture to comply with browser autoplay policy
-                        // Use a minimal timeout to ensure seek completes but stay within gesture context
-                        setTimeout(() => {
-                          if (ws) {
-                            ws.play().then(() => {
-                              setPlaying(true);
-                              if (typeof window !== 'undefined' && window.localStorage?.getItem?.('debug-audio') === '1') {
-                                console.log('[EditorAudio] Segment click -> played successfully');
-                              }
-                            }).catch((err) => {
-                              console.error('Segment play error:', err);
-                              // Fallback: just update state
-                              setPlaying(true);
-                            });
-                          }
-                        }, 50); // Short delay to ensure seek completes
+                        const seekPosition = t / dur;
+                        ws.seekTo(seekPosition);
+                        console.log('[Audio Debug] Segment clicked - seeked to:', t, 'seconds (', seekPosition * 100, '%)');
+                        
+                        // If currently playing, pause it
+                        if (isPlaying) {
+                          ws.pause();
+                          setPlaying(false);
+                        }
+                        toast.success(`Position set to ${formatTime(segment.start)}`);
                       } catch (err) {
                         console.error('Seek error:', err);
                       }
                     } else {
-                      // No wavesurfer, just update state
-                      setPlaying(true);
+                      console.log('[Audio Debug] Segment clicked but no wavesurfer - just set time to:', t);
                     }
                   }}
                 className={`group mb-3 p-3 rounded-lg cursor-pointer transition-all ${
@@ -1047,14 +1039,43 @@ export default function ThreeColumnEditor({
                   wavesurferRef.current.pause();
                   setPlaying(false);
                 } else {
-                  console.log('[Audio Debug] Playing audio...');
-                  wavesurferRef.current.play().then(() => {
-                    console.log('[Audio Debug] Play successful');
-                    setPlaying(true);
-                  }).catch((err) => {
-                    console.error('[Audio Debug] Play failed:', err);
-                    toast.error(`Play failed: ${err.message || 'Unknown error'}`);
+                  // Get current position from wavesurfer first
+                  const wsCurrentTime = wavesurferRef.current.getCurrentTime();
+                  const dur = wavesurferRef.current.getDuration();
+                  
+                  console.log('[Audio Debug] Play button state:', {
+                    storeCurrentTime: currentTime,
+                    wavesurferCurrentTime: wsCurrentTime,
+                    duration: dur
                   });
+                  
+                  // If wavesurfer is at 0 but store has a position, seek first
+                  if (wsCurrentTime === 0 && currentTime > 0 && dur > 0) {
+                    console.log('[Audio Debug] WaveSurfer at 0, seeking to store position:', currentTime);
+                    wavesurferRef.current.seekTo(currentTime / dur);
+                    // Small delay to ensure seek completes
+                    setTimeout(() => {
+                      if (wavesurferRef.current) {
+                        wavesurferRef.current.play().then(() => {
+                          console.log('[Audio Debug] Play successful after seek');
+                          setPlaying(true);
+                        }).catch((err) => {
+                          console.error('[Audio Debug] Play failed:', err);
+                          toast.error(`Play failed: ${err.message || 'Unknown error'}`);
+                        });
+                      }
+                    }, 50);
+                  } else {
+                    // Play from current wavesurfer position
+                    console.log('[Audio Debug] Playing from wavesurfer position:', wsCurrentTime);
+                    wavesurferRef.current.play().then(() => {
+                      console.log('[Audio Debug] Play successful');
+                      setPlaying(true);
+                    }).catch((err) => {
+                      console.error('[Audio Debug] Play failed:', err);
+                      toast.error(`Play failed: ${err.message || 'Unknown error'}`);
+                    });
+                  }
                 }
               }}
               className="p-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
