@@ -36,7 +36,7 @@ export class DocumentExportService {
     options: Partial<ExportOptions> = {}
   ): Promise<Blob> {
     // Dynamic import to reduce bundle size
-    const { Document, Packer, Paragraph, TextRun, HeadingLevel, PageBreak, AlignmentType, BorderStyle } = await import('docx');
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel, PageBreak, AlignmentType, TableOfContents } = await import('docx');
     
     const doc = new Document({
       sections: [{
@@ -78,36 +78,6 @@ export class DocumentExportService {
             })
           ] : []),
           
-          // Table of Contents
-          ...(chapters.length > 0 && options.includeChapters !== false ? [
-            new PageBreak(),
-            new Paragraph({
-              text: 'Table of Contents',
-              heading: HeadingLevel.HEADING_1,
-              spacing: { after: 400 }
-            }),
-            ...chapters.map((chapter, idx) => 
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: `${idx + 1}. `,
-                    bold: true
-                  }),
-                  new TextRun({
-                    text: `${chapter.title} `,
-                  }),
-                  new TextRun({
-                    text: `(${this.formatTime(chapter.startTime)})`,
-                    italics: true,
-                    color: '666666'
-                  })
-                ],
-                spacing: { after: 200 },
-                indent: { left: 360 }
-              })
-            )
-          ] : []),
-          
           // Summary Section
           ...(summary && options.includeSummary !== false ? [
             new PageBreak(),
@@ -134,15 +104,21 @@ export class DocumentExportService {
           
           // Content by chapters or flat
           ...(chapters.length > 0 && options.includeChapters !== false ? 
-            this.generateChapterContent(chapters, options.includeTimestamps !== false) :
-            this.generateFlatContent(transcription, options.includeTimestamps !== false)
+            await this.generateChapterContent(chapters, options.includeTimestamps !== false) :
+            await this.generateFlatContent(transcription, options.includeTimestamps !== false)
           )
         ]
       }]
     });
     
-    const blob = await Packer.toBlob(doc);
-    return blob;
+    // In Node (API routes), prefer toBuffer for reliability.
+    if (typeof window === 'undefined') {
+      const buffer = await Packer.toBuffer(doc);
+      return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    } else {
+      const blob = await Packer.toBlob(doc);
+      return blob;
+    }
   }
   
   /**
@@ -215,17 +191,17 @@ export class DocumentExportService {
     }
     
     // Table of Contents
-    if (chapters.length > 0 && options.includeChapters !== false) {
-      doc.addPage();
-      yPosition = margins.top;
-      addText('Table of Contents', 18, true);
-      yPosition += 5;
+    // if (chapters.length > 0 && options.includeChapters !== false) {
+    //   doc.addPage();
+    //   yPosition = margins.top;
+    //   addText('Table of Contents', 18, true);
+    //   yPosition += 5;
       
-      chapters.forEach((chapter, idx) => {
-        const chapterLine = `${idx + 1}. ${chapter.title} (${this.formatTime(chapter.startTime)})`;
-        addText(chapterLine, 12, false);
-      });
-    }
+    //   chapters.forEach((chapter, idx) => {
+    //     const chapterLine = `${idx + 1}. ${chapter.title} (${this.formatTime(chapter.startTime)})`;
+    //     addText(chapterLine, 12, false);
+    //   });
+    // }
     
     // Summary
     if (summary && options.includeSummary !== false) {
@@ -284,8 +260,8 @@ export class DocumentExportService {
   /**
    * Generate chapter content for Word document
    */
-  private static generateChapterContent(chapters: BasicChapter[], includeTimestamps: boolean): any[] {
-    const { Paragraph, TextRun, HeadingLevel } = require('docx');
+  private static async generateChapterContent(chapters: BasicChapter[], includeTimestamps: boolean, includeSpeakers: boolean = true): Promise<any[]> {
+    const { Paragraph, TextRun, HeadingLevel } = await import('docx');
     const content: any[] = [];
     
     chapters.forEach((chapter, idx) => {
@@ -313,8 +289,9 @@ export class DocumentExportService {
       );
       
       // Chapter segments
-      if (chapter.segments) {
+      if (chapter.segments && chapter.segments.length > 0) {
         chapter.segments.forEach(segment => {
+          const speakerPrefix = includeSpeakers && (segment as any).speaker ? `${(segment as any).speaker}: ` : '';
           if (includeTimestamps) {
             content.push(
               new Paragraph({
@@ -325,7 +302,7 @@ export class DocumentExportService {
                     color: '0066CC'
                   }),
                   new TextRun({
-                    text: segment.text
+                    text: `${speakerPrefix}${segment.text}`
                   })
                 ],
                 spacing: { after: 150 }
@@ -334,12 +311,22 @@ export class DocumentExportService {
           } else {
             content.push(
               new Paragraph({
-                text: segment.text,
+                text: `${speakerPrefix}${segment.text}`,
                 spacing: { after: 150 }
               })
             );
           }
         });
+      } else {
+        // If chapter has no segments, add a note
+        content.push(
+          new Paragraph({
+            text: '(No segments in this chapter)',
+            italics: true,
+            color: '999999',
+            spacing: { after: 150 }
+          })
+        );
       }
     });
     
@@ -349,30 +336,43 @@ export class DocumentExportService {
   /**
    * Generate flat content for Word document
    */
-  private static generateFlatContent(transcription: any, includeTimestamps: boolean): any[] {
-    const { Paragraph, TextRun } = require('docx');
+  private static async generateFlatContent(transcription: any, includeTimestamps: boolean): Promise<any[]> {
+    const { Paragraph, TextRun } = await import('docx');
     const content: any[] = [];
     
-    if (transcription.segments && includeTimestamps) {
-      transcription.segments.forEach((segment: TranscriptionSegment) => {
-        content.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `[${this.formatTime(segment.start)}] `,
-                bold: true,
-                color: '0066CC'
-              }),
-              new TextRun({
-                text: segment.text
-              })
-            ],
-            spacing: { after: 150 }
-          })
-        );
-      });
-    } else {
-      // Just add the plain text
+    // Handle both segments array and text
+    if (transcription.segments && transcription.segments.length > 0) {
+      if (includeTimestamps) {
+        transcription.segments.forEach((segment: TranscriptionSegment) => {
+          content.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `[${this.formatTime(segment.start)}] `,
+                  bold: true,
+                  color: '0066CC'
+                }),
+                new TextRun({
+                  text: segment.text
+                })
+              ],
+              spacing: { after: 150 }
+            })
+          );
+        });
+      } else {
+        // Without timestamps, just add segment text
+        transcription.segments.forEach((segment: TranscriptionSegment) => {
+          content.push(
+            new Paragraph({
+              text: segment.text,
+              spacing: { after: 150 }
+            })
+          );
+        });
+      }
+    } else if (transcription.text) {
+      // Fall back to plain text if no segments
       transcription.text.split('\n').forEach((paragraph: string) => {
         if (paragraph.trim()) {
           content.push(

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { usePlayerStore } from '@/stores/player-store';
 import { useTranslations } from 'next-intl';
@@ -17,8 +18,10 @@ import {
   ChevronRight,
   X
 } from 'lucide-react';
+import { Volume2 } from 'lucide-react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.js';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 interface ThreeColumnEditorProps {
   audioUrl?: string | null;
@@ -26,16 +29,37 @@ interface ThreeColumnEditorProps {
   chapters: any[];
   transcription: any;
   onClose?: () => void;
+  backHref?: string;
+  onSegmentsUpdate?: (segments: any[]) => void;
 }
 
 export default function ThreeColumnEditor({ 
   audioUrl, 
-  segments, 
+  segments: initialSegments, 
   chapters: initialChapters, 
   transcription,
-  onClose 
+  onClose,
+  backHref,
+  onSegmentsUpdate
 }: ThreeColumnEditorProps) {
   const t = useTranslations('tool_interface');
+  
+  // Debug: Log props on mount
+  console.log('[Audio Debug] ThreeColumnEditor mounted with audioUrl:', audioUrl);
+  
+  // Show warning if no audio URL
+  useEffect(() => {
+    if (!audioUrl) {
+      console.warn('[Audio Debug] No audio URL provided to editor');
+      toast.warning('No audio file available for this transcription');
+    }
+  }, [audioUrl]);
+  
+  // Debug toggle: run in console -> localStorage.setItem('debug-audio','1') to enable
+  const DEBUG = typeof window !== 'undefined' && window.localStorage?.getItem?.('debug-audio') === '1';
+  const dlog = (...args: any[]) => { if (DEBUG) console.log('[EditorAudio]', ...args); };
+  const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState<null | 'docx' | 'pdf'>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [editingChapter, setEditingChapter] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -43,8 +67,17 @@ export default function ThreeColumnEditor({
   const [shortcutsEnabled, setShortcutsEnabled] = useState(false); // Default off
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
+  const regionsRef = useRef<any>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const [waveformReady, setWaveformReady] = useState(false);
+  const [linkMode, setLinkMode] = useState<'both'|'text'|'audio'>('both');
+  const [preRollLocal, setPreRollLocal] = useState<0|0.5|1|2>(1);
+  // 手动高亮：用于暂停或仅文本联动时也能高亮选中的句子
+  const [manualHighlightIdx, setManualHighlightIdx] = useState<number | null>(null);
+  const [splitModal, setSplitModal] = useState<{open:boolean; index:number|null; segmentIndex:number}>({ open:false, index:null, segmentIndex:0 });
+  const [mergeModal, setMergeModal] = useState<{open:boolean; index:number|null}>({ open:false, index:null });
+  const [segmentSplitModal, setSegmentSplitModal] = useState<{open:boolean; segmentIndex:number|null; splitPosition:number}>({ open:false, segmentIndex:null, splitPosition:0 });
+  const [segments, setSegments] = useState(initialSegments);
   
   const {
     isPlaying,
@@ -52,17 +85,21 @@ export default function ThreeColumnEditor({
     duration,
     currentChapter,
     chapters,
+    volume,
     setPlaying,
     setCurrentTime,
     setDuration,
     jumpToChapter,
     setChapters,
-    updateChapter
+    updateChapter,
+    setVolume
   } = usePlayerStore();
 
-  // Initialize chapters
+  // Initialize chapters once, or when there are no chapters yet.
+  // Avoid overriding user edits on unrelated re-renders (e.g., transcription object changes).
   useEffect(() => {
-    // If no chapters, create default ones based on segments
+    if (chapters && chapters.length > 0) return; // already initialized; don't clobber edits
+
     const chaptersToUse = initialChapters.length > 0 ? initialChapters : [{
       id: 'full',
       title: 'Full Transcription',
@@ -74,12 +111,44 @@ export default function ThreeColumnEditor({
     if (transcription?.duration) {
       setDuration(transcription.duration);
     }
-  }, [initialChapters, segments, transcription]);
+  }, [chapters, initialChapters, transcription]);
 
   // Initialize WaveSurfer
   useEffect(() => {
-    if (!waveformRef.current || !audioUrl) return;
+    console.log('[Audio Debug] WaveSurfer init effect running. audioUrl:', audioUrl, 'waveformRef:', !!waveformRef.current);
+    
+    // Clean up existing instance if any
+    if (wavesurferRef.current) {
+      console.log('[Audio Debug] Cleaning up existing WaveSurfer instance');
+      try {
+        wavesurferRef.current.destroy();
+      } catch (e) {
+        console.error('[Audio Debug] Error destroying existing instance:', e);
+      }
+      wavesurferRef.current = null;
+    }
+    
+    if (!waveformRef.current) {
+      console.log('[Audio Debug] No waveform container element');
+      return;
+    }
+    
+    if (!audioUrl) {
+      console.log('[Audio Debug] No audio URL provided');
+      return;
+    }
+    
+    // Validate audio URL
+    try {
+      const url = new URL(audioUrl, window.location.origin);
+      dlog('Loading audio from:', url.href);
+    } catch (e) {
+      console.warn('Invalid audio URL:', audioUrl);
+      toast.error('Invalid audio URL');
+      return;
+    }
 
+    console.log('[Audio Debug] Creating WaveSurfer instance...');
     const wavesurfer = WaveSurfer.create({
       container: waveformRef.current,
       waveColor: 'rgba(147, 51, 234, 0.3)',
@@ -94,14 +163,46 @@ export default function ThreeColumnEditor({
       interact: true,
       dragToSeek: true,
     });
+    
+    console.log('[Audio Debug] WaveSurfer instance created:', !!wavesurfer);
 
     const regions = wavesurfer.registerPlugin(RegionsPlugin.create());
+    regionsRef.current = regions;
     
-    wavesurfer.load(audioUrl);
+    // Store wavesurfer ref immediately after creation
+    wavesurferRef.current = wavesurfer;
+    console.log('[Audio Debug] wavesurferRef.current set:', !!wavesurferRef.current);
+    
+    try { (window as any).__wavesurfer = wavesurfer; } catch {}
+    
+    // Use proxy to avoid CORS issues
+    let playUrl = audioUrl;
+    
+    // If the URL is external (not relative), use proxy
+    if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
+      playUrl = `/api/media/proxy?url=${encodeURIComponent(audioUrl)}`;
+      console.log('[Audio Debug] Using proxy for external URL');
+    }
+    
+    // Debug: Log the actual URL being loaded
+    console.log('[Audio Debug] Loading audio from URL:', playUrl);
+    console.log('[Audio Debug] Original URL:', audioUrl);
+    dlog('wavesurfer.load()', playUrl);
+    
+    // Load audio with detailed error handling
+    wavesurfer.load(playUrl).then(() => {
+      console.log('[Audio Debug] Audio loaded successfully');
+    }).catch((error) => {
+      console.error('[Audio Debug] Failed to load audio:', error);
+      toast.error(`Failed to load audio: ${error.message || 'Unknown error'}`);
+    });
     
     wavesurfer.on('ready', () => {
+      dlog('Event: ready; duration=', wavesurfer.getDuration());
       setWaveformReady(true);
       setDuration(wavesurfer.getDuration());
+      // Set initial volume
+      wavesurfer.setVolume(volume);
       
       // Add chapter regions
       chapters.forEach((chapter, idx) => {
@@ -124,17 +225,25 @@ export default function ThreeColumnEditor({
     wavesurfer.on('seeking', (progress) => {
       const time = progress * wavesurfer.getDuration();
       setCurrentTime(time);
+      dlog('Event: seeking', { progress, time });
     });
 
-    wavesurfer.on('play', () => setPlaying(true));
-    wavesurfer.on('pause', () => setPlaying(false));
+    // Keep state in sync with wavesurfer
+    wavesurfer.on('play', () => { dlog('Event: play'); setPlaying(true); });
+    wavesurfer.on('pause', () => { dlog('Event: pause'); setPlaying(false); });
+    wavesurfer.on('error', (err: any) => {
+      console.error('WaveSurfer error:', err);
+      toast.error('Audio playback error');
+    });
 
     regions.on('region-clicked', (region: any) => {
       wavesurfer.setTime(region.start);
       setCurrentTime(region.start);
+      dlog('Region clicked -> setTime', region.start);
+      toast.success(`Jumped to ${formatTime(region.start)} · ${region.content || ''}`);
     });
 
-    wavesurferRef.current = wavesurfer;
+    // wavesurferRef.current already set above after creation
 
     return () => {
       if (wavesurferRef.current) {
@@ -148,13 +257,50 @@ export default function ThreeColumnEditor({
     };
   }, [audioUrl]); // Only recreate when audioUrl changes, not chapters
 
+  // Rebuild waveform regions when chapters change
+  useEffect(() => {
+    if (!wavesurferRef.current || !regionsRef.current || !waveformReady) return;
+    const regions = regionsRef.current;
+    try {
+      if (typeof regions.clearRegions === 'function') {
+        regions.clearRegions();
+      } else {
+        const all = regions.getRegions ? regions.getRegions() : [];
+        all.forEach((r: any) => r.remove && r.remove());
+      }
+      chapters.forEach((chapter, idx) => {
+        const hue = (idx * 60) % 360;
+        regions.addRegion({
+          start: chapter.startTime,
+          end: chapter.endTime,
+          content: chapter.title,
+          color: `hsla(${hue}, 70%, 50%, 0.15)`,
+          drag: false,
+          resize: false,
+        });
+      });
+    } catch (e) {
+      console.warn('Rebuild regions failed', e);
+    }
+  }, [chapters, waveformReady]);
+
   // Sync playback state
   useEffect(() => {
     if (!wavesurferRef.current || !waveformReady) return;
     
-    if (isPlaying) {
-      wavesurferRef.current.play();
-    } else {
+    // Check current wavesurfer playing state to avoid unnecessary calls
+    const wsIsPlaying = wavesurferRef.current.isPlaying();
+    
+    if (isPlaying && !wsIsPlaying) {
+      // Need to start playing
+      dlog('Effect: start playing');
+      wavesurferRef.current.play().catch((err: any) => {
+        console.error('Play error:', err);
+        setPlaying(false); // Reset state on error
+      });
+    } else if (!isPlaying && wsIsPlaying) {
+      // Need to pause
+      dlog('Effect: pause audio');
       wavesurferRef.current.pause();
     }
   }, [isPlaying, waveformReady]);
@@ -165,42 +311,39 @@ export default function ThreeColumnEditor({
     
     const wsTime = wavesurferRef.current.getCurrentTime();
     if (Math.abs(wsTime - currentTime) > 0.5) {
+      dlog('Effect: setTime to store currentTime', { wsTime, currentTime });
       wavesurferRef.current.setTime(currentTime);
     }
   }, [currentTime, waveformReady]);
 
-  // Auto-scroll to active segment
+  // Helper: scroll transcript to segment index
+  const scrollToSegmentIndex = (idx: number) => {
+    if (idx < 0 || !transcriptRef.current) return;
+    const segmentEl = transcriptRef.current.querySelector(`[data-segment="${idx}"]`) as HTMLElement | null;
+    if (!segmentEl) return;
+    const container = transcriptRef.current;
+    const top = (segmentEl.offsetTop - container.offsetTop) - 12; // 顶部预留 12px
+    container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  };
+
+  // Auto-scroll to active segment whenever time改变（即使暂停）
   useEffect(() => {
     const activeSegmentIdx = segments.findIndex(
       seg => currentTime >= seg.start && currentTime < seg.end
     );
-    
-    if (activeSegmentIdx !== -1 && transcriptRef.current && isPlaying) {
-      const segmentEl = transcriptRef.current.querySelector(`[data-segment="${activeSegmentIdx}"]`) as HTMLElement;
-      if (segmentEl && transcriptRef.current) {
-        // Calculate position relative to the transcript container
-        const containerRect = transcriptRef.current.getBoundingClientRect();
-        const elementRect = segmentEl.getBoundingClientRect();
-        const relativeTop = elementRect.top - containerRect.top;
-        const containerHeight = transcriptRef.current.clientHeight;
-        const scrollTop = transcriptRef.current.scrollTop;
-        
-        // Only scroll if element is not already in view
-        if (relativeTop < 100 || relativeTop > containerHeight - 100) {
-          const targetScroll = scrollTop + relativeTop - containerHeight / 2;
-          transcriptRef.current.scrollTo({
-            top: targetScroll,
-            behavior: 'smooth'
-          });
-        }
-      }
+    if (activeSegmentIdx !== -1) {
+      scrollToSegmentIndex(activeSegmentIdx);
+      setManualHighlightIdx(activeSegmentIdx);
     }
-  }, [currentTime, segments, isPlaying]);
+  }, [currentTime, segments]);
 
   // Keyboard shortcuts - only when enabled
   useHotkeys('space', (e) => {
     if (!shortcutsEnabled) return;
     e.preventDefault();
+    if (typeof window !== 'undefined' && window.localStorage?.getItem?.('debug-audio') === '1') {
+      console.log('[EditorAudio] Hotkey: space pressed, toggle playback');
+    }
     setPlaying(!isPlaying);
   }, [isPlaying, shortcutsEnabled]);
   
@@ -259,6 +402,35 @@ export default function ThreeColumnEditor({
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
+  // Persist current edits to server
+  const persistEdits = async (
+    chaptersOverride?: any[],
+    segmentsOverride?: any[]
+  ) => {
+    try {
+      setSaving(true);
+      const body = {
+        chapters: chaptersOverride ?? usePlayerStore.getState().chapters,
+        segments: segmentsOverride ?? segments,
+        updatedAt: new Date().toISOString()
+      };
+      const url = typeof window !== 'undefined' ? window.location.pathname : '';
+      const jobId = url.split('/').pop();
+      const res = await fetch(`/api/transcriptions/${jobId}/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error('save failed');
+      toast.success('Saved');
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const startEditChapter = (index: number, title: string) => {
     setEditingChapter(index);
     setEditTitle(title);
@@ -266,10 +438,256 @@ export default function ThreeColumnEditor({
 
   const saveChapterTitle = () => {
     if (editingChapter !== null && editTitle.trim()) {
-      updateChapter(editingChapter, { title: editTitle.trim() });
+      const newTitle = editTitle.trim();
+      updateChapter(editingChapter, { title: newTitle });
+      // Auto-save on rename
+      const latestChapters = usePlayerStore.getState().chapters;
+      persistEdits(latestChapters, segments);
     }
     setEditingChapter(null);
     setEditTitle('');
+  };
+
+  // Open split modal to select segment split point
+  const openSplitModal = (index: number) => {
+    const ch = chapters[index];
+    if (!ch) return;
+    const chapterSegments = ch.segments || [];
+    if (chapterSegments.length < 2) {
+      toast.error('Chapter needs at least 2 segments to split');
+      return;
+    }
+    // Default to middle segment
+    const defaultSegmentIndex = Math.floor(chapterSegments.length / 2);
+    setSplitModal({ open:true, index, segmentIndex: defaultSegmentIndex });
+  };
+  const confirmSplit = () => {
+    if (splitModal.index === null) return;
+    const idx = splitModal.index;
+    const ch = chapters[idx];
+    if (!ch) return;
+    
+    const chapterSegments = ch.segments || [];
+    if (splitModal.segmentIndex < 1 || splitModal.segmentIndex >= chapterSegments.length) {
+      toast.error('Invalid split position');
+      return;
+    }
+    
+    // Split at the selected segment boundary
+    const splitSegment = chapterSegments[splitModal.segmentIndex];
+    const splitTime = splitSegment.start;
+    
+    // Create two new chapters
+    const firstSegments = chapterSegments.slice(0, splitModal.segmentIndex);
+    const secondSegments = chapterSegments.slice(splitModal.segmentIndex);
+    
+    const newChapters = [...chapters];
+    const firstChapter = {
+      ...ch,
+      endTime: splitTime,
+      segments: firstSegments
+    };
+    const secondChapter = {
+      ...ch,
+      id: `${ch.id}-split-${Date.now()}`,
+      title: `${ch.title} (continued)`,
+      startTime: splitTime,
+      segments: secondSegments
+    };
+    
+    newChapters.splice(idx, 1, firstChapter, secondChapter);
+    setChapters(newChapters);
+    
+    setTimeout(() => {
+      try { jumpToChapter(idx); } catch {}
+    }, 0);
+    
+    toast.success(`Split chapter into ${firstSegments.length} and ${secondSegments.length} segments`);
+    setSplitModal({ open:false, index:null, segmentIndex:0 });
+  };
+
+  // Merge modal actions
+  const openMergeModal = (index: number) => setMergeModal({ open:true, index });
+  const doMergePrev = () => {
+    const idx = mergeModal.index ?? -1;
+    if (idx <= 0) return;
+    
+    const newChapters = [...chapters];
+    const left = newChapters[idx - 1];
+    const right = newChapters[idx];
+    
+    const mergedChapter = {
+      ...left,
+      endTime: right.endTime,
+      segments: [...(left.segments || []), ...(right.segments || [])]
+    };
+    
+    newChapters.splice(idx - 1, 2, mergedChapter);
+    setChapters(newChapters);
+    
+    setTimeout(() => { try { jumpToChapter(idx - 1); } catch {} }, 0);
+    toast.success('Merged with previous chapter');
+    setMergeModal({ open:false, index:null });
+  };
+  
+  const doMergeNext = () => {
+    const idx = mergeModal.index ?? -1;
+    if (idx < 0 || idx >= chapters.length - 1) return;
+    
+    const newChapters = [...chapters];
+    const left = newChapters[idx];
+    const right = newChapters[idx + 1];
+    
+    const mergedChapter = {
+      ...left,
+      endTime: right.endTime,
+      segments: [...(left.segments || []), ...(right.segments || [])]
+    };
+    
+    newChapters.splice(idx, 2, mergedChapter);
+    setChapters(newChapters);
+    
+    setTimeout(() => { try { jumpToChapter(idx); } catch {} }, 0);
+    toast.success('Merged with next chapter');
+    setMergeModal({ open:false, index:null });
+  };
+
+  const mergeWithPrevious = (index: number) => {
+    openMergeModal(index);
+  };
+
+  const splitAtCurrentTime = (index: number) => {
+    openSplitModal(index);
+  };
+
+  // Merge two segments
+  const mergeSegments = (firstIdx: number, secondIdx: number) => {
+    if (firstIdx < 0 || secondIdx >= segments.length) return;
+    
+    const first = segments[firstIdx];
+    const second = segments[secondIdx];
+    
+    // Create merged segment
+    const mergedSegment = {
+      ...first,
+      end: second.end,
+      text: first.text + ' ' + second.text
+    };
+    
+    // Update segments array
+    const newSegments = [...segments];
+    newSegments.splice(firstIdx, 2, mergedSegment);
+    
+    // Update segments state
+    setSegments(newSegments);
+    
+    // Update chapters to reflect the new segments
+    const newChapters = chapters.map((chapter: any) => {
+      // More lenient filtering: segment overlaps with chapter time range
+      const chapterSegments = newSegments.filter((seg: any) => 
+        seg.start < chapter.endTime && seg.end > chapter.startTime
+      );
+      return {
+        ...chapter,
+        segments: chapterSegments
+      };
+    });
+    
+    setChapters(newChapters);
+    
+    // Call callback if provided
+    if (onSegmentsUpdate) {
+      onSegmentsUpdate(newSegments);
+    }
+    
+    toast.success('Merged segments');
+  };
+
+  // Open segment split modal
+  const openSegmentSplitModal = (segmentIdx: number) => {
+    const segment = segments[segmentIdx];
+    if (!segment || !segment.text || segment.text.length < 10) {
+      toast.error('Segment too short to split');
+      return;
+    }
+    
+    // Check if segment duration is too short
+    const duration = segment.end - segment.start;
+    if (duration < 2) {
+      toast.error('Segment duration less than 2 seconds, cannot split');
+      return;
+    }
+    
+    // Default split position at middle of text
+    const defaultPosition = Math.floor(segment.text.length / 2);
+    setSegmentSplitModal({ 
+      open: true, 
+      segmentIndex: segmentIdx, 
+      splitPosition: defaultPosition 
+    });
+  };
+
+  // Confirm segment split
+  const confirmSegmentSplit = () => {
+    if (segmentSplitModal.segmentIndex === null) return;
+    
+    const segment = segments[segmentSplitModal.segmentIndex];
+    if (!segment) return;
+    
+    const splitPos = segmentSplitModal.splitPosition;
+    const text1 = segment.text.substring(0, splitPos).trim();
+    const text2 = segment.text.substring(splitPos).trim();
+    
+    if (!text1 || !text2) {
+      toast.error('Invalid split position');
+      return;
+    }
+    
+    // Calculate time split based on text proportion
+    const totalDuration = segment.end - segment.start;
+    const splitTime = segment.start + (totalDuration * (splitPos / segment.text.length));
+    
+    // Create two new segments
+    const firstSegment = {
+      ...segment,
+      end: splitTime,
+      text: text1
+    };
+    
+    const secondSegment = {
+      ...segment,
+      start: splitTime,
+      text: text2
+    };
+    
+    // Update segments array
+    const newSegments = [...segments];
+    newSegments.splice(segmentSplitModal.segmentIndex, 1, firstSegment, secondSegment);
+    
+    // Update segments state
+    setSegments(newSegments);
+    
+    // Update chapters to reflect the new segments
+    const newChapters = chapters.map((chapter: any) => {
+      // More lenient filtering: segment overlaps with chapter time range
+      const chapterSegments = newSegments.filter((seg: any) => 
+        seg.start < chapter.endTime && seg.end > chapter.startTime
+      );
+      return {
+        ...chapter,
+        segments: chapterSegments
+      };
+    });
+    
+    setChapters(newChapters);
+    
+    // Call callback if provided
+    if (onSegmentsUpdate) {
+      onSegmentsUpdate(newSegments);
+    }
+    
+    toast.success('Split segment');
+    setSegmentSplitModal({ open: false, segmentIndex: null, splitPosition: 0 });
   };
 
   return (
@@ -277,16 +695,64 @@ export default function ThreeColumnEditor({
       {/* Header Bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-900/50">
         <h3 className="text-sm font-medium text-gray-300">Editor View</h3>
-        <button
-          onClick={onClose}
-          className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
-        >
-          <X className="w-4 h-4 text-gray-400" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              await persistEdits(chapters, segments);
+            }}
+            className={`px-3 py-1.5 text-xs rounded ${saving ? 'bg-gray-700 text-gray-300' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}
+            disabled={saving}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                setExporting('docx');
+                const jobId = (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '') as string;
+                const a = document.createElement('a');
+                a.href = `/api/transcriptions/${jobId}/export?format=docx`;
+                a.click();
+              } finally { setExporting(null); }
+            }}
+            className="px-3 py-1.5 text-xs rounded bg-gray-800 hover:bg-gray-700 text-gray-200"
+          >
+            Export Word
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                setExporting('pdf');
+                const jobId = (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '') as string;
+                const a = document.createElement('a');
+                a.href = `/api/transcriptions/${jobId}/export?format=pdf`;
+                a.click();
+              } finally { setExporting(null); }
+            }}
+            className="px-3 py-1.5 text-xs rounded bg-gray-800 hover:bg-gray-700 text-gray-200"
+          >
+            Export PDF
+          </button>
+          <button
+            onClick={() => {
+              if (onClose) return onClose();
+              if (backHref) {
+                window.location.href = backHref;
+              } else {
+                window.history.back();
+              }
+            }}
+            className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
       </div>
-
-      {/* Three Column Layout */}
-      <div className="flex h-[700px] w-full">
+      
+      {/* Main Content Area */}
+      <div className="flex flex-col h-[700px] w-full">
+        {/* Upper Content - Three Columns */}
+        <div className="flex flex-1 overflow-hidden">
         {/* Left Panel - Chapters */}
         <div className="w-64 border-r border-gray-800 flex flex-col bg-gray-950/50 flex-shrink-0">
           <div className="p-4 border-b border-gray-800">
@@ -297,6 +763,19 @@ export default function ThreeColumnEditor({
           </div>
           
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {chapters.length <= 1 && (
+              <div className="p-3 rounded-lg bg-gray-900/60 border border-gray-800 text-xs text-gray-300">
+                <div className="flex items-center gap-2 mb-2">
+                  <button
+                    onClick={() => openSplitModal(0)}
+                    className="px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded text-gray-200"
+                  >
+                    Split at current time
+                  </button>
+                </div>
+                <p className="text-gray-500">Use split to create chapters; more actions appear once you have multiple chapters.</p>
+              </div>
+            )}
             {chapters.map((chapter, idx) => {
               const isActive = idx === currentChapter;
               const progress = isActive ? 
@@ -313,7 +792,23 @@ export default function ThreeColumnEditor({
                       ? 'bg-purple-500/20 border border-purple-500/50' 
                       : 'hover:bg-gray-800/50'
                   }`}
-                  onClick={() => jumpToChapter(idx)}
+                  onClick={() => {
+                    // 先处理音频跳转（联动受 linkMode 控制）
+                    if (linkMode !== 'text') {
+                      const ws = wavesurferRef.current;
+                      const dur = ws?.getDuration?.() || duration || 0;
+                      const target = Math.max(0, chapter.startTime - preRollLocal);
+                      try {
+                        if (ws && dur > 0) ws.seekTo(target / dur); else ws?.setTime?.(target);
+                      } catch {}
+                      setCurrentTime(target);
+                    }
+                    // 文本始终滚动到该章节第一句
+                    const segIdx = Math.max(0, segments.findIndex(s => s.start >= chapter.startTime));
+                    setManualHighlightIdx(segIdx);
+                    scrollToSegmentIndex(segIdx);
+                    toast.success(`Jumped to ${formatTime(chapter.startTime)} · ${chapter.title}`);
+                  }}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
@@ -347,7 +842,7 @@ export default function ThreeColumnEditor({
                       </div>
                     </div>
                     
-                    {!editingChapter && (
+                    {editingChapter !== idx && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -385,45 +880,126 @@ export default function ThreeColumnEditor({
           
           <div ref={transcriptRef} className="flex-1 overflow-y-auto p-4 relative scroll-smooth">
             {segments.map((segment, idx) => {
-              const isActive = currentTime >= segment.start && currentTime < segment.end;
+              const isActive = (currentTime >= segment.start && currentTime < segment.end) || manualHighlightIdx === idx;
               
               return (
                 <div
                   key={idx}
                   data-segment={idx}
-                  onClick={() => setCurrentTime(segment.start)}
-                  className={`group mb-3 p-3 rounded-lg cursor-pointer transition-all ${
+                  onClick={() => {
+                    // Jump to segment and start playing
+                    const ws = wavesurferRef.current;
+                    const dur = ws?.getDuration?.() || duration || 0;
+                    const t = Math.max(0, segment.start);
+                    
+                    // Set time position
+                    setCurrentTime(t);
+                    
+                    // Highlight segment immediately
+                    setManualHighlightIdx(idx);
+                    scrollToSegmentIndex(idx);
+                    
+                    // Seek and play within user gesture
+                    if (ws && dur > 0) {
+                      try {
+                        ws.seekTo(t / dur);
+                        // Direct play() call within user gesture to comply with browser autoplay policy
+                        // Use a minimal timeout to ensure seek completes but stay within gesture context
+                        setTimeout(() => {
+                          if (ws) {
+                            ws.play().then(() => {
+                              setPlaying(true);
+                              if (typeof window !== 'undefined' && window.localStorage?.getItem?.('debug-audio') === '1') {
+                                console.log('[EditorAudio] Segment click -> played successfully');
+                              }
+                            }).catch((err) => {
+                              console.error('Segment play error:', err);
+                              // Fallback: just update state
+                              setPlaying(true);
+                            });
+                          }
+                        }, 50); // Short delay to ensure seek completes
+                      } catch (err) {
+                        console.error('Seek error:', err);
+                      }
+                    } else {
+                      // No wavesurfer, just update state
+                      setPlaying(true);
+                    }
+                  }}
+                className={`group mb-3 p-3 rounded-lg cursor-pointer transition-all ${
                     isActive 
                       ? 'bg-purple-500/10 border-l-2 border-purple-500' 
                       : 'hover:bg-gray-800/30'
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <span className={`text-xs font-mono ${
-                      isActive ? 'text-purple-400' : 'text-gray-500'
-                    }`}>
-                      {formatTime(segment.start)}
-                    </span>
-                    
-                    <p className={`flex-1 text-sm leading-relaxed ${
-                      isActive ? 'text-white' : 'text-gray-300'
-                    }`}>
-                      {segment.text}
-                    </p>
-                    
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyText(segment.text, idx);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700 rounded transition-all"
-                    >
-                      {copiedIndex === idx ? (
-                        <Check className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <Copy className="w-4 h-4 text-gray-400" />
-                      )}
-                    </button>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-start gap-3">
+                      <div className="flex items-center gap-1">
+                        {isActive && isPlaying && (
+                          <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                        )}
+                        <span className={`text-xs font-mono ${
+                          isActive ? 'text-purple-400' : 'text-gray-500'
+                        }`}>
+                          {formatTime(segment.start)}
+                        </span>
+                      </div>
+                      
+                      <p className={`flex-1 text-sm leading-relaxed ${
+                        isActive ? 'text-white' : 'text-gray-300'
+                      }`}>
+                        {segment.text}
+                      </p>
+                      
+                      {/* Show buttons when active or on hover */}
+                      <div className={`flex items-center gap-1 transition-opacity ${
+                        isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`}>
+                        {/* Merge with previous segment */}
+                        {idx > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              mergeSegments(idx - 1, idx);
+                            }}
+                            className="px-2 py-1 text-[10px] bg-blue-600 hover:bg-blue-700 rounded text-white"
+                            title="Merge with previous segment"
+                          >
+                            Merge ↑
+                          </button>
+                        )}
+                        
+                        {/* Split segment */}
+                        {segment.text && segment.text.length > 10 && (segment.end - segment.start) >= 2 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openSegmentSplitModal(idx);
+                            }}
+                            className="px-2 py-1 text-[10px] bg-green-600 hover:bg-green-700 rounded text-white"
+                            title="Split this segment"
+                          >
+                            Split
+                          </button>
+                        )}
+                        
+                        {/* Copy text */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyText(segment.text, idx);
+                          }}
+                          className="p-1 hover:bg-gray-700 rounded"
+                        >
+                          {copiedIndex === idx ? (
+                            <Check className="w-3 h-3 text-green-400" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-gray-400" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
@@ -431,76 +1007,115 @@ export default function ThreeColumnEditor({
           </div>
         </div>
 
-        {/* Right Panel - Player */}
-        <div className="w-72 border-l border-gray-800 flex flex-col bg-gray-950/50 flex-shrink-0">
-          <div className="p-4 border-b border-gray-800">
-            <h4 className="text-sm font-medium text-white">Audio Player</h4>
+        {/* Right Panel removed per request */}
+      </div>
+
+      {/* Bottom Panel - Audio Player Controls */}
+      <div className="border-t border-gray-800 bg-gray-950/50 p-4">
+        {/* Waveform Container - Hidden but kept in DOM for WaveSurfer */}
+        <div ref={waveformRef} className="hidden" />
+        
+        <div className="max-w-6xl mx-auto flex items-center gap-6">
+          {/* Play Controls */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => jumpToChapter(Math.max(0, currentChapter - 1))}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <SkipBack className="w-5 h-5 text-gray-300" />
+            </button>
+            
+            <button
+              onClick={() => {
+                console.log('[Audio Debug] Play button clicked. isPlaying:', isPlaying, 'waveformReady:', waveformReady);
+                
+                if (!wavesurferRef.current) {
+                  console.error('[Audio Debug] No wavesurfer instance!');
+                  toast.error('Audio player not initialized');
+                  return;
+                }
+                
+                if (!waveformReady) {
+                  console.error('[Audio Debug] Waveform not ready!');
+                  toast.error('Audio not ready. Please wait...');
+                  return;
+                }
+                
+                // Direct control within user gesture to comply with browser autoplay policy
+                if (isPlaying) {
+                  console.log('[Audio Debug] Pausing audio...');
+                  wavesurferRef.current.pause();
+                  setPlaying(false);
+                } else {
+                  console.log('[Audio Debug] Playing audio...');
+                  wavesurferRef.current.play().then(() => {
+                    console.log('[Audio Debug] Play successful');
+                    setPlaying(true);
+                  }).catch((err) => {
+                    console.error('[Audio Debug] Play failed:', err);
+                    toast.error(`Play failed: ${err.message || 'Unknown error'}`);
+                  });
+                }
+              }}
+              className="p-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+            >
+              {isPlaying ? (
+                <Pause className="w-6 h-6 text-white" />
+              ) : (
+                <Play className="w-6 h-6 text-white ml-0.5" />
+              )}
+            </button>
+            
+            <button
+              onClick={() => jumpToChapter(Math.min(chapters.length - 1, currentChapter + 1))}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <SkipForward className="w-5 h-5 text-gray-300" />
+            </button>
           </div>
-          
-          <div className="flex-1 p-4 space-y-4">
-            {/* Waveform */}
-            {audioUrl ? (
-              <div className="bg-gray-900 rounded-lg p-3">
-                <div ref={waveformRef} />
-              </div>
-            ) : (
-              <div className="bg-gray-900 rounded-lg p-8 text-center">
-                <p className="text-sm text-gray-500">No audio available</p>
-              </div>
-            )}
-            
-            {/* Play Controls */}
-            <div className="flex items-center justify-center gap-3">
-              <button
-                onClick={() => jumpToChapter(Math.max(0, currentChapter - 1))}
-                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <SkipBack className="w-5 h-5 text-gray-300" />
-              </button>
-              
-              <button
-                onClick={() => setPlaying(!isPlaying)}
-                className="p-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-              >
-                {isPlaying ? (
-                  <Pause className="w-6 h-6 text-white" />
-                ) : (
-                  <Play className="w-6 h-6 text-white ml-0.5" />
-                )}
-              </button>
-              
-              <button
-                onClick={() => jumpToChapter(Math.min(chapters.length - 1, currentChapter + 1))}
-                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <SkipForward className="w-5 h-5 text-gray-300" />
-              </button>
-            </div>
-            
-            {/* Time Display */}
-            <div className="text-center">
-              <div className="text-2xl font-mono text-white">
+
+          {/* Time and Progress */}
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-mono text-white">
                 {formatTime(Math.min(currentTime, duration))}
+              </span>
+              <div className="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
+                <motion.div
+                  className="h-full bg-purple-600"
+                  style={{ width: `${(currentTime / duration) * 100}%` }}
+                />
               </div>
-              <div className="text-sm text-gray-500">
-                of {formatTime(duration || 0)}
-              </div>
+              <span className="text-sm font-mono text-gray-500">
+                {formatTime(duration || 0)}
+              </span>
             </div>
-            
-            {/* Progress Bar */}
-            <div className="bg-gray-800 rounded-full h-2 overflow-hidden">
-              <motion.div
-                className="h-full bg-purple-600"
-                style={{ width: `${(currentTime / duration) * 100}%` }}
+          </div>
+
+          {/* Settings Controls */}
+          <div className="flex items-center gap-4">
+            {/* Volume */}
+            <div className="flex items-center gap-2">
+              <Volume2 className="w-4 h-4 text-gray-400" />
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={volume}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setVolume(v);
+                  if (wavesurferRef.current) wavesurferRef.current.setVolume(v);
+                }}
+                className="w-28 accent-purple-600"
               />
             </div>
-            
-            {/* Current Chapter - removed as it's not useful with single chapter */}
-            
-            {/* Speed Controls */}
-            <div className="space-y-2">
-              <p className="text-xs text-gray-500">Playback Speed</p>
-              <div className="grid grid-cols-3 gap-2">
+
+            {/* Playback Speed */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Speed</span>
+              <div className="flex gap-1">
                 {[0.75, 1, 1.25, 1.5, 1.75, 2].map(speed => (
                   <button
                     key={speed}
@@ -510,7 +1125,7 @@ export default function ThreeColumnEditor({
                         setCurrentSpeed(speed);
                       }
                     }}
-                    className={`px-3 py-1.5 text-xs rounded transition-colors ${
+                    className={`px-2 py-1 text-xs rounded ${
                       currentSpeed === speed
                         ? 'bg-purple-600 text-white'
                         : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
@@ -521,42 +1136,238 @@ export default function ThreeColumnEditor({
                 ))}
               </div>
             </div>
-            
-            {/* Keyboard Shortcuts */}
-            <div className="bg-gray-900 rounded-lg p-3 space-y-2">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-gray-500">{t('editor.keyboard_shortcuts')}</p>
-                <button
-                  onClick={() => setShortcutsEnabled(!shortcutsEnabled)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    shortcutsEnabled ? 'bg-purple-600' : 'bg-gray-700'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                      shortcutsEnabled ? 'translate-x-5' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
-              <div className={`space-y-1 text-xs ${!shortcutsEnabled ? 'opacity-50' : ''}`}>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">{t('editor.play_pause')}</span>
-                  <kbd className="px-2 py-0.5 bg-gray-800 rounded">Space</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">{t('editor.previous_segment')}</span>
-                  <kbd className="px-2 py-0.5 bg-gray-800 rounded">J</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">{t('editor.next_segment')}</span>
-                  <kbd className="px-2 py-0.5 bg-gray-800 rounded">K</kbd>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
+    </div>
+
+      {/* Merge Modal */}
+      <Dialog open={mergeModal.open} onOpenChange={(o)=> setMergeModal(m => ({...m, open:o}))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Merge Chapters</DialogTitle>
+            <DialogDescription>Select how to merge this chapter</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              className="px-3 py-1.5 rounded bg-gray-800 text-gray-200 hover:bg-gray-700 disabled:opacity-50"
+              onClick={doMergePrev}
+              disabled={(mergeModal.index ?? 0) <= 0}
+            >Merge with previous</button>
+            <button
+              className="px-3 py-1.5 rounded bg-gray-800 text-gray-200 hover:bg-gray-700 disabled:opacity-50"
+              onClick={doMergeNext}
+              disabled={(mergeModal.index ?? -1) >= chapters.length - 1}
+            >Merge with next</button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Split Modal */}
+      <Dialog open={splitModal.open} onOpenChange={(o)=> setSplitModal(s => ({...s, open:o}))}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Split Chapter</DialogTitle>
+            <DialogDescription>Select where to split this chapter</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-2 my-4 max-h-[400px]">
+            {(() => {
+              const ch = chapters[splitModal.index ?? 0];
+              if (!ch) return null;
+              const chapterSegments = ch.segments || [];
+              return chapterSegments.map((segment: any, idx: number) => (
+                <div 
+                  key={idx}
+                  className="relative"
+                >
+                  {idx > 0 && (
+                    <button
+                      onClick={() => setSplitModal(s => ({...s, segmentIndex: idx}))}
+                      className={`w-full py-2 mb-2 border-t-2 border-dashed transition-colors ${
+                        splitModal.segmentIndex === idx 
+                          ? 'border-purple-500 bg-purple-500/10' 
+                          : 'border-gray-700 hover:border-gray-500 hover:bg-gray-800/30'
+                      }`}
+                    >
+                      <span className="text-xs text-purple-400">
+                        {splitModal.segmentIndex === idx ? '← Split here →' : 'Click to split here'}
+                      </span>
+                    </button>
+                  )}
+                  <div className={`p-3 rounded ${
+                    idx < splitModal.segmentIndex ? 'bg-blue-900/20' : 'bg-green-900/20'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      <span className="text-xs font-mono text-gray-500">
+                        {formatTime(segment.start)}
+                      </span>
+                      <p className="flex-1 text-sm text-gray-300">
+                        {segment.text}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+          <div className="flex items-center justify-between border-t pt-4">
+            <div className="text-sm text-gray-400">
+              {(() => {
+                const ch = chapters[splitModal.index ?? 0];
+                if (!ch) return null;
+                const segs = ch.segments || [];
+                const firstCount = splitModal.segmentIndex;
+                const secondCount = segs.length - splitModal.segmentIndex;
+                return `Will split into: ${firstCount} segments | ${secondCount} segments`;
+              })()}
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                className="px-3 py-1.5 rounded bg-gray-800 text-gray-200 hover:bg-gray-700" 
+                onClick={()=> setSplitModal({ open:false, index:null, segmentIndex:0 })}
+              >
+                Cancel
+              </button>
+              <button 
+                className="px-3 py-1.5 rounded bg-purple-600 text-white hover:bg-purple-700" 
+                onClick={confirmSplit}
+                disabled={!splitModal.segmentIndex || splitModal.segmentIndex >= (chapters[splitModal.index ?? 0]?.segments?.length ?? 0)}
+              >
+                Confirm Split
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Segment Split Modal */}
+      <Dialog open={segmentSplitModal.open} onOpenChange={(o)=> setSegmentSplitModal(s => ({...s, open:o}))}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Split Segment</DialogTitle>
+            <DialogDescription>Choose where to split this segment - by word position or time</DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const segment = segments[segmentSplitModal.segmentIndex ?? -1];
+            if (!segment) return null;
+            
+            const words = segment.text.split(' ');
+            const duration = segment.end - segment.start;
+            const isLongSegment = duration > 5; // More than 5 seconds
+            
+            return (
+              <div className="space-y-4">
+                {/* Show original text with split preview */}
+                <div className="p-4 bg-gray-800 rounded-lg">
+                  <div className="text-sm mb-2 text-gray-400">Original segment ({formatTime(segment.start)} - {formatTime(segment.end)})</div>
+                  <div className="text-sm text-gray-200">
+                    <span className="text-blue-300">
+                      {segment.text.substring(0, segmentSplitModal.splitPosition)}
+                    </span>
+                    <span className="text-red-400 font-bold">|</span>
+                    <span className="text-green-300">
+                      {segment.text.substring(segmentSplitModal.splitPosition)}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Word-based split slider */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-400">Split by character position</label>
+                  <input
+                    type="range"
+                    min={10}
+                    max={Math.max(10, segment.text.length - 10)}
+                    value={segmentSplitModal.splitPosition}
+                    onChange={(e) => setSegmentSplitModal(s => ({...s, splitPosition: Number(e.target.value)}))}
+                    className="w-full accent-purple-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Character {segmentSplitModal.splitPosition} of {segment.text.length}</span>
+                    <span>Word ~{Math.floor(segmentSplitModal.splitPosition / (segment.text.length / words.length))} of {words.length}</span>
+                  </div>
+                </div>
+                
+                {/* Quick word split buttons */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-400">Quick split at word boundary</label>
+                  <div className="flex flex-wrap gap-2">
+                    {words.map((word: string, idx: number) => {
+                      if (idx === 0 || idx === words.length - 1) return null;
+                      const position = segment.text.indexOf(words.slice(0, idx + 1).join(' ')) + words.slice(0, idx + 1).join(' ').length;
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => setSegmentSplitModal(s => ({...s, splitPosition: position}))}
+                          className={`px-2 py-1 text-xs rounded ${
+                            segmentSplitModal.splitPosition === position
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                          }`}
+                        >
+                          After "{word}"
+                        </button>
+                      );
+                    }).filter(Boolean).slice(0, 10)}
+                  </div>
+                </div>
+                
+                {/* Time-based split for long segments */}
+                {isLongSegment && (
+                  <div className="space-y-2">
+                    <label className="text-sm text-gray-400">Or split by time (for long segments)</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const midPoint = Math.floor(segment.text.length / 2);
+                          setSegmentSplitModal(s => ({...s, splitPosition: midPoint}));
+                        }}
+                        className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded text-gray-300"
+                      >
+                        Split at middle ({formatTime(segment.start + duration/2)})
+                      </button>
+                      <button
+                        onClick={() => {
+                          const thirdPoint = Math.floor(segment.text.length / 3);
+                          setSegmentSplitModal(s => ({...s, splitPosition: thirdPoint}));
+                        }}
+                        className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded text-gray-300"
+                      >
+                        Split at 1/3 ({formatTime(segment.start + duration/3)})
+                      </button>
+                      <button
+                        onClick={() => {
+                          const twoThirdPoint = Math.floor(segment.text.length * 2 / 3);
+                          setSegmentSplitModal(s => ({...s, splitPosition: twoThirdPoint}));
+                        }}
+                        className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded text-gray-300"
+                      >
+                        Split at 2/3 ({formatTime(segment.start + duration*2/3)})
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Action buttons */}
+                <div className="flex items-center justify-end gap-2 pt-4 border-t">
+                  <button 
+                    className="px-3 py-1.5 rounded bg-gray-800 text-gray-200 hover:bg-gray-700" 
+                    onClick={()=> setSegmentSplitModal({ open:false, segmentIndex:null, splitPosition:0 })}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="px-3 py-1.5 rounded bg-purple-600 text-white hover:bg-purple-700" 
+                    onClick={confirmSegmentSplit}
+                  >
+                    Confirm Split
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "@/i18n/navigation";
 import {
   Dialog,
   DialogContent,
@@ -9,9 +10,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { FileText, FileCode, FileJson, FileDown, RefreshCw, Trash2, RotateCcw } from "lucide-react";
+import { FileText, FileCode, FileJson, FileDown, RefreshCw, Trash2, RotateCcw, Edit } from "lucide-react";
 
 export default function Actions({ row, i18n }: { row: any; i18n: any }) {
+  const router = useRouter();
   const [rerunning, setRerunning] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);
@@ -124,6 +126,15 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
 
   return (
     <div className="space-y-3">
+      {/* Edit button */}
+      <div>
+        <button
+          onClick={() => router.push(`/dashboard/editor/${row.job_id}`)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 transition-all duration-200 text-xs font-medium hover:scale-105 hover:shadow-sm"
+        >
+          <Edit className="w-3.5 h-3.5" /> Edit
+        </button>
+      </div>
       {/* 下载格式按钮组 */}
       <div className="flex flex-wrap gap-2">
         {['txt', 'srt', 'vtt', 'json', 'md'].map((format) => {
@@ -159,6 +170,19 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
 
       {/* 操作按钮组 */}
       <div className="flex items-center gap-2">
+        <button
+          onClick={() => router.push(`/dashboard/editor/${row.job_id}`)}
+          className="
+            inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+            bg-purple-500/10 hover:bg-purple-500/20 text-purple-600
+            transition-all duration-200 text-xs font-medium
+            hover:scale-105 hover:shadow-sm
+          "
+        >
+          <Edit className="w-3.5 h-3.5" />
+          {i18n.edit || 'Edit'}
+        </button>
+
         <button
           onClick={onRerun}
           disabled={rerunning || row.source_type === 'file_upload'}

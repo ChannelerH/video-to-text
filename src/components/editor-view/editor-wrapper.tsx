@@ -21,7 +21,8 @@ interface EditorWrapperProps {
   segments: any[];
   chapters: any[];
   transcription: any;
-  onClose: () => void;
+  onClose?: () => void;
+  backHref?: string;
 }
 
 export default function EditorWrapper(props: EditorWrapperProps) {

@@ -1554,48 +1554,30 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         {/* Results Display */}
           {result && result.type === 'full' && result.data && (
             <>
-            {/* Action Buttons - Clean and Elegant */}
+            {/* Simple Action Button */}
             {result.data.transcription.segments && result.data.transcription.segments.length > 0 && (
-              <div className="flex flex-col gap-4 mb-8">
+              <div className="mt-12 mb-8">
                 {isAuthenticated ? (
-                  <div className="space-y-6">
-                    {/* Action buttons with minimal design */}
-                    <div className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto">
-                      {/* Primary action - Edit */}
-                      {result.data.jobId && (
+                  <>
+                    {/* Single primary action */}
+                    {result.data.jobId && (
+                      <div className="text-center">
                         <Link 
                           href={`/${locale}/dashboard/editor/${result.data.jobId}`}
-                          className="group flex-1 inline-flex items-center justify-center gap-3 px-6 py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all font-medium"
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
                               d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
                           <span>{t('edit_transcription')}</span>
-                          <svg className="w-4 h-4 opacity-60 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
                         </Link>
-                      )}
-                      
-                      {/* Secondary action - Dashboard */}
-                      <Link 
-                        href={result?.data?.jobId 
-                          ? `/${locale}/dashboard/editor/${result.data.jobId}` 
-                          : `/${locale}/dashboard/transcriptions`}
-                        className="group flex-1 inline-flex items-center justify-center gap-3 px-6 py-3.5 bg-gray-800/60 backdrop-blur text-white rounded-xl hover:bg-gray-700/60 transition-all border border-gray-700"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                        </svg>
-                        <span>{t('view_all_transcriptions')}</span>
-                        <svg className="w-4 h-4 opacity-60 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </Link>
-                    </div>
-                  </div>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="text-center py-8 px-6 bg-gray-800/20 rounded-xl border border-gray-700/50">
                     <p className="text-gray-400 mb-4">{t('sign_in_to_access_features')}</p>

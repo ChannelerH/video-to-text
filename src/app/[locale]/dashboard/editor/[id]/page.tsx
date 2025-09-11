@@ -2,11 +2,12 @@ import { getTranslations } from "next-intl/server";
 import { getUserUuid } from "@/services/user";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { transcriptions, transcription_results } from "@/db/schema";
+import { transcriptions, transcription_results, transcription_edits } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import EditorWrapper from '@/components/editor-view/editor-wrapper';
+import { BasicSegmentationService } from '@/lib/basic-segmentation';
 
 interface PageProps {
   params: Promise<{ locale: string; id: string }>;
@@ -74,18 +75,38 @@ export default async function EditorPage({
       transcriptionData = JSON.parse(jsonResult.content);
       segments = transcriptionData.segments || [];
       
-      // Extract chapters if available
-      if (transcriptionData.chapters) {
+      // Prefer edited data if user has saved any
+      const edits = await db()
+        .select({ content: transcription_edits.content })
+        .from(transcription_edits)
+        .where(and(eq(transcription_edits.job_id, id), eq(transcription_edits.user_uuid, userUuid)))
+        .limit(1);
+
+      if (edits[0]) {
+        try { 
+          const editedData = JSON.parse(edits[0].content);
+          // Use edited segments if available
+          if (editedData.segments) {
+            segments = editedData.segments;
+          }
+          // Use edited chapters if available
+          chapters = editedData.chapters || [];
+        } catch {}
+      } else if (transcriptionData.chapters) {
         chapters = transcriptionData.chapters;
       } else {
-        // Create a single chapter for the entire transcription
-        chapters = [{
-          id: 'full',
-          title: transcription.title || 'Full Transcription',
-          startTime: 0,
-          endTime: transcription.duration_sec || 60,
-          segments: segments
-        }];
+        // Try a basic segmentation as a good default
+        try {
+          chapters = BasicSegmentationService.generateBasicChapters(segments);
+        } catch {
+          chapters = [{
+            id: 'full',
+            title: transcription.title || 'Full Transcription',
+            startTime: 0,
+            endTime: transcription.duration_sec || 60,
+            segments: segments
+          }];
+        }
       }
     } catch (error) {
       console.error('Failed to parse transcription JSON:', error);
@@ -94,6 +115,20 @@ export default async function EditorPage({
 
   // Get audio URL from source or storage
   audioUrl = transcription.source_url || null;
+  
+  // Debug: Log what we have
+  console.log('[Page Debug] Transcription data:', {
+    job_id: transcription.job_id,
+    source_type: transcription.source_type,
+    source_url: transcription.source_url,
+    source_hash: transcription.source_hash,
+    final_audioUrl: audioUrl
+  });
+  
+  // If no audio URL, show warning
+  if (!audioUrl) {
+    console.warn('[Page Debug] No audio URL available for transcription:', transcription.job_id);
+  }
 
   return (
     <div className="space-y-4">
@@ -124,9 +159,7 @@ export default async function EditorPage({
           segments={segments}
           chapters={chapters}
           transcription={transcriptionData}
-          onClose={() => {
-            window.location.href = `/${locale}/dashboard/transcriptions`;
-          }}
+          backHref={`/${locale}/dashboard/transcriptions`}
         />
       </div>
     </div>

@@ -577,6 +577,7 @@
       "export_desc": "Export your transcription with chapters, summary, and table of contents"
     },
     "view_in_dashboard": "View in Dashboard",
+    "edit": "Edit",
     "edit_transcription": "Edit Transcription",
     "advanced_editor": "Advanced Editor",
     "advanced_editor_desc": "Edit transcription with timestamps, chapters, and export options",

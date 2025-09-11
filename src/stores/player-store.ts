@@ -114,18 +114,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     if (index1 < 0 || index2 >= chapters.length) return;
     
     const newChapters = [...chapters];
+    const left = newChapters[index1];
+    const right = newChapters[index2];
+    const mergedSegments = [
+      ...(left.segments || []),
+      ...(right.segments || [])
+    ];
     const merged = {
-      ...newChapters[index1],
-      endTime: newChapters[index2].endTime,
-      segments: [
-        ...(newChapters[index1].segments || []),
-        ...(newChapters[index2].segments || [])
-      ]
-    };
+      ...left,
+      endTime: right.endTime,
+      segments: mergedSegments,
+      title: left.title // keep left title by default
+    } as any;
     
     newChapters.splice(index1, 1, merged);
     newChapters.splice(index2, 1);
-    set({ chapters: newChapters });
+    set({ chapters: newChapters, currentChapter: Math.max(0, index1) });
   },
   
   splitChapter: (index, splitTime) => {
@@ -136,25 +140,43 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     if (splitTime <= chapter.startTime || splitTime >= chapter.endTime) return;
     
     const newChapters = [...chapters];
-    const segments = chapter.segments || [];
-    const splitIndex = segments.findIndex((seg: any) => seg.start >= splitTime);
-    
+    const segs = chapter.segments || [];
+    // find first segment starting at/after splitTime; if none, use length
+    let splitIdx = segs.findIndex((seg: any) => seg.start >= splitTime);
+    if (splitIdx < 0) splitIdx = segs.length;
+
+    const firstSegs = segs.slice(0, splitIdx);
+    const secondSegs = segs.slice(splitIdx);
+
+    // Guard against empty sides: if one side empty, adjust by moving one segment
+    if (firstSegs.length === 0 && segs.length > 0) {
+      firstSegs.push(segs[0]);
+      secondSegs.shift();
+      splitTime = Math.max(splitTime, (segs[0] as any).end || (chapter.startTime + 0.1));
+    }
+    if (secondSegs.length === 0 && segs.length > 0) {
+      secondSegs.unshift(segs[segs.length - 1]);
+      firstSegs.pop();
+      splitTime = Math.min(splitTime, (segs[segs.length - 1] as any).start - 0.1);
+    }
+
     const firstChapter = {
       ...chapter,
       endTime: splitTime,
-      segments: segments.slice(0, splitIndex)
-    };
-    
+      segments: firstSegs
+    } as any;
+
     const secondChapter = {
       ...chapter,
-      id: `${chapter.id}-split`,
+      id: `${chapter.id}-split-${Date.now()}`,
       title: `${chapter.title} (continued)`,
       startTime: splitTime,
-      segments: segments.slice(splitIndex)
-    };
-    
+      endTime: chapter.endTime,
+      segments: secondSegs
+    } as any;
+
     newChapters.splice(index, 1, firstChapter, secondChapter);
-    set({ chapters: newChapters });
+    set({ chapters: newChapters, currentChapter: index });
   },
   
   setViewMode: (mode) => set({ viewMode: mode }),

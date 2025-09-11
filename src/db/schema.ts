@@ -173,3 +173,15 @@ export const transcription_results = pgTable("v2tx_transcription_results", {
 }, (t) => [
   uniqueIndex("transcription_result_unique").on(t.job_id, t.format)
 ]);
+
+// Edited transcription structure per user (chapters/titles, etc.)
+export const transcription_edits = pgTable("v2tx_transcription_edits", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  job_id: varchar({ length: 64 }).notNull(),
+  user_uuid: varchar({ length: 255 }).notNull(),
+  content: text().notNull(), // JSON string
+  created_at: timestamp({ withTimezone: true }),
+  updated_at: timestamp({ withTimezone: true }),
+}, (t) => [
+  uniqueIndex("transcription_edits_job_user_unique").on(t.job_id, t.user_uuid)
+]);

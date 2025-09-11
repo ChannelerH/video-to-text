@@ -1,0 +1,122 @@
+/* Modern Editor Styles */
+.editor-container {
+  @apply bg-gradient-to-b from-gray-950 via-gray-900 to-black;
+}
+
+/* Glass morphism effects */
+.glass-panel {
+  @apply bg-white/[0.02] backdrop-blur-xl border border-white/[0.05];
+}
+
+.glass-panel-hover {
+  @apply hover:bg-white/[0.04] hover:border-white/[0.08];
+}
+
+/* Gradient text */
+.gradient-text {
+  @apply bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent;
+}
+
+/* Modern scrollbar */
+.modern-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(147, 51, 234, 0.3) transparent;
+}
+
+.modern-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.modern-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modern-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(147, 51, 234, 0.3);
+  border-radius: 3px;
+}
+
+.modern-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(147, 51, 234, 0.5);
+}
+
+/* Waveform container */
+.waveform-container {
+  @apply relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-900/20 to-pink-900/20 p-1;
+}
+
+.waveform-container::before {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-r from-purple-600/10 to-pink-600/10 animate-pulse;
+}
+
+/* Chapter card animations */
+.chapter-card {
+  @apply relative overflow-hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chapter-card::before {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-r from-purple-600/0 to-pink-600/0;
+  transition: opacity 0.3s ease;
+}
+
+.chapter-card:hover::before {
+  @apply from-purple-600/10 to-pink-600/10;
+}
+
+/* Segment highlight */
+.segment-active {
+  position: relative;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(147, 51, 234, 0);
+  }
+  50% {
+    box-shadow: 0 0 20px 5px rgba(147, 51, 234, 0.3);
+  }
+}
+
+/* Button animations */
+.btn-primary {
+  @apply relative overflow-hidden;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  transition: all 0.3s ease;
+}
+
+.btn-primary::before {
+  content: '';
+  @apply absolute inset-0 opacity-0;
+  background: linear-gradient(135deg, #764ba2 0%, #f093fb 100%);
+  transition: opacity 0.3s ease;
+}
+
+.btn-primary:hover::before {
+  @apply opacity-100;
+}
+
+.btn-primary span {
+  @apply relative z-10;
+}
+
+/* Speed button group */
+.speed-btn-group {
+  @apply flex gap-1 p-1 bg-gray-900/50 rounded-lg;
+}
+
+.speed-btn {
+  @apply px-3 py-1.5 text-xs rounded-md transition-all duration-200;
+}
+
+.speed-btn-active {
+  @apply bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25;
+}
+
+.speed-btn-inactive {
+  @apply bg-transparent text-gray-400 hover:text-white hover:bg-white/10;
+}

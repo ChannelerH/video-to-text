@@ -43,6 +43,7 @@ export interface TranscriptionResponse {
     transcription: TranscriptionResult;
     formats: Record<string, string>;
     videoInfo?: VideoInfo;
+    jobId?: string;
     fromCache: boolean;
     estimatedCost?: number;
   };
@@ -353,6 +354,7 @@ export class TranscriptionService {
           transcription,
           formats,
           videoInfo,
+          jobId: request.options?.userId ? jobId : undefined,
           fromCache: false,
           estimatedCost: 0 // 使用现有字幕无成本
         }
@@ -692,10 +694,11 @@ export class TranscriptionService {
       }, 60000); // 1分钟后清理
 
       // 写入数据库（仅登录用户，保存润色后的文本）
+      let jobId: string | undefined;
       if (request.options?.userId) {
         try {
           const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
-          let jobId = crypto.randomUUID();
+          jobId = crypto.randomUUID();
           const row = await createOrReuseTranscription({
             job_id: jobId,
             user_uuid: request.options?.userId || "",
@@ -709,7 +712,9 @@ export class TranscriptionService {
             status: 'completed'
           });
           jobId = (row as any).job_id || jobId;
-          await upsertTranscriptionFormats(jobId, formats);
+          if (jobId) {
+            await upsertTranscriptionFormats(jobId, formats);
+          }
         } catch (e) {
           console.warn('DB write skipped:', e);
         }
@@ -731,6 +736,7 @@ export class TranscriptionService {
           transcription,
           formats,
           videoInfo,
+          jobId,
           fromCache: false,
           estimatedCost
         }
@@ -881,10 +887,11 @@ export class TranscriptionService {
       );
 
       // 9. 写入数据库（仅登录用户）
+      let jobId: string | undefined;
       if (request.options?.userId) {
         try {
           const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
-          let jobId = crypto.randomUUID();
+          jobId = crypto.randomUUID();
           const row = await this.time('db.write', createOrReuseTranscription({
             job_id: jobId,
             user_uuid: request.options?.userId || "",
@@ -898,7 +905,9 @@ export class TranscriptionService {
             status: 'completed'
           }));
           jobId = (row as any).job_id || jobId;
-          await this.time('db.write_formats', upsertTranscriptionFormats(jobId, formats));
+          if (jobId) {
+            await this.time('db.write_formats', upsertTranscriptionFormats(jobId, formats));
+          }
         } catch (e) {
           console.warn('DB write skipped:', e);
         }
@@ -909,6 +918,7 @@ export class TranscriptionService {
         data: {
           transcription,
           formats,
+          jobId,
           fromCache: false,
           estimatedCost
         }
@@ -1315,10 +1325,11 @@ export class TranscriptionService {
       ));
 
       // 写入数据库（仅登录用户）
+      let jobId: string | undefined;
       if (request.options?.userId) {
         try {
           const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
-          let jobId = crypto.randomUUID();
+          jobId = crypto.randomUUID();
           const row = await this.time('db.write', createOrReuseTranscription({
             job_id: jobId,
             user_uuid: request.options?.userId || "",
@@ -1332,7 +1343,9 @@ export class TranscriptionService {
             status: 'completed'
           }));
           jobId = (row as any).job_id || jobId;
-          await this.time('db.write_formats', upsertTranscriptionFormats(jobId, formats));
+          if (jobId) {
+            await this.time('db.write_formats', upsertTranscriptionFormats(jobId, formats));
+          }
         } catch(e) {
           // ignore
         }
@@ -1353,6 +1366,7 @@ export class TranscriptionService {
         data: {
           transcription,
           formats,
+          jobId,
           fromCache: false,
           estimatedCost
         }

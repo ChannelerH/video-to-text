@@ -283,6 +283,7 @@ export default function TranscriptionsTable({ rows, t, highlightJobId }: { rows:
                   <Actions 
                     row={r} 
                     i18n={{
+                      edit: t.edit ?? 'Edit',
                       rerun: t.rerun ?? 'Re-run',
                       delete: t.delete ?? 'Delete',
                       confirm_delete: t.confirm_delete ?? 'Are you sure?',

@@ -260,19 +260,6 @@ export default function ChapterNavigation({
           </select>
         </div>
         
-        <div className="flex items-center justify-between">
-          <span>Pre-roll:</span>
-          <select
-            value={usePlayerStore.getState().preRoll}
-            onChange={(e) => usePlayerStore.getState().setPreRoll(parseFloat(e.target.value) as any)}
-            className="px-2 py-1 bg-black/40 border border-gray-600 rounded text-xs"
-          >
-            <option value="0">0s</option>
-            <option value="0.5">0.5s</option>
-            <option value="1">1s</option>
-            <option value="2">2s</option>
-          </select>
-        </div>
       </div>
     </div>
   );
