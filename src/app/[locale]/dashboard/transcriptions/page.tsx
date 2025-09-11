@@ -27,8 +27,12 @@ export default async function TranscriptionsPage({
     redirect(`/${locale}/auth/signin`);
   }
 
-  const s = (await (searchParams || Promise.resolve({} as any))) as { page?: string; q?: string };
+  const s = (await (searchParams || Promise.resolve({} as any))) as { page?: string; q?: string; highlight?: string; open?: string };
   const q = s.q?.trim() || '';
+  // If "open" is provided, jump straight to editor for that job
+  if (s.open) {
+    redirect(`/${locale}/dashboard/editor/${s.open}`);
+  }
   const rawPage = Number(s.page);
   const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
   const limit = 12;
@@ -250,7 +254,8 @@ export default async function TranscriptionsPage({
             
             {/* Transcriptions Table/Grid */}
             <TranscriptionsTable 
-              rows={transcriptionsList} 
+              rows={transcriptionsList}
+              highlightJobId={s.highlight}
               t={{
                 select_all: 'Select All',
                 clear: 'Clear',

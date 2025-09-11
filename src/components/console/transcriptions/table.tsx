@@ -6,7 +6,7 @@ import Actions from "@/components/console/transcriptions/actions";
 import { toast } from "sonner";
 import { FileAudio, Clock, Calendar, Download, Trash2, CheckCircle2, Circle } from "lucide-react";
 
-export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }) {
+export default function TranscriptionsTable({ rows, t, highlightJobId }: { rows: any[]; t: any; highlightJobId?: string }) {
   const searchParams = useSearchParams();
   const [localRows, setLocalRows] = useState<any[]>(rows || []);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -14,6 +14,7 @@ export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }
   const [deleting, setDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [highlight, setHighlight] = useState<string | null>(highlightJobId || null);
   const toggle = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }));
   const all = localRows.map((r) => r.job_id);
   const selectedIds = all.filter((id) => selected[id]);
@@ -92,6 +93,23 @@ export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }
   useEffect(() => {
     setListLoading(false);
   }, [searchParams?.toString(), localRows.length]);
+
+  // Update highlight when prop arrives; auto-clear after a while
+  useEffect(() => {
+    if (highlightJobId) {
+      setHighlight(highlightJobId);
+      // Scroll into view
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          const el = document.querySelector(`[data-job-id="${highlightJobId}"]`);
+          (el as HTMLElement | null)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+      }
+      // Remove highlight after 6s
+      const timer = setTimeout(() => setHighlight(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightJobId]);
 
   // Sync incoming rows from server on navigation/search
   useEffect(() => {
@@ -204,6 +222,7 @@ export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }
           return (
             <div
               key={r.job_id}
+              data-job-id={r.job_id}
               className={`
                 relative group rounded-2xl border transition-all duration-300
                 ${isSelected 
@@ -211,6 +230,7 @@ export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }
                   : 'border-border/50 bg-card hover:border-border hover:shadow-lg'
                 }
                 ${isHovered ? 'scale-[1.02] shadow-xl' : ''}
+                ${highlight === r.job_id ? 'ring-2 ring-purple-500 ring-offset-0' : ''}
               `}
               onMouseEnter={() => setHoveredCard(r.job_id)}
               onMouseLeave={() => setHoveredCard(null)}

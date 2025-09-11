@@ -435,9 +435,11 @@
     "edit_transcription": "编辑转录",
     "advanced_editor": "高级编辑器",
     "advanced_editor_desc": "编辑转录内容，添加时间戳、章节，并导出多种格式",
-    "view_all_transcriptions": "查看所有转录",
+    "view_all_transcriptions": "编辑转录",
     "view_all_transcriptions_desc": "在一个地方管理和组织您的所有转录记录",
     "go_to_dashboard": "前往工作台",
+    "transcription_saved": "转录已成功保存！",
+    "tip_edit_for_chapters": "提示：使用编辑器添加章节并导出多种格式",
     "sign_in_to_access_features": "登录以使用高级编辑功能并保存您的转录",
     "sign_in_to_save": "登录以保存",
     "editor": {

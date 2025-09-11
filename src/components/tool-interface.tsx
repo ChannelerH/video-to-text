@@ -95,6 +95,16 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [showSuccess, setShowSuccess] = useState(false);
   const router = useRouter();
   const locale = useLocale();
+  // Prefetch dashboard editor + transcriptions routes when jobId is available
+  useEffect(() => {
+    try {
+      const id = (result as any)?.data?.jobId;
+      if (id) {
+        router.prefetch?.(`/${locale}/dashboard/editor/${id}`);
+        router.prefetch?.(`/${locale}/dashboard/transcriptions?highlight=${id}`);
+      }
+    } catch {}
+  }, [result, locale, router]);
   // Early banner when Chinese is detected via probe
   const [showChineseUpgrade, setShowChineseUpgrade] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -1544,66 +1554,45 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         {/* Results Display */}
           {result && result.type === 'full' && result.data && (
             <>
-            {/* Action Buttons - Better UX with descriptions */}
+            {/* Action Buttons - Clean and Elegant */}
             {result.data.transcription.segments && result.data.transcription.segments.length > 0 && (
-              <div className="flex flex-col gap-6 mb-8">
+              <div className="flex flex-col gap-4 mb-8">
                 {isAuthenticated ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Primary action - Advanced Editor */}
-                    {result.data.jobId && (
-                      <div className="group relative bg-gradient-to-br from-purple-600/10 to-pink-600/10 rounded-xl border border-purple-500/20 p-6 hover:border-purple-500/40 transition-all">
+                  <div className="space-y-6">
+                    {/* Action buttons with minimal design */}
+                    <div className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto">
+                      {/* Primary action - Edit */}
+                      {result.data.jobId && (
                         <Link 
                           href={`/${locale}/dashboard/editor/${result.data.jobId}`}
-                          className="block"
+                          className="group flex-1 inline-flex items-center justify-center gap-3 px-6 py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all font-medium"
                         >
-                          <div className="flex items-start gap-4">
-                            <div className="p-3 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 shadow-lg">
-                              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
-                                {t('advanced_editor')}
-                              </h3>
-                              <p className="text-sm text-gray-400">
-                                {t('advanced_editor_desc')}
-                              </p>
-                            </div>
-                            <svg className="w-5 h-5 text-gray-500 group-hover:text-purple-400 transform group-hover:translate-x-1 transition-all mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </div>
-                        </Link>
-                      </div>
-                    )}
-                    
-                    {/* Secondary action - Dashboard */}
-                    <div className="group relative bg-gray-800/20 rounded-xl border border-gray-700/50 p-6 hover:border-gray-600 transition-all">
-                      <Link 
-                        href={`/${locale}/dashboard/transcriptions`}
-                        className="block"
-                      >
-                        <div className="flex items-start gap-4">
-                          <div className="p-3 rounded-lg bg-gray-800 shadow-lg">
-                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                            </svg>
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-gray-300 transition-colors">
-                              {t('view_all_transcriptions')}
-                            </h3>
-                            <p className="text-sm text-gray-400">
-                              {t('view_all_transcriptions_desc')}
-                            </p>
-                          </div>
-                          <svg className="w-5 h-5 text-gray-500 group-hover:text-gray-400 transform group-hover:translate-x-1 transition-all mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <span>{t('edit_transcription')}</span>
+                          <svg className="w-4 h-4 opacity-60 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
-                        </div>
+                        </Link>
+                      )}
+                      
+                      {/* Secondary action - Dashboard */}
+                      <Link 
+                        href={result?.data?.jobId 
+                          ? `/${locale}/dashboard/editor/${result.data.jobId}` 
+                          : `/${locale}/dashboard/transcriptions`}
+                        className="group flex-1 inline-flex items-center justify-center gap-3 px-6 py-3.5 bg-gray-800/60 backdrop-blur text-white rounded-xl hover:bg-gray-700/60 transition-all border border-gray-700"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        <span>{t('view_all_transcriptions')}</span>
+                        <svg className="w-4 h-4 opacity-60 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
                       </Link>
                     </div>
                   </div>
