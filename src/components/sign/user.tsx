@@ -27,28 +27,6 @@ export default function SignUser({ user }: { user: User }) {
     } catch {}
   }, [router]);
 
-  const dropdownItems: NavItem[] = [
-    {
-      title: user.nickname,
-    },
-    {
-      title: t("dashboard"),
-      url: "/dashboard",
-    },
-  ];
-
-  if (user.is_admin) {
-    dropdownItems.push({
-      title: t("user.admin_system"),
-      url: "/admin/users",
-    });
-  }
-
-  dropdownItems.push({
-    title: t("user.sign_out"),
-    onClick: () => signOut(),
-  });
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -58,23 +36,42 @@ export default function SignUser({ user }: { user: User }) {
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="mx-4 bg-background">
-        {dropdownItems.map((item, index) => (
-          <React.Fragment key={index}>
+        {/* User name - non-clickable header */}
+        <div className="px-2 py-1.5 text-sm font-semibold text-center">
+          {user.nickname}
+        </div>
+        <DropdownMenuSeparator />
+        
+        {/* Dashboard link */}
+        <DropdownMenuItem
+          className="flex justify-center cursor-pointer"
+          onSelect={() => router.push("/dashboard")}
+        >
+          Dashboard
+        </DropdownMenuItem>
+        
+        {/* Admin system if admin */}
+        {user.is_admin && (
+          <>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               className="flex justify-center cursor-pointer"
-              onSelect={() => {
-                if (item.url) {
-                  router.push(item.url as string);
-                } else {
-                  item.onClick?.();
-                }
-              }}
+              onSelect={() => router.push("/admin/users")}
             >
-              {item.title}
+              {t("user.admin_system")}
             </DropdownMenuItem>
-            {index !== dropdownItems.length - 1 && <DropdownMenuSeparator />}
-          </React.Fragment>
-        ))}
+          </>
+        )}
+        
+        <DropdownMenuSeparator />
+        
+        {/* Sign out */}
+        <DropdownMenuItem
+          className="flex justify-center cursor-pointer"
+          onSelect={() => signOut()}
+        >
+          {t("user.sign_out")}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
