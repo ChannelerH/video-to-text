@@ -7,6 +7,18 @@ import { Section as SectionType } from "@/types/blocks/section";
 
 export default function Stats({ section }: { section: SectionType }) {
   const t = useTranslations('stats');
+  const tf = (key: string, fallback: string, values?: Record<string, any>) => {
+    try {
+      // @ts-ignore next-intl types accept values
+      return t(key, values);
+    } catch {
+      if (values) {
+        // Simple token replacement for {var}
+        return fallback.replace(/\{(\w+)\}/g, (_, k) => String(values[k] ?? ''));
+      }
+      return fallback;
+    }
+  };
   
   if (section.disabled) {
     return null;
@@ -100,8 +112,8 @@ export default function Stats({ section }: { section: SectionType }) {
                 }}
               >↗ +12%</motion.span>
             </div>
-            <div className="text-gray-400 text-sm mb-1">{t('daily_processed')}</div>
-            <div className="text-xs text-gray-500">{t('industry_average', { value: '800' })}</div>
+            <div className="text-gray-400 text-sm mb-1">{tf('daily_processed', 'Daily Processed')}</div>
+            <div className="text-xs text-gray-500">{tf('industry_average', '(Industry Avg: {value})', { value: '800' })}</div>
           </motion.div>
 
           <motion.div
@@ -126,8 +138,8 @@ export default function Stats({ section }: { section: SectionType }) {
                 }}
               >🎯</motion.span>
             </div>
-            <div className="text-gray-400 text-sm mb-1">{t('accuracy_rate')}</div>
-            <div className="text-xs text-gray-500">{t('industry_leading')}</div>
+            <div className="text-gray-400 text-sm mb-1">{tf('accuracy_rate', 'Accuracy Rate')}</div>
+            <div className="text-xs text-gray-500">{tf('industry_leading', '(Industry Leading)')}</div>
           </motion.div>
 
           <motion.div
@@ -150,10 +162,10 @@ export default function Stats({ section }: { section: SectionType }) {
                   ease: "easeInOut",
                   delay: 1 
                 }}
-              >⚡ {t('times_faster', { times: 3 })}</motion.span>
+              >⚡ {tf('times_faster', '{times}x Faster', { times: 3 })}</motion.span>
             </div>
-            <div className="text-gray-400 text-sm mb-1">{t('average_speed')}</div>
-            <div className="text-xs text-gray-500">{t('competitor_average', { value: '6min' })}</div>
+            <div className="text-gray-400 text-sm mb-1">{tf('average_speed', 'Average Speed')}</div>
+            <div className="text-xs text-gray-500">{tf('competitor_average', '(Competitor Avg: {value})', { value: '6min' })}</div>
           </motion.div>
 
           <motion.div
@@ -178,10 +190,10 @@ export default function Stats({ section }: { section: SectionType }) {
                 }}
               >📈 +15</motion.span>
             </div>
-            <div className="text-gray-400 text-sm mb-1">{t('online_users')}</div>
+            <div className="text-gray-400 text-sm mb-1">{tf('online_users', 'Online Users')}</div>
             <div className="flex items-center justify-center gap-1">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-green-400 text-xs">{t('live')}</span>
+              <span className="text-green-400 text-xs">{tf('live', 'Live')}</span>
             </div>
           </motion.div>
         </div>

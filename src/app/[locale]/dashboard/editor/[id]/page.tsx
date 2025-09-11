@@ -1,25 +1,12 @@
 import { getTranslations } from "next-intl/server";
 import { getUserUuid } from "@/services/user";
 import { redirect } from "next/navigation";
-import dynamic from 'next/dynamic';
 import { db } from "@/db";
 import { transcriptions, transcription_results } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-
-// Lazy load the editor
-const ThreeColumnEditor = dynamic(
-  () => import('@/components/editor-view/three-column-editor'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
-      </div>
-    )
-  }
-);
+import EditorWrapper from '@/components/editor-view/editor-wrapper';
 
 interface PageProps {
   params: Promise<{ locale: string; id: string }>;
@@ -124,7 +111,7 @@ export default async function EditorPage({
               {transcription.title || t('untitled_transcription')}
             </h1>
             <p className="text-sm text-gray-400">
-              {new Date(transcription.created_at).toLocaleDateString()} • {formatDuration(transcription.duration_sec)}
+              {transcription.created_at ? new Date(transcription.created_at).toLocaleDateString() : ''} • {formatDuration(transcription.duration_sec || 0)}
             </p>
           </div>
         </div>
@@ -132,7 +119,7 @@ export default async function EditorPage({
 
       {/* Editor */}
       <div className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-purple-500/20 overflow-hidden">
-        <ThreeColumnEditor
+        <EditorWrapper
           audioUrl={audioUrl}
           segments={segments}
           chapters={chapters}
@@ -148,6 +135,6 @@ export default async function EditorPage({
 
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
+  const secs = Math.floor(seconds % 60);
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }

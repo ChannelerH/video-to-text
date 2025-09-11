@@ -1563,8 +1563,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                 ) : (
                   <button
                     onClick={() => router.push('/auth/signin')}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 
-                      text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 

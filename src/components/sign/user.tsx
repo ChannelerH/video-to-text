@@ -21,9 +21,9 @@ export default function SignUser({ user }: { user: User }) {
   const t = useTranslations();
   const router = useRouter();
   React.useEffect(() => {
-    // Prefetch user center route to make navigation feel instant
+    // Prefetch dashboard route to make navigation feel instant
     try {
-      router.prefetch?.("/my-credits");
+      router.prefetch?.("/dashboard");
     } catch {}
   }, [router]);
 
@@ -32,8 +32,8 @@ export default function SignUser({ user }: { user: User }) {
       title: user.nickname,
     },
     {
-      title: t("user.user_center"),
-      url: "/my-credits",
+      title: t("dashboard"),
+      url: "/dashboard",
     },
   ];
 

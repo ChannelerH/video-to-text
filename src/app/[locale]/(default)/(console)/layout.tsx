@@ -5,7 +5,8 @@ import { getTranslations } from "next-intl/server";
 import { getUserInfo } from "@/services/user";
 import { redirect } from "next/navigation";
 
-export default async function ({ children }: { children: ReactNode }) {
+export default async function ({ children, params }: { children: ReactNode; params: { locale: string } }) {
+  const { locale } = params;
   const userInfo = await getUserInfo();
   if (!userInfo || !userInfo.email) {
     redirect("/auth/signin");
@@ -32,5 +33,5 @@ export default async function ({ children }: { children: ReactNode }) {
     },
   };
 
-  return <ConsoleLayout sidebar={sidebar}>{children}</ConsoleLayout>;
+  return <ConsoleLayout sidebar={sidebar} locale={locale}>{children}</ConsoleLayout>;
 }

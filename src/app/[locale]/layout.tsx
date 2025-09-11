@@ -6,7 +6,7 @@ import {
 import { AppContextProvider } from "@/contexts/app";
 import { Metadata } from "next";
 import { NextAuthSessionProvider } from "@/auth/session";
-import { NextIntlClientProvider } from "next-intl";
+import IntlProvider from "@/components/i18n/intl-provider";
 import { ThemeProvider } from "@/providers/theme";
 import { locales } from "@/i18n/locale";
 
@@ -47,12 +47,12 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <NextIntlClientProvider messages={messages}>
+    <IntlProvider messages={messages} locale={locale}>
       <NextAuthSessionProvider>
         <AppContextProvider>
           <ThemeProvider>{children}</ThemeProvider>
         </AppContextProvider>
       </NextAuthSessionProvider>
-    </NextIntlClientProvider>
+    </IntlProvider>
   );
 }

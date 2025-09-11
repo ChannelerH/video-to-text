@@ -43,7 +43,13 @@ export default async function DashboardPage({
         </div>
 
         {/* Quick Actions */}
-        <DashboardActions locale={locale} t={t} />
+        <DashboardActions 
+          locale={locale}
+          uploadTitle={t('actions.upload_file')}
+          uploadDesc={t('actions.upload_description')}
+          youtubeTitle={t('actions.youtube_link')}
+          youtubeDesc={t('actions.youtube_description')}
+        />
 
         {/* Statistics */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
@@ -183,7 +189,7 @@ export default async function DashboardPage({
                 </p>
                 
                 <div className="flex items-center justify-center gap-4">
-                  <EmptyStateButton locale={locale} t={t} />
+                  <EmptyStateButton locale={locale} label={t('actions.upload_file')} />
                 </div>
               </div>
             </div>

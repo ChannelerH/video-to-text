@@ -6,10 +6,10 @@ import UploadModal from './upload-modal';
 
 interface EmptyStateButtonProps {
   locale: string;
-  t: any;
+  label: string;
 }
 
-export default function EmptyStateButton({ locale, t }: EmptyStateButtonProps) {
+export default function EmptyStateButton({ locale, label }: EmptyStateButtonProps) {
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     mode: 'upload' | 'youtube';
@@ -31,7 +31,7 @@ export default function EmptyStateButton({ locale, t }: EmptyStateButtonProps) {
           rounded-lg font-medium hover:opacity-90 transition-opacity inline-flex items-center gap-2"
       >
         <Zap className="w-4 h-4" />
-        {t('actions.upload_file')}
+        {label}
       </button>
       
       <UploadModal

@@ -6,10 +6,13 @@ import UploadModal from './upload-modal';
 
 interface DashboardActionsProps {
   locale: string;
-  t: any;
+  uploadTitle: string;
+  uploadDesc: string;
+  youtubeTitle: string;
+  youtubeDesc: string;
 }
 
-export default function DashboardActions({ locale, t }: DashboardActionsProps) {
+export default function DashboardActions({ locale, uploadTitle, uploadDesc, youtubeTitle, youtubeDesc }: DashboardActionsProps) {
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     mode: 'upload' | 'youtube';
@@ -44,12 +47,8 @@ export default function DashboardActions({ locale, t }: DashboardActionsProps) {
                 transform group-hover:translate-x-1 transition-all" />
             </div>
             
-            <h3 className="text-xl font-semibold text-white mb-2">
-              {t('actions.upload_file')}
-            </h3>
-            <p className="text-sm text-gray-400">
-              {t('actions.upload_description')}
-            </p>
+            <h3 className="text-xl font-semibold text-white mb-2">{uploadTitle}</h3>
+            <p className="text-sm text-gray-400">{uploadDesc}</p>
           </div>
         </button>
 
@@ -71,12 +70,8 @@ export default function DashboardActions({ locale, t }: DashboardActionsProps) {
                 transform group-hover:translate-x-1 transition-all" />
             </div>
             
-            <h3 className="text-xl font-semibold text-white mb-2">
-              {t('actions.youtube_link')}
-            </h3>
-            <p className="text-sm text-gray-400">
-              {t('actions.youtube_description')}
-            </p>
+            <h3 className="text-xl font-semibold text-white mb-2">{youtubeTitle}</h3>
+            <p className="text-sm text-gray-400">{youtubeDesc}</p>
           </div>
         </button>
       </div>

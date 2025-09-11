@@ -1,5 +1,6 @@
 import { getUserUuid } from "@/services/user";
 import Link from "next/link";
+import { Fragment } from "react";
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import QuickActions from '@/components/dashboard/quick-actions';
 import TranscriptionsSearch from '@/components/dashboard/transcriptions-search';
@@ -134,21 +135,17 @@ export default async function TranscriptionsPage({
     thisMonth: Number(statsThisMonth[0]?.count || 0)
   };
 
-  // Generate page numbers for pagination
-  const getPageNumbers = () => {
-    const pages = [];
-    const maxVisible = 5;
-    let start = Math.max(1, page - 2);
-    let end = Math.min(totalPages, start + maxVisible - 1);
-    
-    if (end - start < maxVisible - 1) {
-      start = Math.max(1, end - maxVisible + 1);
+  // Build a unique, ordered list of page numbers to show
+  const buildPages = () => {
+    const set = new Set<number>();
+    // Always include first and last
+    if (totalPages >= 1) set.add(1);
+    if (totalPages >= 2) set.add(totalPages);
+    // Window around current page
+    for (let p = page - 2; p <= page + 2; p++) {
+      if (p >= 1 && p <= totalPages) set.add(p);
     }
-    
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
-    }
-    return pages;
+    return Array.from(set).sort((a, b) => a - b);
   };
 
   // Pagination component
@@ -168,49 +165,35 @@ export default async function TranscriptionsPage({
         >
           <ChevronLeft className="w-4 h-4" />
         </Link>
-        
-        {/* First page */}
-        {page > 3 && (
-          <>
-            <Link
-              className="px-3 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium text-white transition-colors"
-              href={`/${locale}/dashboard/transcriptions?${new URLSearchParams({ ...(q?{q}:{}), page: '1' }).toString()}`}
-            >
-              1
-            </Link>
-            {page > 4 && <span className="px-2 text-gray-500">...</span>}
-          </>
-        )}
-        
-        {/* Page numbers */}
-        {getPageNumbers().map(pageNum => (
-          <Link
-            key={pageNum}
-            className={`
-              px-3 py-2 rounded-lg text-sm font-medium transition-colors
-              ${pageNum === page 
-                ? 'bg-purple-600 text-white' 
-                : 'hover:bg-gray-800 text-gray-300'
-              }
-            `}
-            href={`/${locale}/dashboard/transcriptions?${new URLSearchParams({ ...(q?{q}:{}), page: String(pageNum) }).toString()}`}
-          >
-            {pageNum}
-          </Link>
-        ))}
-        
-        {/* Last page */}
-        {page < totalPages - 2 && (
-          <>
-            {page < totalPages - 3 && <span className="px-2 text-gray-500">...</span>}
-            <Link
-              className="px-3 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium text-white transition-colors"
-              href={`/${locale}/dashboard/transcriptions?${new URLSearchParams({ ...(q?{q}:{}), page: String(totalPages) }).toString()}`}
-            >
-              {totalPages}
-            </Link>
-          </>
-        )}
+        {(() => {
+          const pages = buildPages();
+          let last = 0;
+          return (
+            <>
+              {pages.map((p) => {
+                const gap = p - last;
+                last = p;
+                return (
+                  <Fragment key={`p-${p}`}>
+                    {gap > 1 && <span className="px-2 text-gray-500">...</span>}
+                    <Link
+                      className={`
+                        px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                        ${p === page 
+                          ? 'bg-purple-600 text-white' 
+                          : 'hover:bg-gray-800 text-gray-300'
+                        }
+                      `}
+                      href={`/${locale}/dashboard/transcriptions?${new URLSearchParams({ ...(q?{q}:{}), page: String(p) }).toString()}`}
+                    >
+                      {p}
+                    </Link>
+                  </Fragment>
+                );
+              })}
+            </>
+          );
+        })()}
         
         {/* Next Button */}
         <Link 

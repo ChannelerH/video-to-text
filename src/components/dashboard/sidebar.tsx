@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { signOut } from 'next-auth/react';
@@ -63,12 +63,10 @@ export default function DashboardSidebar({ locale, userUuid }: DashboardSidebarP
     <aside className="w-60 h-screen bg-[#0e0e15] border-r border-gray-800 flex flex-col">
       {/* Logo */}
       <div className="px-6 py-5 border-b border-gray-800">
-        <Link href={`/${locale}/dashboard`} className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">V</span>
-          </div>
+        <a href={`/`} className="flex items-center gap-2">
+          <img src="/logo.png" alt="V2TX" className="w-8 h-8 rounded-lg" />
           <span className="text-lg font-semibold text-white">V2TX</span>
-        </Link>
+        </a>
       </div>
 
       {/* Plan Status */}
