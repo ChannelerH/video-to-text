@@ -197,7 +197,14 @@
     "deleted_ok": "已删除",
     "deleted_fail": "删除失败",
     "export_ok": "已导出 ZIP",
-    "export_fail": "导出失败"
+    "export_fail": "导出失败",
+    "no_results": "未找到结果",
+    "try_different_search": "尝试不同的搜索词或清除搜索以查看所有转录",
+    "table_empty_state": {
+      "title": "还没有转录记录",
+      "description": "从上传音频文件或粘贴YouTube链接开始"
+    },
+    "untitled": "无标题转录"
   },
   "sign_modal": {
     "sign_in_title": "登录",
@@ -319,6 +326,37 @@
     "rating_tip": "您对 ShipAny 的看法如何？",
     "placeholder": "在这里留下您的反馈..."
   },
+  "account": {
+    "manage_your_account": "管理您的账户设置和偏好",
+    "profile": "个人资料",
+    "profile_desc": "您的账户信息和详细信息",
+    "email": "邮箱",
+    "member_since": "注册时间",
+    "subscription": "订阅",
+    "subscription_desc": "管理您的订阅计划和账单",
+    "current_plan": "当前计划",
+    "settings": "设置",
+    "settings_desc": "账户设置和偏好",
+    "change_password": "修改密码",
+    "manage_billing": "管理账单",
+    "sign_out": "退出登录"
+  },
+  "dashboard": {
+    "title": "工作台",
+    "nav": {
+      "account": "账户"
+    },
+    "upgrade_now": "立即升级",
+    "usage": {
+      "monthly_usage": "本月使用量",
+      "minutes": "分钟"
+    },
+    "plan": {
+      "free": "免费计划",
+      "basic": "基础计划",
+      "pro": "专业计划"
+    }
+  },
   "tool_interface": {
     "upload_tip": "拖放文件到此处或点击浏览",
     "click_to_replace": "点击替换文件",
@@ -364,6 +402,7 @@
       "copy": "复制",
       "copied": "已复制！",
       "timestamped_segments": "时间戳段落：",
+      "chapters_with_timestamps": "章节与时间戳：",
       "download_options": "下载转录文件",
       "smart_features": "智能功能",
       "pro_features": "专业功能",
@@ -382,7 +421,95 @@
       "check_connection": "请检查网络连接后重试",
       "chapters": "章节",
       "summary": "摘要",
-      "generating": "生成中..."
+      "generating": "生成中...",
+      "advanced_export": "高级导出",
+      "with_toc": "包含目录",
+      "exporting": "导出中...",
+      "export_success": "导出成功！",
+      "word_exported": "Word文档已下载",
+      "pdf_exported": "PDF文档已下载",
+      "export_failed": "导出失败",
+      "export_desc": "导出包含章节、摘要和目录的完整转录文档"
+    },
+    "view_mode": {
+      "simple": "简单视图",
+      "editor": "编辑器视图"
+    },
+    "view_in_dashboard": "在工作台中查看",
+    "sign_in_to_save": "登录以保存",
+    "editor": {
+      "show_chapters": "显示章节",
+      "keyboard_shortcuts": "快捷键",
+      "chapters": "章节",
+      "transcription_text": "转录文本",
+      "play_pause": "播放/暂停",
+      "previous_segment": "上一段",
+      "next_segment": "下一段"
+    },
+    "upgrade": {
+      "title": "升级您的套餐",
+      "selected": "已选择",
+      "recommended": "推荐",
+      "upgrade_now": "立即升级",
+      "cancel_anytime": "随时取消，无需理由。",
+      "trigger": {
+        "usage_limit": "您已达到本月使用限制。升级以继续转录。",
+        "feature_locked": "此功能仅限高级套餐使用。",
+        "export_format": "升级到高级套餐以导出此格式。",
+        "default": "升级到高级套餐解锁更多功能。"
+      },
+      "features": {
+        "basic": {
+          "minutes": "每月分钟数",
+          "file_size": "最大文件大小",
+          "export": "导出格式",
+          "editor": "编辑器访问",
+          "chapters": "章节生成"
+        },
+        "pro": {
+          "minutes": "每月分钟数",
+          "file_size": "最大文件大小",
+          "export": "导出格式",
+          "editor": "编辑器访问",
+          "chapters": "章节生成",
+          "refinement": "AI优化"
+        }
+      }
+    },
+    "dashboard": {
+      "welcome_back": "欢迎回来",
+      "dashboard_subtitle": "管理您的转录记录和账户",
+      "nav": {
+        "home": "首页",
+        "transcriptions": "所有转录",
+        "account": "账户"
+      },
+      "quick_actions": "快速操作",
+      "actions": {
+        "upload_file": "上传文件",
+        "upload_description": "上传音频或视频文件进行转录",
+        "youtube_link": "YouTube链接",
+        "youtube_description": "通过URL转录YouTube视频"
+      },
+      "usage": {
+        "monthly_usage": "本月使用量",
+        "minutes": "分钟",
+        "near_limit": "接近限制",
+        "limit_reached": "已达到限制",
+        "upgrade_for_more": "升级获得无限转录"
+      },
+      "stats": {
+        "total_transcriptions": "总转录数",
+        "minutes_transcribed": "转录分钟数",
+        "this_month": "本月"
+      },
+      "recent_transcriptions": "最近转录",
+      "view_all": "查看全部",
+      "no_transcriptions_yet": "还没有转录记录",
+      "start_transcribing": "从上传文件或粘贴YouTube链接开始",
+      "upgrade": "升级",
+      "upgrade_now": "立即升级",
+      "upgrade_available": "升级获得更多功能"
     },
     "errors": {
       "upload_failed": "上传失败。请重试。",
@@ -413,6 +540,39 @@
       "pricing_link": "去升级",
       "speed_hint": "精度更高，速度稍慢"
     }
+  },
+  "welcome_back": "欢迎回来",
+  "dashboard_subtitle": "管理您的转录记录和账户",
+  "nav": {
+    "home": "首页",
+    "transcriptions": "所有转录",
+    "account": "账户"
+  },
+  "quick_actions": "快速操作",
+  "actions": {
+    "upload_file": "上传文件",
+    "upload_description": "上传音频或视频文件进行转录",
+    "youtube_link": "YouTube链接",
+    "youtube_description": "通过URL转录YouTube视频"
+  },
+  "usage": {
+    "monthly_usage": "本月使用量",
+    "minutes": "分钟",
+    "near_limit": "接近限制",
+    "limit_reached": "已达到限制",
+    "upgrade_for_more": "升级获得无限转录"
+  },
+  "upgrade": "升级",
+  "upgrade_now": "立即升级",
+  "upgrade_available": "升级获得更多功能",
+  "recent_transcriptions": "最近转录",
+  "view_all": "查看全部",
+  "no_transcriptions_yet": "还没有转录记录",
+  "start_transcribing": "从上传文件或粘贴YouTube链接开始",
+  "stats": {
+    "total_transcriptions": "总转录数",
+    "minutes_transcribed": "转录分钟数",
+    "this_month": "本月"
   },
   "why_choose_us": {
     "title": "🚀 为什么选择 V2TX 脱颖而出",
@@ -908,5 +1068,11 @@
     "upgrade_required_basic": "此功能需要基础版或更高订阅",
     "upgrade_required_pro": "此功能需要专业版或更高订阅",
     "smart_features_desc": "AI驱动的功能，提升您的转录体验"
-  }
+  },
+  "errors": {
+    "transcription_not_found": "转录记录未找到",
+    "transcription_not_found_desc": "请求的转录记录未找到或您没有访问权限。"
+  },
+  "back_to_transcriptions": "返回转录列表",
+  "untitled_transcription": "无标题转录"
 }

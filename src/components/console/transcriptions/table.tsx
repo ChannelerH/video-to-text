@@ -93,6 +93,12 @@ export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }
     setListLoading(false);
   }, [searchParams?.toString(), localRows.length]);
 
+  // Sync incoming rows from server on navigation/search
+  useEffect(() => {
+    setLocalRows(rows || []);
+    setSelected({});
+  }, [rows]);
+
   // 格式化来源显示
   const getSourceDisplay = (sourceType: string) => {
     const sourceMap: Record<string, { icon: string; color: string }> = {
@@ -229,7 +235,7 @@ export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1 pr-2">
                     <h3 className="font-semibold text-base line-clamp-2 mb-2">
-                      {r.title || 'Untitled Transcription'}
+                      {r.title || t.untitled}
                     </h3>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <span className="text-lg">{sourceInfo.icon}</span>
@@ -292,10 +298,10 @@ export default function TranscriptionsTable({ rows, t }: { rows: any[]; t: any }
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <FileAudio className="w-16 h-16 text-muted-foreground/30 mb-4" />
           <p className="text-lg font-medium text-muted-foreground mb-2">
-            No transcriptions yet
+            {t.table_empty_state?.title || "No transcriptions yet"}
           </p>
           <p className="text-sm text-muted-foreground">
-            Start by uploading an audio file or pasting a YouTube URL
+            {t.table_empty_state?.description || "Start by uploading an audio file or pasting a YouTube URL"}
           </p>
         </div>
       )}

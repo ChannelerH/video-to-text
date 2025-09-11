@@ -342,7 +342,14 @@
     "deleted_ok": "Deleted",
     "deleted_fail": "Delete failed",
     "export_ok": "ZIP ready",
-    "export_fail": "Export failed"
+    "export_fail": "Export failed",
+    "no_results": "No results found",
+    "try_different_search": "Try different search terms or clear the search to see all transcriptions",
+    "table_empty_state": {
+      "title": "No transcriptions yet",
+      "description": "Start by uploading an audio file or pasting a YouTube URL"
+    },
+    "untitled": "Untitled Transcription"
   },
   "sign_modal": {
     "sign_in_title": "Sign In",
@@ -464,6 +471,37 @@
     "rating_tip": "How do you feel about ShipAny?",
     "placeholder": "Leave your words here..."
   },
+  "account": {
+    "manage_your_account": "Manage your account settings and preferences",
+    "profile": "Profile",
+    "profile_desc": "Your account information and details",
+    "email": "Email",
+    "member_since": "Member since",
+    "subscription": "Subscription",
+    "subscription_desc": "Manage your subscription plan and billing",
+    "current_plan": "Current plan",
+    "settings": "Settings",
+    "settings_desc": "Account settings and preferences",
+    "change_password": "Change password",
+    "manage_billing": "Manage billing",
+    "sign_out": "Sign out"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "nav": {
+      "account": "Account"
+    },
+    "upgrade_now": "Upgrade Now",
+    "usage": {
+      "monthly_usage": "Monthly Usage",
+      "minutes": "minutes"
+    },
+    "plan": {
+      "free": "Free Plan",
+      "basic": "Basic Plan",
+      "pro": "Pro Plan"
+    }
+  },
   "tool_interface": {
     "upload_tip": "Drop your file here or click to browse",
     "click_to_replace": "Click to replace file",
@@ -509,6 +547,7 @@
       "copy": "Copy",
       "copied": "Copied!",
       "timestamped_segments": "Timestamped Segments:",
+      "chapters_with_timestamps": "Chapters & Timestamps:",
       "download_options": "Download Your Transcription",
       "smart_features": "Smart Features",
       "pro_features": "Pro Features",
@@ -527,7 +566,95 @@
       "check_connection": "Please check your internet connection and try again",
       "chapters": "Chapters",
       "summary": "Summary",
-      "generating": "Generating..."
+      "generating": "Generating...",
+      "advanced_export": "Advanced Export",
+      "with_toc": "With Table of Contents",
+      "exporting": "Exporting...",
+      "export_success": "Export successful!",
+      "word_exported": "Your Word document has been downloaded",
+      "pdf_exported": "Your PDF document has been downloaded",
+      "export_failed": "Export failed",
+      "export_desc": "Export your transcription with chapters, summary, and table of contents"
+    },
+    "view_mode": {
+      "simple": "Simple View",
+      "editor": "Editor View"
+    },
+    "view_in_dashboard": "View in Dashboard",
+    "sign_in_to_save": "Sign in to save",
+    "editor": {
+      "show_chapters": "Show chapters",
+      "keyboard_shortcuts": "Keyboard Shortcuts",
+      "chapters": "Chapters",
+      "transcription_text": "Transcript",
+      "play_pause": "Play/Pause",
+      "previous_segment": "Previous Segment",
+      "next_segment": "Next Segment"
+    },
+    "upgrade": {
+      "title": "Upgrade Your Plan",
+      "selected": "Selected",
+      "recommended": "Recommended",
+      "upgrade_now": "Upgrade Now",
+      "cancel_anytime": "Cancel anytime. No questions asked.",
+      "trigger": {
+        "usage_limit": "You've reached your monthly usage limit. Upgrade to continue transcribing.",
+        "feature_locked": "This feature is available in premium plans.",
+        "export_format": "Export to this format with a premium plan.",
+        "default": "Unlock more features with a premium plan."
+      },
+      "features": {
+        "basic": {
+          "minutes": "Monthly Minutes",
+          "file_size": "Max File Size",
+          "export": "Export Formats",
+          "editor": "Editor Access",
+          "chapters": "Chapter Generation"
+        },
+        "pro": {
+          "minutes": "Monthly Minutes",
+          "file_size": "Max File Size", 
+          "export": "Export Formats",
+          "editor": "Editor Access",
+          "chapters": "Chapter Generation",
+          "refinement": "AI Refinement"
+        }
+      }
+    },
+    "dashboard": {
+      "welcome_back": "Welcome Back",
+      "dashboard_subtitle": "Manage your transcriptions and account",
+      "nav": {
+        "home": "Home",
+        "transcriptions": "All Transcriptions",
+        "account": "Account"
+      },
+      "quick_actions": "Quick Actions",
+      "actions": {
+        "upload_file": "Upload File",
+        "upload_description": "Upload audio or video files for transcription",
+        "youtube_link": "YouTube Link",
+        "youtube_description": "Transcribe YouTube videos by URL"
+      },
+      "usage": {
+        "monthly_usage": "Monthly Usage",
+        "minutes": "minutes",
+        "near_limit": "Approaching limit",
+        "limit_reached": "Limit reached",
+        "upgrade_for_more": "Upgrade for unlimited transcriptions"
+      },
+      "stats": {
+        "total_transcriptions": "Total Transcriptions",
+        "minutes_transcribed": "Minutes Transcribed",
+        "this_month": "This Month"
+      },
+      "recent_transcriptions": "Recent Transcriptions",
+      "view_all": "View All",
+      "no_transcriptions_yet": "No transcriptions yet",
+      "start_transcribing": "Start by uploading a file or pasting a YouTube link",
+      "upgrade": "Upgrade",
+      "upgrade_now": "Upgrade Now",
+      "upgrade_available": "Upgrade for more features"
     },
     "errors": {
       "upload_failed": "Upload failed. Please try again.",
@@ -558,6 +685,39 @@
       "pricing_link": "Upgrade",
       "speed_hint": "Higher accuracy, slightly slower"
     }
+  },
+  "welcome_back": "Welcome Back",
+  "dashboard_subtitle": "Manage your transcriptions and account",
+  "nav": {
+    "home": "Home",
+    "transcriptions": "All Transcriptions",
+    "account": "Account"
+  },
+  "quick_actions": "Quick Actions",
+  "actions": {
+    "upload_file": "Upload File",
+    "upload_description": "Upload audio or video files for transcription",
+    "youtube_link": "YouTube Link",
+    "youtube_description": "Transcribe YouTube videos by URL"
+  },
+  "usage": {
+    "monthly_usage": "Monthly Usage",
+    "minutes": "minutes",
+    "near_limit": "Approaching limit",
+    "limit_reached": "Limit reached",
+    "upgrade_for_more": "Upgrade for unlimited transcriptions"
+  },
+  "upgrade": "Upgrade",
+  "upgrade_now": "Upgrade Now",
+  "upgrade_available": "Upgrade for more features",
+  "recent_transcriptions": "Recent Transcriptions",
+  "view_all": "View All",
+  "no_transcriptions_yet": "No transcriptions yet",
+  "start_transcribing": "Start by uploading a file or pasting a YouTube link",
+  "stats": {
+    "total_transcriptions": "Total Transcriptions",
+    "minutes_transcribed": "Minutes Transcribed",
+    "this_month": "This Month"
   },
   "tiers": {
     "features": {
@@ -590,5 +750,11 @@
     "upgrade_required_basic": "This feature requires Basic subscription or higher",
     "upgrade_required_pro": "This feature requires Pro subscription or higher",
     "smart_features_desc": "AI-powered features to enhance your transcription experience"
-  }
+  },
+  "errors": {
+    "transcription_not_found": "Transcription Not Found",
+    "transcription_not_found_desc": "The requested transcription could not be found or you don't have permission to access it."
+  },
+  "back_to_transcriptions": "Back to Transcriptions",
+  "untitled_transcription": "Untitled Transcription"
 }

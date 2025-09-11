@@ -7,6 +7,7 @@ import { FileText, Download, Copy, Check, Code } from "lucide-react";
 import PyramidLoader from "@/components/ui/pyramid-loader";
 import { useRouter } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { useAppContext } from "@/contexts/app";
@@ -14,6 +15,30 @@ import { isAuthEnabled } from "@/lib/auth";
 import { MultipartUploader } from "@/lib/multipart-upload";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { ToastNotification, useToast } from "@/components/toast-notification";
+import { DocumentExportService } from "@/lib/export-document";
+import { usePlayerStore } from "@/stores/player-store";
+import dynamic from 'next/dynamic';
+
+// Lazy load editor views
+const EditorView = dynamic(() => import('@/components/editor-view'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-96"><PyramidLoader size="medium" /></div>
+});
+
+const ModernEditor = dynamic(() => import('@/components/editor-view/modern-editor'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-96"><PyramidLoader size="medium" /></div>
+});
+
+const CleanEditor = dynamic(() => import('@/components/editor-view/clean-editor'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-96"><PyramidLoader size="medium" /></div>
+});
+
+const ThreeColumnEditor = dynamic(() => import('@/components/editor-view/three-column-editor'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-96"><PyramidLoader size="medium" /></div>
+});
 
 interface ToolInterfaceProps {
   mode?: "video" | "audio";
@@ -82,6 +107,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [copiedSegments, setCopiedSegments] = useState<boolean>(false);
   const [generatingChapters, setGeneratingChapters] = useState<boolean>(false);
   const [generatingSummary, setGeneratingSummary] = useState<boolean>(false);
+  const [exportingDocument, setExportingDocument] = useState<boolean>(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const viewMode = usePlayerStore((state) => state.viewMode);
+  const setViewMode = usePlayerStore((state) => state.setViewMode);
   useEffect(() => { setMounted(true); }, []);
 
   // Helper to display and auto-hide the Chinese upgrade toast (disabled)
@@ -801,6 +830,14 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           if (isZh) showChineseToast(); else setShowChineseUpgrade(false);
         } catch {}
         setResult({ type: "full", data: result.data });
+        // Set audio URL for editor view
+        if (uploadedFileInfo?.publicUrl) {
+          setAudioUrl(uploadedFileInfo.publicUrl);
+        } else if (uploadedFileInfo?.replicateUrl) {
+          setAudioUrl(uploadedFileInfo.replicateUrl);
+        } else if (url) {
+          setAudioUrl(url);
+        }
         setProgress(t("progress.completed"));
         setShowSuccess(true);
         // Clear progress bar after completion
@@ -1506,7 +1543,103 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
 
         {/* Results Display */}
           {result && result.type === 'full' && result.data && (
-            <div className="mt-4 space-y-4">
+            <>
+            {/* Action Buttons - Save to Dashboard & View Mode Toggle */}
+            {result.data.transcription.segments && result.data.transcription.segments.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+                {/* Save to Dashboard */}
+                {isAuthenticated ? (
+                  <Link 
+                    href={`/${locale}/dashboard/transcriptions`}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 
+                      text-white rounded-lg hover:opacity-90 transition-opacity"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    {t('view_in_dashboard')}
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => router.push('/auth/signin')}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 
+                      text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                        d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                    {t('sign_in_to_save')}
+                  </button>
+                )}
+                
+                {/* View Mode Toggle */}
+                <div className="inline-flex p-1 rounded-full bg-black/30 backdrop-blur-xl border border-purple-500/20">
+                  <button
+                    onClick={() => setViewMode('simple')}
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                      viewMode === 'simple' 
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                      </svg>
+                      {t('view_mode.simple')}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setViewMode('editor');
+                      // Set audio URL if not already set
+                      if ((uploadedFileInfo?.publicUrl || uploadedFileInfo?.replicateUrl) && !audioUrl) {
+                        setAudioUrl(uploadedFileInfo.publicUrl || uploadedFileInfo.replicateUrl);
+                      }
+                    }}
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                      viewMode === 'editor' 
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      {t('view_mode.editor')}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Three Column Editor - Shows when in editor mode */}
+            {viewMode === 'editor' && result.data.transcription.segments && (
+              <div className="mt-4 -mx-12 px-4">
+                <ThreeColumnEditor
+                  audioUrl={audioUrl || uploadedFileInfo?.publicUrl || uploadedFileInfo?.replicateUrl}
+                  segments={result.data.transcription.segments || []}
+                  chapters={generatedChapters.length > 0 ? generatedChapters : [
+                    {
+                      id: 'full',
+                      title: 'Full Transcription',
+                      startTime: 0,
+                      endTime: result.data.transcription.duration || 60,
+                      segments: result.data.transcription.segments
+                    }
+                  ]}
+                  transcription={result.data.transcription}
+                  onClose={() => setViewMode('simple')}
+                />
+              </div>
+            )}
+            
+            {/* Main Content - Only visible in simple view */}
+            {viewMode === 'simple' && (
+              <div className="mt-4 space-y-4">
               <div className="p-4 rounded-lg" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)" }}>
                 <h3 className="font-semibold mb-4" style={{ color: "#D1FAE5" }}>
                   {t("results.transcription_complete")}
@@ -1555,19 +1688,39 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                     </div>
                   </div>
 
-                  {/* Segments with Timestamps (Chinese groups paragraphs) */}
+                  {/* Segments with Timestamps - Organized by Chapters if available */}
                   {result.data.transcription.segments && result.data.transcription.segments.length > 0 && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-medium" style={{ color: "#A7F3D0" }}>{t("results.timestamped_segments")}</h4>
+                        <h4 className="font-medium" style={{ color: "#A7F3D0" }}>
+                          {generatedChapters.length > 0 ? t("results.chapters_with_timestamps") : t("results.timestamped_segments")}
+                        </h4>
                         <button
                           onClick={() => {
-                            const segments = result.data.transcription.segments || [];
-                            const segmentsText = segments.map((seg: any) => {
-                              const startTime = `${Math.floor(seg.start / 60).toString().padStart(2, '0')}:${(seg.start % 60).toFixed(3).padStart(6, '0')}`;
-                              const endTime = `${Math.floor(seg.end / 60).toString().padStart(2, '0')}:${(seg.end % 60).toFixed(3).padStart(6, '0')}`;
-                              return `[${startTime} - ${endTime}] ${seg.text}`;
-                            }).join('\n');
+                            let segmentsText = '';
+                            
+                            if (generatedChapters.length > 0) {
+                              // Export with chapter organization
+                              generatedChapters.forEach((chapter) => {
+                                const chapterTime = `${Math.floor(chapter.startTime / 60)}:${String(Math.floor(chapter.startTime % 60)).padStart(2, '0')}`;
+                                segmentsText += `\n=== ${chapterTime} - ${chapter.title} ===\n`;
+                                
+                                chapter.segments?.forEach((seg: any) => {
+                                  const startTime = `${Math.floor(seg.start / 60).toString().padStart(2, '0')}:${(seg.start % 60).toFixed(3).padStart(6, '0')}`;
+                                  const endTime = `${Math.floor(seg.end / 60).toString().padStart(2, '0')}:${(seg.end % 60).toFixed(3).padStart(6, '0')}`;
+                                  segmentsText += `[${startTime} - ${endTime}] ${seg.text}\n`;
+                                });
+                              });
+                            } else {
+                              // Export flat segments
+                              const segments = result.data.transcription.segments || [];
+                              segmentsText = segments.map((seg: any) => {
+                                const startTime = `${Math.floor(seg.start / 60).toString().padStart(2, '0')}:${(seg.start % 60).toFixed(3).padStart(6, '0')}`;
+                                const endTime = `${Math.floor(seg.end / 60).toString().padStart(2, '0')}:${(seg.end % 60).toFixed(3).padStart(6, '0')}`;
+                                return `[${startTime} - ${endTime}] ${seg.text}`;
+                              }).join('\n');
+                            }
+                            
                             navigator.clipboard.writeText(segmentsText);
                             setCopiedSegments(true);
                             setTimeout(() => setCopiedSegments(false), 2000);
@@ -1582,15 +1735,55 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           <span>{copiedSegments ? t("results.copied") : t("results.copy")}</span>
                         </button>
                       </div>
-                      <div className="p-4 rounded-lg max-h-60 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
-                        <div className="space-y-2">
+                      <div className="p-4 rounded-lg max-h-96 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
+                        <div className="space-y-4">
                           {(() => {
                             const lang = result.data.transcription.language as string | undefined;
                             const rawText = result.data.transcription.text as string;
                             const segments = (result.data.transcription.segments || []) as Segment[];
                             const isZh = isChineseLangOrText(lang, rawText);
+                            
+                            // If we have chapters, organize segments by chapters
+                            if (generatedChapters.length > 0) {
+                              return generatedChapters.map((chapter, chapterIdx) => (
+                                <div 
+                                  key={chapterIdx} 
+                                  id={`chapter-${chapterIdx}`}
+                                  className="chapter-section p-3 rounded-lg transition-all"
+                                  style={{ 
+                                    background: 'rgba(0,0,0,0.2)',
+                                    border: '1px solid rgba(168,85,247,0.1)'
+                                  }}
+                                >
+                                  {/* Chapter Header */}
+                                  <div className="flex items-start gap-3 mb-3 pb-2" style={{ borderBottom: '1px solid rgba(168,85,247,0.2)' }}>
+                                    <span className="text-sm font-medium" style={{ color: '#a855f7', minWidth: '60px' }}>
+                                      {Math.floor(chapter.startTime / 60)}:{String(Math.floor(chapter.startTime % 60)).padStart(2, '0')}
+                                    </span>
+                                    <span className="text-sm font-semibold flex-1" style={{ color: '#e2e8f0' }}>
+                                      {chapter.title}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Chapter Segments */}
+                                  <div className="space-y-2 pl-4">
+                                    {chapter.segments?.map((segment: Segment, segIdx: number) => (
+                                      <div key={segIdx} className="text-sm">
+                                        <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>
+                                          [{formatTs(segment.start)} - {formatTs(segment.end)}]
+                                        </span>
+                                        <span className="ml-2">
+                                          {isZh ? punctuateChineseParagraph(segment.text) : segment.text}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ));
+                            }
+                            
+                            // Fallback to flat segment display
                             if (isZh) {
-                              // Use sentence-level refined segments for finer timestamps; lightly punctuate each line.
                               return segments.map((segment: Segment, index: number) => (
                                 <div key={index} className="text-sm">
                                   <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>
@@ -1804,12 +1997,25 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                         </div>
                         <div className="space-y-2">
                           {generatedChapters.map((chapter, idx) => (
-                            <div key={idx} className="flex items-start gap-2 text-sm">
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                // Scroll to the corresponding timestamp section
+                                const element = document.getElementById(`chapter-${idx}`);
+                                if (element) {
+                                  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                  // Add highlight effect
+                                  element.classList.add('highlight-chapter');
+                                  setTimeout(() => element.classList.remove('highlight-chapter'), 2000);
+                                }
+                              }}
+                              className="flex items-start gap-2 text-sm w-full text-left p-2 rounded hover:bg-white/5 transition-colors"
+                            >
                               <span className="text-gray-400" style={{ minWidth: '60px' }}>
                                 {Math.floor(chapter.startTime / 60)}:{String(Math.floor(chapter.startTime % 60)).padStart(2, '0')}
                               </span>
-                              <span className="text-gray-200">{chapter.title}</span>
-                            </div>
+                              <span className="text-gray-200 hover:text-white">{chapter.title}</span>
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -1893,11 +2099,193 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                       })}
                     </div>
                   </div>
+                  
+                  {/* Advanced Export Section - Word/PDF with TOC */}
+                  {(generatedChapters.length > 0 || generatedSummary) && (
+                    <div className="export-section mt-6 p-4 rounded-lg" style={{ 
+                      background: 'linear-gradient(135deg, rgba(168,85,247,0.05) 0%, rgba(59,130,246,0.05) 100%)',
+                      border: '1px solid rgba(59,130,246,0.2)'
+                    }}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <h4 className="font-semibold text-lg" style={{ color: "#A7F3D0" }}>
+                          {t("results.advanced_export")}
+                        </h4>
+                        <span className="text-xs px-2 py-1 rounded-full" style={{ 
+                          background: 'rgba(59,130,246,0.1)', 
+                          color: '#3b82f6',
+                          border: '1px solid rgba(59,130,246,0.2)'
+                        }}>
+                          {t("results.with_toc")}
+                        </span>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-3">
+                        {/* Export to Word */}
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={async () => {
+                            setExportingDocument(true);
+                            try {
+                              const blob = await DocumentExportService.exportToWord(
+                                {
+                                  text: result.data.transcription.text,
+                                  segments: result.data.transcription.segments,
+                                  language: result.data.transcription.language,
+                                  duration: result.data.transcription.duration
+                                },
+                                generatedChapters,
+                                generatedSummary,
+                                {
+                                  metadata: {
+                                    title: 'Transcription',
+                                    date: new Date().toLocaleDateString(),
+                                    language: result.data.transcription.language,
+                                    duration: result.data.transcription.duration
+                                  },
+                                  includeTimestamps: true,
+                                  includeChapters: true,
+                                  includeSummary: true
+                                }
+                              );
+                              
+                              // Download the file
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `transcription_${new Date().toISOString().split('T')[0]}.docx`;
+                              link.click();
+                              URL.revokeObjectURL(url);
+                              
+                              showToast('success', t("results.export_success"), t("results.word_exported"));
+                            } catch (error) {
+                              console.error('Export error:', error);
+                              showToast('error', t("results.export_failed"), t("results.try_again_later"));
+                            } finally {
+                              setExportingDocument(false);
+                            }
+                          }}
+                          disabled={exportingDocument}
+                          className="group relative overflow-hidden transition-all hover:scale-105"
+                          style={{
+                            background: 'rgba(0,0,0,0.4)',
+                            border: '1px solid rgba(59,130,246,0.3)',
+                            padding: '14px 28px',
+                            fontSize: '16px'
+                          }}
+                        >
+                          <span className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          {exportingDocument ? (
+                            <>
+                              <svg className="w-5 h-5 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>{t("results.exporting")}</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                  d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                  d="M9 13h6m-6 4h6m2-12v4h4" />
+                              </svg>
+                              <span className="relative font-medium">WORD</span>
+                            </>
+                          )}
+                        </Button>
+                        
+                        {/* Export to PDF */}
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={async () => {
+                            setExportingDocument(true);
+                            try {
+                              const blob = await DocumentExportService.exportToPDF(
+                                {
+                                  text: result.data.transcription.text,
+                                  segments: result.data.transcription.segments,
+                                  language: result.data.transcription.language,
+                                  duration: result.data.transcription.duration
+                                },
+                                generatedChapters,
+                                generatedSummary,
+                                {
+                                  metadata: {
+                                    title: 'Transcription',
+                                    date: new Date().toLocaleDateString(),
+                                    language: result.data.transcription.language,
+                                    duration: result.data.transcription.duration
+                                  },
+                                  includeTimestamps: true,
+                                  includeChapters: true,
+                                  includeSummary: true
+                                }
+                              );
+                              
+                              // Download the file
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `transcription_${new Date().toISOString().split('T')[0]}.pdf`;
+                              link.click();
+                              URL.revokeObjectURL(url);
+                              
+                              showToast('success', t("results.export_success"), t("results.pdf_exported"));
+                            } catch (error) {
+                              console.error('Export error:', error);
+                              showToast('error', t("results.export_failed"), t("results.try_again_later"));
+                            } finally {
+                              setExportingDocument(false);
+                            }
+                          }}
+                          disabled={exportingDocument}
+                          className="group relative overflow-hidden transition-all hover:scale-105"
+                          style={{
+                            background: 'rgba(0,0,0,0.4)',
+                            border: '1px solid rgba(239,68,68,0.3)',
+                            padding: '14px 28px',
+                            fontSize: '16px'
+                          }}
+                        >
+                          <span className="absolute inset-0 bg-gradient-to-r from-red-600/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          {exportingDocument ? (
+                            <>
+                              <svg className="w-5 h-5 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>{t("results.exporting")}</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                  d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                  d="M12 11v4m0 4h.01" />
+                              </svg>
+                              <span className="relative font-medium">PDF</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      
+                      <div className="mt-3 text-xs text-gray-400">
+                        <p>{t("results.export_desc")}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          )}
+            )}
 
+          </>
+          )}
+          
           {/* Preview only (unauthenticated) */}
           {result?.type === 'preview' && (
             <div className="mt-6">
@@ -1927,6 +2315,25 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             </div>
           )}
       </div>
+      {/* CSS for chapter highlight animation */}
+      <style jsx>{`
+        .chapter-section {
+          position: relative;
+        }
+        .chapter-section.highlight-chapter {
+          animation: highlightPulse 2s ease-out;
+        }
+        @keyframes highlightPulse {
+          0% {
+            background: rgba(168, 85, 247, 0.3);
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+          }
+          100% {
+            background: rgba(0, 0, 0, 0.2);
+            box-shadow: none;
+          }
+        }
+      `}</style>
       {/* Success overlay */}
       <div className={`success-overlay ${showSuccess ? "show" : ""}`} onClick={() => setShowSuccess(false)}>
         <div className="success-content" onClick={(e) => e.stopPropagation()}>

@@ -145,42 +145,107 @@ export class BasicSegmentationService {
     // Check if content is in Chinese
     const isChinese = /[\u4e00-\u9fff]/.test(allText);
     
-    // Try to use the first meaningful sentence or phrase as title
-    let title = '';
+    // Extract key topic and action from the text
+    const topic = this.extractTopic(allText, isChinese);
+    const action = this.extractAction(allText, isChinese);
     
-    // Get first sentence (up to 50 characters)
+    // Generate descriptive title in format: "Topic | Action"
+    if (topic && action) {
+      return isChinese ? `${topic}｜${action}` : `${topic} | ${action}`;
+    } else if (topic) {
+      return topic;
+    }
+    
+    // Fallback: Use first meaningful phrase
     const firstSentence = allText.match(/^[^.!?。！？]+/)?.[0]?.trim() || '';
-    if (firstSentence && firstSentence.length <= 50) {
-      title = firstSentence;
+    if (firstSentence && firstSentence.length <= 30) {
+      return firstSentence;
     } else if (firstSentence) {
-      // Truncate long sentence
       const words = firstSentence.split(/\s+/);
-      title = words.slice(0, 5).join(' ');
-      if (words.length > 5) {
-        title += '...';
-      }
-    }
-    
-    // If still no good title, try keywords
-    if (!title) {
-      const keywords = this.extractKeywords(allText);
-      if (keywords.length > 0) {
-        const titleKeywords = keywords.slice(0, Math.min(3, keywords.length));
-        title = this.capitalizeWords(titleKeywords.join(' '));
-      }
-    }
-    
-    // If we have a title, add chapter number for context
-    if (title) {
-      if (isChinese) {
-        return `第${chapterNumber}章: ${title}`;
-      } else {
-        return `Chapter ${chapterNumber}: ${title}`;
-      }
+      return words.slice(0, 4).join(' ') + '...';
     }
 
-    // Fallback to generic title
-    return isChinese ? `第${chapterNumber}章` : `Chapter ${chapterNumber}`;
+    // Last fallback
+    return isChinese ? `第${chapterNumber}段` : `Section ${chapterNumber}`;
+  }
+
+  /**
+   * Extract the main topic from text
+   */
+  private static extractTopic(text: string, isChinese: boolean): string {
+    // Look for location, person, or main subject
+    const keywords = this.extractKeywords(text);
+    
+    // Common topic patterns
+    if (isChinese) {
+      const patterns = [
+        /在(.{2,6})[，。]/,  // Location: 在...
+        /关于(.{2,8})/,      // About: 关于...
+        /(.{2,6})的问题/,    // Issue: ...的问题
+      ];
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match) return match[1];
+      }
+    } else {
+      // Look for location or subject mentions
+      const locationMatch = text.match(/(?:at|in|on)\s+(?:the\s+)?(\w+(?:\s+\w+)?)/i);
+      if (locationMatch) return this.capitalizeWords(locationMatch[1]);
+      
+      // Look for main subject (first noun phrase)
+      if (keywords.length > 0) {
+        return this.capitalizeWords(keywords[0]);
+      }
+    }
+    
+    return '';
+  }
+
+  /**
+   * Extract the main action or event from text
+   */
+  private static extractAction(text: string, isChinese: boolean): string {
+    // Look for verbs and action phrases
+    const sentences = text.match(/[^.!?。！？]+/g) || [];
+    if (sentences.length === 0) return '';
+    
+    const firstSentence = sentences[0];
+    
+    if (isChinese) {
+      // Chinese action patterns
+      const patterns = [
+        /(.{2,10}了)/,       // Past action: ...了
+        /正在(.{2,10})/,     // Ongoing: 正在...
+        /开始(.{2,10})/,     // Start: 开始...
+        /(.{2,10})起来/,     // Begin to: ...起来
+      ];
+      for (const pattern of patterns) {
+        const match = firstSentence.match(pattern);
+        if (match) return match[1].replace(/[，。]/g, '');
+      }
+    } else {
+      // Extract verb phrase
+      const verbPatterns = [
+        /(?:is|was|are|were)\s+(\w+ing)/i,  // Progressive
+        /(?:has|have|had)\s+(\w+ed)/i,       // Perfect
+        /(?:to|will|would|can|could|should)\s+(\w+)/i, // Modal + base
+      ];
+      
+      for (const pattern of verbPatterns) {
+        const match = firstSentence.match(pattern);
+        if (match) return this.capitalizeWords(match[1]);
+      }
+      
+      // Look for action words in keywords
+      const actionWords = this.extractKeywords(firstSentence)
+        .filter(word => !['the', 'a', 'an', 'this', 'that'].includes(word.toLowerCase()));
+      
+      if (actionWords.length > 1) {
+        return this.capitalizeWords(actionWords.slice(0, 2).join(' '));
+      }
+    }
+    
+    return '';
   }
 
   /**
