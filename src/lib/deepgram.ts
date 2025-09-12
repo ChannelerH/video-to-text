@@ -1,4 +1,7 @@
 import { TranscriptionResult, TranscriptionSegment } from './replicate';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 
 export interface DeepgramOptions {
   language?: string;
@@ -17,6 +20,13 @@ interface DeepgramResponse {
     created: string;
     duration: number;
     channels: number;
+    utterances?: Array<{
+      start: number;
+      end: number;
+      transcript: string;
+      speaker: number | string;
+      words?: Array<{ start: number; end: number; word: string; speaker?: number | string }>;
+    }>;
   };
   results: {
     channels: Array<{
@@ -55,6 +65,22 @@ export class DeepgramService {
   private apiKey: string;
   private apiUrl = 'https://api.deepgram.com/v1/listen';
   private DEBUG = process.env.DEBUG_TRANSCRIPTION === 'true';
+  private DEBUG_RAW = process.env.DEBUG_DEEPGRAM_RAW === 'true';
+  private DEBUG_TO_FILE = process.env.DEBUG_DEEPGRAM_RAW_FILE === 'true';
+
+  private async writeDebugFile(kind: 'raw' | 'parsed' | 'snapshot', data: any) {
+    if (!this.DEBUG_TO_FILE) return;
+    try {
+      const dir = path.join(process.cwd(), '.debug', 'raw-deepgram');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const id = crypto.randomBytes(4).toString('hex');
+      const file = path.join(dir, `dg-${ts}-${id}-${kind}.json`);
+      fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {
+      // Silently ignore file I/O errors during debugging
+    }
+  }
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -78,7 +104,7 @@ export class DeepgramService {
         smart_format: 'true',
         utterances: 'true',
         paragraphs: 'true', // 获取段落信息
-        diarize: 'false', // Can be enabled if needed
+        diarize: 'true', // enable speaker diarization
         numerals: 'true',
         profanity_filter: 'false',
         redact: 'false'
@@ -128,6 +154,33 @@ export class DeepgramService {
       if (this.DEBUG) {
         console.log(`✅ Received JSON response from Deepgram Nova-2`);
       }
+
+      // Optional: print a concise snapshot of Deepgram raw response for debugging
+      if (this.DEBUG_RAW) {
+        try {
+          const ch = result?.results?.channels?.[0] as any;
+          const alt = ch?.alternatives?.[0] || {};
+          const words = Array.isArray(alt?.words) ? alt.words.slice(0, 8) : [];
+          const utterances: any[] = (result as any)?.results?.utterances || [];
+          console.log('[DG RAW] Snapshot:', {
+            detected_language: ch?.detected_language,
+            alt_languages: alt?.languages,
+            transcript_len: (alt?.transcript || '').length,
+            words_sample: words.map((w: any) => ({ w: w.word, start: w.start, end: w.end, sp: w.speaker })).slice(0, 8),
+            utterances_count: utterances.length,
+            utterances_sample: utterances.slice(0, 3).map((u: any) => ({ start: u.start, end: u.end, sp: u.speaker, text: (u.transcript || '').slice(0, 80) }))
+          });
+          await this.writeDebugFile('snapshot', {
+            detected_language: ch?.detected_language,
+            alt_languages: alt?.languages,
+            transcript_len: (alt?.transcript || '').length,
+            utterances_count: utterances.length
+          });
+          await this.writeDebugFile('raw', result);
+        } catch (e) {
+          console.warn('[DG RAW] Snapshot logging failed:', e);
+        }
+      }
       
       // Parse response
       const channel = result.results?.channels?.[0];
@@ -170,7 +223,45 @@ export class DeepgramService {
       }
       
       // Convert to segments（若无 alternative，返回空数组）
-      const segments = alternative ? this.convertToSegments(alternative) : [];
+      let segments = alternative ? this.convertToSegments(alternative) : [];
+
+      // Enrich segments with speaker info using diarization data (utterances or word-level speakers)
+      try {
+        const utterances = (result.results as any)?.utterances as DeepgramResponse['results']['utterances'] | undefined;
+        if (utterances && utterances.length > 0) {
+          // Assign speaker based on the utterance that overlaps most with the segment
+          segments = segments.map((seg) => {
+            let best: { overlap: number; speaker: string | null } = { overlap: 0, speaker: null };
+            for (const utt of utterances) {
+              const a = Math.max(seg.start, utt.start);
+              const b = Math.min(seg.end, utt.end);
+              const overlap = Math.max(0, b - a);
+              if (overlap > best.overlap) {
+                const sp = typeof utt.speaker === 'number' ? String(utt.speaker) : String(utt.speaker || '');
+                best = { overlap, speaker: sp };
+              }
+            }
+            return best.speaker ? { ...(seg as any), speaker: best.speaker } : seg;
+          });
+        } else if ((alternative as any)?.words?.some((w: any) => w && w.speaker !== undefined)) {
+          const words: any[] = (alternative as any).words || [];
+          segments = segments.map((seg) => {
+            const within = words.filter((w) => typeof w.start === 'number' && typeof w.end === 'number' && w.start < seg.end && w.end > seg.start && w.speaker !== undefined);
+            if (!within.length) return seg;
+            const counts = new Map<string, number>();
+            within.forEach((w) => {
+              const key = String(w.speaker);
+              counts.set(key, (counts.get(key) || 0) + (w.end - w.start));
+            });
+            let bestSpeaker: string | null = null;
+            let bestScore = -1;
+            counts.forEach((val, key) => { if (val > bestScore) { bestScore = val; bestSpeaker = key; } });
+            return bestSpeaker ? { ...(seg as any), speaker: bestSpeaker } : seg;
+          });
+        }
+      } catch (e) {
+        console.warn('[Deepgram] Failed to enrich segments with speaker info:', e);
+      }
       
       // Detect primary language
       let detectedLanguage = channel.detected_language || 
@@ -186,6 +277,18 @@ export class DeepgramService {
         duration: result.metadata.duration,
         srtText
       };
+
+      if (this.DEBUG_RAW) {
+        try {
+          console.log('[DG RAW] Parsed result:', {
+            language: transcriptionResult.language,
+            textLen: transcriptionResult.text.length,
+            segments: transcriptionResult.segments.length,
+            segSample: transcriptionResult.segments.slice(0, 3).map((s: any) => ({ start: s.start, end: s.end, sp: s.speaker, text: (s.text || '').slice(0, 80) }))
+          });
+          await this.writeDebugFile('parsed', transcriptionResult);
+        } catch {}
+      }
       
       if (this.DEBUG) {
         console.log(`✅ Deepgram transcription completed in ${result.metadata.duration}s`);
@@ -213,7 +316,10 @@ export class DeepgramService {
       .map((segment, index) => {
         const startTime = this.secondsToSRTTime(segment.start);
         const endTime = this.secondsToSRTTime(segment.end);
-        return `${index + 1}\n${startTime} --> ${endTime}\n${segment.text.trim()}\n`;
+        const sp = (segment as any).speaker;
+        const speakerLabel = (typeof sp === 'string' && /^\d+$/.test(sp)) ? `Speaker ${parseInt(sp) + 1}` : (sp ? String(sp) : null);
+        const line = speakerLabel ? `${speakerLabel}: ${segment.text.trim()}` : segment.text.trim();
+        return `${index + 1}\n${startTime} --> ${endTime}\n${line}\n`;
       })
       .join('\n');
   }

@@ -87,6 +87,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [uploadProgress, setUploadProgress] = useState(0);
   // AI refine button removed; backend runs optional refinement automatically for Chinese
   const [highAccuracy, setHighAccuracy] = useState(false);
+  const [enableDiarizationAfterWhisper, setEnableDiarizationAfterWhisper] = useState(false);
   const [uploadedFileInfo, setUploadedFileInfo] = useState<any>(null);
   const [copiedText, setCopiedText] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -696,6 +697,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         };
         if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
           requestData.options.highAccuracyMode = true;
+          // PRO 附加：说话人分离（Deepgram 叠加）开关，默认关闭
+          if (tier === 'pro' && enableDiarizationAfterWhisper) {
+            (requestData.options as any).enableDiarizationAfterWhisper = true;
+          }
         }
         // 轻量语言探针（不阻塞主流程）：若判定中文，立刻展示升级提示
         try {
@@ -723,6 +728,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         };
         if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
           requestData.options.highAccuracyMode = true;
+          if (tier === 'pro' && enableDiarizationAfterWhisper) {
+            (requestData.options as any).enableDiarizationAfterWhisper = true;
+          }
         }
         // 轻量语言探针（不阻塞主流程）
         try {
@@ -1457,6 +1465,17 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                   <>
                     <span className="toggle-label">{t('high_accuracy.enabled_label')}</span>
                     <span className="toggle-hint">{t('high_accuracy.speed_hint')}</span>
+                    {highAccuracy && (
+                      <div className="mt-2 flex items-center gap-2 text-xs">
+                        <input
+                          id="dia-pro"
+                          type="checkbox"
+                          checked={enableDiarizationAfterWhisper}
+                          onChange={(e) => setEnableDiarizationAfterWhisper(e.target.checked)}
+                        />
+                        <label htmlFor="dia-pro" className="opacity-80">Add speaker diarization (Deepgram, PRO)</label>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>

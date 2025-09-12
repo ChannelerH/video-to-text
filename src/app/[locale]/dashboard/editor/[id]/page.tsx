@@ -153,15 +153,13 @@ export default async function EditorPage({
       </div>
 
       {/* Editor */}
-      <div className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-purple-500/20 overflow-hidden">
-        <EditorWrapper
-          audioUrl={audioUrl}
-          segments={segments}
-          chapters={chapters}
-          transcription={transcriptionData}
-          backHref={`/${locale}/dashboard/transcriptions`}
-        />
-      </div>
+      <EditorWrapper
+        audioUrl={audioUrl}
+        segments={segments}
+        chapters={chapters}
+        transcription={transcriptionData}
+        backHref={`/${locale}/dashboard/transcriptions`}
+      />
     </div>
   );
 }

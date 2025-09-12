@@ -22,6 +22,7 @@ import { Volume2 } from 'lucide-react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { suggestSpeakerNames } from '@/lib/speaker-suggest';
 
 interface ThreeColumnEditorProps {
   audioUrl?: string | null;
@@ -78,6 +79,11 @@ export default function ThreeColumnEditor({
   const [mergeModal, setMergeModal] = useState<{open:boolean; index:number|null}>({ open:false, index:null });
   const [segmentSplitModal, setSegmentSplitModal] = useState<{open:boolean; segmentIndex:number|null; splitPosition:number}>({ open:false, segmentIndex:null, splitPosition:0 });
   const [segments, setSegments] = useState(initialSegments);
+  // Speakers (derived from diarization in segments)
+  const [speakers, setSpeakers] = useState<{ id: string; label: string; color: string }[]>([]);
+  const [editingSpeakerId, setEditingSpeakerId] = useState<string | null>(null);
+  const [speakerSuggestions, setSpeakerSuggestions] = useState<Record<string, { name: string; score: number }[]>>({});
+  const [groupBySpeaker, setGroupBySpeaker] = useState<boolean>(true);
   
   const {
     isPlaying,
@@ -112,6 +118,19 @@ export default function ThreeColumnEditor({
       setDuration(transcription.duration);
     }
   }, [chapters, initialChapters, transcription]);
+
+  // Initialize speakers once from segments' diarization
+  useEffect(() => {
+    try {
+      const ids = Array.from(new Set((segments || []).map((s: any) => s.speaker).filter(Boolean))).map(String);
+      if (ids.length === 0) return;
+      setSpeakers(prev => {
+        if (prev && prev.length > 0) return prev;
+        const palette = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#eab308', '#ef4444'];
+        return ids.map((id, idx) => ({ id, label: `Speaker ${Number(id).toString().match(/^\d+$/) ? Number(id) + 1 : id}`, color: palette[idx % palette.length] }));
+      });
+    } catch {}
+  }, [segments]);
 
   // Initialize WaveSurfer
   useEffect(() => {
@@ -284,6 +303,19 @@ export default function ThreeColumnEditor({
     }
   }, [chapters, waveformReady]);
 
+  // Build suggestions when segments update
+  useEffect(() => {
+    try {
+      if (!segments || segments.length === 0) return;
+      const hasSpeaker = segments.some((s: any) => !!s.speaker);
+      if (!hasSpeaker) return;
+      const sug = suggestSpeakerNames(segments as any);
+      setSpeakerSuggestions(sug);
+    } catch (e) {
+      console.warn('Speaker suggestion failed:', e);
+    }
+  }, [segments]);
+
   // Sync playback state
   useEffect(() => {
     if (!wavesurferRef.current || !waveformReady) return;
@@ -412,6 +444,7 @@ export default function ThreeColumnEditor({
       const body = {
         chapters: chaptersOverride ?? usePlayerStore.getState().chapters,
         segments: segmentsOverride ?? segments,
+        speakers,
         updatedAt: new Date().toISOString()
       };
       const url = typeof window !== 'undefined' ? window.location.pathname : '';
@@ -691,9 +724,9 @@ export default function ThreeColumnEditor({
   };
 
   return (
-    <div className="w-full max-w-full bg-gray-900 rounded-xl overflow-hidden border border-purple-500/20">
+    <div className="w-full h-screen bg-gray-950 flex flex-col overflow-hidden">
       {/* Header Bar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-900/50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-900/50 flex-shrink-0">
         <h3 className="text-sm font-medium text-gray-300">Editor View</h3>
         <div className="flex items-center gap-2">
           <button
@@ -749,20 +782,18 @@ export default function ThreeColumnEditor({
         </div>
       </div>
       
-      {/* Main Content Area */}
-      <div className="flex flex-col h-[700px] w-full">
-        {/* Upper Content - Three Columns */}
-        <div className="flex flex-1 overflow-hidden">
+      {/* Main Content Area - Three Columns - Takes remaining space minus audio player */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left Panel - Chapters */}
-        <div className="w-64 border-r border-gray-800 flex flex-col bg-gray-950/50 flex-shrink-0">
-          <div className="p-4 border-b border-gray-800">
+        <div className="w-64 border-r border-gray-800 flex flex-col bg-gray-950/50 flex-shrink-0 h-full">
+          <div className="p-4 border-b border-gray-800 flex-shrink-0">
             <h4 className="text-sm font-medium text-white">Chapters</h4>
             <p className="text-xs text-gray-500 mt-1">
               {chapters.length} chapters • {formatTime(duration)}
             </p>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
             {chapters.length <= 1 && (
               <div className="p-3 rounded-lg bg-gray-900/60 border border-gray-800 text-xs text-gray-300">
                 <div className="flex items-center gap-2 mb-2">
@@ -870,17 +901,65 @@ export default function ThreeColumnEditor({
         </div>
 
         {/* Center Panel - Transcript */}
-        <div className="flex-1 flex flex-col bg-gray-950/30">
-          <div className="p-4 border-b border-gray-800">
-            <h4 className="text-sm font-medium text-white">Transcript</h4>
-            <p className="text-xs text-gray-500 mt-1">
-              {segments.length} segments • Click to position
-            </p>
+        <div className="flex-1 flex flex-col bg-gray-950/30 h-full min-w-0">
+          <div className="p-4 border-b border-gray-800 flex-shrink-0 flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-medium text-white">Transcript</h4>
+              <p className="text-xs text-gray-500 mt-1">
+                {segments.length} segments • Click to position
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <span>Group by speaker</span>
+              <button
+                onClick={() => setGroupBySpeaker(v => !v)}
+                className={`px-2 py-1 rounded border ${groupBySpeaker ? 'border-purple-500 text-purple-300 bg-purple-500/10' : 'border-gray-700 text-gray-400 hover:bg-gray-800'}`}
+              >{groupBySpeaker ? 'On' : 'Off'}</button>
+            </div>
           </div>
           
-          <div ref={transcriptRef} className="flex-1 overflow-y-auto p-4 relative scroll-smooth">
-            {segments.map((segment, idx) => {
+          <div ref={transcriptRef} className="flex-1 overflow-y-auto p-4 relative scroll-smooth min-h-0">
+            {groupBySpeaker ? (
+              <div className="space-y-4">
+                {(() => {
+                  const groups: Array<{ speaker?: string; start: number; end: number; text: string }> = [];
+                  let cur: any = null;
+                  for (const s of segments as any[]) {
+                    const sid = s.speaker ? String(s.speaker) : undefined;
+                    if (!cur) { cur = { speaker: sid, start: s.start, end: s.end, text: String(s.text||'').trim() }; continue; }
+                    if (cur.speaker === sid) { cur.end = s.end; cur.text += (cur.text ? ' ' : '') + String(s.text||'').trim(); }
+                    else { groups.push(cur); cur = { speaker: sid, start: s.start, end: s.end, text: String(s.text||'').trim() }; }
+                  }
+                  if (cur) groups.push(cur);
+                  return groups.map((g, i) => {
+                    const info = g.speaker ? (speakers || []).find(sp => String(sp.id) === String(g.speaker)) : undefined;
+                    return (
+                      <div key={i} className="space-y-2">
+                        <div className="flex items-center gap-3 text-xs text-gray-400">
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-semibold" style={{ backgroundColor: info?.color || '#6b7280' }}>
+                            {(info?.label || 'S').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="text-sm font-medium text-gray-300">{info?.label || 'Speaker'}</div>
+                          <div className="opacity-70">{formatTime(g.start)} - {formatTime(g.end)}</div>
+                        </div>
+                        <div
+                          className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-sm leading-7 text-gray-200 hover:border-gray-700 cursor-pointer"
+                          onClick={() => {
+                            const ws = wavesurferRef.current; const dur = ws?.getDuration?.() || duration || 0; const t = Math.max(0, g.start);
+                            setCurrentTime(t); if (ws && dur > 0) { try { ws.seekTo(t / dur); } catch {} }
+                          }}
+                        >
+                          {g.text}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            ) : (
+            segments.map((segment, idx) => {
               const isActive = (currentTime >= segment.start && currentTime < segment.end) || manualHighlightIdx === idx;
+              const sp = segment.speaker ? (speakers || []).find(s => String(s.id) === String(segment.speaker)) : undefined;
               
               return (
                 <div
@@ -938,6 +1017,15 @@ export default function ThreeColumnEditor({
                         </span>
                       </div>
                       
+                      {sp && (
+                        <span
+                          className="shrink-0 px-1.5 py-0.5 text-[10px] rounded text-white font-medium"
+                          style={{ backgroundColor: sp.color }}
+                          title={`Speaker ${sp.id}`}
+                        >
+                          {sp.label}
+                        </span>
+                      )}
                       <p className={`flex-1 text-sm leading-relaxed ${
                         isActive ? 'text-white' : 'text-gray-300'
                       }`}>
@@ -995,26 +1083,85 @@ export default function ThreeColumnEditor({
                   </div>
                 </div>
               );
-            })}
+            })
+            )}
           </div>
         </div>
 
-        {/* Right Panel removed per request */}
+        {/* Right Panel - Speakers */}
+        <div className="w-64 border-l border-gray-800 bg-gray-950/40 flex-shrink-0 flex flex-col h-full">
+          <div className="p-4 border-b border-gray-800 flex-shrink-0">
+            <h4 className="text-sm font-medium text-white">Speakers</h4>
+            <p className="text-xs text-gray-500 mt-1">Diarization & naming suggestions</p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+            {speakers.length === 0 && (
+              <div className="text-xs text-gray-500 p-3 bg-gray-900/40 rounded border border-gray-800">No diarization found in this transcription.</div>
+            )}
+            {speakers.map((sp) => {
+              const segCount = segments.filter((s: any) => String(s.speaker) === sp.id).length;
+              const sugs = (speakerSuggestions[sp.id] || []).slice(0,3);
+              return (
+                <div key={sp.id} className="bg-gray-900/40 rounded border border-gray-800 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style={{ backgroundColor: sp.color }}>{sp.id}</div>
+                    <div className="flex-1">
+                      {editingSpeakerId === sp.id ? (
+                        <input
+                          value={sp.label}
+                          onChange={(e) => setSpeakers(arr => arr.map(x => x.id === sp.id ? { ...x, label: e.target.value } : x))}
+                          onBlur={() => { setEditingSpeakerId(null); persistEdits(undefined, segments); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { setEditingSpeakerId(null); persistEdits(undefined, segments); } if (e.key === 'Escape') setEditingSpeakerId(null); }}
+                          className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white"
+                          autoFocus
+                        />
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium text-white">{sp.label}</div>
+                          <button onClick={() => setEditingSpeakerId(sp.id)} className="text-xs text-gray-400 hover:text-gray-200">Rename</button>
+                        </div>
+                      )}
+                      <div className="text-xs text-gray-500 mt-1">{segCount} segments</div>
+                    </div>
+                  </div>
+                  {sugs.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs text-gray-400 mb-1">Suggested:</div>
+                      <div className="flex flex-wrap gap-2">
+                        {sugs.map((sug, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              setSpeakers(arr => arr.map(x => x.id === sp.id ? { ...x, label: sug.name } : x));
+                              persistEdits(undefined, segments);
+                            }}
+                            className="px-2 py-0.5 text-xs rounded bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30"
+                            title={`Score ${Math.round(sug.score)}`}
+                          >{sug.name}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
-
-      {/* Bottom Panel - Audio Player Controls */}
-      <div className="border-t border-gray-800 bg-gray-950/50 p-4">
+      
+      {/* Bottom Panel - Audio Player Controls - Always visible at bottom */}
+      <div className="border-t border-gray-800 bg-gray-900/80 px-4 py-3 flex-shrink-0 relative z-10">
         {/* Waveform Container - Hidden but kept in DOM for WaveSurfer */}
         <div ref={waveformRef} className="hidden" />
         
-        <div className="max-w-6xl mx-auto flex items-center gap-6">
+        <div className="flex items-center gap-3">
           {/* Play Controls */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => jumpToChapter(Math.max(0, currentChapter - 1))}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-gray-800/50 rounded transition-all"
             >
-              <SkipBack className="w-5 h-5 text-gray-300" />
+              <SkipBack className="w-4 h-4 text-white" />
             </button>
             
             <button
@@ -1078,27 +1225,27 @@ export default function ThreeColumnEditor({
                   }
                 }
               }}
-              className="p-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+              className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-all"
             >
               {isPlaying ? (
-                <Pause className="w-6 h-6 text-white" />
+                <Pause className="w-5 h-5 text-white" />
               ) : (
-                <Play className="w-6 h-6 text-white ml-0.5" />
+                <Play className="w-5 h-5 text-white ml-0.5" />
               )}
             </button>
             
             <button
               onClick={() => jumpToChapter(Math.min(chapters.length - 1, currentChapter + 1))}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-gray-800/50 rounded transition-all"
             >
-              <SkipForward className="w-5 h-5 text-gray-300" />
+              <SkipForward className="w-4 h-4 text-white" />
             </button>
           </div>
 
           {/* Time and Progress */}
           <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-mono text-white">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-gray-400">
                 {formatTime(Math.min(currentTime, duration))}
               </span>
               <div className="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
@@ -1107,7 +1254,7 @@ export default function ThreeColumnEditor({
                   style={{ width: `${(currentTime / duration) * 100}%` }}
                 />
               </div>
-              <span className="text-sm font-mono text-gray-500">
+              <span className="text-xs font-mono text-gray-400">
                 {formatTime(duration || 0)}
               </span>
             </div>
@@ -1160,8 +1307,7 @@ export default function ThreeColumnEditor({
           </div>
         </div>
       </div>
-    </div>
-
+      
       {/* Merge Modal */}
       <Dialog open={mergeModal.open} onOpenChange={(o)=> setMergeModal(m => ({...m, open:o}))}>
         <DialogContent className="sm:max-w-md">

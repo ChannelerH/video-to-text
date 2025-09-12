@@ -234,7 +234,7 @@ export class UnifiedTranscriptionService {
         throw new Error('Deepgram service not available');
       }
 
-      const deepgramOptions: DeepgramOptions = {
+      let deepgramOptions: DeepgramOptions = {
         language: options.language,
         userTier: options.userTier,
         isPreview: options.isPreview,
@@ -242,7 +242,31 @@ export class UnifiedTranscriptionService {
         outputFormat: options.outputFormat
       };
 
-      return await this.deepgramService.transcribeAudio(audioUrl, deepgramOptions);
+      // First pass with auto-detect unless user forced a language
+      const first = await this.deepgramService.transcribeAudio(audioUrl, deepgramOptions);
+
+      // Heuristic: if Deepgram mislabeled as zh but text is overwhelmingly ASCII/English, re-run with language='en'
+      const text = (first.text || '').trim();
+      const cjkCount = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+      const latinCount = (text.match(/[A-Za-z]/g) || []).length;
+      const zhLabelled = (first.language || '').toLowerCase().includes('zh');
+      const englishLike = latinCount > 50 && cjkCount === 0; // long enough English text with no CJK
+
+      if (!options.language && zhLabelled && englishLike && !options.isPreview) {
+        try {
+          console.warn('[LangGuard] Deepgram labelled as zh but text looks English. Re-running with language=en');
+          deepgramOptions = { ...deepgramOptions, language: 'en' };
+          const second = await this.deepgramService.transcribeAudio(audioUrl, deepgramOptions);
+          // Prefer the one with longer alphabetic content
+          const latin2 = (second.text || '').match(/[A-Za-z]/g)?.length || 0;
+          return latin2 >= latinCount ? second : first;
+        } catch (e) {
+          console.warn('[LangGuard] Fallback en-run failed, using first result', e);
+          return first;
+        }
+      }
+
+      return first;
       
     } else {
       // Use Replicate (Whisper)
@@ -314,10 +338,54 @@ export class UnifiedTranscriptionService {
   }
 
   /**
+   * Overlay diarization (speaker labels) onto existing sentence-level segments using Deepgram.
+   * Does not change text; only assigns segment.speaker by maximal time overlap with utterances/word speakers.
+   */
+  async addDiarizationFromUrl(audioUrl: string, transcription: TranscriptionResult): Promise<boolean> {
+    if (!this.deepgramService) return false;
+    try {
+      const dg = await this.deepgramService.transcribeAudio(audioUrl, {
+        language: transcription.language || 'auto',
+        isPreview: false,
+        outputFormat: 'json'
+      } as any);
+      const altSegs: any[] = dg.segments || [];
+      if (!altSegs.some((s: any) => s.speaker != null)) return false;
+      // Assign speaker by overlap for each sentence in existing transcription
+      (transcription.segments as any[]).forEach((sent: any) => {
+        let bestSpeaker: string | undefined;
+        let best = 0;
+        for (const s of altSegs) {
+          if (s.speaker == null) continue;
+          const a = Math.max(sent.start, s.start);
+          const b = Math.min(sent.end, s.end);
+          const overlap = Math.max(0, b - a);
+          if (overlap > best) { best = overlap; bestSpeaker = String(s.speaker); }
+        }
+        if (bestSpeaker) sent.speaker = bestSpeaker;
+      });
+      return true;
+    } catch (e) {
+      console.warn('[Overlay] diarization overlay failed:', e);
+      return false;
+    }
+  }
+
+  /**
    * Convert transcription to plain text
    */
   convertToPlainText(transcription: TranscriptionResult): string {
     try {
+      // If diarization exists, provide a simple speaker-prefixed text (one per segment)
+      if (Array.isArray(transcription.segments) && transcription.segments.some((s: any) => s && (s as any).speaker)) {
+        const lines = transcription.segments.map((s: any) => {
+          const sp = s.speaker;
+          const label = (typeof sp === 'string' && /^\d+$/.test(sp)) ? `Speaker ${parseInt(sp) + 1}` : (sp ? String(sp) : '');
+          const prefix = label ? `${label}: ` : '';
+          return prefix + String(s.text || '').trim();
+        });
+        return lines.join('\n');
+      }
       const isZh = (transcription.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(transcription.text || '');
       if (isZh) {
         const raw = (transcription.text || '').trim();

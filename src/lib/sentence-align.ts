@@ -65,6 +65,23 @@ export function alignSentencesWithSegments(
     const last = originalSegments[Math.max(startIdx, segIdx - 1)];
     if (!first || !last) break;
 
+    // Determine majority speaker in merged window (if any)
+    const windowSegs = originalSegments.slice(startIdx, Math.max(startIdx, segIdx));
+    let speaker: string | undefined;
+    try {
+      const counts = new Map<string, number>();
+      windowSegs.forEach((s: any) => {
+        if (s && s.speaker != null) {
+          const key = String(s.speaker);
+          counts.set(key, (counts.get(key) || 0) + 1);
+        }
+      });
+      let bestKey: string | undefined;
+      let best = -1;
+      counts.forEach((v, k) => { if (v > best) { best = v; bestKey = k; } });
+      speaker = bestKey;
+    } catch {}
+
     result.push({
       id: result.length,
       seek: 0,
@@ -75,7 +92,8 @@ export function alignSentencesWithSegments(
       temperature: 0,
       avg_logprob: 0,
       compression_ratio: 1,
-      no_speech_prob: 0
+      no_speech_prob: 0,
+      ...(speaker ? { speaker } as any : {})
     });
     sentId++;
   }
@@ -99,4 +117,3 @@ export function alignSentencesWithSegments(
 
   return result;
 }
-

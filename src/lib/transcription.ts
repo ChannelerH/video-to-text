@@ -19,6 +19,7 @@ export interface TranscriptionRequest {
     isPreview?: boolean; // 是否为预览请求
     fallbackEnabled?: boolean; // 是否启用降级
     highAccuracyMode?: boolean; // Pro用户高准确度模式
+    enableDiarizationAfterWhisper?: boolean; // PRO附加选项：Whisper后叠加Deepgram说话人分离
     outputFormat?: 'json' | 'srt'; // Deepgram输出格式
     formats?: string[]; // ['txt', 'srt', 'vtt', 'json', 'md']
     r2Key?: string; // 对于文件上传，传入 R2 对象键用于稳定缓存
@@ -599,7 +600,8 @@ export class TranscriptionService {
       ));
 
       // 使用 R2 URL 进行转录
-      const preferredLang = request.options?.language || (/[\u4e00-\u9fff]/.test(videoInfo.title) ? 'zh' : 'auto');
+      // Do NOT infer language from title; rely on auto-detect + guard logic.
+      const preferredLang = request.options?.language || 'auto';
       const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(uploadResult.url, {
         language: preferredLang,
         userTier: request.options?.userTier, // 传递用户等级信息
@@ -608,6 +610,15 @@ export class TranscriptionService {
         highAccuracyMode: request.options?.highAccuracyMode
       }));
       console.log('[TEST][YT-002] model.used', { model: 'deepgram_or_whisper_decided_above' });
+
+      // Optional: overlay diarization for PRO users when enabled
+      const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && request.options?.userTier === 'pro';
+      if (enableOverlay) {
+        try {
+          const ok = await this.transcriptionService.addDiarizationFromUrl(uploadResult.url, transcription);
+          console.log('[Overlay] diarization after-whisper', ok ? 'applied' : 'skipped');
+        } catch {}
+      }
 
       // 本地中文规范化：段内标点与句末补全（不改时间戳）并重建全文 + 英文术语修复 + 可选LLM标点增强
       try {
@@ -816,6 +827,12 @@ export class TranscriptionService {
         highAccuracyMode: request.options?.highAccuracyMode
       }));
       console.log('[TEST][HA-001] transcribe.audio_url.completed', { duration: transcription.duration, language: transcription.language });
+
+      // 可选：为 PRO 用户叠加话者分离（Deepgram）
+      const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && request.options?.userTier === 'pro';
+      if (enableOverlay) {
+        try { await this.transcriptionService.addDiarizationFromUrl(uploadResult.url, transcription); } catch {}
+      }
 
       // 6. 本地中文规范化（如适用）+ 英文术语修复 + 可选LLM标点增强
       try {
@@ -1254,6 +1271,12 @@ export class TranscriptionService {
         outputFormat: request.options?.outputFormat || 'json',
         highAccuracyMode: request.options?.highAccuracyMode
       }));
+
+      // 可选：为 PRO 用户叠加话者分离（Deepgram）
+      const enableOverlayFile = !!request.options?.enableDiarizationAfterWhisper && request.options?.userTier === 'pro';
+      if (enableOverlayFile) {
+        try { await this.transcriptionService.addDiarizationFromUrl(filePath, transcription); } catch {}
+      }
 
       // Report processing phase
       if (request.options?.onProgress) {

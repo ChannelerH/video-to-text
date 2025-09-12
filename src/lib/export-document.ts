@@ -291,7 +291,12 @@ export class DocumentExportService {
       // Chapter segments
       if (chapter.segments && chapter.segments.length > 0) {
         chapter.segments.forEach(segment => {
-          const speakerPrefix = includeSpeakers && (segment as any).speaker ? `${(segment as any).speaker}: ` : '';
+          let speakerPrefix = '';
+          if (includeSpeakers && (segment as any).speaker) {
+            const sp = (segment as any).speaker;
+            const label = (typeof sp === 'string' && /^\d+$/.test(sp)) ? `Speaker ${parseInt(sp) + 1}` : String(sp);
+            speakerPrefix = `${label}: `;
+          }
           if (includeTimestamps) {
             content.push(
               new Paragraph({
