@@ -18,23 +18,24 @@ export async function createOrReuseTranscription(params: {
 }) {
   const now = new Date();
 
-  // Try to find an existing completed job for the same source AND same user (avoid cross-user reuse)
-  const existing = await db()
-    .select()
-    .from(transcriptions)
-    .where(and(
-      eq(transcriptions.source_type as any, params.source_type),
-      eq(transcriptions.source_hash, params.source_hash),
-      eq(transcriptions.deleted, false as any),
-      eq(transcriptions.status as any, "completed"),
-      eq(transcriptions.user_uuid, params.user_uuid || "")
-    ))
-    .orderBy(desc(transcriptions.completed_at))
-    .limit(1);
+  // DISABLED CACHING - Always create new transcription
+  // // Try to find an existing completed job for the same source AND same user (avoid cross-user reuse)
+  // const existing = await db()
+  //   .select()
+  //   .from(transcriptions)
+  //   .where(and(
+  //     eq(transcriptions.source_type as any, params.source_type),
+  //     eq(transcriptions.source_hash, params.source_hash),
+  //     eq(transcriptions.deleted, false as any),
+  //     eq(transcriptions.status as any, "completed"),
+  //     eq(transcriptions.user_uuid, params.user_uuid || "")
+  //   ))
+  //   .orderBy(desc(transcriptions.completed_at))
+  //   .limit(1);
 
-  if (existing.length > 0) {
-    return existing[0];
-  }
+  // if (existing.length > 0) {
+  //   return existing[0];
+  // }
 
   const [row] = await db().insert(transcriptions).values({
     job_id: params.job_id,

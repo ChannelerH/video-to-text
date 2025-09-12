@@ -178,29 +178,7 @@ export class TranscriptionService {
 
     // begin youtube processing
 
-    // 2. 检查缓存
-    const variant = this.variantSuffix(request.options);
-    const cachedEntry = await transcriptionCache.get('youtube', videoId + variant);
-    if (cachedEntry && (cachedEntry.transcriptionData?.text || '').trim().length > 0) {
-      console.log('[TEST][CACHE-001] youtube.cache.hit', { videoId, variant });
-      return {
-        success: true,
-        data: {
-          transcription: cachedEntry.transcriptionData,
-          formats: cachedEntry.formats,
-          videoInfo: {
-            videoId,
-            title: cachedEntry.videoTitle || '',
-            duration: cachedEntry.duration,
-            thumbnails: []
-          },
-          fromCache: true
-        }
-      };
-    } else if (cachedEntry) {
-      console.log('[CACHE] youtube.cache.stale', { videoId, variant });
-      await transcriptionCache.delete('youtube', videoId + variant).catch(() => {});
-    }
+    // 2.（已禁用缓存）始终走新转写
 
     // 3. 获取视频信息
     let videoInfo: VideoInfo;
@@ -676,21 +654,7 @@ export class TranscriptionService {
         });
       }
 
-      // 缓存结果
-      await this.time('cache.set', transcriptionCache.set(
-        'youtube',
-        videoInfo.videoId + this.variantSuffix(request.options),
-        transcription,
-        formats,
-        {
-          originalUrl: request.content,
-          videoTitle: videoInfo.title,
-          userTier: request.options?.userTier,
-          r2Key: uploadResult.key // 保存 R2 key 用于后续清理
-        },
-        { userId: request.options?.userId }
-      ));
-      console.log('[CACHE] youtube.cache.set.audio');
+      // （已禁用缓存）不写入缓存
 
       // 记录下载方法用于分析（通过日志）
       console.log(`Transcription cached with download method: ${downloadMethod}`);
@@ -782,22 +746,8 @@ export class TranscriptionService {
 
       console.log(`Audio detected: ${audioInfo.contentType}, ${audioInfo.sizeInfo}`);
 
-      // 2. 检查缓存（基于 URL hash）
+      // 2.（已禁用缓存）始终走新转写
       const urlHash = crypto.createHash('sha256').update(url).digest('hex');
-      const cached = await transcriptionCache.get('audio_url', urlHash + this.variantSuffix(request.options));
-      
-      if (cached) {
-        console.log('Audio transcription found in cache');
-        return {
-          success: true,
-          data: {
-            transcription: cached.transcriptionData,
-            formats: cached.formats || {},
-            fromCache: true,
-            estimatedCost: this.transcriptionService.estimateCost(cached.duration || 60)
-          }
-        };
-      }
 
       // 3. 下载音频文件
       const audioBuffer = await this.time('audio.download', this.downloadAudioFromUrl(url, audioInfo));
@@ -870,25 +820,7 @@ export class TranscriptionService {
       const formats = await this.time('formats.generate', this.generateFormats(transcription, audioInfo.filename || 'audio'));
       console.log('[TEST][FMT-001] formats.generated', { txt: !!formats.txt, srt: !!formats.srt, vtt: !!formats.vtt, json: !!formats.json, md: !!formats.md });
 
-      // 8. 缓存结果
-      await this.time('cache.set', transcriptionCache.set(
-        'audio_url',
-        urlHash + this.variantSuffix(request.options),
-        transcription,
-        formats,
-        {
-          originalUrl: url,
-          audioInfo: {
-            contentType: audioInfo.contentType,
-            fileSize: audioBuffer.length,
-            duration: transcription.segments?.length ? 
-              Math.max(...transcription.segments.map((s: any) => s.end)) : 60
-          },
-          userTier: request.options?.userTier,
-          r2Key: uploadResult.key
-        },
-        { userId: request.options?.userId }
-      ));
+      // （已禁用缓存）不写入缓存
 
       // 9. 异步清理 R2 文件
       setTimeout(async () => {
