@@ -28,6 +28,7 @@ interface ThreeColumnEditorProps {
   audioUrl?: string | null;
   segments: any[];
   chapters: any[];
+  speakers?: any[];
   transcription: any;
   onClose?: () => void;
   backHref?: string;
@@ -38,6 +39,7 @@ export default function ThreeColumnEditor({
   audioUrl, 
   segments: initialSegments, 
   chapters: initialChapters, 
+  speakers: initialSpeakers,
   transcription,
   onClose,
   backHref,
@@ -88,6 +90,61 @@ export default function ThreeColumnEditor({
   const [generatedSummary, setGeneratedSummary] = useState<string>("");
   const [generatingSummary, setGeneratingSummary] = useState<boolean>(false);
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
+  const [generatingChapters, setGeneratingChapters] = useState<boolean>(false);
+  const hasShownAudioLoadedToast = useRef(false);
+  const [changingSpeakerForSegment, setChangingSpeakerForSegment] = useState<number | null>(null);
+  
+  // Generate consistent color for speaker name
+  const getSpeakerColor = (speakerName: string | null | undefined): string => {
+    if (!speakerName) return '#6b7280'; // gray for no speaker
+    
+    // Check if color already assigned in speakers array
+    const existingSpeaker = speakers.find(s => s.id === speakerName);
+    if (existingSpeaker?.color) {
+      return existingSpeaker.color;
+    }
+    
+    // More diverse colors to reduce collision chance
+    const colors = [
+      '#f97316', // orange
+      '#3b82f6', // blue
+      '#10b981', // emerald
+      '#8b5cf6', // violet
+      '#eab308', // yellow
+      '#ef4444', // red
+      '#06b6d4', // cyan
+      '#ec4899', // pink
+      '#14b8a6', // teal
+      '#a855f7', // purple
+      '#22c55e', // green
+      '#f59e0b', // amber
+      '#84cc16', // lime
+      '#0ea5e9', // sky
+      '#6366f1', // indigo
+      '#d946ef'  // fuchsia
+    ];
+    
+    // Get already used colors
+    const usedColors = speakers.map(s => s.color).filter(Boolean);
+    
+    // Try to find an unused color first
+    const availableColors = colors.filter(c => !usedColors.includes(c));
+    if (availableColors.length > 0) {
+      // Use hash to pick from available colors for consistency
+      let hash = 0;
+      for (let i = 0; i < speakerName.length; i++) {
+        hash = speakerName.charCodeAt(i) * 31 + ((hash << 5) - hash);
+      }
+      return availableColors[Math.abs(hash) % availableColors.length];
+    }
+    
+    // If all colors are used, use hash to pick one
+    let hash = 0;
+    for (let i = 0; i < speakerName.length; i++) {
+      hash = speakerName.charCodeAt(i) * 31 + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
   
   const {
     isPlaying,
@@ -122,19 +179,88 @@ export default function ThreeColumnEditor({
       setDuration(transcription.duration);
     }
   }, [chapters, initialChapters, transcription]);
+  
+  // Generate AI chapters
+  const generateAIChapters = async () => {
+    if (generatingChapters) return;
+    
+    setGeneratingChapters(true);
+    try {
+      const jobId = (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '') as string;
+      console.log('Generating AI chapters for job:', jobId);
+      toast.info('Generating AI chapters... This may take a moment.');
+      
+      const response = await fetch(`/api/transcriptions/${jobId}/chapters`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          segments: segments,
+          options: {
+            language: transcription?.language || 'auto',
+            generateSummary: false
+          }
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.data?.chapters && result.data.chapters.length > 0) {
+          console.log('AI chapters generated:', result.data.chapters.length);
+          setChapters(result.data.chapters);
+          toast.success('AI chapters generated successfully');
+        } else {
+          toast.warning('No chapters generated. Try manual splitting instead.');
+        }
+      } else {
+        toast.error('Failed to generate AI chapters. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to generate AI chapters:', error);
+      toast.error('Error generating chapters. Please try manual splitting.');
+    } finally {
+      setGeneratingChapters(false);
+    }
+  };
 
-  // Initialize speakers once from segments' diarization
+  // Initialize speakers from segments
   useEffect(() => {
     try {
-      const ids = Array.from(new Set((segments || []).map((s: any) => s.speaker).filter(Boolean))).map(String);
-      if (ids.length === 0) return;
-      setSpeakers(prev => {
-        if (prev && prev.length > 0) return prev;
-        const palette = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#eab308', '#ef4444'];
-        return ids.map((id, idx) => ({ id, label: `Speaker ${Number(id).toString().match(/^\d+$/) ? Number(id) + 1 : id}`, color: palette[idx % palette.length] }));
-      });
+      // Get unique speaker values from segments
+      const uniqueSpeakers = Array.from(new Set((segments || []).map((s: any) => s.speaker).filter(Boolean))).map(String);
+      if (uniqueSpeakers.length === 0) {
+        setSpeakers([]);
+        return;
+      }
+      
+      // If we have initial speakers with proper labels, use them
+      if (initialSpeakers && initialSpeakers.length > 0) {
+        // Map segment speakers to initial speaker labels if they match IDs
+        const mappedSpeakers = uniqueSpeakers.map(speakerValue => {
+          const initialSpeaker = initialSpeakers.find(s => s.id === speakerValue);
+          if (initialSpeaker) {
+            return initialSpeaker;
+          }
+          // Otherwise treat as direct name
+          return {
+            id: speakerValue,
+            label: speakerValue,
+            color: getSpeakerColor(speakerValue)
+          };
+        });
+        setSpeakers(mappedSpeakers);
+      } else {
+        // Create speakers from unique values
+        const newSpeakers = uniqueSpeakers.map(name => ({
+          id: name,
+          label: name,
+          color: getSpeakerColor(name)
+        }));
+        setSpeakers(newSpeakers);
+      }
     } catch {}
-  }, [segments]);
+  }, [segments, initialSpeakers]);
 
   // Initialize WaveSurfer
   useEffect(() => {
@@ -254,8 +380,11 @@ export default function ThreeColumnEditor({
       // Set initial volume
       wavesurfer.setVolume(volume);
       
-      // Show success message
-      toast.success('Audio loaded successfully! Ready to play.');
+      // Show success message only once
+      if (!hasShownAudioLoadedToast.current) {
+        toast.success('Audio loaded successfully! Ready to play.');
+        hasShownAudioLoadedToast.current = true;
+      }
       
       // Add chapter regions
       chapters.forEach((chapter, idx) => {
@@ -471,14 +600,15 @@ export default function ThreeColumnEditor({
   // Persist current edits to server
   const persistEdits = async (
     chaptersOverride?: any[],
-    segmentsOverride?: any[]
+    segmentsOverride?: any[],
+    speakersOverride?: any[]
   ) => {
     try {
       setSaving(true);
       const body = {
         chapters: chaptersOverride ?? usePlayerStore.getState().chapters,
         segments: segmentsOverride ?? segments,
-        speakers,
+        speakers: speakersOverride ?? speakers,
         updatedAt: new Date().toISOString()
       };
       const url = typeof window !== 'undefined' ? window.location.pathname : '';
@@ -842,26 +972,25 @@ export default function ThreeColumnEditor({
         {/* Left Panel - Chapters */}
         <div className="w-64 border-r border-gray-800 flex flex-col bg-gray-950/50 flex-shrink-0 h-full">
           <div className="p-4 border-b border-gray-800 flex-shrink-0">
-            <h4 className="text-sm font-medium text-white">Chapters</h4>
-            <p className="text-xs text-gray-500 mt-1">
-              {chapters.length} chapters • {formatTime(duration)}
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-medium text-white">Chapters</h4>
+                <p className="text-xs text-gray-500 mt-1">
+                  {chapters.length} chapters • {formatTime(duration)}
+                </p>
+              </div>
+              {chapters.length === 1 && chapters[0].title === 'Full Transcription' && (
+                <button
+                  onClick={generateAIChapters}
+                  className="px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+                >
+                  Generate AI Chapters
+                </button>
+              )}
+            </div>
           </div>
           
           <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
-            {chapters.length <= 1 && (
-              <div className="p-3 rounded-lg bg-gray-900/60 border border-gray-800 text-xs text-gray-300">
-                <div className="flex items-center gap-2 mb-2">
-                  <button
-                    onClick={() => openSplitModal(0)}
-                    className="px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded text-gray-200"
-                  >
-                    Split at current time
-                  </button>
-                </div>
-                <p className="text-gray-500">Use split to create chapters; more actions appear once you have multiple chapters.</p>
-              </div>
-            )}
             {chapters.map((chapter, idx) => {
               const isActive = idx === currentChapter;
               const progress = isActive ? 
@@ -987,14 +1116,26 @@ export default function ThreeColumnEditor({
                   }
                   if (cur) groups.push(cur);
                   return groups.map((g, i) => {
-                    const info = g.speaker ? (speakers || []).find(sp => String(sp.id) === String(g.speaker)) : undefined;
+                    // Display logic: for numeric IDs show "Speaker N", for others show as-is
+                    let speakerName = 'Speaker';
+                    if (g.speaker) {
+                      if (/^\d+$/.test(g.speaker)) {
+                        // If it's a pure number, display as "Speaker N"
+                        speakerName = `Speaker ${g.speaker}`;
+                      } else {
+                        // For non-numeric values, display as-is
+                        speakerName = g.speaker;
+                      }
+                    }
+                    // Use the original g.speaker value for color calculation to match right panel
+                    const speakerColor = getSpeakerColor(g.speaker);
                     return (
                       <div key={i} className="space-y-2">
                         <div className="flex items-center gap-3 text-xs text-gray-400">
-                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-semibold" style={{ backgroundColor: info?.color || '#6b7280' }}>
-                            {(info?.label || 'S').charAt(0).toUpperCase()}
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-semibold" style={{ backgroundColor: speakerColor }}>
+                            {speakerName.charAt(0).toUpperCase()}
                           </div>
-                          <div className="text-sm font-medium text-gray-300">{info?.label || 'Speaker'}</div>
+                          <div className="text-sm font-medium text-gray-300">{speakerName}</div>
                           <div className="opacity-70">{formatTime(g.start)} - {formatTime(g.end)}</div>
                         </div>
                         <div
@@ -1014,7 +1155,19 @@ export default function ThreeColumnEditor({
             ) : (
             segments.map((segment, idx) => {
               const isActive = (currentTime >= segment.start && currentTime < segment.end) || manualHighlightIdx === idx;
-              const sp = segment.speaker ? (speakers || []).find(s => String(s.id) === String(segment.speaker)) : undefined;
+              // Display logic: for numeric IDs show "Speaker N", for others show as-is
+              let speakerName = null;
+              if (segment.speaker) {
+                if (/^\d+$/.test(segment.speaker)) {
+                  // If it's a pure number, display as "Speaker N"
+                  speakerName = `Speaker ${segment.speaker}`;
+                } else {
+                  // For non-numeric values, display as-is
+                  speakerName = segment.speaker;
+                }
+              }
+              // Use the original segment.speaker value for color calculation to match right panel
+              const speakerColor = getSpeakerColor(segment.speaker);
               
               return (
                 <div
@@ -1072,13 +1225,72 @@ export default function ThreeColumnEditor({
                         </span>
                       </div>
                       
-                      {sp && (
+                      {changingSpeakerForSegment === idx ? (
+                        <input
+                          type="text"
+                          className="px-2 py-0.5 text-xs bg-gray-800 border border-gray-700 rounded text-white"
+                          defaultValue={speakerName || ''}
+                          placeholder="Enter speaker name"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const newSpeakerName = (e.target as HTMLInputElement).value.trim();
+                              
+                              // Check if the name actually changed
+                              const currentSpeakerName = segment.speaker || '';
+                              if (newSpeakerName === currentSpeakerName) {
+                                // No change, just close the input
+                                setChangingSpeakerForSegment(null);
+                                return;
+                              }
+                              
+                              // Update only this specific segment's speaker
+                              const updatedSegments = segments.map((seg: any, i: number) => {
+                                if (i === idx) {
+                                  return { ...seg, speaker: newSpeakerName || null };
+                                }
+                                return seg;
+                              });
+                              
+                              setSegments(updatedSegments);
+                              persistEdits(undefined, updatedSegments, speakers);
+                              setChangingSpeakerForSegment(null);
+                              toast.success('Speaker updated');
+                            } else if (e.key === 'Escape') {
+                              setChangingSpeakerForSegment(null);
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const newSpeakerName = e.target.value.trim();
+                            
+                            // Check if the name actually changed
+                            const currentSpeakerName = segment.speaker || '';
+                            if (newSpeakerName === currentSpeakerName) {
+                              // No change, just close the input
+                              setChangingSpeakerForSegment(null);
+                              return;
+                            }
+                            
+                            // Update only this specific segment's speaker
+                            const updatedSegments = segments.map((seg: any, i: number) => {
+                              if (i === idx) {
+                                return { ...seg, speaker: newSpeakerName || null };
+                              }
+                              return seg;
+                            });
+                            
+                            setSegments(updatedSegments);
+                            persistEdits(undefined, updatedSegments, speakers);
+                            setChangingSpeakerForSegment(null);
+                          }}
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
                         <span
                           className="shrink-0 px-1.5 py-0.5 text-[10px] rounded text-white font-medium"
-                          style={{ backgroundColor: sp.color }}
-                          title={`Speaker ${sp.id}`}
+                          style={{ backgroundColor: speakerName ? speakerColor : '#6b7280' }}
                         >
-                          {sp.label}
+                          {speakerName || 'No Speaker'}
                         </span>
                       )}
                       <p className={`flex-1 text-sm leading-relaxed ${
@@ -1091,6 +1303,18 @@ export default function ThreeColumnEditor({
                       <div className={`flex items-center gap-1 transition-opacity ${
                         isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                       }`}>
+                        {/* Edit speaker button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setChangingSpeakerForSegment(idx);
+                          }}
+                          className="px-2 py-1 text-[10px] bg-purple-600 hover:bg-purple-700 rounded text-white"
+                          title="Edit speaker name"
+                        >
+                          Speaker
+                        </button>
+                        
                         {/* Merge with previous segment */}
                         {idx > 0 && (
                           <button
@@ -1154,26 +1378,100 @@ export default function ThreeColumnEditor({
               <div className="text-xs text-gray-500 p-3 bg-gray-900/40 rounded border border-gray-800">No diarization found in this transcription.</div>
             )}
             {speakers.map((sp) => {
-              const segCount = segments.filter((s: any) => String(s.speaker) === sp.id).length;
+              const segCount = segments.filter((s: any) => s.speaker === sp.id || s.speaker === sp.label).length;
               const sugs = (speakerSuggestions[sp.id] || []).slice(0,3);
+              
+              // Display logic: for numeric IDs show "Speaker N", for others show as-is
+              let displayName = sp.label;
+              if (/^\d+$/.test(sp.id)) {
+                displayName = `Speaker ${sp.id}`;
+              } else if (!sp.label || sp.label === sp.id) {
+                displayName = sp.id;
+              }
+              
               return (
                 <div key={sp.id} className="bg-gray-900/40 rounded border border-gray-800 p-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style={{ backgroundColor: sp.color }}>{sp.id}</div>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style={{ backgroundColor: sp.color }}>
+                      {displayName.charAt(0).toUpperCase()}
+                    </div>
                     <div className="flex-1">
                       {editingSpeakerId === sp.id ? (
                         <input
-                          value={sp.label}
-                          onChange={(e) => setSpeakers(arr => arr.map(x => x.id === sp.id ? { ...x, label: e.target.value } : x))}
-                          onBlur={() => { setEditingSpeakerId(null); persistEdits(undefined, segments); }}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { setEditingSpeakerId(null); persistEdits(undefined, segments); } if (e.key === 'Escape') setEditingSpeakerId(null); }}
+                          defaultValue={displayName}
+                          onBlur={(e) => { 
+                            const newLabel = e.target.value.trim();
+                            if (newLabel && newLabel !== displayName) {
+                              // Update all segments with this speaker ID to use the new name
+                              const updatedSegments = segments.map((seg: any) => {
+                                if (seg.speaker === sp.id) {
+                                  return { ...seg, speaker: newLabel };
+                                }
+                                return seg;
+                              });
+                              
+                              // Check if the new label already exists in speakers
+                              const existingSpeaker = speakers.find(s => s.id === newLabel);
+                              const newColor = existingSpeaker ? existingSpeaker.color : getSpeakerColor(newLabel);
+                              
+                              // Update speakers array with new id and label
+                              const updatedSpeakers = speakers.map(x => 
+                                x.id === sp.id 
+                                  ? { ...x, id: newLabel, label: newLabel, color: newColor } 
+                                  : x
+                              );
+                              
+                              setSegments(updatedSegments);
+                              setSpeakers(updatedSpeakers);
+                              persistEdits(undefined, updatedSegments, updatedSpeakers);
+                            }
+                            setEditingSpeakerId(null);
+                          }}
+                          onKeyDown={(e) => { 
+                            if (e.key === 'Enter') { 
+                              e.preventDefault(); // Prevent form submission
+                              const newLabel = (e.target as HTMLInputElement).value.trim();
+                              if (newLabel && newLabel !== displayName) {
+                                // Update all segments with this speaker ID to use the new name
+                                const updatedSegments = segments.map((seg: any) => {
+                                  if (seg.speaker === sp.id) {
+                                    return { ...seg, speaker: newLabel };
+                                  }
+                                  return seg;
+                                });
+                                
+                                // Check if the new label already exists in speakers
+                                const existingSpeaker = speakers.find(s => s.id === newLabel);
+                                const newColor = existingSpeaker ? existingSpeaker.color : getSpeakerColor(newLabel);
+                                
+                                // Update speakers array with new id and label
+                                const updatedSpeakers = speakers.map(x => 
+                                  x.id === sp.id 
+                                    ? { ...x, id: newLabel, label: newLabel, color: newColor } 
+                                    : x
+                                );
+                                
+                                setSegments(updatedSegments);
+                                setSpeakers(updatedSpeakers);
+                                persistEdits(undefined, updatedSegments, updatedSpeakers);
+                              }
+                              setEditingSpeakerId(null);
+                            } 
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setEditingSpeakerId(null);
+                            }
+                          }}
                           className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white"
                           autoFocus
                         />
                       ) : (
                         <div className="flex items-center justify-between">
-                          <div className="text-sm font-medium text-white">{sp.label}</div>
-                          <button onClick={() => setEditingSpeakerId(sp.id)} className="text-xs text-gray-400 hover:text-gray-200">Rename</button>
+                          <div className="text-sm font-medium text-white">{displayName}</div>
+                          <button onClick={() => {
+                            console.log('Rename button clicked for speaker:', sp.id);
+                            setEditingSpeakerId(sp.id);
+                          }} className="text-xs text-gray-400 hover:text-gray-200">Rename</button>
                         </div>
                       )}
                       <div className="text-xs text-gray-500 mt-1">{segCount} segments</div>
@@ -1187,8 +1485,28 @@ export default function ThreeColumnEditor({
                           <button
                             key={idx}
                             onClick={() => {
-                              setSpeakers(arr => arr.map(x => x.id === sp.id ? { ...x, label: sug.name } : x));
-                              persistEdits(undefined, segments);
+                              // Update all segments with this speaker ID to use the new name
+                              const updatedSegments = segments.map((seg: any) => {
+                                if (seg.speaker === sp.id) {
+                                  return { ...seg, speaker: sug.name };
+                                }
+                                return seg;
+                              });
+                              
+                              // Check if the suggested name already exists in speakers
+                              const existingSpeaker = speakers.find(s => s.id === sug.name);
+                              const newColor = existingSpeaker ? existingSpeaker.color : getSpeakerColor(sug.name);
+                              
+                              // Update speakers array with new id and label
+                              const updatedSpeakers = speakers.map(x => 
+                                x.id === sp.id 
+                                  ? { ...x, id: sug.name, label: sug.name, color: newColor } 
+                                  : x
+                              );
+                              
+                              setSegments(updatedSegments);
+                              setSpeakers(updatedSpeakers);
+                              persistEdits(undefined, updatedSegments, updatedSpeakers);
                             }}
                             className="px-2 py-0.5 text-xs rounded bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30"
                             title={`Score ${Math.round(sug.score)}`}

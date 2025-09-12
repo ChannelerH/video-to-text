@@ -20,6 +20,7 @@ interface EditorWrapperProps {
   audioUrl: string | null;
   segments: any[];
   chapters: any[];
+  speakers?: any[];
   transcription: any;
   onClose?: () => void;
   backHref?: string;

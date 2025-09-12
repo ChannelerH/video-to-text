@@ -358,6 +358,7 @@
     }
   },
   "tool_interface": {
+    "loading": "加载中...",
     "upload_tip": "拖放文件到此处或点击浏览",
     "click_to_replace": "点击替换文件",
     "supported_formats": "支持 MP3、M4A、WAV、OGG、MP4 格式",

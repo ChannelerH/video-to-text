@@ -16,9 +16,9 @@ export interface BasicChapter {
 }
 
 export class BasicSegmentationService {
-  private static readonly MIN_CHAPTER_DURATION = 30; // Minimum 30 seconds per chapter
-  private static readonly MAX_CHAPTER_DURATION = 300; // Maximum 5 minutes per chapter
-  private static readonly SILENCE_THRESHOLD = 2; // 2 seconds of silence marks a break
+  private static readonly MIN_CHAPTER_DURATION = 30; // Reduced to 30 seconds for more chapters
+  private static readonly MAX_CHAPTER_DURATION = 90; // Reduced to 1.5 minutes for more chapters
+  private static readonly SILENCE_THRESHOLD = 0.5; // Reduced to 0.5 seconds for more sensitive detection
   
   /**
    * Generate basic chapters from segments using algorithmic detection

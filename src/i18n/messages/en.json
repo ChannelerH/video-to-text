@@ -468,7 +468,7 @@
     "submit": "Submit",
     "loading": "Submitting...",
     "contact_tip": "Other ways to contact us",
-    "rating_tip": "How do you feel about ShipAny?",
+    "rating_tip": "How do you feel about V2TX?",
     "placeholder": "Leave your words here..."
   },
   "account": {
@@ -503,6 +503,7 @@
     }
   },
   "tool_interface": {
+    "loading": "Loading...",
     "upload_tip": "Drop your file here or click to browse",
     "click_to_replace": "Click to replace file",
     "supported_formats": "MP3, M4A, WAV, OGG, MP4 supported",

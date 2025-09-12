@@ -7,6 +7,7 @@ import { eq, and } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import EditorWrapper from '@/components/editor-view/editor-wrapper';
+import { AIChapterService } from '@/lib/ai-chapters';
 import { BasicSegmentationService } from '@/lib/basic-segmentation';
 
 interface PageProps {
@@ -66,6 +67,7 @@ export default async function EditorPage({
   let transcriptionData: any = {};
   let segments: any[] = [];
   let chapters: any[] = [];
+  let speakers: any[] = [];
   let audioUrl: string | null = null;
 
   // Find and parse the JSON result
@@ -91,14 +93,44 @@ export default async function EditorPage({
           }
           // Use edited chapters if available
           chapters = editedData.chapters || [];
+          // Use edited speakers if available
+          if (editedData.speakers) {
+            speakers = editedData.speakers;
+          }
         } catch {}
       } else if (transcriptionData.chapters) {
         chapters = transcriptionData.chapters;
       } else {
-        // Try a basic segmentation as a good default
+        // Generate AI chapters on server side for better initial experience
         try {
-          chapters = BasicSegmentationService.generateBasicChapters(segments);
-        } catch {
+          console.log('Generating AI chapters for transcription:', id);
+          // Increased timeout for AI generation
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+          
+          chapters = await AIChapterService.generateAIChapters(segments, {
+            language: transcriptionData.language || 'auto',
+            generateSummary: false
+          });
+          
+          clearTimeout(timeoutId);
+          console.log('AI chapters generated:', chapters.length);
+          
+          // Validate that we have multiple chapters
+          if (chapters && chapters.length === 1) {
+            console.warn('AI only generated 1 chapter, attempting to use basic segmentation as fallback');
+            const basicChapters = BasicSegmentationService.generateBasicChapters(segments);
+            if (basicChapters.length > 1) {
+              chapters = basicChapters;
+              console.log('Using basic segmentation with', chapters.length, 'chapters');
+            }
+          }
+        } catch (error) {
+          console.error('Failed to generate AI chapters:', error);
+        }
+        
+        // Only use fallback if AI generation completely fails
+        if (!chapters || chapters.length === 0) {
           chapters = [{
             id: 'full',
             title: transcription.title || 'Full Transcription',
@@ -156,6 +188,7 @@ export default async function EditorPage({
           audioUrl={audioUrl}
           segments={segments}
           chapters={chapters}
+          speakers={speakers}
           transcription={transcriptionData}
           backHref={`/${locale}/dashboard/transcriptions`}
         />
