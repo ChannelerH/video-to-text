@@ -1,11 +1,30 @@
 // Local-only Chinese punctuation normalization and conservative sentence restoration
 
-const CJK = /[\u4e00-\u9fff]/;
+const CJK = /[\u4e00-\u9fff]/g;
+const LATIN = /[A-Za-z]/g;
 
+function count(re: RegExp, s: string | undefined): number {
+  if (!s) return 0;
+  const m = s.match(re);
+  return m ? m.length : 0;
+}
+
+/**
+ * Strict Chinese detection.
+ * Must satisfy BOTH:
+ * - language contains 'zh'
+ * - CJK chars are significant (>= 30 OR >= 5% of visible letters) AND greater than latin letters by 20%
+ */
 export function isChineseLangOrText(language?: string, text?: string): boolean {
-  if (language && language.toLowerCase().includes('zh')) return true;
-  if (!text) return false;
-  return CJK.test(text);
+  const langZh = !!language && language.toLowerCase().includes('zh');
+  if (!langZh || !text) return false;
+  const cjk = count(CJK, text);
+  const latin = count(LATIN, text);
+  const letters = cjk + latin;
+  const ratioOk = letters > 0 ? (cjk / letters) >= 0.05 : cjk >= 30; // 5% threshold
+  const absOk = cjk >= 30; // absolute floor
+  const dominance = cjk > latin * 1.2; // “明显大于”
+  return (ratioOk || absOk) && dominance;
 }
 
 export function localChinesePunctuate(text: string): string {
@@ -87,4 +106,3 @@ export function localPunctuateSegmentsIfChinese(
 export function rebuildTextFromSegments(segments: { text: string }[]): string {
   return (segments || []).map(s => String(s.text || '').trim()).join('');
 }
-

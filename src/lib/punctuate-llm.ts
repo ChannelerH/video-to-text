@@ -57,13 +57,24 @@ export async function punctuateTextLLM(text: string, opts: PunctuateOptions = {}
     if (!apiKey) return null;
 
     const language = opts.language || 'zh';
+    // Safeguard: only run for sufficiently Chinese text
+    if (language.toLowerCase().includes('zh')) {
+      const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+      const latin = (text.match(/[A-Za-z]/g) || []).length;
+      const letters = cjk + latin;
+      const sparse = cjk < 30 || (letters > 0 && cjk / letters < 0.05);
+      if (sparse) return null; // skip LLM for non-Chinese majority text
+    } else {
+      // Non zh language: never run the Chinese LLM normalizer
+      return null;
+    }
     const maxLen = Math.max(1200, Math.min(2400, opts.chunkSize || parseInt(process.env.PUNCTUATE_LLM_CHUNK_SIZE || '1800')));
     const parts = chunkText(text, maxLen);
     const concurrency = Math.max(1, Math.min(8, opts.concurrency || parseInt(process.env.PUNCTUATE_LLM_CONCURRENCY || '3')));
     const batchDelayMs = Math.max(0, opts.batchDelayMs ?? parseInt(process.env.PUNCTUATE_LLM_BATCH_DELAY_MS || '150'));
     console.log(`[Punct][LLM] enabled: base=${apiBase} model=${model} chunks=${parts.length} cc=${concurrency} delay=${batchDelayMs}ms`);
 
-    const system = 'You are a strict Chinese copy editor. Only restore missing punctuation, sentence breaks, and CJK/Latin spacing. Do not translate; do not add or remove words. Return plain text.';
+    const system = 'You are a strict Chinese copy editor. Only restore missing punctuation, sentence breaks, and CJK/Latin spacing. Never translate or change wording. Return plain text in the original language.';
 
     const results: string[] = new Array(parts.length);
 

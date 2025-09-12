@@ -358,16 +358,16 @@ export default function ThreeColumnEditor({
     container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   };
 
-  // Auto-scroll to active segment whenever time改变（即使暂停）
-  useEffect(() => {
-    const activeSegmentIdx = segments.findIndex(
-      seg => currentTime >= seg.start && currentTime < seg.end
-    );
-    if (activeSegmentIdx !== -1) {
-      scrollToSegmentIndex(activeSegmentIdx);
-      setManualHighlightIdx(activeSegmentIdx);
-    }
-  }, [currentTime, segments]);
+  // Auto-scroll to active segment whenever time changes (disabled to prevent jumping during edits)
+  // useEffect(() => {
+  //   const activeSegmentIdx = segments.findIndex(
+  //     seg => currentTime >= seg.start && currentTime < seg.end
+  //   );
+  //   if (activeSegmentIdx !== -1) {
+  //     scrollToSegmentIndex(activeSegmentIdx);
+  //     setManualHighlightIdx(activeSegmentIdx);
+  //   }
+  // }, [currentTime, segments]);
 
   // Keyboard shortcuts - only when enabled
   useHotkeys('space', (e) => {

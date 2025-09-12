@@ -622,7 +622,8 @@ export class TranscriptionService {
 
       // 本地中文规范化：段内标点与句末补全（不改时间戳）并重建全文 + 英文术语修复 + 可选LLM标点增强
       try {
-        const isZh = (transcription.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(transcription.text || '');
+        const { isChineseLangOrText } = await import('./refine-local');
+        const isZh = isChineseLangOrText(transcription.language, transcription.text);
         if (isZh) {
           const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
           if (changed) console.log(`[Punct] youtube_audio.segments normalized: ${changed}`);
@@ -836,7 +837,8 @@ export class TranscriptionService {
 
       // 6. 本地中文规范化（如适用）+ 英文术语修复 + 可选LLM标点增强
       try {
-        const isZh = (transcription.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(transcription.text || '');
+        const { isChineseLangOrText } = await import('./refine-local');
+        const isZh = isChineseLangOrText(transcription.language, transcription.text);
         if (isZh) {
           const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
           if (changed) console.log(`[Punct] audio_url.segments normalized: ${changed}`);
@@ -1290,7 +1292,8 @@ export class TranscriptionService {
 
       // 本地中文规范化（如适用）+ 英文术语修复 + 可选LLM标点增强
       try {
-        const isZh = (transcription.language || '').toLowerCase().includes('zh') || /[\u4e00-\u9fff]/.test(transcription.text || '');
+        const { isChineseLangOrText } = await import('./refine-local');
+        const isZh = isChineseLangOrText(transcription.language, transcription.text);
         if (isZh) {
           const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
           if (changed) console.log(`[Punct] file_upload.segments normalized: ${changed}`);

@@ -1466,7 +1466,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                     <span className="toggle-label">{t('high_accuracy.enabled_label')}</span>
                     <span className="toggle-hint">{t('high_accuracy.speed_hint')}</span>
                     {highAccuracy && (
-                      <div className="mt-2 flex items-center gap-2 text-xs">
+                      <div 
+                        className="mt-2 flex items-center gap-2 text-xs"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <input
                           id="dia-pro"
                           type="checkbox"
