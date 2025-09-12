@@ -71,6 +71,7 @@ export default function ThreeColumnEditor({
   const regionsRef = useRef<any>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const [waveformReady, setWaveformReady] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(true);
   const [linkMode, setLinkMode] = useState<'both'|'text'|'audio'>('both');
   const [preRollLocal, setPreRollLocal] = useState<0|0.5|1|2>(1);
   // 手动高亮：用于暂停或仅文本联动时也能高亮选中的句子
@@ -83,7 +84,7 @@ export default function ThreeColumnEditor({
   const [speakers, setSpeakers] = useState<{ id: string; label: string; color: string }[]>([]);
   const [editingSpeakerId, setEditingSpeakerId] = useState<string | null>(null);
   const [speakerSuggestions, setSpeakerSuggestions] = useState<Record<string, { name: string; score: number }[]>>({});
-  const [groupBySpeaker, setGroupBySpeaker] = useState<boolean>(true);
+  const [groupBySpeaker, setGroupBySpeaker] = useState<boolean>(false);
   
   const {
     isPlaying,
@@ -209,19 +210,49 @@ export default function ThreeColumnEditor({
     dlog('wavesurfer.load()', playUrl);
     
     // Load audio with detailed error handling
+    console.log('[Audio Debug] Loading audio from URL:', playUrl);
+    setAudioLoading(true);  // Start loading
+    
     wavesurfer.load(playUrl).then(() => {
       console.log('[Audio Debug] Audio loaded successfully');
+      setWaveformReady(true);  // Set ready immediately after successful load
+      setAudioLoading(false);  // Loading complete
     }).catch((error) => {
       console.error('[Audio Debug] Failed to load audio:', error);
-      toast.error(`Failed to load audio: ${error.message || 'Unknown error'}`);
+      setWaveformReady(false);
+      setAudioLoading(false);  // Stop loading even on error
+      
+      // More detailed error message
+      if (error.message?.includes('CORS')) {
+        toast.error('Audio blocked by CORS policy. Using proxy...');
+        // Try with proxy if CORS error
+        const proxyUrl = `/api/media/proxy?url=${encodeURIComponent(audioUrl)}`;
+        console.log('[Audio Debug] Retrying with proxy:', proxyUrl);
+        setAudioLoading(true);  // Restart loading for proxy
+        wavesurfer.load(proxyUrl).then(() => {
+          console.log('[Audio Debug] Audio loaded via proxy');
+          setWaveformReady(true);
+          setAudioLoading(false);
+        }).catch((proxyError) => {
+          console.error('[Audio Debug] Proxy also failed:', proxyError);
+          toast.error('Unable to load audio file');
+          setAudioLoading(false);
+        });
+      } else {
+        toast.error(`Failed to load audio: ${error.message || 'Unknown error'}`);
+      }
     });
     
     wavesurfer.on('ready', () => {
       dlog('Event: ready; duration=', wavesurfer.getDuration());
-      setWaveformReady(true);
+      setWaveformReady(true);  // Ensure it's set on ready event too
+      setAudioLoading(false);  // Ensure loading is false
       setDuration(wavesurfer.getDuration());
       // Set initial volume
       wavesurfer.setVolume(volume);
+      
+      // Show success message
+      toast.success('Audio loaded successfully! Ready to play.');
       
       // Add chapter regions
       chapters.forEach((chapter, idx) => {
@@ -1171,7 +1202,11 @@ export default function ThreeColumnEditor({
                 
                 if (!waveformReady) {
                   console.error('[Audio Debug] Waveform not ready!');
-                  toast.error('Audio not ready. Please wait...');
+                  if (audioLoading) {
+                    toast.info('Audio is loading... Please wait a moment');
+                  } else {
+                    toast.error('Audio failed to load. Please refresh the page');
+                  }
                   return;
                 }
                 
