@@ -2,7 +2,7 @@ import Hero from "@/components/blocks/hero";
 import Feature1 from "@/components/blocks/feature1";
 import Feature from "@/components/blocks/feature";
 import FAQ from "@/components/blocks/faq";
-import Pricing from "@/components/blocks/pricing";
+import PricingCTA from "@/components/blocks/pricing-cta";
 import { setRequestLocale } from "next-intl/server";
 
 export const revalidate = 60;
@@ -72,7 +72,7 @@ export default async function AudioToTextPage({
       {page.how_it_works && <Feature section={page.how_it_works} />}
       {page.tool_description && <Feature1 section={page.tool_description} />}
       {page.export_formats && <Feature section={page.export_formats} />}
-      {page.pricing && <Pricing pricing={page.pricing} />}
+      <PricingCTA />
       {page.faq && <FAQ section={page.faq} />}
     </>
   );

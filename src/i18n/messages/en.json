@@ -21,6 +21,21 @@
     "view_full_comparison": "View full comparison",
     "cny_payment": "CNY Payment"
   },
+  "pricing_cta": {
+    "title": "Simple, Transparent Pricing",
+    "subtitle": "Start free with 30 minutes per month",
+    "description": "No credit card required. Upgrade anytime.",
+    "button": "View Pricing Plans",
+    "free_tier": "Free",
+    "free_minutes": "30 min/month",
+    "basic_tier": "Basic",
+    "basic_price": "$10",
+    "basic_minutes": "500 min/month",
+    "pro_tier": "Pro",
+    "pro_price": "$29",
+    "pro_minutes": "2000 min/month",
+    "pro_badge": "High Accuracy"
+  },
   "transcription_demo": {
     "title": "🎬 Real Transcription Results",
     "description": "See how our AI accurately handles various types of video content<br />From technical lectures to business meetings, from code tutorials to group discussions",

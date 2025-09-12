@@ -9,8 +9,8 @@ import VideoTypes from "@/components/blocks/video-types";
 import ComparisonTable from "@/components/blocks/comparison-table";
 import ROICalculator from "@/components/blocks/roi-calculator";
 import TechSpecs from "@/components/blocks/tech-specs";
-import Pricing from "@/components/blocks/pricing";
 import QuickStart from "@/components/blocks/quick-start";
+import PricingCTA from "@/components/blocks/pricing-cta";
 import FAQ from "@/components/blocks/faq";
 import CTA from "@/components/blocks/cta";
 import { getTranslations } from "next-intl/server";
@@ -75,8 +75,8 @@ export default async function VideoToTextPage({
       {/* 6. 成本分析（ROI） */}
       <ROICalculator section={{ name: "roi-calculator", disabled: false }} />
 
-      {/* 7. 定价方案（精简版） */}
-      {page.pricing && <Pricing pricing={page.pricing} />}
+      {/* 7. 定价引导 */}
+      <PricingCTA />
 
       {/* 8. FAQ 精选 */}
       {page.faq && <FAQ section={page.faq} />}
