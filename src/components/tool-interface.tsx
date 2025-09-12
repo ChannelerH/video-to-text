@@ -7,7 +7,6 @@ import { FileText, Download, Copy, Check, Code } from "lucide-react";
 import PyramidLoader from "@/components/ui/pyramid-loader";
 import { useRouter } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { useAppContext } from "@/contexts/app";
@@ -117,8 +116,11 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
   const [copiedSegments, setCopiedSegments] = useState<boolean>(false);
   const [generatingChapters, setGeneratingChapters] = useState<boolean>(false);
+  const [isNavigatingToEditor, setIsNavigatingToEditor] = useState<boolean>(false);
   const [generatingSummary, setGeneratingSummary] = useState<boolean>(false);
   const [exportingDocument, setExportingDocument] = useState<boolean>(false);
+  const [exportingWord, setExportingWord] = useState<boolean>(false);
+  const [exportingPDF, setExportingPDF] = useState<boolean>(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const viewMode = usePlayerStore((state) => state.viewMode);
   const setViewMode = usePlayerStore((state) => state.setViewMode);
@@ -1584,19 +1586,35 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                     {/* Single primary action */}
                     {result.data.jobId && (
                       <div className="text-center">
-                        <Link 
-                          href={`/${locale}/dashboard/editor/${result.data.jobId}`}
-                          className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
+                        <button
+                          onClick={() => {
+                            setIsNavigatingToEditor(true);
+                            router.push(`/${locale}/dashboard/editor/${result.data.jobId}`);
+                          }}
+                          disabled={isNavigatingToEditor}
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          <span>{t('edit_transcription')}</span>
-                          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </Link>
+                          {isNavigatingToEditor ? (
+                            <>
+                              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>{t('loading')}</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              <span>{t('edit_transcription')}</span>
+                              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </>
+                          )}
+                        </button>
                       </div>
                     )}
                   </>
@@ -1852,13 +1870,6 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                               showToast('success', t("results.chapters_generated"), t("results.chapters_generated_desc"));
                               // Store chapters in state for display
                               setGeneratedChapters(data.data.chapters);
-                            } else if (response.status === 403) {
-                              // Show upgrade modal
-                              setUpgradeModal({
-                                isOpen: true,
-                                requiredTier: data.requiredTier || 'basic',
-                                feature: t("results.generate_chapters")
-                              });
                             } else {
                               showToast('error', t("results.generation_failed"), data.error || t("results.try_again_later"));
                             }
@@ -2127,7 +2138,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           variant="outline"
                           size="lg"
                           onClick={async () => {
-                            setExportingDocument(true);
+                            setExportingWord(true);
                             try {
                               const blob = await DocumentExportService.exportToWord(
                                 {
@@ -2164,10 +2175,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                               console.error('Export error:', error);
                               showToast('error', t("results.export_failed"), t("results.try_again_later"));
                             } finally {
-                              setExportingDocument(false);
+                              setExportingWord(false);
                             }
                           }}
-                          disabled={exportingDocument}
+                          disabled={exportingWord}
                           className="group relative overflow-hidden transition-all hover:scale-105"
                           style={{
                             background: 'rgba(0,0,0,0.4)',
@@ -2177,7 +2188,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           }}
                         >
                           <span className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          {exportingDocument ? (
+                          {exportingWord ? (
                             <>
                               <svg className="w-5 h-5 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -2203,7 +2214,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           variant="outline"
                           size="lg"
                           onClick={async () => {
-                            setExportingDocument(true);
+                            setExportingPDF(true);
                             try {
                               const blob = await DocumentExportService.exportToPDF(
                                 {
@@ -2240,10 +2251,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                               console.error('Export error:', error);
                               showToast('error', t("results.export_failed"), t("results.try_again_later"));
                             } finally {
-                              setExportingDocument(false);
+                              setExportingPDF(false);
                             }
                           }}
-                          disabled={exportingDocument}
+                          disabled={exportingPDF}
                           className="group relative overflow-hidden transition-all hover:scale-105"
                           style={{
                             background: 'rgba(0,0,0,0.4)',
@@ -2253,7 +2264,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           }}
                         >
                           <span className="absolute inset-0 bg-gradient-to-r from-red-600/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          {exportingDocument ? (
+                          {exportingPDF ? (
                             <>
                               <svg className="w-5 h-5 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
