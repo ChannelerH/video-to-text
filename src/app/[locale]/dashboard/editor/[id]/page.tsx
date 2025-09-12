@@ -131,35 +131,35 @@ export default async function EditorPage({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link
-            href={`/${locale}/dashboard/transcriptions`}
-            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+    <div className="h-screen flex flex-col">
+      {/* Simplified Header */}
+      <div className="flex items-center gap-3 px-4 py-3 bg-gray-950/80 border-b border-gray-800/50">
+        <Link
+          href={`/${locale}/dashboard/transcriptions`}
+          className="p-1.5 hover:bg-gray-800/50 rounded-lg transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-gray-400" />
+        </Link>
+        <div className="flex-1 min-w-0">
+          <h1 
+            className="text-base font-medium text-gray-200 truncate"
+            title={transcription.title || t('untitled_transcription')}
           >
-            <ArrowLeft className="w-5 h-5 text-gray-400" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-white">
-              {transcription.title || t('untitled_transcription')}
-            </h1>
-            <p className="text-sm text-gray-400">
-              {transcription.created_at ? new Date(transcription.created_at).toLocaleDateString() : ''} • {formatDuration(transcription.duration_sec || 0)}
-            </p>
-          </div>
+            {transcription.title || t('untitled_transcription')}
+          </h1>
         </div>
       </div>
 
-      {/* Editor */}
-      <EditorWrapper
-        audioUrl={audioUrl}
-        segments={segments}
-        chapters={chapters}
-        transcription={transcriptionData}
-        backHref={`/${locale}/dashboard/transcriptions`}
-      />
+      {/* Editor - Full height */}
+      <div className="flex-1 overflow-hidden">
+        <EditorWrapper
+          audioUrl={audioUrl}
+          segments={segments}
+          chapters={chapters}
+          transcription={transcriptionData}
+          backHref={`/${locale}/dashboard/transcriptions`}
+        />
+      </div>
     </div>
   );
 }

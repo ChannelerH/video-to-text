@@ -724,10 +724,10 @@ export default function ThreeColumnEditor({
   };
 
   return (
-    <div className="w-full h-screen bg-gray-950 flex flex-col overflow-hidden">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-900/50 flex-shrink-0">
-        <h3 className="text-sm font-medium text-gray-300">Editor View</h3>
+    <div className="w-full h-full bg-gray-950 flex flex-col overflow-hidden">
+      {/* Top Action Bar */}
+      <div className="flex items-center justify-between px-4 py-2 bg-gray-900/50 flex-shrink-0">
+        <div className="text-xs text-gray-400">Editor View</div>
         <div className="flex items-center gap-2">
           <button
             onClick={async () => {
@@ -766,19 +766,14 @@ export default function ThreeColumnEditor({
           >
             Export PDF
           </button>
-          <button
-            onClick={() => {
-              if (onClose) return onClose();
-              if (backHref) {
-                window.location.href = backHref;
-              } else {
-                window.history.back();
-              }
-            }}
-            className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
-          >
-            <X className="w-4 h-4 text-gray-400" />
-          </button>
+          {onClose && (
+            <button
+              onClick={() => onClose()}
+              className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          )}
         </div>
       </div>
       
