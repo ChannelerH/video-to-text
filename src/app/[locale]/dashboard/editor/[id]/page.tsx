@@ -17,25 +17,67 @@ interface PageProps {
 export default async function EditorPage({ 
   params 
 }: PageProps) {
-  const { locale, id } = await params;
-  const t = await getTranslations();
-  const userUuid = await getUserUuid();
+  console.time('[EditorPage] Total Load Time');
+  console.time('[EditorPage] Initial Setup');
+  
+  // Parallelize initial setup
+  const [{ locale, id }, t, userUuid] = await Promise.all([
+    params,
+    getTranslations(),
+    getUserUuid()
+  ]);
+  
+  console.timeEnd('[EditorPage] Initial Setup');
   
   if (!userUuid) {
     return null; // Layout will handle redirect
   }
 
-  // Fetch transcription data
-  const [transcription] = await db()
-    .select()
-    .from(transcriptions)
-    .where(
-      and(
-        eq(transcriptions.job_id, id),
-        eq(transcriptions.user_uuid, userUuid)
+  // Run all database queries in parallel for better performance
+  console.time('[EditorPage] All Database Queries (Parallel)');
+  
+  const [transcriptionResult, resultsData, editsData] = await Promise.all([
+    // Query 1: Fetch transcription (only necessary fields)
+    db()
+      .select({
+        job_id: transcriptions.job_id,
+        title: transcriptions.title,
+        source_url: transcriptions.source_url,
+        duration_sec: transcriptions.duration_sec,
+        language: transcriptions.language
+      })
+      .from(transcriptions)
+      .where(
+        and(
+          eq(transcriptions.job_id, id),
+          eq(transcriptions.user_uuid, userUuid)
+        )
       )
-    )
-    .limit(1);
+      .limit(1),
+    
+    // Query 2: Fetch only JSON result (not all formats)
+    db()
+      .select()
+      .from(transcription_results)
+      .where(
+        and(
+          eq(transcription_results.job_id, id),
+          eq(transcription_results.format, 'json')  // Only get JSON, skip other formats
+        )
+      )
+      .limit(1),
+    
+    // Query 3: Fetch edited data
+    db()
+      .select({ content: transcription_edits.content })
+      .from(transcription_edits)
+      .where(and(eq(transcription_edits.job_id, id), eq(transcription_edits.user_uuid, userUuid)))
+      .limit(1)
+  ]);
+  
+  console.timeEnd('[EditorPage] All Database Queries (Parallel)');
+  
+  const transcription = transcriptionResult[0];
 
   if (!transcription) {
     return (
@@ -57,12 +99,6 @@ export default async function EditorPage({
     );
   }
 
-  // Fetch transcription results
-  const results = await db()
-    .select()
-    .from(transcription_results)
-    .where(eq(transcription_results.job_id, id));
-
   // Parse the transcription data
   let transcriptionData: any = {};
   let segments: any[] = [];
@@ -70,23 +106,27 @@ export default async function EditorPage({
   let speakers: any[] = [];
   let audioUrl: string | null = null;
 
-  // Find and parse the JSON result
-  const jsonResult = results.find(r => r.format === 'json');
+  // Parse JSON result and edited data
+  console.time('[EditorPage] Data Processing');
+  
+  const jsonResult = resultsData[0];  // Now we only get JSON format
   if (jsonResult && jsonResult.content) {
+    console.log('[EditorPage] JSON content size:', jsonResult.content.length, 'bytes');
+    
+    // Parse both JSON results in parallel if both exist
+    const parsePromises = [JSON.parse(jsonResult.content)];
+    if (editsData[0]) {
+      parsePromises.push(JSON.parse(editsData[0].content));
+    }
+    
     try {
-      transcriptionData = JSON.parse(jsonResult.content);
+      const [parsedTranscription, editedData] = await Promise.all(parsePromises);
+      transcriptionData = parsedTranscription;
       segments = transcriptionData.segments || [];
+      console.log('[EditorPage] Segments count:', segments.length);
       
-      // Prefer edited data if user has saved any
-      const edits = await db()
-        .select({ content: transcription_edits.content })
-        .from(transcription_edits)
-        .where(and(eq(transcription_edits.job_id, id), eq(transcription_edits.user_uuid, userUuid)))
-        .limit(1);
-
-      if (edits[0]) {
-        try { 
-          const editedData = JSON.parse(edits[0].content);
+      // Use edited data if available
+      if (editedData) {
           // Use edited segments if available
           if (editedData.segments) {
             segments = editedData.segments;
@@ -97,71 +137,31 @@ export default async function EditorPage({
           if (editedData.speakers) {
             speakers = editedData.speakers;
           }
-        } catch {}
       } else if (transcriptionData.chapters) {
         chapters = transcriptionData.chapters;
       } else {
-        // Generate AI chapters on server side for better initial experience
-        try {
-          console.log('Generating AI chapters for transcription:', id);
-          // Increased timeout for AI generation
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-          
-          chapters = await AIChapterService.generateAIChapters(segments, {
-            language: transcriptionData.language || 'auto',
-            generateSummary: false
-          });
-          
-          clearTimeout(timeoutId);
-          console.log('AI chapters generated:', chapters.length);
-          
-          // Validate that we have multiple chapters
-          if (chapters && chapters.length === 1) {
-            console.warn('AI only generated 1 chapter, attempting to use basic segmentation as fallback');
-            const basicChapters = BasicSegmentationService.generateBasicChapters(segments);
-            if (basicChapters.length > 1) {
-              chapters = basicChapters;
-              console.log('Using basic segmentation with', chapters.length, 'chapters');
-            }
-          }
-        } catch (error) {
-          console.error('Failed to generate AI chapters:', error);
-        }
-        
-        // Only use fallback if AI generation completely fails
-        if (!chapters || chapters.length === 0) {
-          chapters = [{
-            id: 'full',
-            title: transcription.title || 'Full Transcription',
-            startTime: 0,
-            endTime: transcription.duration_sec || 60,
-            segments: segments
-          }];
-        }
+        // Don't generate AI chapters on server - let client handle it asynchronously
+        console.log('[EditorPage] Skipping server-side AI generation, will generate on client');
+        chapters = [{
+          id: 'full',
+          title: transcription.title || 'Full Transcription',
+          startTime: 0,
+          endTime: transcription.duration_sec || 60,
+          segments: segments,
+          _needsAIGeneration: true // Flag for client to auto-generate
+        }];
       }
     } catch (error) {
       console.error('Failed to parse transcription JSON:', error);
     }
   }
+  console.timeEnd('[EditorPage] Data Processing');
 
   // Get audio URL from source or storage
   audioUrl = transcription.source_url || null;
-  
-  // Debug: Log what we have
-  console.log('[Page Debug] Transcription data:', {
-    job_id: transcription.job_id,
-    source_type: transcription.source_type,
-    source_url: transcription.source_url,
-    source_hash: transcription.source_hash,
-    final_audioUrl: audioUrl
-  });
-  
-  // If no audio URL, show warning
-  if (!audioUrl) {
-    console.warn('[Page Debug] No audio URL available for transcription:', transcription.job_id);
-  }
 
+  console.timeEnd('[EditorPage] Total Load Time');
+  
   return (
     <div className="h-screen flex flex-col">
       {/* Simplified Header */}

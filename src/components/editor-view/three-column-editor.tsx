@@ -178,6 +178,15 @@ export default function ThreeColumnEditor({
     if (transcription?.duration) {
       setDuration(transcription.duration);
     }
+    
+    // Check if we need to auto-generate AI chapters
+    if (initialChapters.length > 0 && initialChapters[0]?._needsAIGeneration && segments.length > 0) {
+      console.log('[Editor] Auto-generating AI chapters after page load');
+      // Small delay to ensure page is fully rendered
+      setTimeout(() => {
+        generateAIChapters();
+      }, 500);
+    }
   }, [chapters, initialChapters, transcription]);
   
   // Generate AI chapters
