@@ -619,15 +619,22 @@ export class TranscriptionService {
         }
       } catch {}
 
-      // 对齐最终文本句子到模型时间戳：按句展示且时间准确（合并原段，不按比例切）
+      // 对齐最终文本句子到模型时间戳：仅在中文等需要强可读性的场景执行；
+      // 英文等情况下保持 Whisper 原始分段以保证时间更稳。
       try {
-        transcription.segments = alignSentencesWithSegments(
-          transcription.text,
-          transcription.segments as any,
-          transcription.language
-        );
-        // Ensure SRT/VTT regenerated from updated sentence-level segments
-        (transcription as any).srtText = undefined;
+        const { isChineseLangOrText } = await import('./refine-local');
+        const shouldAlign = isChineseLangOrText(transcription.language, transcription.text);
+        if (shouldAlign) {
+          transcription.segments = alignSentencesWithSegments(
+            transcription.text,
+            transcription.segments as any,
+            transcription.language
+          );
+          // Ensure SRT/VTT regenerated from updated sentence-level segments
+          (transcription as any).srtText = undefined;
+        } else {
+          console.log('[Align] Skipped sentence realignment for non-Chinese to preserve timing');
+        }
       } catch {}
 
       // Report formatting phase
@@ -806,14 +813,20 @@ export class TranscriptionService {
         }
       } catch {}
 
-      // 对齐最终文本句子到模型时间戳
+      // 对齐最终文本句子到模型时间戳：仅在中文等需要强可读性的场景执行
       try {
-        transcription.segments = alignSentencesWithSegments(
-          transcription.text,
-          transcription.segments as any,
-          transcription.language
-        );
-        (transcription as any).srtText = undefined;
+        const { isChineseLangOrText } = await import('./refine-local');
+        const shouldAlign = isChineseLangOrText(transcription.language, transcription.text);
+        if (shouldAlign) {
+          transcription.segments = alignSentencesWithSegments(
+            transcription.text,
+            transcription.segments as any,
+            transcription.language
+          );
+          (transcription as any).srtText = undefined;
+        } else {
+          console.log('[Align] Skipped sentence realignment for non-Chinese to preserve timing');
+        }
       } catch {}
 
       // 7. 生成不同格式

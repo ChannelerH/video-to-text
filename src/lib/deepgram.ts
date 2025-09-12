@@ -96,6 +96,53 @@ export class DeepgramService {
     options: DeepgramOptions = {}
   ): Promise<TranscriptionResult> {
     try {
+      // Normalize human-readable language names to Deepgram-supported codes
+      const normalizeLanguage = (lang?: string): string | 'auto' => {
+        if (!lang) return 'auto';
+        const raw = String(lang).trim().toLowerCase();
+        if (raw === '' || raw === 'auto' || raw === 'unknown') return 'auto';
+        if (raw === 'multi') return 'multi';
+        // If already looks like a code (e.g., en, en-US), keep as is
+        if (/^[a-z]{2}(-[A-Z]{2})?$/.test(lang)) return lang;
+        const map: Record<string, string> = {
+          english: 'en',
+          chinese: 'zh',
+          'chinese (simplified)': 'zh',
+          'chinese (traditional)': 'zh',
+          mandarin: 'zh',
+          cantonese: 'zh',
+          japanese: 'ja',
+          korean: 'ko',
+          spanish: 'es',
+          french: 'fr',
+          german: 'de',
+          italian: 'it',
+          portuguese: 'pt',
+          russian: 'ru',
+          hindi: 'hi',
+          indonesian: 'id',
+          vietnamese: 'vi',
+          thai: 'th',
+          turkish: 'tr',
+          polish: 'pl',
+          dutch: 'nl',
+          arabic: 'ar',
+          ukrainian: 'uk',
+          hebrew: 'he',
+          swedish: 'sv',
+          norwegian: 'no',
+          danish: 'da',
+          finnish: 'fi',
+          czech: 'cs',
+          greek: 'el',
+          romanian: 'ro',
+          bulgarian: 'bg',
+          hungarian: 'hu',
+          malay: 'ms',
+        };
+        return map[raw] || 'auto';
+      };
+      const normalizedLanguage = normalizeLanguage(options.language);
       
       // Build query parameters
       const params = new URLSearchParams({
@@ -110,17 +157,17 @@ export class DeepgramService {
         redact: 'false'
       });
 
-      // Language configuration
-      if (options.language === 'auto' || !options.language) {
+      // Language configuration (after normalization)
+      if (normalizedLanguage === 'auto') {
         // Enable language detection for auto mode
         params.set('detect_language', 'true');
-      } else if (options.language === 'multi') {
+      } else if (normalizedLanguage === 'multi') {
         // Enable code-switching for mixed languages
         params.set('language', 'multi');
         params.set('endpointing', '100'); // Recommended for code-switching
       } else {
         // Specific language
-        params.set('language', options.language);
+        params.set('language', normalizedLanguage);
       }
 
       // Note: Deepgram does not support partial transcription via start/end on the HTTP API.
