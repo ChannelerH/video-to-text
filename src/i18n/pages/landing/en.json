@@ -583,7 +583,7 @@
     "name": "footer",
     "brand": {
       "title": "V2TX",
-      "description": "Convert videos and audio to text online. Free 90-second previews, multiple export formats including SRT, TXT, VTT, DOCX, and JSON.",
+      "description": "Convert videos and audio to text online. Free 5-minute previews, multiple export formats including SRT, TXT, VTT, DOCX, and JSON.",
       "logo": {
         "src": "/logo.png",
         "alt": "V2TX"
@@ -1274,7 +1274,7 @@
         "details": [
           "GPU-accelerated processing, 10x speed boost",
           "Real-time progress display",
-          "Preview first 90 seconds for free",
+          "Preview first 5 minutes for free",
           "Automatic notification when processing complete"
         ]
       },
@@ -1298,7 +1298,7 @@
         },
         {
           "title": "Can test with free quota first",
-          "description": "90-second free preview, purchase full service when satisfied"
+          "description": "5-minute free preview, purchase full service when satisfied"
         },
         {
           "title": "Batch processing saves more time",
@@ -1312,12 +1312,12 @@
     },
     "cta_section": {
       "title": "Ready to get started?",
-      "description": "Upload your first video and experience the power of AI transcription<br />First 90 seconds completely free, no registration required to start",
+      "description": "Upload your first video and experience the power of AI transcription<br />First 5 minutes completely free, no registration required to start",
       "upload_btn": "Upload Video Now",
       "demo_btn": "Watch Demo Video",
       "features": [
         {
-          "label": "90s free preview"
+          "label": "5-minute free preview"
         },
         {
           "label": "Multi-format export"

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { FileText, Download, Copy, Check, Code } from "lucide-react";
 import PyramidLoader from "@/components/ui/pyramid-loader";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter, Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
@@ -49,6 +49,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   // Authentication state
   const { data: session } = isAuthEnabled() ? useSession() : { data: null };
   const { user, userTier } = useAppContext();
+  const isFreeTier = (userTier || 'free') === 'free';
   const isAuthenticated = !!(session?.user || user);
   const tier = (userTier || (user as any)?.userTier || 'free') as string;
   const canUseHighAccuracy = isAuthenticated && (tier === 'pro');
@@ -68,7 +69,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [selectedFormats, setSelectedFormats] = useState(["txt", "srt", "vtt", "md", "json"]);
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState<string>("");
+  const [progress, setProgress] = useState<string | React.ReactNode>("");
   const [result, setResult] = useState<any>(null);
   const [upgradeModal, setUpgradeModal] = useState<{
     isOpen: boolean;
@@ -704,19 +705,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             (requestData.options as any).enableDiarizationAfterWhisper = true;
           }
         }
-        // 轻量语言探针（不阻塞主流程）：若判定中文，立刻展示升级提示
-        try {
-          // Show immediately; if probe says not Chinese, hide it
-          showChineseToast();
-          fetch('/api/transcribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: urlType, content: url, action: 'probe', options: { userTier: tier, languageProbeSeconds: 10 } })
-          })
-          .then(r => r.json())
-          .then(res => { if (res?.success) { if (!res?.isChinese) { setShowChineseUpgrade(false); setZhBannerShown(false); } } })
-          .catch(() => {});
-        } catch {}
+        // 已移除语言探针：仅在拿到模型结果后再判定是否显示中文润色提示
       } else if (uploadedFileInfo) {
         const progressText = action === "preview" 
           ? t("progress.generating_preview")
@@ -734,18 +723,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             (requestData.options as any).enableDiarizationAfterWhisper = true;
           }
         }
-        // 轻量语言探针（不阻塞主流程）
-        try {
-          showChineseToast();
-          fetch('/api/transcribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'file_upload', content: uploadedFileInfo.replicateUrl, action: 'probe', options: { userTier: tier, languageProbeSeconds: 10 } })
-          })
-          .then(r => r.json())
-          .then(res => { if (res?.success) { if (!res?.isChinese) { setShowChineseUpgrade(false); setZhBannerShown(false); } } })
-          .catch(() => {});
-        } catch {}
+        // 已移除语言探针：仅在拿到模型结果后再判定是否显示中文润色提示
       } else {
         setProgress(t("errors.wait_for_upload"));
         setIsProcessing(false);
@@ -894,10 +872,24 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         } else if (result.error.includes('timeout')) {
           userFriendlyError = 'Request timeout. The audio file may be too large or the connection is slow. Please try again.';
         } else {
-          userFriendlyError = `Transcription failed: ${result.error}`;
+          // Check if error contains "Upgrade" to make it a link
+          if (result.error.includes('Upgrade')) {
+            // Parse the error message to make "Upgrade" clickable
+            const errorParts = result.error.split('Upgrade');
+            setProgress(
+              <span>
+                {`Transcription failed: ${errorParts[0]}`}
+                <Link href="/pricing" className="text-blue-400 hover:text-blue-300 underline">
+                  Upgrade
+                </Link>
+                {errorParts[1] || ''}
+              </span>
+            );
+          } else {
+            userFriendlyError = `Transcription failed: ${result.error}`;
+            setProgress(userFriendlyError);
+          }
         }
-        
-        setProgress(userFriendlyError);
       }
     } catch (error) {
       console.error("Transcription error:", error);
@@ -907,52 +899,57 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     }
   };
 
+  const fetchAndDownload = async (url: string, fallbackName: string) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`download_failed_${res.status}`);
+    const blob = await res.blob();
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename\*=UTF-8''([^;]+)/);
+    const filename = m ? decodeURIComponent(m[1]) : fallbackName;
+    const obj = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = obj; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(obj);
+  };
+
   const downloadFormat = async (format: string) => {
     if (!result?.data || result.type !== 'full') return;
 
     try {
-      // 创建并下载文件
-      const content = result.data.formats[format];
+      const jobId = result.data.jobId as string | undefined;
+      if (jobId) {
+        // 统一走后端导出（Free 自动裁到 5 分钟并去 speaker）
+        await fetchAndDownload(`/api/transcriptions/${jobId}/file?format=${format}`, `${(result.data.videoInfo?.title || 'transcription').replace(/\s+/g,'_')}.${format}`);
+        return;
+      }
+      // 无 jobId（极少），前端兜底
+      let content = result.data.formats[format];
+      if (isFreeTier && format === 'txt' && typeof content === 'string') {
+        content = content.replace(/^Speaker\s+\d+:\s*/gm, '');
+      }
       const title = result.data.videoInfo?.title || 'transcription';
       const safeTitle = title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
       const fileName = `${safeTitle}.${format}`;
-
       const blob = new Blob([content], { type: getContentType(format) });
       const url = URL.createObjectURL(blob);
-      
       const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Download error:', error);
     }
   };
 
-  const downloadPreview = () => {
+  const downloadPreview = async () => {
     if (!result?.data || result.type !== 'preview') return;
-
     try {
-      // 添加预览标记
-      const previewMarker = `[PREVIEW - First 90 seconds only]\n[完整版预览 - 仅前90秒]\n\n`;
-      const watermark = `\n\n---\n[This is a preview of the first 90 seconds. Sign in for full transcription.]\n[这是前90秒的预览。登录以获取完整转录。]`;
-      
+      const previewMarker = `[PREVIEW - First 5 minutes only]\n[完整版预览 - 仅前5分钟]\n\n`;
+      const watermark = `\n\n---\n[This is a preview of the first 5 minutes. Sign in for full transcription.]\n[这是前5分钟的预览。登录以获取完整转录。]`;
       const content = previewMarker + (result.data.text || '') + watermark;
-      const fileName = 'preview_90s.txt';
-
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const resp = await fetch('/api/preview/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: content, filename: 'preview_5min' }) });
+      if (!resp.ok) throw new Error('download_failed');
+      const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
-      
       const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      a.href = url; a.download = 'preview_5min.txt'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Preview download error:', error);
     }
@@ -1871,7 +1868,12 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                               // Store chapters in state for display
                               setGeneratedChapters(data.data.chapters);
                             } else {
-                              showToast('error', t("results.generation_failed"), data.error || t("results.try_again_later"));
+                              if (response.status === 403) {
+                                const msg = data?.limit ? `Basic 每日限 ${data.limit} 次，今天已用 ${data.used || 0} 次。升级 Pro 可不限次。` : (data?.error || '当前套餐受限，升级以解锁完整功能。');
+                                showToast('error', '需要升级或稍后重试', msg);
+                              } else {
+                                showToast('error', t("results.generation_failed"), data.error || t("results.try_again_later"));
+                              }
                             }
                           } catch (error) {
                             console.error('Error generating chapters:', error);
@@ -1932,12 +1934,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                               // Store summary in state for display
                               setGeneratedSummary(data.data.summary);
                             } else if (response.status === 403) {
-                              // Show upgrade modal
-                              setUpgradeModal({
-                                isOpen: true,
-                                requiredTier: 'pro',
-                                feature: t("results.generate_summary")
-                              });
+                              const msg = data?.limit ? `Basic 每日限 ${data.limit} 次，今天已用 ${data.used || 0} 次。升级 Pro 可不限次。` : (data?.error || '当前套餐受限，升级以解锁完整功能。');
+                              showToast('error', '需要升级或稍后重试', msg);
                             } else {
                               showToast('error', t("results.generation_failed"), data.error || t("results.try_again_later"));
                             }
@@ -1972,6 +1970,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           </>
                         )}
                       </button>
+                      <div className="mt-2 text-[11px] text-gray-400">
+                        {t("results.usage_limits")}
+                      </div>
                     </div>
 
                     {/* Feature descriptions */}
@@ -2114,8 +2115,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                   </div>
                   
                   {/* Advanced Export Section - Word/PDF with TOC */}
-                  {(generatedChapters.length > 0 || generatedSummary) && (
-                    <div className="export-section mt-6 p-4 rounded-lg" style={{ 
+                  <div className="export-section mt-6 p-4 rounded-lg" style={{ 
                       background: 'linear-gradient(135deg, rgba(168,85,247,0.05) 0%, rgba(59,130,246,0.05) 100%)',
                       border: '1px solid rgba(59,130,246,0.2)'
                     }}>
@@ -2133,43 +2133,44 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                       </div>
                       
                       <div className="flex flex-wrap gap-3">
-                        {/* Export to Word */}
+                        {/* Export to Word (backend export when jobId exists) */}
                         <Button
                           variant="outline"
                           size="lg"
                           onClick={async () => {
                             setExportingWord(true);
                             try {
-                              const blob = await DocumentExportService.exportToWord(
-                                {
-                                  text: result.data.transcription.text,
-                                  segments: result.data.transcription.segments,
-                                  language: result.data.transcription.language,
-                                  duration: result.data.transcription.duration
-                                },
-                                generatedChapters,
-                                generatedSummary,
-                                {
-                                  metadata: {
-                                    title: 'Transcription',
-                                    date: new Date().toLocaleDateString(),
+                              const jobId = result.data.jobId as string | undefined;
+                              if (jobId) {
+                                await fetchAndDownload(`/api/transcriptions/${jobId}/export?format=docx`, `transcription_${new Date().toISOString().split('T')[0]}.docx`);
+                              } else {
+                                // fallback: client-side export (rare)
+                                const blob = await DocumentExportService.exportToWord(
+                                  {
+                                    text: result.data.transcription.text,
+                                    segments: result.data.transcription.segments,
                                     language: result.data.transcription.language,
                                     duration: result.data.transcription.duration
                                   },
-                                  includeTimestamps: true,
-                                  includeChapters: true,
-                                  includeSummary: true
-                                }
-                              );
-                              
-                              // Download the file
-                              const url = URL.createObjectURL(blob);
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.download = `transcription_${new Date().toISOString().split('T')[0]}.docx`;
-                              link.click();
-                              URL.revokeObjectURL(url);
-                              
+                                  generatedChapters,
+                                  generatedSummary,
+                                  {
+                                    metadata: {
+                                      title: 'Transcription',
+                                      date: new Date().toLocaleDateString(),
+                                      language: result.data.transcription.language,
+                                      duration: result.data.transcription.duration
+                                    },
+                                    includeTimestamps: true,
+                                    includeChapters: true,
+                                    includeSummary: true,
+                                    includeSpeakers: !isFreeTier
+                                  }
+                                );
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url; link.download = `transcription_${new Date().toISOString().split('T')[0]}.docx`; link.click(); URL.revokeObjectURL(url);
+                              }
                               showToast('success', t("results.export_success"), t("results.word_exported"));
                             } catch (error) {
                               console.error('Export error:', error);
@@ -2209,43 +2210,43 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           )}
                         </Button>
                         
-                        {/* Export to PDF */}
+                        {/* Export to PDF (backend export when jobId exists) */}
                         <Button
                           variant="outline"
                           size="lg"
                           onClick={async () => {
                             setExportingPDF(true);
                             try {
-                              const blob = await DocumentExportService.exportToPDF(
-                                {
-                                  text: result.data.transcription.text,
-                                  segments: result.data.transcription.segments,
-                                  language: result.data.transcription.language,
-                                  duration: result.data.transcription.duration
-                                },
-                                generatedChapters,
-                                generatedSummary,
-                                {
-                                  metadata: {
-                                    title: 'Transcription',
-                                    date: new Date().toLocaleDateString(),
+                              const jobId = result.data.jobId as string | undefined;
+                              if (jobId) {
+                                await fetchAndDownload(`/api/transcriptions/${jobId}/export?format=pdf`, `transcription_${new Date().toISOString().split('T')[0]}.pdf`);
+                              } else {
+                                const blob = await DocumentExportService.exportToPDF(
+                                  {
+                                    text: result.data.transcription.text,
+                                    segments: result.data.transcription.segments,
                                     language: result.data.transcription.language,
                                     duration: result.data.transcription.duration
                                   },
-                                  includeTimestamps: true,
-                                  includeChapters: true,
-                                  includeSummary: true
-                                }
-                              );
-                              
-                              // Download the file
-                              const url = URL.createObjectURL(blob);
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.download = `transcription_${new Date().toISOString().split('T')[0]}.pdf`;
-                              link.click();
-                              URL.revokeObjectURL(url);
-                              
+                                  generatedChapters,
+                                  generatedSummary,
+                                  {
+                                    metadata: {
+                                      title: 'Transcription',
+                                      date: new Date().toLocaleDateString(),
+                                      language: result.data.transcription.language,
+                                      duration: result.data.transcription.duration
+                                    },
+                                    includeTimestamps: true,
+                                    includeChapters: true,
+                                    includeSummary: true,
+                                    includeSpeakers: !isFreeTier
+                                  }
+                                );
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url; link.download = `transcription_${new Date().toISOString().split('T')[0]}.pdf`; link.click(); URL.revokeObjectURL(url);
+                              }
                               showToast('success', t("results.export_success"), t("results.pdf_exported"));
                             } catch (error) {
                               console.error('Export error:', error);
@@ -2290,7 +2291,6 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                         <p>{t("results.export_desc")}</p>
                       </div>
                     </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -2321,7 +2321,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                     className="design-btn-secondary"
                     onClick={() => downloadPreview()}
                   >
-                    {t('preview.download_preview')} (90s)
+                    {t('preview.download_preview')} (5m)
                   </button>
                 </div>
               </div>

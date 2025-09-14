@@ -38,10 +38,10 @@
   },
   "hero": {
     "title": "音频转文字 – 即时将音频转换为文本和字幕",
-    "description": "上传音频文件或粘贴链接，立即获得90秒预览，然后解锁完整转录。支持MP3、M4A、WAV、OGG格式，自动语言检测和双语输出选项。",
+    "description": "上传音频文件或粘贴链接，立即获得 5 分钟预览，然后解锁完整转录。支持MP3、M4A、WAV、OGG格式，自动语言检测和双语输出选项。",
     "show_tool": true,
     "tool_mode": "audio",
-    "tip": "免费90秒预览 • 自动语言检测 • 24小时自动删除"
+    "tip": "免费 5 分钟预览 • 自动语言检测 • 24小时自动删除"
   },
   "how_it_works": {
     "title": "工作原理", 
@@ -53,7 +53,7 @@
         "icon": "RiUploadLine"
       },
       {
-        "title": "获得90秒预览",
+        "title": "获得 5 分钟预览",
         "description": "立即查看TXT/SRT预览，验证质量后再进行完整处理",
         "icon": "RiEyeLine"
       },
@@ -124,15 +124,15 @@
   "pricing": {
     "name": "pricing",
     "title": "简单定价",
-    "description": "从90秒免费预览开始，然后选择最适合您的方案",
+    "description": "从 5 分钟免费预览开始，然后选择最适合您的方案",
     "items": [
       {
         "title": "免费预览",
         "price": "￥0",
         "unit": "永久",
-        "description": "90秒预览",
+        "description": "5 分钟预览",
         "features": [
-          "90秒预览",
+          "5 分钟预览",
           "TXT和SRT预览",
           "基础质量",
           "无需注册账户"
@@ -189,7 +189,7 @@
     "items": [
       {
         "title": "如何在线将音频转换为文字？",
-        "description": "上传您的MP3、M4A、WAV或OGG文件，或粘贴直接音频链接。获得90秒预览以验证准确性，然后解锁带时间戳的完整转录。"
+        "description": "上传您的MP3、M4A、WAV或OGG文件，或粘贴直接音频链接。获得 5 分钟预览以验证准确性，然后解锁带时间戳的完整转录。"
       },
       {
         "title": "支持哪些音频格式？",
@@ -240,7 +240,7 @@
     "name": "footer",
     "brand": {
       "title": "视频转文字",
-      "description": "在线将视频和音频转换为文本。免费90秒预览，支持SRT、TXT、VTT、DOCX和JSON等多种导出格式。",
+      "description": "在线将视频和音频转换为文本。免费 5 分钟预览，支持SRT、TXT、VTT、DOCX和JSON等多种导出格式。",
       "logo": {
         "src": "/logo.png",
         "alt": "视频转文字"

@@ -38,14 +38,22 @@ export default async function TranscriptionsPage({
   const limit = 12;
   const offset = (page - 1) * limit;
   
-  // (Optional) user data fetch removed as unused
+  // Get user tier to determine retention period
+  const currentUserTier = await getUserTier(user_uuid as string);
+  const retentionDays = currentUserTier === UserTier.PRO ? 365 : 
+                       currentUserTier === UserTier.BASIC ? 90 : 7;
+  
+  // Calculate cutoff date based on retention period
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
-  // Build where clause with search - handle both cases properly
+  // Build where clause with search and retention filter
   let whereClause: any;
   if (q && q.length > 0) {
     whereClause = and(
       eq(transcriptions.user_uuid, user_uuid),
       eq(transcriptions.deleted, false),
+      gte(transcriptions.created_at, cutoffDate),  // Only show files within retention period
       or(
         ilike(transcriptions.title, `%${q}%`),
         ilike(transcriptions.source_url, `%${q}%`)
@@ -54,7 +62,8 @@ export default async function TranscriptionsPage({
   } else {
     whereClause = and(
       eq(transcriptions.user_uuid, user_uuid),
-      eq(transcriptions.deleted, false)
+      eq(transcriptions.deleted, false),
+      gte(transcriptions.created_at, cutoffDate)  // Only show files within retention period
     );
   }
 
@@ -216,6 +225,8 @@ export default async function TranscriptionsPage({
     </div>
   );
 
+  // Free 档是否需要展示“预览模式”横幅：仅当存在时长 > 5 分钟的转写记录
+
   return (
     <div className="flex h-screen bg-[#0a0a0f]">
       {/* Main Content Area */}
@@ -224,6 +235,21 @@ export default async function TranscriptionsPage({
         <div className="border-b border-gray-800 bg-[#0a0a0f]/80 backdrop-blur-sm">
           <div className="px-8 py-5">
             <h1 className="text-2xl font-semibold text-white mb-4">All Transcriptions</h1>
+            {/* Show retention notice for Free and Basic users */}
+            {(currentUserTier === UserTier.FREE || currentUserTier === UserTier.BASIC) && (
+              <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <p className="text-sm text-blue-300">
+                  {currentUserTier === UserTier.FREE 
+                    ? '📅 Showing transcriptions from the last 7 days. Older files are automatically archived.'
+                    : '📅 Showing transcriptions from the last 90 days.'}
+                  {currentUserTier === UserTier.FREE && (
+                    <Link href={`/${locale}/pricing`} className="ml-2 text-blue-400 hover:text-blue-300 underline">
+                      Upgrade for longer retention
+                    </Link>
+                  )}
+                </p>
+              </div>
+            )}
             
             {/* Statistics Bar */}
             <div className="flex gap-6">
@@ -336,22 +362,41 @@ export default async function TranscriptionsPage({
             </div>
           </div>
 
-          {/* Upgrade Card */}
-          {usage.tier === 'free' && (
+          {/* Upgrade Card - Show for Free and Basic tiers */}
+          {(userTier === UserTier.FREE || userTier === UserTier.BASIC) && (
             <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 
               rounded-lg p-5 border border-purple-500/30">
               <h3 className="text-white font-medium mb-2">
-                Upgrade to Pro
+                {userTier === UserTier.FREE ? 'Unlock Full Features' : 'Upgrade to Pro'}
               </h3>
-              <p className="text-gray-300 text-sm mb-4">
-                Get more transcription minutes
-              </p>
               
-              <ul className="text-xs text-gray-300 space-y-1 mb-4">
-                <li>✓ 1,000 minutes monthly</li>
-                <li>✓ Priority processing</li>
-                <li>✓ Advanced features</li>
-              </ul>
+              {userTier === UserTier.FREE ? (
+                <>
+                  <p className="text-gray-300 text-sm mb-4">
+                    Free users can only view the first 5 minutes sample and basic features. 
+                    Upgrade to BASIC/PRO to unlock full content, complete speaker labels/AI features, 
+                    and all export formats.
+                  </p>
+                  <ul className="text-xs text-gray-300 space-y-1 mb-4">
+                    <li>✓ Full transcription content</li>
+                    <li>✓ Complete AI chapters & summaries</li>
+                    <li>✓ All export formats</li>
+                    <li>✓ Speaker diarization</li>
+                  </ul>
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-300 text-sm mb-4">
+                    Get more transcription minutes and premium features
+                  </p>
+                  <ul className="text-xs text-gray-300 space-y-1 mb-4">
+                    <li>✓ 2,200 minutes monthly (2000 standard + 200 high-accuracy)</li>
+                    <li>✓ Priority processing queue</li>
+                    <li>✓ Batch processing & export</li>
+                    <li>✓ Extended file retention (365 days)</li>
+                  </ul>
+                </>
+              )}
               
               <Link 
                 href={`/${locale}/pricing`}

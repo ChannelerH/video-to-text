@@ -23,8 +23,8 @@ function resolveFfmpegPath(): string {
 }
 
 export async function createWavClipFromUrl(audioUrl: string, seconds: number = 10, startOffset: number = 0): Promise<Buffer> {
-  // Allow up to 120s to support 90s preview; probes typically pass 8–12s
-  const clipSeconds = Math.max(1, Math.min(120, Math.floor(seconds || 10)));
+  // Allow up to 300s to support 5-minute clips for Free users
+  const clipSeconds = Math.max(1, Math.min(300, Math.floor(seconds || 10)));
   const offsetSeconds = Math.max(0, Math.floor(startOffset || 0));
 
   // Resolve ffmpeg binary
@@ -54,7 +54,14 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
         '-acodec', 'pcm_s16le',
         'pipe:1'
       ];
-      console.log('[TEST][LANG-001/PREV-001] ffmpeg.args', args.join(' '));
+      console.log('[FREE_CLIP][ffmpeg] Command:', `ffmpeg ${args.join(' ')}`.replace(audioUrl, safeUrlLog));
+      console.log('[FREE_CLIP][ffmpeg] Clip parameters:', {
+        startOffset: offsetSeconds,
+        duration: clipSeconds,
+        sampleRate: 16000,
+        channels: 'mono',
+        format: 'WAV PCM 16-bit'
+      });
 
       const proc = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
@@ -70,7 +77,14 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
       proc.on('close', (code) => {
         if (code === 0) {
           const buf = Buffer.concat(chunks);
-          console.log(`[ffmpeg] Clip done (${clipSeconds}s) size=${buf.length} bytes`);
+          const expectedSize = clipSeconds * 16000 * 2; // 16kHz, 16-bit mono
+          console.log(`[FREE_CLIP][ffmpeg] Clip completed successfully:`, {
+            requestedDuration: clipSeconds,
+            outputSize: buf.length,
+            outputSizeMB: (buf.length / 1024 / 1024).toFixed(2),
+            expectedSizeBytes: expectedSize,
+            sizeRatio: (buf.length / expectedSize).toFixed(2)
+          });
           resolve(buf);
         } else {
           const stderr = Buffer.concat(errChunks).toString('utf8');

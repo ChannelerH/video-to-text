@@ -8,6 +8,7 @@ import {
   timestamp,
   unique,
   uniqueIndex,
+  numeric,
 } from "drizzle-orm/pg-core";
 
 // Users table
@@ -185,3 +186,32 @@ export const transcription_edits = pgTable("v2tx_transcription_edits", {
 }, (t) => [
   uniqueIndex("transcription_edits_job_user_unique").on(t.job_id, t.user_uuid)
 ]);
+
+// Usage records for quota tracking
+export const usage_records = pgTable("v2tx_usage_records", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  user_id: varchar({ length: 64 }).notNull(),
+  date: varchar({ length: 16 }).notNull(),
+  minutes: numeric({ precision: 10, scale: 2 }).notNull().default('0'),
+  model_type: varchar({ length: 32 }).notNull().default('standard'),
+  created_at: timestamp({ withTimezone: true }),
+});
+
+// Distributed FIFO queue (DB-backed)
+export const q_jobs = pgTable("v2tx_q_jobs", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  job_id: varchar({ length: 64 }).notNull(),
+  tier: varchar({ length: 32 }).notNull(),
+  user_id: varchar({ length: 64 }).notNull(),
+  created_at: timestamp({ withTimezone: true }).notNull(),
+  picked_at: timestamp({ withTimezone: true }),
+  done: boolean().notNull().default(false),
+});
+
+// Minutes packs/balances per user
+export const user_minutes = pgTable("v2tx_user_minutes", {
+  user_id: varchar({ length: 64 }).primaryKey().notNull(),
+  std_balance: integer().notNull().default(0),
+  ha_balance: integer().notNull().default(0),
+  updated_at: timestamp({ withTimezone: true }).notNull(),
+});

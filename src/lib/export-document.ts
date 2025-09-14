@@ -9,6 +9,7 @@ import { TranscriptionSegment } from './replicate';
 export interface ExportOptions {
   format: 'docx' | 'pdf';
   includeTimestamps: boolean;
+  includeSpeakers?: boolean;
   includeChapters: boolean;
   includeSummary: boolean;
   metadata?: {
@@ -104,7 +105,7 @@ export class DocumentExportService {
           
           // Content by chapters or flat
           ...(chapters.length > 0 && options.includeChapters !== false ? 
-            await this.generateChapterContent(chapters, options.includeTimestamps !== false) :
+            await this.generateChapterContent(chapters, options.includeTimestamps !== false, options.includeSpeakers !== false) :
             await this.generateFlatContent(transcription, options.includeTimestamps !== false)
           )
         ]

@@ -20,6 +20,8 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
   const [undoing, setUndoing] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
   const [downloadingFormats, setDownloadingFormats] = useState<Set<string>>(new Set());
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
   const deleteTimerRef = useRef<any>(null);
 
   const onDelete = async () => {
@@ -77,6 +79,7 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
   };
 
   const base = `/api/transcriptions/${row.job_id}/file`;
+  const exportBase = `/api/transcriptions/${row.job_id}/export`;
 
   const download = async (format: string) => {
     // 设置loading状态
@@ -126,7 +129,7 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
 
   return (
     <div className="space-y-3">
-      {/* 下载格式按钮组 */}
+      {/* 下载格式按钮组 - 包含所有导出格式 */}
       <div className="flex flex-wrap gap-2">
         {['txt', 'srt', 'vtt', 'json', 'md'].map((format) => {
           const Icon = formatIcons[format as keyof typeof formatIcons] || FileDown;
@@ -157,9 +160,87 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
             </button>
           );
         })}
+        
+        {/* Word 和 PDF 按钮移到这里 */}
+        <button
+          onClick={async () => {
+            setExportingWord(true);
+            try {
+              const res = await fetch(`${exportBase}?format=docx`);
+              if (!res.ok) { toast.error('Word export failed'); return; }
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = `${(row.title || 'transcription').replace(/\s+/g,'_')}.docx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+              toast.success('Word exported successfully');
+            } catch { 
+              toast.error('Word export failed'); 
+            } finally {
+              setExportingWord(false);
+            }
+          }}
+          disabled={exportingWord}
+          className={`
+            inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+            transition-all duration-200 text-xs font-medium
+            ${exportingWord 
+              ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300 cursor-not-allowed' 
+              : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 hover:scale-105 hover:shadow-sm'}
+          `}
+        >
+          {exportingWord ? (
+            <>
+              <div className="w-3.5 h-3.5 border-2 border-purple-300/30 border-t-purple-300 rounded-full animate-spin" />
+              <span>Exporting...</span>
+            </>
+          ) : (
+            <>
+              <FileText className="w-3.5 h-3.5" />
+              <span>Word</span>
+            </>
+          )}
+        </button>
+        <button
+          onClick={async () => {
+            setExportingPDF(true);
+            try {
+              const res = await fetch(`${exportBase}?format=pdf`);
+              if (!res.ok) { toast.error('PDF export failed'); return; }
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = `${(row.title || 'transcription').replace(/\s+/g,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+              toast.success('PDF exported successfully');
+            } catch { 
+              toast.error('PDF export failed'); 
+            } finally {
+              setExportingPDF(false);
+            }
+          }}
+          disabled={exportingPDF}
+          className={`
+            inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+            transition-all duration-200 text-xs font-medium
+            ${exportingPDF 
+              ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 cursor-not-allowed' 
+              : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:scale-105 hover:shadow-sm'}
+          `}
+        >
+          {exportingPDF ? (
+            <>
+              <div className="w-3.5 h-3.5 border-2 border-emerald-300/30 border-t-emerald-300 rounded-full animate-spin" />
+              <span>Exporting...</span>
+            </>
+          ) : (
+            <>
+              <FileDown className="w-3.5 h-3.5" />
+              <span>PDF</span>
+            </>
+          )}
+        </button>
       </div>
 
-      {/* 操作按钮组 */}
+      {/* 操作按钮组 - 只保留 Re-run 和 Delete */}
       <div className="flex items-center gap-2">
         <button
           onClick={onRerun}

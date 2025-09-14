@@ -1,12 +1,15 @@
 import { getTranslations } from "next-intl/server";
 import { getUserUuid } from "@/services/user";
+import { getUserTier, UserTier, hasFeature } from "@/services/user-tier";
+import { POLICY, trimSegmentsToSeconds } from "@/services/policy";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { transcriptions, transcription_results, transcription_edits } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import EditorWrapper from '@/components/editor-view/editor-wrapper';
+import { UnifiedTranscriptionService } from '@/lib/unified-transcription';
 import { AIChapterService } from '@/lib/ai-chapters';
 import { BasicSegmentationService } from '@/lib/basic-segmentation';
 
@@ -33,6 +36,13 @@ export default async function EditorPage({
     return null; // Layout will handle redirect
   }
 
+  // Get user tier and calculate retention cutoff
+  const userTier = await getUserTier(userUuid as string);
+  const retentionDays = userTier === UserTier.PRO ? 365 : 
+                       userTier === UserTier.BASIC ? 90 : 7;
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+  
   // Run all database queries in parallel for better performance
   console.time('[EditorPage] All Database Queries (Parallel)');
   
@@ -50,7 +60,8 @@ export default async function EditorPage({
       .where(
         and(
           eq(transcriptions.job_id, id),
-          eq(transcriptions.user_uuid, userUuid)
+          eq(transcriptions.user_uuid, userUuid),
+          gte(transcriptions.created_at, cutoffDate)  // Check retention period
         )
       )
       .limit(1),
@@ -157,11 +168,24 @@ export default async function EditorPage({
   }
   console.timeEnd('[EditorPage] Data Processing');
 
-  // Get audio URL from source or storage
+  // 先提取音频 URL，供后续话者叠加使用
   audioUrl = transcription.source_url || null;
+
+  // FREE 用户：仅预览前 5 分钟（服务端导出已截断，这里仅影响编辑器显示）
+  try {
+    const tier = await getUserTier(userUuid);
+    if (tier === UserTier.FREE && Array.isArray(segments) && segments.length > 0) {
+      const maxSec = POLICY.preview.freePreviewSeconds || 300;
+      segments = trimSegmentsToSeconds(segments as any, maxSec) as any[];
+      // 不在编辑页做叠加；叠加仅在转写阶段、且显式勾选“说话人分离”时执行
+  }
+  } catch {}
 
   console.timeEnd('[EditorPage] Total Load Time');
   
+  // Derive preview mode flag: 仅当原始时长 > 5 分钟才视为预览
+  const isPreview = (transcription.duration_sec || 0) > (POLICY.preview.freePreviewSeconds || 300);
+
   return (
     <div className="h-screen flex flex-col">
       {/* Simplified Header */}
@@ -182,6 +206,21 @@ export default async function EditorPage({
         </div>
       </div>
 
+      {/* FREE Preview Notice */}
+      {(() => {
+        // Inline server-side badge for FREE preview
+        const tierPromise = getUserTier(userUuid);
+        // Note: This simple IIFE awaits synchronously through top-level await not supported here.
+        // 仅当原始时长 > 5 分钟才显示横幅
+        const isPreview = (transcription.duration_sec || 0) > (POLICY.preview.freePreviewSeconds || 300);
+        if (!isPreview) return null;
+        return (
+          <div className="px-4 py-2 bg-amber-500/10 text-amber-300 text-sm border-b border-amber-500/20">
+            Preview mode: showing the first 5 minutes only. <a href={`/${locale}/pricing`} className="underline hover:text-amber-200">Upgrade</a> to unlock full transcript, speaker labels, and full AI features.
+          </div>
+        );
+      })()}
+
       {/* Editor - Full height */}
       <div className="flex-1 overflow-hidden">
         <EditorWrapper
@@ -191,6 +230,7 @@ export default async function EditorPage({
           speakers={speakers}
           transcription={transcriptionData}
           backHref={`/${locale}/dashboard/transcriptions`}
+          isPreviewMode={isPreview}
         />
       </div>
     </div>

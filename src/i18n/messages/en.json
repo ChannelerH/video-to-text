@@ -1,7 +1,7 @@
 {
   "metadata": {
     "title": "V2TX - Video to Text Converter Online | Free Video Transcription",
-    "description": "V2TX is the best video to text converter online. Convert videos to text instantly with AI-powered transcription. Free 90s preview, export SRT, TXT, DOCX formats.",
+    "description": "V2TX is the best video to text converter online. Convert videos to text instantly with AI-powered transcription. Free 5‑minute preview, export SRT, TXT, DOCX formats.",
     "keywords": "V2TX, video to text, video transcription, video to text converter, online video transcription, AI video to text, YouTube to text"
   },
   "stats": {
@@ -300,9 +300,12 @@
   },
   "final_cta": {
     "title": "Ready to transcribe your first video?",
-    "description": "Start with a free 90s preview. Upgrade anytime for full features.",
+    "description": "Start with a free 5‑minute preview. Upgrade anytime for full features.",
     "get_started": "Get Started",
-    "urgency": "Start saving time today — No setup required"
+    "urgency": "Start saving time today — No setup required",
+    "instant_transcription": "Instant transcription",
+    "98_languages": "98+ languages",
+    "no_credit_card": "No credit card required"
   },
   "user": {
     "sign_in": "Sign In",
@@ -547,12 +550,12 @@
       "upload_success": "File uploaded successfully! Ready for transcription.",
       "starting": "Starting transcription...",
       "chinese_upgrade": "Detected Chinese. Upgrading to advanced model for better accuracy. Processing may be slightly slower.",
-      "generating_preview": "Generating 90s preview...",
+      "generating_preview": "Generating 5‑minute preview...",
       "processing_youtube": "Processing YouTube video...",
       "processing_audio_url": "Processing audio file from URL...",
       "processing_file": "Processing file transcription...",
       "completed": "Transcription completed!",
-      "preview_ready": "Preview generated (90s). Sign in to get full result.",
+      "preview_ready": "Preview generated (5 minutes). Sign in to get full result.",
       "audio_transformed": "Your audio has been transformed into text."
     },
     "results": {
@@ -583,6 +586,7 @@
       "chapters": "Chapters",
       "summary": "Summary",
       "generating": "Generating...",
+      "usage_limits": "Basic: 10 times daily each · Pro: Unlimited",
       "advanced_export": "Advanced Export",
       "with_toc": "With Table of Contents",
       "exporting": "Exporting...",
@@ -608,10 +612,15 @@
       "show_chapters": "Show chapters",
       "keyboard_shortcuts": "Keyboard Shortcuts",
       "chapters": "Chapters",
+      "chapters_count": "chapters",
       "transcription_text": "Transcript",
       "play_pause": "Play/Pause",
       "previous_segment": "Previous Segment",
-      "next_segment": "Next Segment"
+      "next_segment": "Next Segment",
+      "full_transcription": "Full Transcription",
+      "ai_smart_chapters": "AI Smart Chapters",
+      "generating_chapters": "Generating...",
+      "long_video_tip": "Recommended for long videos"
     },
     "upgrade": {
       "title": "Upgrade Your Plan",
@@ -692,11 +701,16 @@
     },
     "preview": {
       "title": "Preview Only",
-      "banner": "Unauthenticated: showing 90s preview",
+      "banner": "Unauthenticated: showing 5‑minute preview",
       "message": "Sign in to run full transcription and save results to your history.",
       "sign_in": "Sign in to unlock full",
       "download_disabled": "Download disabled in preview",
-      "download_preview": "Download preview"
+      "download_preview": "Download preview",
+      "preview_mode": "Preview Mode",
+      "unlock_full": "Unlock Full Content",
+      "showing": "Showing",
+      "locked_content": "{minutes} locked",
+      "upgrade_message": "Upgrade to access complete transcription, all export formats, and AI features"
     },
     "social_proof": "★★★★★ 4.8 | 1000+ conversions | 12 countries",
     "high_accuracy": {
@@ -778,5 +792,15 @@
     "transcription_not_found_desc": "The requested transcription could not be found or you don't have permission to access it."
   },
   "back_to_transcriptions": "Back to Transcriptions",
-  "untitled_transcription": "Untitled Transcription"
+  "untitled_transcription": "Untitled Transcription",
+  "paywall": {
+    "preview_mode_message": "Free users can only view the first 5 minutes sample and basic features. Upgrade to BASIC/PRO to unlock full content, complete speaker labels/AI features, and all export formats.",
+    "upgrade_button": "Upgrade Now",
+    "editor_preview_message": "Preview mode: showing the first 5 minutes only. Upgrade to unlock full transcript, speaker labels, and full AI features.",
+    "intelligent_recommendation": "Detected: {reasons}. Recommend upgrading to PRO for high-accuracy model (more stable timing, priority processing, long audio support).",
+    "view_pro_plan": "View PRO Plan",
+    "multiple_speakers": "Multiple speakers",
+    "long_audio": "Long audio",
+    "sample_only": "Sample only (first 5 minutes)"
+  }
 }

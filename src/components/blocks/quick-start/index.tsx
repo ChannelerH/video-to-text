@@ -140,7 +140,7 @@ export default function QuickStart({ section }: QuickStartProps) {
     {
       icon: RiVipCrownLine,
       title: tipsData[1]?.title || "Can test with free quota first",
-      description: tipsData[1]?.description || "90-second free preview, purchase full service when satisfied"
+      description: tipsData[1]?.description || "5-minute free preview, purchase full service when satisfied"
     },
     {
       icon: RiSpeedUpLine,

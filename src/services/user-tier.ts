@@ -35,9 +35,9 @@ export const TIER_FEATURES: Record<UserTier, TierFeatures> = {
   [UserTier.FREE]: {
     timestamps: true,
     basicSegmentation: false,
-    aiChapters: true,
-    aiSummary: false,
-    speakerIdentification: false,
+    aiChapters: true,     // FREE: 仅预览（由路由限制）
+    aiSummary: false,     // FREE: 不开放全片，仅预览由路由控制
+    speakerIdentification: false, // FREE: 不开放全片，仅预览由路由控制
     batchProcessing: false,
     apiAccess: false,
     priorityQueue: false, // TODO: 第一版暂不启用
@@ -47,7 +47,7 @@ export const TIER_FEATURES: Record<UserTier, TierFeatures> = {
     basicSegmentation: true,
     aiChapters: true,
     aiSummary: true,
-    speakerIdentification: false,
+    speakerIdentification: true,
     batchProcessing: false,
     apiAccess: false,
     priorityQueue: false, // TODO: 第一版暂不启用
@@ -78,7 +78,8 @@ export const TIER_FEATURES: Record<UserTier, TierFeatures> = {
  * 根据用户UUID获取用户等级
  */
 export async function getUserTier(userUuid: string): Promise<UserTier> {
-  return UserTier.PRO;
+  // TODO: integrate real subscription lookup; default to FREE when unknown
+  // return UserTier.PRO;
 
   if (!userUuid) {
     return UserTier.FREE;
@@ -92,19 +93,19 @@ export async function getUserTier(userUuid: string): Promise<UserTier> {
       return UserTier.FREE;
     }
 
-    // 根据订单产品名称判断等级（需要根据实际产品名称调整）
+    // 根据订单产品ID/名称判断等级（优先使用产品ID，回退到名称）
     for (const order of activeOrders) {
-      const productName = order.product_name?.toLowerCase() || '';
-      
-      if (productName.includes('premium') || productName.includes('enterprise')) {
+      const pid = (order.product_id || '').toLowerCase();
+      const pname = (order.product_name || '').toLowerCase();
+      const idOrName = `${pid} ${pname}`;
+
+      if (/premium|enterprise/.test(idOrName)) {
         return UserTier.PREMIUM;
       }
-      
-      if (productName.includes('pro') || productName.includes('professional')) {
+      if (/pro|professional/.test(idOrName)) {
         return UserTier.PRO;
       }
-      
-      if (productName.includes('basic') || productName.includes('starter')) {
+      if (/basic|starter/.test(idOrName)) {
         return UserTier.BASIC;
       }
     }
@@ -152,7 +153,7 @@ export function getUserTierInfo(tier: UserTier): UserTierInfo {
       return {
         tier,
         displayName: 'Free',
-        features: ['90s Preview Only', 'Fast Preview Processing'],
+        features: ['5-minute Preview Only', 'Fast Preview Processing'],
         featureAccess: TIER_FEATURES[UserTier.FREE]
       };
   }

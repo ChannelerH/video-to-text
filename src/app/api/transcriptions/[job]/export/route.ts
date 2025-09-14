@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { transcriptions, transcription_results, transcription_edits } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { DocumentExportService } from "@/lib/export-document";
+import { getUserTier, UserTier } from "@/services/user-tier";
+import { POLICY, trimSegmentsToSeconds } from "@/services/policy";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ job: string }> }) {
   const user_uuid = await getUserUuid();
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
   const edited = editRow ? JSON.parse(editRow.content) : null;
   
   // Use edited segments if available, otherwise use original
-  const finalSegments = edited?.segments || segments;
+  let finalSegments = edited?.segments || segments;
   let chapters = edited?.chapters || [];
   const summary = edited?.summary || '';
   
@@ -55,7 +57,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
   const editedText = finalSegments.map((s: any) => s.text).join(' ');
   
   // Ensure chapters have proper segments
-  const finalChapters = chapters.map((chapter: any) => {
+  let finalChapters = chapters.map((chapter: any) => {
     if (!chapter.segments || chapter.segments.length === 0) {
       // Rebuild segments for this chapter based on time range
       const chapterSegments = finalSegments.filter((seg: any) => 
@@ -65,6 +67,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
     }
     return chapter;
   });
+
+  // Enforce FREE export as preview-only (first 5 minutes)
+  const tier = await getUserTier(user_uuid);
+  if (tier === UserTier.FREE) {
+    const maxSec = POLICY.preview.freePreviewSeconds;
+    finalSegments = trimSegmentsToSeconds(finalSegments, maxSec);
+    finalChapters = finalChapters.map((c: any) => ({
+      ...c,
+      segments: trimSegmentsToSeconds(c.segments || [], maxSec),
+      endTime: Math.min(c.endTime, maxSec)
+    }));
+  }
   
   // Debug logging
   console.log('Export Debug:', {
@@ -87,13 +101,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
         { text: editedText, segments: finalSegments, language: tdata.language, duration: trow.duration_sec },
         finalChapters,
         summary,
-        { includeChapters, includeTimestamps, metadata: meta }
+        { includeChapters, includeTimestamps, includeSpeakers: tier !== UserTier.FREE, metadata: meta }
       )
     : await DocumentExportService.exportToPDF(
         { text: editedText, segments: finalSegments, language: tdata.language, duration: trow.duration_sec },
         finalChapters,
         summary,
-        { includeChapters, includeTimestamps, metadata: meta }
+        { includeChapters, includeTimestamps, includeSpeakers: tier !== UserTier.FREE, metadata: meta }
       );
 
   const ab = await blob.arrayBuffer();

@@ -58,7 +58,8 @@ export async function GET(req: NextRequest) {
     const ct = upstream.headers.get('content-type') || '';
     if (!ct.startsWith('audio/') && !ct.startsWith('video/')) {
       // Prevent decoding errors when upstream is HTML (e.g., YouTube watch page)
-      return new Response('unsupported content-type', { status: 415 });
+      console.error(`Unsupported content-type: ${ct} for URL: ${src}`);
+      return new Response(`unsupported content-type: ${ct}`, { status: 415 });
     }
 
     const headers = new Headers(upstream.headers);

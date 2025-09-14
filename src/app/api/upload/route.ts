@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CloudflareR2Service } from '@/lib/r2-upload';
+import { getUserUuid } from '@/services/user';
+import { getUserTier, UserTier } from '@/services/user-tier';
+import { POLICY } from '@/services/policy';
 
 // 配置API路由以支持大文件上传
 export const runtime = 'nodejs';
@@ -29,8 +32,8 @@ const SUPPORTED_AUDIO_TYPES = [
 
 const ALL_SUPPORTED_TYPES = [...SUPPORTED_VIDEO_TYPES, ...SUPPORTED_AUDIO_TYPES];
 
-// 最大文件大小 (500MB)
-const MAX_FILE_SIZE = 500 * 1024 * 1024;
+// 默认最大文件大小 (fallback)
+const DEFAULT_MAX_FILE_SIZE = 500 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,12 +73,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 根据用户等级计算文件大小限制
+    const userUuid = await getUserUuid();
+    const tier = userUuid ? await getUserTier(userUuid) : UserTier.FREE;
+    const limits = POLICY.limits(tier);
+    const maxFileSize = (limits.maxFileSizeMB || DEFAULT_MAX_FILE_SIZE / (1024 * 1024)) * 1024 * 1024;
+
     // 验证文件大小
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > maxFileSize) {
       return NextResponse.json(
         { 
           success: false, 
-          error: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB` 
+          error: `File too large. Maximum size is ${maxFileSize / 1024 / 1024}MB for your plan` 
         },
         { status: 400 }
       );
@@ -127,7 +136,7 @@ export async function POST(request: NextRequest) {
       file.type,
       {
         folder: `${mode}-uploads`, // video-uploads 或 audio-uploads
-        expiresIn: 24, // 24小时后自动删除
+        expiresIn: 24, // 临时上传始终 24 小时后删除（与转录存储保留期不同）
         makePublic: true // 设为公开访问，以便 Replicate 可以访问
       }
     );
@@ -169,8 +178,8 @@ export async function GET() {
   return NextResponse.json({
     success: true,
     data: {
-      maxFileSize: MAX_FILE_SIZE,
-      maxFileSizeMB: MAX_FILE_SIZE / 1024 / 1024,
+      maxFileSize: DEFAULT_MAX_FILE_SIZE,
+      maxFileSizeMB: DEFAULT_MAX_FILE_SIZE / 1024 / 1024,
       supportedVideoTypes: SUPPORTED_VIDEO_TYPES,
       supportedAudioTypes: SUPPORTED_AUDIO_TYPES,
       allSupportedTypes: ALL_SUPPORTED_TYPES

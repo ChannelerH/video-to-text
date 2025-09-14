@@ -10,7 +10,8 @@ import {
   FileText,
   LogOut,
   MessageSquare,
-  Users
+  Users,
+  Loader2
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app';
 
@@ -24,6 +25,7 @@ export default function DashboardSidebar({ locale, userUuid }: DashboardSidebarP
   const pathname = usePathname();
   const { user, setShowFeedback } = useAppContext();
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingRoute, setLoadingRoute] = useState<string | null>(null);
 
   useEffect(() => {
     // Set loading to false once we've checked for user
@@ -31,6 +33,11 @@ export default function DashboardSidebar({ locale, userUuid }: DashboardSidebarP
       setIsLoading(false);
     }
   }, [user]);
+
+  // Clear loading state when route changes
+  useEffect(() => {
+    setLoadingRoute(null);
+  }, [pathname]);
 
   const navigation = [
     {
@@ -93,20 +100,32 @@ export default function DashboardSidebar({ locale, userUuid }: DashboardSidebarP
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4">
         <div className="space-y-1">
-          {navigation.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                isActive(item.href)
-                  ? 'bg-purple-600/20 text-purple-400'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-              }`}
-            >
-              <item.icon className="w-4 h-4" />
-              <span>{item.name}</span>
-            </Link>
-          ))}
+          {navigation.map((item) => {
+            const isItemLoading = loadingRoute === item.href;
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={() => {
+                  if (!isActive(item.href)) {
+                    setLoadingRoute(item.href);
+                  }
+                }}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  isActive(item.href)
+                    ? 'bg-purple-600/20 text-purple-400'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                }`}
+              >
+                {isItemLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <item.icon className="w-4 h-4" />
+                )}
+                <span>{item.name}</span>
+              </Link>
+            );
+          })}
         </div>
       </nav>
 

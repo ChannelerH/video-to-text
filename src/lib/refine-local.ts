@@ -32,6 +32,8 @@ export function localChinesePunctuate(text: string): string {
   let t = text;
   // normalize whitespace
   t = t.replace(/[\t\r\f]+/g, ' ').replace(/\u00A0/g, ' ').replace(/\s{2,}/g, ' ');
+  // join spaced digits like "2 5 5" -> "255"
+  t = t.replace(/(\d)\s+(?=\d)/g, '$1');
   // remove spaces between CJK
   t = t.replace(/([\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])/g, '$1');
   // add spaces between CJK and Latin/number

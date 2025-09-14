@@ -1,18 +1,18 @@
 import Hero from "@/components/blocks/hero";
 import Feature1 from "@/components/blocks/feature1";
 import Feature from "@/components/blocks/feature";
-import Stats from "@/components/blocks/stats";
-import UseCases from "@/components/blocks/use-cases";
-import TranscriptionDemo from "@/components/blocks/transcription-demo";
-import WhyChooseUs from "@/components/blocks/why-choose-us";
+import Stats from "@/components/blocks/stats/simple-server";
+import UseCases from "@/components/blocks/use-cases/server";
+import TranscriptionDemo from "@/components/blocks/transcription-demo/server";
+import WhyChooseUs from "@/components/blocks/why-choose-us/server";
 import VideoTypes from "@/components/blocks/video-types";
 import ComparisonTable from "@/components/blocks/comparison-table";
-import ROICalculator from "@/components/blocks/roi-calculator";
+import ROICalculator from "@/components/blocks/roi-calculator/server";
 import TechSpecs from "@/components/blocks/tech-specs";
 import QuickStart from "@/components/blocks/quick-start";
 import PricingCTA from "@/components/blocks/pricing-cta";
-import FAQ from "@/components/blocks/faq";
-import CTA from "@/components/blocks/cta";
+import FAQ from "@/components/blocks/faq/server";
+import CTA from "@/components/blocks/cta/server";
 import { getTranslations } from "next-intl/server";
 // Added new core content modules for Video to Text functionality
 import { getLandingPage } from "@/services/page";
@@ -61,25 +61,25 @@ export default async function VideoToTextPage({
       {page.hero && <Hero hero={page.hero} />}
       
       {/* 2. 信任指标（关键数据） */}
-      {page.stats && <Stats section={page.stats} />}
+      {page.stats && <Stats section={page.stats} locale={locale} />}
 
       {/* 3. 使用场景（核心场景） */}
-      <UseCases section={{ name: "use-cases", disabled: false }} />
+      <UseCases section={{ name: "use-cases", disabled: false }} locale={locale} />
 
       {/* 4. 效果展示（真实转写样本） */}
-      <TranscriptionDemo section={{ name: "transcription-demo", disabled: false }} />
+      <TranscriptionDemo section={{ name: "transcription-demo", disabled: false }} locale={locale} />
 
       {/* 5. 竞争优势（为什么选择我们） */}
-      <WhyChooseUs section={{ name: "why-choose-us", disabled: false }} />
+      <WhyChooseUs section={{ name: "why-choose-us", disabled: false }} locale={locale} />
 
       {/* 6. 成本分析（ROI） */}
-      <ROICalculator section={{ name: "roi-calculator", disabled: false }} />
+      <ROICalculator section={{ name: "roi-calculator", disabled: false }} locale={locale} />
 
       {/* 7. 定价引导 */}
-      <PricingCTA />
+      <PricingCTA locale={locale} />
 
       {/* 8. FAQ 精选 */}
-      {page.faq && <FAQ section={page.faq} />}
+      {page.faq && <FAQ section={page.faq} locale={locale} />}
 
       {/* 9. 收尾 CTA */}
       <CTA

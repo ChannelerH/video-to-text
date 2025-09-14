@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserTier, hasFeature, UserTier } from '@/services/user-tier';
 import { AIChapterService } from '@/lib/ai-chapters';
 import { getUserUuid } from '@/services/user';
+import { POLICY, trimSegmentsToSeconds } from '@/services/policy';
+import { db } from '@/db';
+import { usage_records } from '@/db/schema';
+import { and, eq, gte, count } from 'drizzle-orm';
 
 export async function POST(
   request: NextRequest,
@@ -11,20 +15,11 @@ export async function POST(
     // Get user UUID
     const userUuid = await getUserUuid();
     
-    // Get user tier
-    const userTier = userUuid ? await getUserTier(userUuid) : UserTier.FREE;
-    
-    // Check if user has access to AI summary
-    if (!hasFeature(userTier, 'aiSummary')) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'AI summary generation requires Pro subscription or higher',
-          requiredTier: UserTier.PRO
-        },
-        { status: 403 }
-      );
+    // Get user tier (require login)
+    if (!userUuid) {
+      return NextResponse.json({ success: false, error: 'authentication required', authRequired: true }, { status: 401 });
     }
+    const userTier = await getUserTier(userUuid);
 
     const { segments, options } = await request.json();
     
@@ -35,8 +30,42 @@ export async function POST(
       );
     }
 
+    // FREE: preview-only for first 5 minutes, with monthly limit
+    let workingSegments = segments;
+    if (userTier === UserTier.FREE) {
+      const now = new Date();
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const [row] = await db().select({ count: count() }).from(usage_records)
+        .where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, monthStart), eq(usage_records.model_type, 'preview_ai_summary')));
+      const used = Number(row?.count || 0);
+      const limit = POLICY.preview.freeMonthlyAiSummary;
+      if (used >= limit) {
+        return NextResponse.json({ success: false, error: 'AI 总结（预览）本月次数已用尽（按功能分别计数）', requiredTier: UserTier.BASIC, limit, used }, { status: 403 });
+      }
+      workingSegments = trimSegmentsToSeconds(segments, POLICY.preview.freePreviewSeconds);
+      await db().insert(usage_records).values({ user_id: userUuid, date: new Date().toISOString().slice(0,10), minutes: 0, model_type: 'preview_ai_summary', created_at: new Date() }).catch(() => {});
+    } else {
+      // BASIC/PRO must have feature
+      if (!hasFeature(userTier, 'aiSummary')) {
+        return NextResponse.json({ success: false, error: 'AI summary not available for your plan', requiredTier: UserTier.BASIC }, { status: 403 });
+      }
+      // BASIC: daily limit (e.g., <= 10 per day)
+      if (userTier === UserTier.BASIC) {
+        const now = new Date();
+        const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        const [day] = await db().select({ count: count() }).from(usage_records)
+          .where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, dayStart), eq(usage_records.model_type, 'ai_summary')));
+        const usedToday = Number(day?.count || 0);
+        const dailyLimit = 10;
+        if (usedToday >= dailyLimit) {
+          return NextResponse.json({ success: false, error: 'AI 总结今日次数已达上限（10 次/天，按功能分别计数）', requiredTier: UserTier.PRO, limit: dailyLimit, used: usedToday }, { status: 403 });
+        }
+        await db().insert(usage_records).values({ user_id: userUuid || '', date: new Date().toISOString().slice(0,10), minutes: 0, model_type: 'ai_summary', created_at: new Date() }).catch(() => {});
+      }
+    }
+
     // Generate AI summary
-    const summary = await AIChapterService.generateSummary(segments, {
+    const summary = await AIChapterService.generateSummary(workingSegments, {
       language: options?.language,
       maxLength: options?.maxLength || 200
     });

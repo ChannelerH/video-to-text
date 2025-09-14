@@ -583,3 +583,72 @@ body::after {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* FAQ Details/Summary Styles for SSR */
+details summary {
+  list-style: none;
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+details[open] summary ~ * {
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Transcription Demo CSS-only Tabs */
+.transcription-demo-tabs .demo-tab-radio {
+  display: none;
+}
+
+.transcription-demo-tabs .demo-tab-content {
+  display: none;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.transcription-demo-tabs .demo-tab-radio:checked + * + * + * + .demo-tab-label {
+  background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(59,130,246,0.2));
+  border-color: rgb(168,85,247);
+  color: white;
+}
+
+/* Show content based on which radio is checked */
+#demo-tab-english:checked ~ .demo-content-english,
+#demo-tab-chinese:checked ~ .demo-content-chinese,
+#demo-tab-code:checked ~ .demo-content-code,
+#demo-tab-meeting:checked ~ .demo-content-meeting {
+  display: block;
+}
+
+/* Style the active label */
+#demo-tab-english:checked ~ div label[for="demo-tab-english"],
+#demo-tab-chinese:checked ~ div label[for="demo-tab-chinese"],
+#demo-tab-code:checked ~ div label[for="demo-tab-code"],
+#demo-tab-meeting:checked ~ div label[for="demo-tab-meeting"] {
+  background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(59,130,246,0.2));
+  border-color: rgb(168,85,247);
+  color: white;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

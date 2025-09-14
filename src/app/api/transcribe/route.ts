@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TranscriptionService } from '@/lib/transcription';
 import { transcriptionCache } from '@/lib/cache';
 import { getUserUuid } from '@/services/user';
-import { getUserTier } from '@/services/user-tier';
+import { getUserTier, UserTier } from '@/services/user-tier';
 // import { hasFeature } from '@/services/user-tier'; // TODO: 队列功能暂时不启用
 import { RateLimiter, PREVIEW_LIMITS } from '@/lib/rate-limiter';
+import { enqueueJob, waitForTurn, markDone } from '@/services/queue';
+import { POLICY } from '@/services/policy';
+import { db } from '@/db';
+import { usage_records } from '@/db/schema';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import { AbuseDetector } from '@/lib/abuse-detector';
 import { quotaTracker } from '@/services/quota-tracker';
 import { headers } from 'next/headers';
-import { CloudflareR2Service } from '@/lib/r2-upload';
 import { YouTubeService } from '@/lib/youtube';
 // import { PriorityQueueManager } from '@/lib/priority-queue'; // TODO: 队列功能暂时不启用
 
@@ -68,47 +72,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 语言探针：前端可在转录前调用
-    if (action === 'probe') {
-      console.log('[API/probe] type=%s', type);
-      if (type === 'youtube_url') {
-        try {
-          const videoId = YouTubeService.validateAndParseUrl(content);
-          if (!videoId) {
-            return NextResponse.json({ success: true, language: 'unknown', isChinese: false, supported: false });
-          }
-          const videoInfo = await YouTubeService.getVideoInfo(videoId);
-          const hasZhCaption = !!videoInfo.captions?.some(c => (c.languageCode || '').toLowerCase().includes('zh'));
-          if (hasZhCaption) {
-            console.log('[API/probe] youtube zh caption detected');
-            return NextResponse.json({ success: true, supported: true, language: 'zh', isChinese: true });
-          }
-          // 无字幕：下载一个短音频片段，上传到 R2，调用 Deepgram 探针（不再使用标题启发式判定语言）
-          try {
-            const clip = await YouTubeService.downloadAudioClip(videoId, Math.max(8, Math.min(12, options.languageProbeSeconds || 10)));
-            const r2 = new CloudflareR2Service();
-            const uploaded = await r2.uploadFile(clip, `yt_probe_${videoId}.m4a`, 'audio/mp4', { folder: 'youtube-probe', expiresIn: 1, makePublic: true });
-            const probeRes = await transcriptionService.probeLanguageFromUrl(uploaded.url, { userTier: options.userTier, languageProbeSeconds: Math.max(8, Math.min(12, options.languageProbeSeconds || 10)) });
-            // 异步清理
-            setTimeout(() => r2.deleteFile(uploaded.key).catch(() => {}), 30000);
-            console.log('[API/probe] youtube clip deepgram result:', probeRes);
-            return NextResponse.json({ success: true, supported: true, ...probeRes });
-          } catch (probeError) {
-            console.warn('YouTube short clip probe failed:', probeError);
-            return NextResponse.json({ success: true, supported: true, language: 'unknown', isChinese: false });
-          }
-        } catch (e) {
-          console.warn('YouTube probe failed:', e);
-          return NextResponse.json({ success: true, language: 'unknown', isChinese: false, supported: false });
-        }
-      } else if (['audio_url', 'file_upload'].includes(type)) {
-        const audioUrl = content;
-        const res = await transcriptionService.probeLanguageFromUrl(audioUrl, { userTier: options.userTier, languageProbeSeconds: options.languageProbeSeconds });
-        console.log('[API/probe] audio/file deepgram result:', res);
-        return NextResponse.json({ success: true, supported: true, ...res });
-      }
-      return NextResponse.json({ success: true, language: 'unknown', isChinese: false, supported: false });
-    }
+    // 已移除独立的语言探针 action，前端不再调用
 
     // 根据动作类型处理请求
     if (action === 'preview') {
@@ -243,6 +207,48 @@ export async function POST(request: NextRequest) {
       // 获取用户等级
       const userTier = await getUserTier(user_uuid);
       
+      // Free用户限制：检查视频时长
+      if (userTier === UserTier.FREE && type === 'youtube') {
+        try {
+          const { YouTubeService } = await import('@/lib/youtube');
+          const videoInfo = await YouTubeService.getVideoInfo(content);
+          const maxSeconds = POLICY.preview.freePreviewSeconds || 300; // 5分钟
+          
+          console.log('[FREE_CLIP][API] Free user YouTube video check:', {
+            userTier,
+            videoId: content,
+            videoDuration: videoInfo.duration,
+            maxAllowed: maxSeconds,
+            needsClipping: videoInfo.duration > maxSeconds
+          });
+          
+          if (videoInfo.duration > maxSeconds) {
+            // 只转录前5分钟
+            options.trimToSeconds = maxSeconds;
+            console.log('[FREE_CLIP][API] Setting trimToSeconds for Free user:', {
+              originalDuration: videoInfo.duration,
+              trimToSeconds: maxSeconds,
+              savingsPercent: ((1 - maxSeconds/videoInfo.duration) * 100).toFixed(1)
+            });
+          }
+        } catch (error) {
+          console.error('[FREE_CLIP][API] Failed to check video duration:', error);
+          // Continue if we can't get video info
+        }
+      }
+      
+      // Free用户限制：上传文件
+      if (userTier === UserTier.FREE && type === 'file') {
+        // 对于文件上传，我们无法预先知道时长，但可以在转录后检查
+        // 标记需要在转录后截断
+        options.trimToSeconds = POLICY.preview.freePreviewSeconds || 300;
+        console.log('[FREE_CLIP][API] Free user file upload - will clip to:', {
+          userTier,
+          type: 'file',
+          trimToSeconds: options.trimToSeconds
+        });
+      }
+      
       // Add job to priority queue if user has priority queue feature
       // TODO: 第一版暂时不启用队列功能，后续根据需求再开启
       let queueInfo = null;
@@ -265,15 +271,26 @@ export async function POST(request: NextRequest) {
       //   console.log(`[API] Job ${jobId} added to priority queue for ${userTier} user`);
       // }
       
-      // 检查用户配额
-      const estimatedMinutes = 10; // 估算的转录时长，实际应根据音频长度计算
-      const quotaStatus = await quotaTracker.checkQuota(user_uuid, userTier, estimatedMinutes);
+      // 检查用户配额（先用分钟包抵扣估算，再核配额）
+      let estimatedMinutes = 10; // 估算的转录时长，实际应根据音频长度计算
+      try {
+        const { getEstimatedPackCoverage } = await import('@/services/minutes');
+        const cover = await getEstimatedPackCoverage(user_uuid, estimatedMinutes, (options?.highAccuracyMode && userTier === 'pro') ? 'high_accuracy' : 'standard');
+        estimatedMinutes = Math.max(0, estimatedMinutes - cover);
+      } catch {}
+      const quotaStatus = await quotaTracker.checkQuota(
+        user_uuid,
+        userTier,
+        estimatedMinutes,
+        options?.highAccuracyMode && userTier === 'pro' ? 'high_accuracy' : 'standard'
+      );
       
       if (!quotaStatus.isAllowed) {
         return NextResponse.json(
           { 
             success: false, 
-            error: quotaStatus.reason || 'Quota exceeded',
+            error: (quotaStatus.reason || 'Quota exceeded') + ' — Upgrade at /pricing',
+            upgrade: { url: '/pricing', reason: quotaStatus.reason || 'quota', required: 'upgrade' },
             quotaInfo: {
               tier: userTier,
               remaining: quotaStatus.remaining,
@@ -284,6 +301,18 @@ export async function POST(request: NextRequest) {
         );
       }
       
+      // 分布式 FIFO（可开关）：默认关闭，避免用户感知排队
+      const queueEnabled = (process.env.Q_ENABLED === 'true');
+      let jobId: string | undefined;
+      if (queueEnabled) {
+        const info = await enqueueJob(String(userTier).toLowerCase(), user_uuid);
+        jobId = info.jobId;
+        const turn = await waitForTurn(String(userTier).toLowerCase(), info.jobId, info.createdAt, Number(process.env.Q_TIMEOUT_MS || 120000));
+        if (!turn.picked) {
+          await markDone(info.jobId);
+          return NextResponse.json({ success: false, error: 'Queue timeout, please try again later' }, { status: 503 });
+        }
+      }
       // 如果客户端支持SSE，使用流式响应
       if (options.streamProgress) {
         const encoder = new TextEncoder();
@@ -301,7 +330,7 @@ export async function POST(request: NextRequest) {
               const _procStart = Date.now();
               
               // 处理转录，启用降级，传入进度回调
-              const result = await transcriptionService.processTranscription({
+              let result = await transcriptionService.processTranscription({
                 type,
                 content,
                 options: { 
@@ -318,6 +347,12 @@ export async function POST(request: NextRequest) {
                   }
                 }
               });
+              if (!result?.success) {
+                console.warn('[API] transcribe.retry.once (SSE path)');
+                try {
+                  result = await transcriptionService.processTranscription({ type, content, options: { ...options, userId: user_uuid, userTier, fallbackEnabled: true } });
+                } catch {}
+              }
               
               console.log('[API] transcribe.completed', { success: result?.success, fromCache: result?.data?.fromCache, duration: result?.data?.transcription?.duration, language: result?.data?.transcription?.language });
               console.log(`[API] transcribe ${type} done in ${Date.now()-_procStart}ms (success=${result?.success}, fromCache=${result?.data?.fromCache ?? false})`);
@@ -326,7 +361,39 @@ export async function POST(request: NextRequest) {
               const durationSec = result?.data?.transcription?.duration || 0;
               if (result.success && durationSec > 0) {
                 const actualMinutes = durationSec / 60;
-                await quotaTracker.recordUsage(user_uuid, actualMinutes, userTier);
+                const usedHighAccuracy = !!options?.highAccuracyMode && userTier === 'pro';
+                // 先扣分钟包，再把剩余分钟计入月配额
+                try {
+                  const { deductFromPacks } = await import('@/services/minutes');
+                  const leftover = await deductFromPacks(user_uuid, actualMinutes, usedHighAccuracy ? 'high_accuracy' : 'standard');
+                  const leftoverRounded = Math.max(0, Math.round(leftover * 100) / 100);
+                  if (leftoverRounded > 0) {
+                    await quotaTracker.recordUsage(user_uuid, leftoverRounded, usedHighAccuracy ? 'high_accuracy' : 'standard');
+                  }
+                } catch { await quotaTracker.recordUsage(user_uuid, Math.max(0.01, Math.round(actualMinutes * 100) / 100), usedHighAccuracy ? 'high_accuracy' : 'standard'); }
+                // 高精度溢出计费（仅记录溢出分钟，统一对账扣费）
+                if (usedHighAccuracy && process.env.OVERAGE_ENABLED !== 'false') {
+                  try {
+                    const now = new Date();
+                    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+                    const [row] = await db().select({
+                      total: sql<number>`COALESCE(SUM(${usage_records.minutes}),0)`
+                    }).from(usage_records).where(and(eq(usage_records.user_id, user_uuid), gte(usage_records.created_at, monthStart), eq(usage_records.model_type, 'high_accuracy')));
+                    const total = Number(row?.total || 0);
+                    const prev = Math.max(0, total - actualMinutes);
+                    const quota = 200;
+                    const overAfter = Math.max(0, total - quota);
+                    const overPrev = Math.max(0, prev - quota);
+                    const overThis = Math.max(0, overAfter - overPrev);
+                    if (overThis > 0) {
+                      await db().insert(usage_records).values({ user_id: user_uuid, date: new Date().toISOString().slice(0,10), minutes: String(Math.ceil(overThis)), model_type: 'overage_high_accuracy', created_at: new Date() });
+                      if (process.env.OVERAGE_STRIPE_ENABLED === 'true') {
+                        const { createOverageInvoiceItem } = await import('@/services/overage');
+                        await createOverageInvoiceItem(user_uuid, overThis, Number(process.env.OVERAGE_CENTS_PER_MINUTE || 5));
+                      }
+                    }
+                  } catch {}
+                }
               }
               
               // 发送100%完成进度
@@ -358,6 +425,8 @@ export async function POST(request: NextRequest) {
                 error: error instanceof Error ? error.message : 'Processing failed'
               })}\n\n`));
               controller.close();
+            } finally {
+              try { await markDone(jobId); } catch {}
             }
           }
         });
@@ -372,8 +441,9 @@ export async function POST(request: NextRequest) {
       }
 
       // 非流式响应（向后兼容）
+      try {
       const _procStart = Date.now();
-      const result = await transcriptionService.processTranscription({
+      let result = await transcriptionService.processTranscription({
         type,
         content,
         options: { 
@@ -383,6 +453,10 @@ export async function POST(request: NextRequest) {
           fallbackEnabled: true  // 为付费用户也启用降级保证服务可用性
         }
       });
+      if (!result?.success) {
+        console.warn('[API] transcribe.retry.once');
+        try { result = await transcriptionService.processTranscription({ type, content, options: { ...options, userId: user_uuid, userTier, fallbackEnabled: true } }); } catch {}
+      }
       console.log('[API] transcribe.completed', { success: result?.success, fromCache: result?.data?.fromCache, duration: result?.data?.transcription?.duration, language: result?.data?.transcription?.language });
       console.log(`[API] transcribe ${type} done in ${Date.now()-_procStart}ms (success=${result?.success}, fromCache=${result?.data?.fromCache ?? false})`);
       
@@ -390,7 +464,37 @@ export async function POST(request: NextRequest) {
       const durationSec = result?.data?.transcription?.duration || 0;
       if (result.success && durationSec > 0) {
         const actualMinutes = durationSec / 60;
-        await quotaTracker.recordUsage(user_uuid, actualMinutes, userTier);
+        const usedHighAccuracy = !!options?.highAccuracyMode && userTier === 'pro';
+        try {
+          const { deductFromPacks } = await import('@/services/minutes');
+          const leftover = await deductFromPacks(user_uuid, actualMinutes, usedHighAccuracy ? 'high_accuracy' : 'standard');
+          const leftoverRounded = Math.max(0, Math.round(leftover * 100) / 100);
+          if (leftoverRounded > 0) {
+            await quotaTracker.recordUsage(user_uuid, leftoverRounded, usedHighAccuracy ? 'high_accuracy' : 'standard');
+          }
+        } catch { await quotaTracker.recordUsage(user_uuid, Math.max(0.01, Math.round(actualMinutes * 100) / 100), usedHighAccuracy ? 'high_accuracy' : 'standard'); }
+        if (usedHighAccuracy && process.env.OVERAGE_ENABLED !== 'false') {
+          try {
+            const now = new Date();
+            const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+            const [row] = await db().select({ total: sql<number>`COALESCE(SUM(${usage_records.minutes}),0)` })
+              .from(usage_records)
+              .where(and(eq(usage_records.user_id, user_uuid), gte(usage_records.created_at, monthStart), eq(usage_records.model_type, 'high_accuracy')));
+            const total = Number(row?.total || 0);
+            const prev = Math.max(0, total - actualMinutes);
+            const quota = 200;
+            const overAfter = Math.max(0, total - quota);
+            const overPrev = Math.max(0, prev - quota);
+            const overThis = Math.max(0, overAfter - overPrev);
+            if (overThis > 0) {
+              await db().insert(usage_records).values({ user_id: user_uuid, date: new Date().toISOString().slice(0,10), minutes: String(Math.ceil(overThis)), model_type: 'overage_high_accuracy', created_at: new Date() });
+              if (process.env.OVERAGE_STRIPE_ENABLED === 'true') {
+                const { createOverageInvoiceItem } = await import('@/services/overage');
+                await createOverageInvoiceItem(user_uuid, overThis, Number(process.env.OVERAGE_CENTS_PER_MINUTE || 5));
+              }
+            }
+          } catch {}
+        }
       }
       
       return NextResponse.json({
@@ -401,6 +505,12 @@ export async function POST(request: NextRequest) {
         }
         // ...(queueInfo && { queueInfo })  // TODO: 队列功能暂时不启用
       });
+    } finally {
+      // 非流式路径兜底置 done（SSE 已在内部处理）
+      if (queueEnabled && jobId) {
+        try { await markDone(jobId); } catch {}
+      }
+    }
     }
   } catch (error) {
     console.error('API Error:', error);
@@ -468,3 +578,4 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+ 

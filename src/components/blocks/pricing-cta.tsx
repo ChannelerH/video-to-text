@@ -1,13 +1,13 @@
-'use client';
-
-import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
-import { useLocale } from 'next-intl';
 import { ArrowRight, Check } from 'lucide-react';
 
-export default function PricingCTA() {
-  const t = useTranslations('pricing_cta');
-  const locale = useLocale();
+interface PricingCTAProps {
+  locale: string;
+}
+
+export default async function PricingCTA({ locale }: PricingCTAProps) {
+  const t = await getTranslations('pricing_cta');
 
   return (
     <section className="py-16 px-4 bg-gradient-to-b from-gray-950 to-gray-900">

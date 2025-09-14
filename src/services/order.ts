@@ -59,6 +59,18 @@ export async function updateOrder({
         await updateCreditForOrder(order as unknown as Order);
       }
 
+      // grant minutes pack based on product_id
+      try {
+        const { addMinutes, addMinutesWithExpiry } = await import('./minutes');
+        const pid = (order.product_id || '').toLowerCase();
+        const months = order.valid_months || 12;
+        if (pid === 'std-100') await addMinutesWithExpiry(order.user_uuid, 100, 0, months, order.order_no);
+        else if (pid === 'std-300') await addMinutesWithExpiry(order.user_uuid, 300, 0, months, order.order_no);
+        else if (pid === 'std-1000') await addMinutesWithExpiry(order.user_uuid, 1000, 0, months, order.order_no);
+        else if (pid === 'ha-200') await addMinutesWithExpiry(order.user_uuid, 0, 200, months, order.order_no);
+        else if (pid === 'ha-600') await addMinutesWithExpiry(order.user_uuid, 0, 600, months, order.order_no);
+      } catch {}
+
       // update affiliate for paied order
       await updateAffiliateForOrder(order as unknown as Order);
     }
@@ -124,8 +136,8 @@ export async function updateSubOrder({
     }
 
     // subscribe first payment
-    if (Number(sub_times) === 1) {
-      // order paied
+  if (Number(sub_times) === 1) {
+    // order paied
       if (order.status === OrderStatus.Paid) {
         return;
       }
@@ -145,6 +157,24 @@ export async function updateSubOrder({
         user_email,
         paid_detail
       );
+
+      // set expired_at for first subscription cycle
+      try {
+        let expired_at = "";
+        const currentDate = new Date();
+        if (order.interval === "year") {
+          const oneYearLater = new Date(currentDate);
+          oneYearLater.setFullYear(currentDate.getFullYear() + 1);
+          const newDate = new Date(oneYearLater.getTime() + 24 * 60 * 60 * 1000);
+          expired_at = newDate.toISOString();
+        } else {
+          const oneMonthLater = new Date(currentDate);
+          oneMonthLater.setMonth(currentDate.getMonth() + 1);
+          const newDate = new Date(oneMonthLater.getTime() + 24 * 60 * 60 * 1000);
+          expired_at = newDate.toISOString();
+        }
+        await db().update(orders).set({ expired_at: new Date(expired_at) }).where(eq(orders.order_no, order_no));
+      } catch {}
 
       if (order.user_uuid) {
         if (order.credits > 0) {

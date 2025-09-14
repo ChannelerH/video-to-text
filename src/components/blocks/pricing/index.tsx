@@ -16,6 +16,7 @@ import { useLocale } from "next-intl";
 
 export default function Pricing({ pricing }: { pricing: PricingType }) {
   const t = useTranslations('pricing');
+  const qEnabled = (process.env.NEXT_PUBLIC_Q_ENABLED === 'true');
   
   if (pricing.disabled) {
     return null;
@@ -222,11 +223,19 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                       {item.features && (
                         <>
                           <ul className="design-feature-list">
-                            {(expanded[item.product_id] ? item.features : item.features.slice(0, 5)).map((feature, fi) => (
-                              <li className="design-feature-item" key={`feature-${fi}`}>
-                                {feature}
-                              </li>
-                            ))}
+                            {(expanded[item.product_id] ? item.features : item.features.slice(0, 5))
+                              .filter((feature) => {
+                                const ftxt = String(feature);
+                                if (!qEnabled && (ftxt.includes('Priority queue') || ftxt.includes('优先队列'))) {
+                                  return false; // hide when queue is disabled
+                                }
+                                return true;
+                              })
+                              .map((feature, fi) => (
+                                <li className="design-feature-item" key={`feature-${fi}`}>
+                                  {feature}
+                                </li>
+                              ))}
                           </ul>
                           {item.features.length > 5 && (
                             <button

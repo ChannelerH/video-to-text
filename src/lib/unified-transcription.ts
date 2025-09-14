@@ -135,12 +135,8 @@ export class UnifiedTranscriptionService {
       return result;
     }
     
-    // 语言探针：仅在 language 未指定或 auto 时进行
-    let isChinese = !!options.forceChinese;
-    if (!isChinese && (!options.language || options.language === 'auto')) {
-      const probe = await this.probeLanguage(audioUrl, options);
-      isChinese = probe.isChinese;
-    }
+    // 简化：不做预先语言探针。是否中文在结果阶段由 language+CJK 判定。
+    const isChinese = false;
 
     // 基于探针结果选择模型：非 PRO 一律 Deepgram（若可用）。只有 PRO+highAccuracy 才使用 Whisper。
     if (this.deepgramService) {
@@ -150,7 +146,7 @@ export class UnifiedTranscriptionService {
       strategy = { primary: 'whisper', fallback: null, sloTimeout: options.isPreview ? 60000 : 90000 };
     }
 
-    console.log(`🚀 Transcription strategy (after probe):`);
+    console.log(`🚀 Transcription strategy:`);
     console.log(`  Primary: ${strategy.primary}`);
     console.log(`  Fallback: ${strategy.fallback || 'none'}`);
     console.log(`  SLO timeout: ${strategy.sloTimeout / 1000}s`);
@@ -343,6 +339,10 @@ export class UnifiedTranscriptionService {
    */
   async addDiarizationFromUrl(audioUrl: string, transcription: TranscriptionResult): Promise<boolean> {
     if (!this.deepgramService) return false;
+    if (!audioUrl || !/^https?:/i.test(audioUrl)) {
+      console.warn('[Overlay] Skip diarization overlay: invalid audioUrl');
+      return false;
+    }
     try {
       const dg = await this.deepgramService.transcribeAudio(audioUrl, {
         language: transcription.language || 'auto',

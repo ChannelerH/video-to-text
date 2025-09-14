@@ -151,11 +151,15 @@ export class DeepgramService {
         smart_format: 'true',
         utterances: 'true',
         paragraphs: 'true', // 获取段落信息
-        diarize: 'true', // enable speaker diarization
         numerals: 'true',
         profanity_filter: 'false',
         redact: 'false'
       });
+      // Free 档节省成本：不打开 diarize
+      const tier = (options.userTier || '').toLowerCase();
+      if (tier && tier !== 'free') {
+        params.set('diarize', 'true');
+      }
 
       // Language configuration (after normalization)
       if (normalizedLanguage === 'auto') {
@@ -272,6 +276,38 @@ export class DeepgramService {
       // Convert to segments（若无 alternative，返回空数组）
       let segments = alternative ? this.convertToSegments(alternative) : [];
 
+      // Build word timeline for precise alignment after refinement
+      // Keep original word-level timestamps without interpolation for better accuracy
+      const wordsTimeline: Array<{ start: number; end: number; text: string }> = [];
+      const sentenceAnchors: Array<{ start: number; end: number; text: string }> = [];
+      try {
+        const wlist: any[] = (alternative as any)?.words || [];
+        for (const w of wlist) {
+          if (typeof w.start !== 'number' || typeof w.end !== 'number') continue;
+          const token = String(w.punctuated_word || w.word || '').trim();
+          if (!token) continue;
+          
+          // Use word-level timestamps directly - no character interpolation
+          // This preserves the accurate timing information from Deepgram
+          wordsTimeline.push({ 
+            start: w.start, 
+            end: w.end, 
+            text: token 
+          });
+        }
+        
+        // Extract sentence anchors from paragraphs if available
+        const paras = (alternative as any)?.paragraphs?.paragraphs || [];
+        for (const p of paras) {
+          const slist = Array.isArray(p?.sentences) ? p.sentences : [];
+          for (const s of slist) {
+            if (typeof s.start === 'number' && typeof s.end === 'number' && s.text) {
+              sentenceAnchors.push({ start: s.start, end: s.end, text: String(s.text) });
+            }
+          }
+        }
+      } catch {}
+
       // Enrich segments with speaker info using diarization data (utterances or word-level speakers)
       try {
         const utterances = (result.results as any)?.utterances as DeepgramResponse['results']['utterances'] | undefined;
@@ -322,7 +358,9 @@ export class DeepgramService {
         segments,
         language: detectedLanguage,
         duration: result.metadata.duration,
-        srtText
+        srtText,
+        ...(wordsTimeline.length > 0 ? { words: wordsTimeline } : {}),
+        ...(sentenceAnchors.length > 0 ? { anchors: sentenceAnchors } : {})
       };
 
       if (this.DEBUG_RAW) {

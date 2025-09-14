@@ -38,10 +38,10 @@
   },
   "hero": {
     "title": "Audio to Text – Convert audio to text & subtitles instantly",
-    "description": "Upload audio files or paste links, get a 90-second preview instantly, then unlock the full transcription. Supports MP3, M4A, WAV, OGG with automatic language detection and bilingual output options.",
+    "description": "Upload audio files or paste links, get a 5-minute preview instantly, then unlock the full transcription. Supports MP3, M4A, WAV, OGG with automatic language detection and bilingual output options.",
     "show_tool": true,
     "tool_mode": "audio",
-    "tip": "Free 90-second preview • Auto language detection • 24h auto-delete"
+    "tip": "Free 5-minute preview • Auto language detection • 24h auto-delete"
   },
   "how_it_works": {
     "title": "How it works", 
@@ -53,7 +53,7 @@
         "icon": "RiUploadLine"
       },
       {
-        "title": "Get 90-second preview",
+        "title": "Get 5-minute preview",
         "description": "See TXT/SRT preview instantly to verify quality before full processing",
         "icon": "RiEyeLine"
       },
@@ -124,15 +124,15 @@
   "pricing": {
     "name": "pricing",
     "title": "Simple Pricing",
-    "description": "Start free with 90-second previews, then choose what works best for you",
+    "description": "Start free with 5-minute previews, then choose what works best for you",
     "items": [
       {
         "title": "Free Preview",
         "price": "$0",
         "unit": "Always",
-        "description": "90-second preview",
+        "description": "5-minute preview",
         "features": [
-          "90-second preview",
+          "5-minute preview",
           "TXT & SRT preview",
           "Basic quality",
           "No account required"
@@ -189,7 +189,7 @@
     "items": [
       {
         "title": "How to convert audio to text online?",
-        "description": "Upload your MP3, M4A, WAV, or OGG file, or paste a direct audio link. Get a 90-second preview to verify accuracy, then unlock the complete transcription with timestamps."
+        "description": "Upload your MP3, M4A, WAV, or OGG file, or paste a direct audio link. Get a 5-minute preview to verify accuracy, then unlock the complete transcription with timestamps."
       },
       {
         "title": "What audio formats are supported?",
@@ -240,7 +240,7 @@
     "name": "footer",
     "brand": {
       "title": "V2TX",
-      "description": "Convert videos and audio to text online. Free 90-second previews, multiple export formats including SRT, TXT, VTT, DOCX, and JSON.",
+      "description": "Convert videos and audio to text online. Free 5-minute previews, multiple export formats including SRT, TXT, VTT, DOCX, and JSON.",
       "logo": {
         "src": "/logo.png",
         "alt": "V2TX"

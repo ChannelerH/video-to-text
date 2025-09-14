@@ -16,6 +16,10 @@ export interface TranscriptionResult {
   language: string;
   duration: number;
   srtText?: string; // 原始 SRT 格式文本，带时间戳
+  // 可选：词/字符级时间线（Deepgram 可提供），用于润色后精确对齐
+  words?: Array<{ start: number; end: number; text: string }>;
+  // 可选：模型返回的句子级锚点（Deepgram paragraphs.sentences），用于限制对齐窗口
+  anchors?: Array<{ start: number; end: number; text: string }>;
 }
 
 export interface TranscriptionSegment {

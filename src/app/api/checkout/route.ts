@@ -201,6 +201,25 @@ async function stripeCheckout({
     cancel_url: cancel_url,
   };
 
+  // Intro offer: first-time PRO monthly -> apply coupon if configured
+  try {
+    const introCoupon = process.env.STRIPE_INTRO_COUPON_ID;
+    const isProMonthly = (order.product_id || '').toLowerCase() === 'pro-monthly' && order.interval === 'month';
+    if (introCoupon && isProMonthly) {
+      // Determine first purchase: if user has no paid orders yet, apply discount
+      const { getActiveOrdersByUserUuid } = await import('@/models/order');
+      const active = await getActiveOrdersByUserUuid(order.user_uuid);
+      const hasPaid = Array.isArray(active) && active.length > 0;
+      if (!hasPaid) {
+        // Stripe allows top-level discounts for checkout
+        (options as any).discounts = [{ coupon: introCoupon }];
+        if (options.subscription_data) {
+          (options.subscription_data as any).discounts = [{ coupon: introCoupon }];
+        }
+      }
+    }
+  } catch {}
+
   if (order.user_email) {
     options.customer_email = order.user_email;
   }

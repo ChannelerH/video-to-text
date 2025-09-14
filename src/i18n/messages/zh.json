@@ -1,7 +1,7 @@
 {
   "metadata": {
     "title": "V2TX - 视频转文字在线工具 | 免费视频转录",
-    "description": "V2TX 是最好的视频转文字在线工具。AI驱动的视频转录，即时将视频转换为文本。免费90秒预览，支持导出SRT、TXT、DOCX格式。",
+    "description": "V2TX 是最好的视频转文字在线工具。AI驱动的视频转录，即时将视频转换为文本。免费5分钟预览，支持导出SRT、TXT、DOCX格式。",
     "keywords": "V2TX, 视频转文字, 视频转录, 视频转文字工具, 在线视频转录, AI视频转文字, YouTube转文字"
   },
   "stats": {
@@ -155,9 +155,12 @@
   },
   "final_cta": {
     "title": "准备开始转写你的第一个视频？",
-    "description": "先体验 90 秒免费预览，随时升级解锁全部功能。",
+    "description": "先体验 5 分钟免费预览，随时升级解锁全部功能。",
     "get_started": "立即开始",
-    "urgency": "今天就开始节省时间 — 无需配置"
+    "urgency": "今天就开始节省时间 — 无需配置",
+    "instant_transcription": "即时转录",
+    "98_languages": "支持98+语言",
+    "no_credit_card": "无需信用卡"
   },
   "user": {
     "sign_in": "登录",
@@ -402,12 +405,12 @@
       "upload_success": "文件上传成功！准备转录。",
       "starting": "开始转录...",
       "chinese_upgrade": "当前语言为中文，已自动升级为高级模型进行处理，可能会稍微慢一点，请稍候。",
-      "generating_preview": "正在生成90秒预览...",
+      "generating_preview": "正在生成 5 分钟预览...",
       "processing_youtube": "正在处理 YouTube 视频...",
       "processing_audio_url": "正在处理来自 URL 的音频文件...",
       "processing_file": "正在处理文件转录...",
       "completed": "转录完成！",
-      "preview_ready": "已生成 90 秒预览。登录可获得完整结果并保存记录。",
+      "preview_ready": "已生成 5 分钟预览。登录可获得完整结果并保存记录。",
       "audio_transformed": "您的音频已转换为文本。"
     },
     "results": {
@@ -438,6 +441,7 @@
       "chapters": "章节",
       "summary": "摘要",
       "generating": "生成中...",
+      "usage_limits": "Basic：每项每日 10 次 · Pro：不限次",
       "advanced_export": "高级导出",
       "with_toc": "包含目录",
       "exporting": "导出中...",
@@ -463,10 +467,15 @@
       "show_chapters": "显示章节",
       "keyboard_shortcuts": "快捷键",
       "chapters": "章节",
+      "chapters_count": "个章节",
       "transcription_text": "转录文本",
       "play_pause": "播放/暂停",
       "previous_segment": "上一段",
-      "next_segment": "下一段"
+      "next_segment": "下一段",
+      "full_transcription": "完整转写",
+      "ai_smart_chapters": "AI 智能分章",
+      "generating_chapters": "生成中...",
+      "long_video_tip": "推荐用于长视频"
     },
     "upgrade": {
       "title": "升级您的套餐",
@@ -547,11 +556,16 @@
     },
     "preview": {
       "title": "仅预览",
-      "banner": "未登录：仅展示 90 秒预览",
+      "banner": "未登录：仅展示 5 分钟预览",
       "message": "登录后可进行完整转录，并将结果保存到历史记录。",
       "sign_in": "登录解锁完整结果",
       "download_disabled": "预览模式不可下载",
-      "download_preview": "下载预览"
+      "download_preview": "下载预览",
+      "preview_mode": "预览模式",
+      "unlock_full": "解锁完整内容",
+      "showing": "显示",
+      "locked_content": "还有 {minutes} 内容待解锁",
+      "upgrade_message": "升级以访问完整转录、所有导出格式和 AI 功能"
     },
     "social_proof": "★★★★★ 4.8 | 1000+ 次转换 | 覆盖 12 个国家",
     "high_accuracy": {
@@ -1029,7 +1043,7 @@
         },
         {
           "title": "可先用免费额度测试",
-          "description": "90秒免费预览，满意后再购买完整服务"
+          "description": "5 分钟免费预览，满意后再购买完整服务"
         },
         {
           "title": "批量处理节省更多时间",
@@ -1048,7 +1062,7 @@
       "demo_btn": "查看演示",
       "features": [
         {
-          "label": "90秒免费预览"
+          "label": "5 分钟免费预览"
         },
         {
           "label": "多种导出格式"
@@ -1096,5 +1110,15 @@
     "transcription_not_found_desc": "请求的转录记录未找到或您没有访问权限。"
   },
   "back_to_transcriptions": "返回转录列表",
-  "untitled_transcription": "无标题转录"
+  "untitled_transcription": "无标题转录",
+  "paywall": {
+    "preview_mode_message": "免费用户仅展示前 5 分钟样例与基础功能。升级 BASIC/PRO 解锁完整内容、完整说话人/AI 功能与全部导出格式。",
+    "upgrade_button": "去升级",
+    "editor_preview_message": "预览模式：仅显示前 5 分钟。升级 BASIC/PRO 解锁完整内容、完整说话人/AI 功能与全部导出格式。",
+    "intelligent_recommendation": "检测到：{reasons}。建议升级 PRO 使用高精度模型（更稳时间、优先处理、支持长音频）。",
+    "view_pro_plan": "查看 PRO 方案",
+    "multiple_speakers": "多人说话",
+    "long_audio": "长音频",
+    "sample_only": "仅样例（前 5 分钟）"
+  }
 }

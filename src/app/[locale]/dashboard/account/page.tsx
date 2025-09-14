@@ -19,6 +19,7 @@ import AccountActions from "@/components/dashboard/account-actions";
 import { db } from '@/db';
 import { users, transcriptions } from '@/db/schema';
 import { eq, and, gte, sql } from 'drizzle-orm';
+import { getMinuteSummary } from '@/services/minutes';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -74,6 +75,8 @@ export default async function AccountPage({
 
   const email = user?.email || '';
   const joinedDate = user?.created_at ? new Date(user.created_at) : new Date();
+  const summary = await getMinuteSummary(userUuid);
+  const fmt = (d?: string | null) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
 
   return (
     <div className="min-h-full bg-[#0a0a0f]">
@@ -211,6 +214,20 @@ export default async function AccountPage({
                       You're approaching your monthly limit
                     </p>
                   )}
+                </div>
+
+                {/* Minute Packs Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
+                  <div className="p-4 rounded-xl bg-gray-900/40 border border-gray-800">
+                    <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Standard minutes</div>
+                    <div className="text-white text-lg font-semibold">{summary.std} min</div>
+                    <div className="text-xs text-gray-400 mt-1">Active packs: {summary.stdPacks} · Earliest expiry: {fmt(summary.stdEarliestExpire)}</div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-gray-900/40 border border-gray-800">
+                    <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">High‑accuracy minutes</div>
+                    <div className="text-white text-lg font-semibold">{summary.ha} min</div>
+                    <div className="text-xs text-gray-400 mt-1">Active packs: {summary.haPacks} · Earliest expiry: {fmt(summary.haEarliestExpire)}</div>
+                  </div>
                 </div>
               </div>
             </div>

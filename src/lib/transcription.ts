@@ -4,10 +4,14 @@ import { UnifiedTranscriptionService } from './unified-transcription';
 import { transcriptionCache, CacheEntry } from './cache';
 import { CloudflareR2Service } from './r2-upload';
 import { localChinesePunctuate, localPunctuateSegmentsIfChinese, rebuildTextFromSegments } from './refine-local';
-import { alignSentencesWithSegments } from './sentence-align';
+import { alignSentencesWithSegments, alignSentencesOneToOne } from './sentence-align';
 import { punctuateTextLLM } from './punctuate-llm';
 import { fixLatinNoise, fixLatinNoiseInSegments } from './lexicon-fix';
 import crypto from 'crypto';
+import { POLICY } from '@/services/policy';
+
+// Unified preview window for all preview paths
+const PREVIEW_WINDOW_SEC = 90;
 
 export interface TranscriptionRequest {
   type: 'youtube_url' | 'file_upload' | 'audio_url';
@@ -192,6 +196,21 @@ export class TranscriptionService {
     }
 
     console.log(`Video info: ${videoInfo.title} (${videoInfo.duration}s)`);
+    // Enforce per-tier single file duration caps
+    try {
+      const { POLICY } = await import('@/services/policy');
+      const { UserTier } = await import('@/services/user-tier');
+      const tier = (request.options?.userTier as any) || UserTier.FREE;
+      const limits = POLICY.limits(tier);
+      const maxSec = (limits.maxFileMinutes || 0) * 60;
+      if (maxSec > 0 && videoInfo.duration > maxSec) {
+        return {
+          success: false,
+          error: `This video is too long for your plan. Max ${limits.maxFileMinutes} minutes. Upgrade`,
+          upgrade: { url: '/pricing', reason: 'file_duration_limit', required: 'upgrade' }
+        };
+      }
+    } catch {}
 
     // 4/5. 字幕处理策略：可通过环境变量或用户等级控制
     const skipCaptions = process.env.SKIP_YOUTUBE_CAPTIONS === 'true' || 
@@ -547,7 +566,7 @@ export class TranscriptionService {
       }
 
       // 确保我们有音频数据
-      if (!audioBuffer!) {
+      if (!audioBuffer) {
         throw new Error('Failed to download audio after all attempts');
       }
       console.log(`[Stage] youtube.download_audio ${Date.now() - _dlStart}ms`);
@@ -577,10 +596,57 @@ export class TranscriptionService {
         }
       ));
 
+      // Free用户：先切割音频到5分钟
+      let audioUrlForTranscription = uploadResult.url;
+      if (request.options?.trimToSeconds) {
+        console.log(`[FREE_CLIP] Starting audio clip for Free user:`, {
+          originalUrl: uploadResult.url,
+          targetSeconds: request.options.trimToSeconds,
+          videoId: videoInfo.videoId,
+          videoDuration: videoInfo.duration
+        });
+        
+        const clipStartTime = Date.now();
+        const { createWavClipFromUrl } = await import('./audio-clip');
+        const clipBuffer = await createWavClipFromUrl(uploadResult.url, request.options.trimToSeconds);
+        const clipDuration = Date.now() - clipStartTime;
+        
+        console.log(`[FREE_CLIP] Audio clipped successfully:`, {
+          clipBufferSize: clipBuffer.length,
+          clipSizeMB: (clipBuffer.length / 1024 / 1024).toFixed(2),
+          clipDurationMs: clipDuration,
+          requestedSeconds: request.options.trimToSeconds
+        });
+        
+        // 上传切割后的音频
+        const uploadStartTime = Date.now();
+        const clipUpload = await this.r2Service.uploadFile(
+          clipBuffer,
+          `youtube_free_clip_${videoInfo.videoId}_${Date.now()}.wav`,
+          'audio/wav',
+          {
+            folder: 'youtube-clips',
+            expiresIn: 2,
+            makePublic: true
+          }
+        );
+        audioUrlForTranscription = clipUpload.url;
+        
+        console.log(`[FREE_CLIP] Clipped audio uploaded:`, {
+          uploadDurationMs: Date.now() - uploadStartTime,
+          clippedUrl: clipUpload.url,
+          originalDuration: videoInfo.duration,
+          clippedDuration: request.options.trimToSeconds,
+          savingsPercent: ((1 - request.options.trimToSeconds / videoInfo.duration) * 100).toFixed(1)
+        });
+      } else {
+        console.log(`[FREE_CLIP] No clipping needed - using full audio`);
+      }
+      
       // 使用 R2 URL 进行转录
       // Do NOT infer language from title; rely on auto-detect + guard logic.
       const preferredLang = request.options?.language || 'auto';
-      const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(uploadResult.url, {
+      const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(audioUrlForTranscription, {
         language: preferredLang,
         userTier: request.options?.userTier, // 传递用户等级信息
         fallbackEnabled: request.options?.fallbackEnabled,
@@ -590,10 +656,10 @@ export class TranscriptionService {
       console.log('[TEST][YT-002] model.used', { model: 'deepgram_or_whisper_decided_above' });
 
       // Optional: overlay diarization for PRO users when enabled
-      const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && request.options?.userTier === 'pro';
+      const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && (request.options?.userTier === 'pro' || request.options?.userTier === 'basic');
       if (enableOverlay) {
         try {
-          const ok = await this.transcriptionService.addDiarizationFromUrl(uploadResult.url, transcription);
+          const ok = await this.transcriptionService.addDiarizationFromUrl(audioUrlForTranscription, transcription);
           console.log('[Overlay] diarization after-whisper', ok ? 'applied' : 'skipped');
         } catch {}
       }
@@ -619,21 +685,25 @@ export class TranscriptionService {
         }
       } catch {}
 
-      // 对齐最终文本句子到模型时间戳：仅在中文等需要强可读性的场景执行；
-      // 英文等情况下保持 Whisper 原始分段以保证时间更稳。
+      // 对齐最终文本句子到模型时间戳：
+      // - Deepgram：使用一对一映射，保持原始sentence时间戳
+      // - 非 Deepgram：使用原始 segment 窗口按句对齐（中文）
       try {
         const { isChineseLangOrText } = await import('./refine-local');
-        const shouldAlign = isChineseLangOrText(transcription.language, transcription.text);
-        if (shouldAlign) {
+        const isDeepgramOutput = !!(transcription as any).srtText; // DeepgramService 会设置 srtText
+        const isZh = isChineseLangOrText(transcription.language, transcription.text);
+        if (isZh) {
+          // 对中文内容重新对齐句子
+          // Deepgram有时会返回超长的sentence（如180秒的单个segment），需要重新分割
           transcription.segments = alignSentencesWithSegments(
             transcription.text,
             transcription.segments as any,
             transcription.language
           );
-          // Ensure SRT/VTT regenerated from updated sentence-level segments
           (transcription as any).srtText = undefined;
+          console.log('[Align] Sentence realignment applied for Chinese');
         } else {
-          console.log('[Align] Skipped sentence realignment for non-Chinese to preserve timing');
+          console.log('[Align] Skipped sentence realignment (not Chinese)');
         }
       } catch {}
 
@@ -776,8 +846,51 @@ export class TranscriptionService {
       ));
       console.log(`Audio uploaded to R2: ${uploadResult.key} (${Math.round(audioBuffer.length / 1024 / 1024)}MB)`);
 
+      // Free用户：先切割音频到5分钟
+      let audioUrlForTranscription = uploadResult.url;
+      if (request.options?.trimToSeconds) {
+        console.log(`[FREE_CLIP] Starting audio URL clip for Free user:`, {
+          originalUrl: uploadResult.url,
+          targetSeconds: request.options.trimToSeconds
+        });
+        
+        const clipStartTime = Date.now();
+        const { createWavClipFromUrl } = await import('./audio-clip');
+        const clipBuffer = await createWavClipFromUrl(uploadResult.url, request.options.trimToSeconds);
+        const clipDuration = Date.now() - clipStartTime;
+        
+        console.log(`[FREE_CLIP] Audio URL clipped successfully:`, {
+          clipBufferSize: clipBuffer.length,
+          clipSizeMB: (clipBuffer.length / 1024 / 1024).toFixed(2),
+          clipDurationMs: clipDuration,
+          requestedSeconds: request.options.trimToSeconds
+        });
+        
+        // 上传切割后的音频
+        const uploadStartTime = Date.now();
+        const clipUpload = await this.r2Service.uploadFile(
+          clipBuffer,
+          `audio_free_clip_${Date.now()}.wav`,
+          'audio/wav',
+          {
+            folder: 'audio-clips',
+            expiresIn: 2,
+            makePublic: true
+          }
+        );
+        audioUrlForTranscription = clipUpload.url;
+        
+        console.log(`[FREE_CLIP] Clipped audio URL uploaded:`, {
+          uploadDurationMs: Date.now() - uploadStartTime,
+          clippedUrl: clipUpload.url,
+          clippedDuration: request.options.trimToSeconds
+        });
+      } else {
+        console.log(`[FREE_CLIP] No clipping needed for audio URL - using full audio`);
+      }
+      
       // 5. 使用 R2 URL 进行转录
-      const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(uploadResult.url, {
+      const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(audioUrlForTranscription, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier, // 传递用户等级信息
         fallbackEnabled: request.options?.fallbackEnabled,
@@ -787,9 +900,9 @@ export class TranscriptionService {
       console.log('[TEST][HA-001] transcribe.audio_url.completed', { duration: transcription.duration, language: transcription.language });
 
       // 可选：为 PRO 用户叠加话者分离（Deepgram）
-      const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && request.options?.userTier === 'pro';
+      const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && (request.options?.userTier === 'pro' || request.options?.userTier === 'basic');
       if (enableOverlay) {
-        try { await this.transcriptionService.addDiarizationFromUrl(uploadResult.url, transcription); } catch {}
+        try { await this.transcriptionService.addDiarizationFromUrl(audioUrlForTranscription, transcription); } catch {}
       }
 
       // 6. 本地中文规范化（如适用）+ 英文术语修复 + 可选LLM标点增强
@@ -816,16 +929,20 @@ export class TranscriptionService {
       // 对齐最终文本句子到模型时间戳：仅在中文等需要强可读性的场景执行
       try {
         const { isChineseLangOrText } = await import('./refine-local');
-        const shouldAlign = isChineseLangOrText(transcription.language, transcription.text);
-        if (shouldAlign) {
+        const isDeepgramOutput = !!(transcription as any).srtText; // DeepgramService 会设置 srtText
+        const isZh = isChineseLangOrText(transcription.language, transcription.text);
+        if (isZh) {
+          // 对中文内容重新对齐句子
+          // Deepgram有时会返回超长的sentence（如180秒的单个segment），需要重新分割
           transcription.segments = alignSentencesWithSegments(
             transcription.text,
             transcription.segments as any,
             transcription.language
           );
           (transcription as any).srtText = undefined;
+          console.log('[Align] Sentence realignment applied for Chinese');
         } else {
-          console.log('[Align] Skipped sentence realignment for non-Chinese to preserve timing');
+          console.log('[Align] Skipped sentence realignment (not Chinese)');
         }
       } catch {}
 
@@ -834,6 +951,16 @@ export class TranscriptionService {
       console.log('[TEST][FMT-001] formats.generated', { txt: !!formats.txt, srt: !!formats.srt, vtt: !!formats.vtt, json: !!formats.json, md: !!formats.md });
 
       // （已禁用缓存）不写入缓存
+
+      // 档位单文件时长上限（音频直链）
+      try {
+        const tier = (request.options?.userTier as any) || 'free';
+        const limits = POLICY.limits(tier as any);
+        const maxSec = (limits.maxFileMinutes || 0) * 60;
+        if (maxSec > 0 && transcription.duration > maxSec) {
+          return { success: false, error: `This audio is too long for your plan. Max ${limits.maxFileMinutes} minutes. Upgrade`, upgrade: { url: '/pricing', reason: 'file_duration_limit', required: 'upgrade' } };
+        }
+      } catch {}
 
       // 9. 异步清理 R2 文件
       setTimeout(async () => {
@@ -1210,8 +1337,52 @@ export class TranscriptionService {
         });
       }
 
+      // Free用户：先切割音频到5分钟
+      let audioForTranscription = filePath;
+      if (request.options?.trimToSeconds) {
+        console.log(`[FREE_CLIP] Starting file upload clip for Free user:`, {
+          originalFile: filePath,
+          targetSeconds: request.options.trimToSeconds
+        });
+        
+        const clipStartTime = Date.now();
+        const { createWavClipFromUrl } = await import('./audio-clip');
+        const clipBuffer = await createWavClipFromUrl(filePath, request.options.trimToSeconds);
+        const clipDuration = Date.now() - clipStartTime;
+        
+        console.log(`[FREE_CLIP] File clipped successfully:`, {
+          clipBufferSize: clipBuffer.length,
+          clipSizeMB: (clipBuffer.length / 1024 / 1024).toFixed(2),
+          clipDurationMs: clipDuration,
+          requestedSeconds: request.options.trimToSeconds,
+          expectedWavSize: request.options.trimToSeconds * 16000 * 2 // 16kHz, 16-bit mono
+        });
+        
+        // 上传切割后的音频
+        const uploadStartTime = Date.now();
+        const clipUpload = await this.r2Service.uploadFile(
+          clipBuffer,
+          `file_free_clip_${Date.now()}.wav`,
+          'audio/wav',
+          {
+            folder: 'file-clips',
+            expiresIn: 2,
+            makePublic: true
+          }
+        );
+        audioForTranscription = clipUpload.url;
+        
+        console.log(`[FREE_CLIP] Clipped file uploaded:`, {
+          uploadDurationMs: Date.now() - uploadStartTime,
+          clippedUrl: clipUpload.url,
+          clippedDuration: request.options.trimToSeconds
+        });
+      } else {
+        console.log(`[FREE_CLIP] No clipping needed for file upload - using full audio`);
+      }
+      
       // 进行转录（根据用户等级选择模型）
-      const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(filePath, {
+      const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(audioForTranscription, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier, // 传递用户等级信息
         fallbackEnabled: request.options?.fallbackEnabled,
@@ -1219,10 +1390,20 @@ export class TranscriptionService {
         highAccuracyMode: request.options?.highAccuracyMode
       }));
 
+      // 档位单文件时长上限（文件上传）
+      try {
+        const tier = (request.options?.userTier as any) || 'free';
+        const limits = POLICY.limits(tier as any);
+        const maxSec = (limits.maxFileMinutes || 0) * 60;
+        if (maxSec > 0 && transcription.duration > maxSec) {
+          return { success: false, error: `This file is too long for your plan. Max ${limits.maxFileMinutes} minutes. Upgrade`, upgrade: { url: '/pricing', reason: 'file_duration_limit', required: 'upgrade' } };
+        }
+      } catch {}
+
       // 可选：为 PRO 用户叠加话者分离（Deepgram）
       const enableOverlayFile = !!request.options?.enableDiarizationAfterWhisper && request.options?.userTier === 'pro';
       if (enableOverlayFile) {
-        try { await this.transcriptionService.addDiarizationFromUrl(filePath, transcription); } catch {}
+        try { await this.transcriptionService.addDiarizationFromUrl(audioForTranscription, transcription); } catch {}
       }
 
       // Report processing phase
@@ -1258,12 +1439,30 @@ export class TranscriptionService {
 
       // 对齐最终文本句子到模型时间戳
       try {
-        transcription.segments = alignSentencesWithSegments(
-          transcription.text,
-          transcription.segments as any,
-          transcription.language
-        );
-        (transcription as any).srtText = undefined;
+        const { isChineseLangOrText } = await import('./refine-local');
+        const isDeepgramOutput = !!(transcription as any).srtText; // DeepgramService 会设置 srtText
+        const isZh = isChineseLangOrText(transcription.language, transcription.text);
+        if (isDeepgramOutput && isZh) {
+          // Deepgram已经提供了sentence级别的segments，只需一对一映射润色后的文本
+          transcription.segments = alignSentencesOneToOne(
+            transcription.text,
+            transcription.segments as any,
+            transcription.language,
+            transcription.duration
+          );
+          (transcription as any).srtText = undefined;
+          console.log('[Align] Deepgram one-to-one alignment applied');
+        } else if (isZh) {
+          transcription.segments = alignSentencesWithSegments(
+            transcription.text,
+            transcription.segments as any,
+            transcription.language
+          );
+          (transcription as any).srtText = undefined;
+          console.log('[Align] Non-Deepgram sentence alignment applied');
+        } else {
+          console.log('[Align] Skipped sentence realignment (not applicable)');
+        }
       } catch {}
 
       // Report formatting phase
@@ -1352,7 +1551,7 @@ export class TranscriptionService {
   }
 
   /**
-   * 生成90秒预览
+   * 生成预览（按策略时长，默认 5 分钟）
    */
   async generatePreview(request: TranscriptionRequest): Promise<TranscriptionResponse> {
     try {
@@ -1413,7 +1612,7 @@ export class TranscriptionService {
             if (isZh) {
               console.log('[Preview][YouTube] Detected Chinese caption, applying LLM refinement');
               // 先截取预览长度，然后润色
-              const previewText = this.truncateText(captionText, 90);
+              const previewText = this.truncateText(captionText, PREVIEW_WINDOW_SEC);
               const refined = await punctuateTextLLM(previewText, { 
                 language: 'zh',
                 isPreview: true,
@@ -1428,10 +1627,11 @@ export class TranscriptionService {
             console.warn('[Preview][YouTube] Caption LLM refinement failed:', error);
           }
           
+          const prevSec = PREVIEW_WINDOW_SEC;
           const preview = {
-            text: this.truncateText(processedText, 90),
-            srt: this.truncateSRT(captionSRT, 90),
-            duration: 90
+            text: this.truncateText(processedText, prevSec),
+            srt: this.truncateSRT(captionSRT, prevSec),
+            duration: prevSec
           };
           return { success: true, preview };
         } else {
@@ -1573,9 +1773,9 @@ export class TranscriptionService {
   private async generateFilePreview(request: TranscriptionRequest): Promise<TranscriptionResponse> {
     try {
       // 改为：先对原始 URL 生成 90s WAV 片段，再仅对片段转录
-      console.log('Generating file preview by clipping 90s WAV probe...');
+      console.log('Generating file preview by clipping a WAV probe (preview window)...');
       const { createWavClipFromUrl } = await import('./audio-clip');
-      console.log('[Preview] Clipping 90s WAV from file/audio URL (ffmpeg)');
+      console.log('[Preview] Clipping WAV from file/audio URL for preview window (ffmpeg)');
       const wavClip = await createWavClipFromUrl(request.content, 90);
 
       const clipUpload = await this.r2Service.uploadFile(
@@ -1664,9 +1864,9 @@ export class TranscriptionService {
         return res2;
       }
       
-      // 第三次尝试：如果前两次都失败，尝试90秒位置（跳过1分30秒的片头音乐）
+      // 第三次尝试：如果前两次都失败，尝试 90s 位置（更多跳过片头音乐的概率）
       if (!res2.isChinese && res2.language !== 'zh') {
-        console.log('[Probe] Second attempt still inconclusive, trying with 90s offset...');
+        console.log('[Probe] Second attempt still inconclusive, trying with ~90s offset...');
         const res3 = await attempt(15, 90);
         if (res3.isChinese || res3.language === 'zh') {
           return res3;
@@ -1711,7 +1911,7 @@ export class TranscriptionService {
       if (isZh) {
         console.log('[Preview] Detected Chinese content, applying LLM refinement for preview');
         // 先截取预览长度，然后润色（避免处理过长文本）
-        const previewText = this.truncateText(optimizedText, 90);
+        const previewText = this.truncateText(optimizedText, PREVIEW_WINDOW_SEC);
         
         // 应用LLM润色，使用预览专用配置（限制token数量）
         const refined = await punctuateTextLLM(previewText, { 
@@ -1730,10 +1930,11 @@ export class TranscriptionService {
       // 失败时使用原始文本，不影响预览生成
     }
     
+    const prevSec = PREVIEW_WINDOW_SEC;
     return {
-      text: this.truncateText(optimizedText, 90),
-      srt: this.truncateSRT(formats.srt || '', 90),
-      duration: Math.min(90, transcription.duration)
+      text: this.truncateText(optimizedText, prevSec),
+      srt: this.truncateSRT(formats.srt || '', prevSec),
+      duration: Math.min(prevSec, transcription.duration)
     };
   }
 

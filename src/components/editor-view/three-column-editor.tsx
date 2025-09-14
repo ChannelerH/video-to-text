@@ -16,12 +16,18 @@ import {
   Copy,
   Check,
   ChevronRight,
-  X
+  X,
+  ChevronDown,
+  FileText,
+  Download
 } from 'lucide-react';
 import { Volume2 } from 'lucide-react';
+import PreviewIndicator from '@/components/preview-indicator';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { UpgradeModal } from '@/components/upgrade-modal';
+import { useAppContext } from '@/contexts/app';
 import { suggestSpeakerNames } from '@/lib/speaker-suggest';
 
 interface ThreeColumnEditorProps {
@@ -33,6 +39,7 @@ interface ThreeColumnEditorProps {
   onClose?: () => void;
   backHref?: string;
   onSegmentsUpdate?: (segments: any[]) => void;
+  isPreviewMode?: boolean;
 }
 
 export default function ThreeColumnEditor({ 
@@ -43,9 +50,12 @@ export default function ThreeColumnEditor({
   transcription,
   onClose,
   backHref,
-  onSegmentsUpdate
+  onSegmentsUpdate,
+  isPreviewMode
 }: ThreeColumnEditorProps) {
-  const t = useTranslations('tool_interface');
+  const tPaywall = useTranslations('paywall');
+  const { userTier } = useAppContext();
+  const isFreeTier = (userTier || 'free') === 'free';
   
   // Debug: Log props on mount
   console.log('[Audio Debug] ThreeColumnEditor mounted with audioUrl:', audioUrl);
@@ -62,7 +72,9 @@ export default function ThreeColumnEditor({
   const DEBUG = typeof window !== 'undefined' && window.localStorage?.getItem?.('debug-audio') === '1';
   const dlog = (...args: any[]) => { if (DEBUG) console.log('[EditorAudio]', ...args); };
   const [saving, setSaving] = useState(false);
-  const [exporting, setExporting] = useState<null | 'docx' | 'pdf'>(null);
+  const [exporting, setExporting] = useState<null | 'docx' | 'pdf' | 'txt' | 'srt' | 'vtt' | 'json' | 'md'>(null);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [editingChapter, setEditingChapter] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -93,6 +105,19 @@ export default function ThreeColumnEditor({
   const [generatingChapters, setGeneratingChapters] = useState<boolean>(false);
   const hasShownAudioLoadedToast = useRef(false);
   const [changingSpeakerForSegment, setChangingSpeakerForSegment] = useState<number | null>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  // Intelligent recommendation: suggest PRO high accuracy
+  const recommend = (() => {
+    try {
+      const uniqueSpeakers = Array.from(new Set((segments || []).map((s: any) => s.speaker).filter(Boolean))).length;
+      const durationSec = Number(transcription?.duration || transcription?.duration_sec || 0);
+      const reasons: string[] = [];
+      if (uniqueSpeakers >= 2) reasons.push(tPaywall('multiple_speakers'));
+      if (durationSec >= 3600) reasons.push(tPaywall('long_audio'));
+      if (reasons.length === 0) return null;
+      return { reasons, durationSec };
+    } catch { return null; }
+  })();
   
   // Generate consistent color for speaker name
   const getSpeakerColor = (speakerName: string | null | undefined): string => {
@@ -162,30 +187,25 @@ export default function ThreeColumnEditor({
     setVolume
   } = usePlayerStore();
 
+
   // Initialize chapters once, or when there are no chapters yet.
   // Avoid overriding user edits on unrelated re-renders (e.g., transcription object changes).
   useEffect(() => {
     if (chapters && chapters.length > 0) return; // already initialized; don't clobber edits
 
-    const chaptersToUse = initialChapters.length > 0 ? initialChapters : [{
-      id: 'full',
-      title: 'Full Transcription',
-      startTime: 0,
-      endTime: transcription?.duration || 60,
-      segments: segments
-    }];
+    // Set default chapter if no chapters exist
+    const chaptersToUse = initialChapters.length > 0 && !initialChapters[0]?._needsAIGeneration 
+      ? initialChapters 
+      : [{
+        id: 'full',
+        title: 'Full Transcription',
+        startTime: 0,
+        endTime: transcription?.duration || 60,
+        segments: segments
+      }];
     setChapters(chaptersToUse);
     if (transcription?.duration) {
       setDuration(transcription.duration);
-    }
-    
-    // Check if we need to auto-generate AI chapters
-    if (initialChapters.length > 0 && initialChapters[0]?._needsAIGeneration && segments.length > 0) {
-      console.log('[Editor] Auto-generating AI chapters after page load');
-      // Small delay to ensure page is fully rendered
-      setTimeout(() => {
-        generateAIChapters();
-      }, 500);
     }
   }, [chapters, initialChapters, transcription]);
   
@@ -213,8 +233,9 @@ export default function ThreeColumnEditor({
         })
       });
       
+      const result = await response.json();
+      
       if (response.ok) {
-        const result = await response.json();
         if (result.data?.chapters && result.data.chapters.length > 0) {
           console.log('AI chapters generated:', result.data.chapters.length);
           setChapters(result.data.chapters);
@@ -223,7 +244,34 @@ export default function ThreeColumnEditor({
           toast.warning('No chapters generated. Try manual splitting instead.');
         }
       } else {
-        toast.error('Failed to generate AI chapters. Please try again.');
+        // Handle specific error cases
+        if (response.status === 403) {
+          if (result.error?.includes('本月次数已用尽') || result.error?.includes('monthly limit')) {
+            toast.error(
+              <div className="flex flex-col gap-1">
+                <span>You've used all 10 free AI chapters this month</span>
+                <a href="/pricing" className="text-blue-400 hover:text-blue-300 underline text-sm">
+                  Upgrade to Pro for unlimited AI features
+                </a>
+              </div>
+            );
+            setShowUpgrade(true);
+          } else if (result.error?.includes('今日次数已达上限') || result.error?.includes('daily limit')) {
+            toast.error('Daily AI chapter limit reached. Try again tomorrow.');
+          } else {
+            toast.error(
+              <div className="flex flex-col gap-1">
+                <span>AI chapters not available for your plan</span>
+                <a href="/pricing" className="text-blue-400 hover:text-blue-300 underline text-sm">
+                  Upgrade to unlock AI features
+                </a>
+              </div>
+            );
+            setShowUpgrade(true);
+          }
+        } else {
+          toast.error(result.error || 'Failed to generate AI chapters. Please try again.');
+        }
       }
     } catch (error) {
       console.error('Failed to generate AI chapters:', error);
@@ -270,6 +318,71 @@ export default function ThreeColumnEditor({
       }
     } catch {}
   }, [segments, initialSpeakers]);
+
+  // Handle click outside of export dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setShowExportDropdown(false);
+      }
+    };
+
+    if (showExportDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showExportDropdown]);
+
+  // Handle export for different formats
+  const handleExport = async (format: 'txt' | 'srt' | 'vtt' | 'json' | 'md' | 'docx' | 'pdf') => {
+    if (isPreviewMode && !['txt', 'srt', 'vtt', 'json', 'md'].includes(format)) {
+      setShowUpgrade(true);
+      return;
+    }
+
+    try {
+      setExporting(format);
+      setShowExportDropdown(false);
+      
+      // Show preview warning for free users
+      if (isPreviewMode) {
+        toast.info('Exporting first 5 minutes only (Free preview)', {
+          duration: 4000,
+          icon: '⚠️'
+        });
+      }
+      
+      const jobId = (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '') as string;
+      const a = document.createElement('a');
+      
+      if (format === 'docx' || format === 'pdf') {
+        a.href = `/api/transcriptions/${jobId}/export?format=${format}`;
+      } else {
+        a.href = `/api/transcriptions/${jobId}/export-format?format=${format}`;
+      }
+      
+      a.click();
+      
+      // Add a delay to show loading state
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Success message with preview reminder
+      if (isPreviewMode) {
+        toast.success(`${format.toUpperCase()} exported (first 5 minutes)`, {
+          description: 'Upgrade to export full content'
+        });
+      } else {
+        toast.success(`${format.toUpperCase()} exported successfully`);
+      }
+    } catch (error) {
+      toast.error(`Failed to export ${format.toUpperCase()}`);
+    } finally {
+      setExporting(null);
+    }
+  };
 
   // Initialize WaveSurfer
   useEffect(() => {
@@ -911,60 +1024,106 @@ export default function ThreeColumnEditor({
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
-          <button
-            onClick={async () => {
-              try {
-                setExporting('docx');
-                const jobId = (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '') as string;
-                const a = document.createElement('a');
-                a.href = `/api/transcriptions/${jobId}/export?format=docx`;
-                a.click();
-                // Add a delay to show loading state
-                await new Promise(resolve => setTimeout(resolve, 1500));
-              } finally { setExporting(null); }
-            }}
-            disabled={exporting === 'docx'}
-            className="px-3 py-1.5 text-xs rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-200 inline-flex items-center gap-1.5"
-          >
-            {exporting === 'docx' ? (
-              <>
-                <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Exporting...</span>
-              </>
-            ) : (
-              'Export Word'
+          {/* Export dropdown */}
+          <div className="relative" ref={exportDropdownRef}>
+            <button
+              onClick={() => setShowExportDropdown(!showExportDropdown)}
+              disabled={exporting !== null}
+              className="px-3 py-1.5 text-xs rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-200 inline-flex items-center gap-1.5"
+            >
+              {exporting ? (
+                <>
+                  <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Exporting...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3 h-3" />
+                  <span>Export</span>
+                  {isPreviewMode && (
+                    <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">5 min</span>
+                  )}
+                  <ChevronDown className="w-3 h-3" />
+                </>
+              )}
+            </button>
+            
+            {/* Dropdown menu */}
+            {showExportDropdown && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-50">
+                <div className="py-1">
+                  <button
+                    onClick={() => handleExport('docx')}
+                    className="w-full px-3 py-2 text-xs text-left hover:bg-gray-800 text-gray-200 flex items-center gap-2"
+                  >
+                    <FileText className="w-3 h-3" />
+                    <span>Word (.docx)</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('pdf')}
+                    className="w-full px-3 py-2 text-xs text-left hover:bg-gray-800 text-gray-200 flex items-center gap-2"
+                  >
+                    <FileText className="w-3 h-3" />
+                    <span>PDF (.pdf)</span>
+                  </button>
+                  <div className="border-t border-gray-800 my-1"></div>
+                  <button
+                    onClick={() => handleExport('txt')}
+                    className="w-full px-3 py-2 text-xs text-left hover:bg-gray-800 text-gray-200 flex items-center gap-2"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Plain Text (.txt)</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('srt')}
+                    className="w-full px-3 py-2 text-xs text-left hover:bg-gray-800 text-gray-200 flex items-center gap-2"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>SubRip (.srt)</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('vtt')}
+                    className="w-full px-3 py-2 text-xs text-left hover:bg-gray-800 text-gray-200 flex items-center gap-2"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>WebVTT (.vtt)</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('json')}
+                    className="w-full px-3 py-2 text-xs text-left hover:bg-gray-800 text-gray-200 flex items-center gap-2"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>JSON (.json)</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('md')}
+                    className="w-full px-3 py-2 text-xs text-left hover:bg-gray-800 text-gray-200 flex items-center gap-2"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Markdown (.md)</span>
+                  </button>
+                </div>
+                {isPreviewMode && (
+                  <div className="px-3 py-2 border-t border-gray-800 bg-amber-500/10">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-amber-400 font-medium">Preview Mode (First 5 min)</span>
+                        <a href="/pricing" className="text-[10px] text-blue-400 hover:text-blue-300 underline">
+                          Upgrade for full content
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
-          </button>
-          <button
-            onClick={async () => {
-              try {
-                setExporting('pdf');
-                const jobId = (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '') as string;
-                const a = document.createElement('a');
-                a.href = `/api/transcriptions/${jobId}/export?format=pdf`;
-                a.click();
-                // Add a delay to show loading state
-                await new Promise(resolve => setTimeout(resolve, 1500));
-              } finally { setExporting(null); }
-            }}
-            disabled={exporting === 'pdf'}
-            className="px-3 py-1.5 text-xs rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-200 inline-flex items-center gap-1.5"
-          >
-            {exporting === 'pdf' ? (
-              <>
-                <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Exporting...</span>
-              </>
-            ) : (
-              'Export PDF'
-            )}
-          </button>
+          </div>
           {onClose && (
             <button
               onClick={() => onClose()}
@@ -975,6 +1134,33 @@ export default function ThreeColumnEditor({
           )}
         </div>
       </div>
+      {/* Preview mode indicator for Free users */}
+      {isPreviewMode && (
+        <div className="mx-4 mb-3">
+          <PreviewIndicator
+            totalSeconds={transcription?.duration || transcription?.duration_sec || 0}
+            previewSeconds={300}
+            locale={typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en'}
+          />
+        </div>
+      )}
+
+      {/* Intelligent recommendation bar */}
+      {recommend && (
+        <div className="mx-4 -mt-2 mb-3 p-3 rounded-lg border border-purple-400/30 bg-purple-500/5 text-purple-200 text-sm flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            {tPaywall('intelligent_recommendation', { reasons: recommend.reasons.join(' / ') })}
+          </div>
+          <a href="/pricing" className="px-3 py-1.5 rounded bg-purple-400/20 hover:bg-purple-400/30 text-xs">{tPaywall('view_pro_plan')}</a>
+        </div>
+      )}
+      {/* Upgrade modal before full export */}
+      <UpgradeModal 
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        requiredTier={'basic'}
+        feature={'Full export'}
+      />
       
       {/* Main Content Area - Three Columns - Takes remaining space minus audio player */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -984,17 +1170,34 @@ export default function ThreeColumnEditor({
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-sm font-medium text-white">Chapters</h4>
-                <p className="text-xs text-gray-500 mt-1">
-                  {chapters.length} chapters • {formatTime(duration)}
-                </p>
               </div>
               {chapters.length === 1 && chapters[0].title === 'Full Transcription' && (
-                <button
-                  onClick={generateAIChapters}
-                  className="px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
-                >
-                  Generate AI Chapters
-                </button>
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={generateAIChapters}
+                      disabled={generatingChapters}
+                      className="px-3 py-1.5 text-xs bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                    >
+                      {generatingChapters ? (
+                        <>
+                          <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <span>Generate Chapters</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -1164,12 +1367,13 @@ export default function ThreeColumnEditor({
             ) : (
             segments.map((segment, idx) => {
               const isActive = (currentTime >= segment.start && currentTime < segment.end) || manualHighlightIdx === idx;
-              // Display logic: for numeric IDs show "Speaker N", for others show as-is
+              // Display logic: for numeric IDs show "Speaker N" (1-based), for others show as-is
               let speakerName = null;
               if (segment.speaker) {
                 if (/^\d+$/.test(segment.speaker)) {
-                  // If it's a pure number, display as "Speaker N"
-                  speakerName = `Speaker ${segment.speaker}`;
+                  // If it's a pure number, display as "Speaker N" (1-based)
+                  const n = parseInt(String(segment.speaker), 10);
+                  speakerName = `Speaker ${isNaN(n) ? segment.speaker : n + 1}`;
                 } else {
                   // For non-numeric values, display as-is
                   speakerName = segment.speaker;
@@ -1316,6 +1520,7 @@ export default function ThreeColumnEditor({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (isFreeTier) { setShowUpgrade(true); return; }
                             setChangingSpeakerForSegment(idx);
                           }}
                           className="px-2 py-1 text-[10px] bg-purple-600 hover:bg-purple-700 rounded text-white"
@@ -1390,10 +1595,11 @@ export default function ThreeColumnEditor({
               const segCount = segments.filter((s: any) => s.speaker === sp.id || s.speaker === sp.label).length;
               const sugs = (speakerSuggestions[sp.id] || []).slice(0,3);
               
-              // Display logic: for numeric IDs show "Speaker N", for others show as-is
+              // Display logic: for numeric IDs show "Speaker N" (1-based), for others show as-is
               let displayName = sp.label;
               if (/^\d+$/.test(sp.id)) {
-                displayName = `Speaker ${sp.id}`;
+                const n = parseInt(sp.id, 10);
+                displayName = `Speaker ${isNaN(n) ? sp.id : n + 1}`;
               } else if (!sp.label || sp.label === sp.id) {
                 displayName = sp.id;
               }
@@ -1478,6 +1684,7 @@ export default function ThreeColumnEditor({
                         <div className="flex items-center justify-between">
                           <div className="text-sm font-medium text-white">{displayName}</div>
                           <button onClick={() => {
+                            if (isFreeTier) { setShowUpgrade(true); return; }
                             console.log('Rename button clicked for speaker:', sp.id);
                             setEditingSpeakerId(sp.id);
                           }} className="text-xs text-gray-400 hover:text-gray-200">Rename</button>
@@ -1494,6 +1701,7 @@ export default function ThreeColumnEditor({
                           <button
                             key={idx}
                             onClick={() => {
+                              if (isFreeTier) { setShowUpgrade(true); return; }
                               // Update all segments with this speaker ID to use the new name
                               const updatedSegments = segments.map((seg: any) => {
                                 if (seg.speaker === sp.id) {
@@ -1549,67 +1757,93 @@ export default function ThreeColumnEditor({
               </div>
               
               {!generatedSummary ? (
-                <button
-                  onClick={async () => {
-                    if (generatingSummary) return;
-                    
-                    setGeneratingSummary(true);
-                    try {
-                      const jobId = (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '') as string;
-                      console.log('Generating summary for job:', jobId);
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={async () => {
+                      if (generatingSummary) return;
                       
-                      const response = await fetch(`/api/transcriptions/${jobId}/summary`, {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                          segments: segments,
-                          options: {
-                            language: transcription?.language || 'auto',
-                            maxLength: 200
+                      setGeneratingSummary(true);
+                      try {
+                        const jobId = (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '') as string;
+                        console.log('Generating summary for job:', jobId);
+                        
+                        const response = await fetch(`/api/transcriptions/${jobId}/summary`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            segments: segments,
+                            options: {
+                              language: transcription?.language || 'auto',
+                              maxLength: 200
+                            }
+                          })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                          if (data.data && data.data.summary) {
+                            console.log('Summary generated:', data.data.summary);
+                            toast.success('Summary generated successfully');
+                            setGeneratedSummary(data.data.summary);
                           }
-                        })
-                      });
-                      
-                      if (!response.ok) {
-                        throw new Error('Failed to generate summary');
+                        } else {
+                          // Handle specific error cases
+                          if (response.status === 403) {
+                            if (data.error?.includes('本月次数已用尽') || data.error?.includes('monthly limit')) {
+                              toast.error(
+                                <div className="flex flex-col gap-1">
+                                  <span>You've used all 10 free AI summaries this month</span>
+                                  <a href="/pricing" className="text-blue-400 hover:text-blue-300 underline text-sm">
+                                    Upgrade to Pro for unlimited AI features
+                                  </a>
+                                </div>
+                              );
+                            } else {
+                              toast.error(
+                                <div className="flex flex-col gap-1">
+                                  <span>AI summary not available for your plan</span>
+                                  <a href="/pricing" className="text-blue-400 hover:text-blue-300 underline text-sm">
+                                    Upgrade to unlock AI features
+                                  </a>
+                                </div>
+                              );
+                            }
+                          } else {
+                            toast.error(data.error || 'Failed to generate summary');
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Error generating summary:', error);
+                        toast.error('Failed to generate summary');
+                      } finally {
+                        setGeneratingSummary(false);
                       }
-                      
-                      const data = await response.json();
-                      if (data.data && data.data.summary) {
-                        console.log('Summary generated:', data.data.summary);
-                        toast.success('Summary generated successfully');
-                        setGeneratedSummary(data.data.summary);
-                      }
-                    } catch (error) {
-                      console.error('Error generating summary:', error);
-                      toast.error('Failed to generate summary');
-                    } finally {
-                      setGeneratingSummary(false);
-                    }
-                  }}
-                  disabled={generatingSummary}
-                  className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2"
-                >
-                  {generatingSummary ? (
-                    <>
-                      <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Generating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      </svg>
-                      <span>Generate Summary</span>
-                    </>
-                  )}
-                </button>
+                    }}
+                    disabled={generatingSummary}
+                    className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2"
+                  >
+                    {generatingSummary ? (
+                      <>
+                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                        <span>Generate Summary</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               ) : (
                 <div className="p-3 bg-gray-900/40 rounded-lg border border-gray-800">
                   <p className="text-xs text-gray-200 leading-relaxed whitespace-pre-wrap">

@@ -24,6 +24,7 @@ interface EditorWrapperProps {
   transcription: any;
   onClose?: () => void;
   backHref?: string;
+  isPreviewMode?: boolean;
 }
 
 export default function EditorWrapper(props: EditorWrapperProps) {

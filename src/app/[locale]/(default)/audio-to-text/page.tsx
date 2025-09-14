@@ -1,7 +1,7 @@
 import Hero from "@/components/blocks/hero";
 import Feature1 from "@/components/blocks/feature1";
 import Feature from "@/components/blocks/feature";
-import FAQ from "@/components/blocks/faq";
+import FAQ from "@/components/blocks/faq/server";
 import PricingCTA from "@/components/blocks/pricing-cta";
 import { setRequestLocale } from "next-intl/server";
 
@@ -22,8 +22,8 @@ export async function generateMetadata({
   }
 
   return {
-    title: "Audio to Text Online – Upload or paste MP3/M4A/WAV, free 90s preview, export TXT/SRT",
-    description: "Convert audio to text instantly. Upload MP3, M4A, WAV files or paste audio links. Free 90-second preview, automatic language detection, export multiple formats.",
+    title: "Audio to Text Online – Upload or paste MP3/M4A/WAV, free 5-minute preview, export TXT/SRT",
+    description: "Convert audio to text instantly. Upload MP3, M4A, WAV files or paste audio links. Free 5-minute preview, automatic language detection, export multiple formats.",
     keywords: "audio to text, audio transcription, MP3 to text, voice to text, podcast transcription, audio subtitles",
     alternates: {
       canonical: canonicalUrl,
@@ -72,8 +72,8 @@ export default async function AudioToTextPage({
       {page.how_it_works && <Feature section={page.how_it_works} />}
       {page.tool_description && <Feature1 section={page.tool_description} />}
       {page.export_formats && <Feature section={page.export_formats} />}
-      <PricingCTA />
-      {page.faq && <FAQ section={page.faq} />}
+      <PricingCTA locale={locale} />
+      {page.faq && <FAQ section={page.faq} locale={locale} />}
     </>
   );
 }
