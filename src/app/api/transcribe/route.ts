@@ -207,8 +207,8 @@ export async function POST(request: NextRequest) {
       // 获取用户等级
       const userTier = await getUserTier(user_uuid);
       
-      // Free用户限制：检查视频时长
-      if (userTier === UserTier.FREE && type === 'youtube') {
+      // Free用户限制：检查视频时长（YouTube URL）
+      if (userTier === UserTier.FREE && type === 'youtube_url') {
         try {
           const { YouTubeService } = await import('@/lib/youtube');
           const videoInfo = await YouTubeService.getVideoInfo(content);
@@ -237,14 +237,24 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // Free用户限制：上传文件
-      if (userTier === UserTier.FREE && type === 'file') {
+      // Free用户限制：上传文件（用户文件）
+      if (userTier === UserTier.FREE && type === 'file_upload') {
         // 对于文件上传，我们无法预先知道时长，但可以在转录后检查
         // 标记需要在转录后截断
         options.trimToSeconds = POLICY.preview.freePreviewSeconds || 300;
         console.log('[FREE_CLIP][API] Free user file upload - will clip to:', {
           userTier,
           type: 'file',
+          trimToSeconds: options.trimToSeconds
+        });
+      }
+
+      // Free用户限制：直链音频，也统一裁剪到预览时长
+      if (userTier === UserTier.FREE && type === 'audio_url') {
+        options.trimToSeconds = POLICY.preview.freePreviewSeconds || 300;
+        console.log('[FREE_CLIP][API] Free user audio_url - will clip to:', {
+          userTier,
+          type: 'audio_url',
           trimToSeconds: options.trimToSeconds
         });
       }

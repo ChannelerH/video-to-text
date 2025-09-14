@@ -35,7 +35,7 @@ export class DocumentExportService {
     chapters: BasicChapter[] = [],
     summary: string = '',
     options: Partial<ExportOptions> = {}
-  ): Promise<Blob> {
+  ): Promise<Blob | ArrayBuffer | Buffer> {
     // Dynamic import to reduce bundle size
     const { Document, Packer, Paragraph, TextRun, HeadingLevel, PageBreak, AlignmentType, TableOfContents } = await import('docx');
     
@@ -112,14 +112,15 @@ export class DocumentExportService {
       }]
     });
     
-    // In Node (API routes), prefer toBuffer for reliability.
+    // In Node (API routes), return raw Buffer/ArrayBuffer for maximum compatibility
     if (typeof window === 'undefined') {
       const buffer = await Packer.toBuffer(doc);
-      return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-    } else {
-      const blob = await Packer.toBlob(doc);
-      return blob;
+      // Some Node runtimes (<=18) may not have global Blob; return Buffer directly
+      return buffer as unknown as Buffer;
     }
+    // Browser: return Blob
+    const blob = await Packer.toBlob(doc);
+    return blob;
   }
   
   /**
@@ -135,15 +136,95 @@ export class DocumentExportService {
     chapters: BasicChapter[] = [],
     summary: string = '',
     options: Partial<ExportOptions> = {}
-  ): Promise<Blob> {
+  ): Promise<Blob | ArrayBuffer | Buffer> {
     // Use jsPDF for PDF generation
     const { jsPDF } = await import('jspdf');
     
+    // Helpers
+    const hasCJK = (s: string) => /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(s);
+    const toBase64 = (ab: ArrayBuffer): string => {
+      if (typeof Buffer !== 'undefined') {
+        // Node
+        return Buffer.from(new Uint8Array(ab)).toString('base64');
+      }
+      // Browser
+      let binary = '';
+      const bytes = new Uint8Array(ab);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    };
+    const tryLoadCJKFont = async (): Promise<null | { name: string; file: string }> => {
+      try {
+        // Prefer local public font if present
+        if (typeof window === 'undefined') {
+          try {
+            const { readFile } = await import('fs/promises');
+            const pathCandidates = [
+              `${process.cwd()}/public/fonts/NotoSansSC-Regular.ttf`,
+              `${process.cwd()}/public/fonts/NotoSansSC-Regular.otf`
+            ];
+            for (const p of pathCandidates) {
+              try {
+                const buf = await readFile(p);
+                return { name: p.endsWith('.otf') ? 'NotoSansSC-Regular.otf' : 'NotoSansSC-Regular.ttf', file: buf.toString('base64') };
+              } catch {}
+            }
+          } catch {}
+        } else {
+          const localUrls = [
+            '/fonts/NotoSansSC-Regular.ttf',
+            '/fonts/NotoSansSC-Regular.otf'
+          ];
+          for (const url of localUrls) {
+            try {
+              const resp = await fetch(url);
+              if (resp.ok) {
+                const ab = await resp.arrayBuffer();
+                return { name: url.endsWith('.otf') ? 'NotoSansSC-Regular.otf' : 'NotoSansSC-Regular.ttf', file: toBase64(ab) };
+              }
+            } catch {}
+          }
+        }
+        // Fallback to CDN (prefer TTF for compatibility)
+        const cdn = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/TTF/SimplifiedChinese/NotoSansSC-Regular.ttf';
+        const resp = await fetch(cdn);
+        if (resp.ok) {
+          const ab = await resp.arrayBuffer();
+          return { name: 'NotoSansSC-Regular.ttf', file: toBase64(ab) };
+        }
+      } catch {}
+      return null;
+    };
+    // Determine if we need a CJK font
+    const title = options.metadata?.title || 'Transcription Document';
+    const combined = [
+      title,
+      transcription.text || '',
+      (chapters || []).map(c => c.title).join('\n')
+    ].join('\n');
+    let cjkLoaded = false;
+    let cjkFontName = 'NotoSansSC';
+
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
+
+    // Try to load CJK font if Chinese/Japanese/Korean detected
+    if (hasCJK(combined)) {
+      try {
+        const f = await tryLoadCJKFont();
+        if (f) {
+          (doc as any).addFileToVFS(f.name, f.file);
+          (doc as any).addFont(f.name, cjkFontName, 'normal');
+          doc.setFont(cjkFontName, 'normal');
+          cjkLoaded = true;
+        }
+      } catch {}
+    }
+    try { console.log('[PDF] CJK detection:', { detected: hasCJK(combined), cjkLoaded, cjkFontName }); } catch {}
     
     let yPosition = 20;
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -153,36 +234,55 @@ export class DocumentExportService {
     
     // Helper function to add text with automatic page breaks
     const addText = (text: string, fontSize: number = 12, isBold: boolean = false) => {
+      // 1) 清洗文本：去零宽字符、统一换行
+      const sanitize = (s: string) => s
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\r\n/g, '\n');
+      const content = sanitize(text || '');
+
+      // 2) 字体与字号
       doc.setFontSize(fontSize);
-      if (isBold) {
-        doc.setFont('helvetica', 'bold');
+      if (cjkLoaded) {
+        doc.setFont(cjkFontName, 'normal');
       } else {
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
       }
-      
-      const lines = doc.splitTextToSize(text, contentWidth);
-      
+
+      // 3) 自动换行（统一用 splitTextToSize；CJK 也能按宽度拆分）
+      const lines = doc.splitTextToSize(content, contentWidth);
+
+      // 4) 行距（适当加大，避免叠行）
+      const lineHeight = Math.max(6, fontSize * 0.68);
+
       for (const line of lines) {
         if (yPosition > pageHeight - margins.bottom) {
           doc.addPage();
           yPosition = margins.top;
+          // 新页需继续设置字体
+          if (cjkLoaded) doc.setFont(cjkFontName, 'normal');
+          else doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+          doc.setFontSize(fontSize);
         }
         doc.text(line, margins.left, yPosition);
-        yPosition += fontSize * 0.4;
+        yPosition += lineHeight;
       }
-      yPosition += 5;
+      // 段后间距
+      yPosition += Math.max(4, fontSize * 0.15);
     };
     
-    // Title
+    // Title (wrap and center)
     doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.text(options.metadata?.title || 'Transcription Document', pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 15;
+    if (!cjkLoaded) doc.setFont('helvetica', 'bold'); else doc.setFont(cjkFontName, 'normal');
+    const titleLines = doc.splitTextToSize(title, contentWidth);
+    titleLines.forEach((line: string, idx: number) => {
+      doc.text(line, pageWidth / 2, yPosition + idx * 9, { align: 'center' });
+    });
+    yPosition += Math.max(15, titleLines.length * 9 + 6);
     
     // Metadata
     if (options.metadata) {
       doc.setFontSize(12);
-      doc.setFont('helvetica', 'normal');
+      if (!cjkLoaded) doc.setFont('helvetica', 'normal'); else doc.setFont(cjkFontName, 'normal');
       doc.text(`Date: ${options.metadata.date || new Date().toLocaleDateString()}`, pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 7;
       doc.text(`Language: ${transcription.language || 'Unknown'}`, pageWidth / 2, yPosition, { align: 'center' });
@@ -255,7 +355,12 @@ export class DocumentExportService {
       }
     }
     
-    return doc.output('blob');
+    // In Node (API routes), return ArrayBuffer/Buffer for maximum compatibility
+    if (typeof window === 'undefined') {
+      const arr = doc.output('arraybuffer') as ArrayBuffer;
+      return arr;
+    }
+    return doc.output('blob') as Blob;
   }
   
   /**

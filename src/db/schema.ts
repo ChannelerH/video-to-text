@@ -156,6 +156,7 @@ export const transcriptions = pgTable("v2tx_transcriptions", {
   title: varchar({ length: 512 }),
   language: varchar({ length: 50 }),
   duration_sec: integer().notNull().default(0),
+  original_duration_sec: integer().notNull().default(0),
   cost_minutes: integer().notNull().default(0),
   status: varchar({ length: 50 }).notNull().default("completed"),
   created_at: timestamp({ withTimezone: true }),

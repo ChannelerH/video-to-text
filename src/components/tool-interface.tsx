@@ -923,8 +923,62 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       }
       // 无 jobId（极少），前端兜底
       let content = result.data.formats[format];
-      if (isFreeTier && format === 'txt' && typeof content === 'string') {
-        content = content.replace(/^Speaker\s+\d+:\s*/gm, '');
+      // Enforce Free preview trimming when falling back client-side
+      if (isFreeTier) {
+        const maxSec = 300;
+        const orig = result.data.transcription;
+        const trimmedSegments = (orig.segments || [])
+          .filter((s: any) => s.start < maxSec)
+          .map((s: any) => ({ ...s, end: Math.min(s.end, maxSec) }));
+        if (format === 'srt' || format === 'vtt') {
+          // Best-effort line/time trimming on existing content
+          const str = String(content || '');
+          if (format === 'srt') {
+            const blocks = str.split(/\n\n+/);
+            const kept: string[] = [];
+            for (const b of blocks) {
+              const lines = b.split(/\n/);
+              const timeLine = lines.find(l => l.includes('-->')) || '';
+              const endMatch = timeLine.match(/-->\s*(\d{2}:\d{2}:\d{2})[,.](\d{3})/);
+              let keep = true;
+              if (endMatch) {
+                const [hh, mm, ss] = endMatch[1].split(':').map(Number);
+                const endSec = hh * 3600 + mm * 60 + ss;
+                keep = endSec <= maxSec;
+              }
+              if (keep) kept.push(b);
+            }
+            content = kept.join('\n\n');
+          } else {
+            const lines = str.split(/\n/);
+            const out: string[] = [];
+            for (let i = 0; i < lines.length; i++) {
+              const ln = lines[i];
+              const m = ln.match(/(\d{2}:\d{2}:\d{2})\.(\d{3})\s+-->\s+(\d{2}:\d{2}:\d{2})\.(\d{3})/);
+              if (m) {
+                const [hh, mm, ss] = m[3].split(':').map(Number);
+                const endSec = hh * 3600 + mm * 60 + ss;
+                if (endSec > maxSec) break;
+              }
+              out.push(ln);
+            }
+            content = out.join('\n');
+          }
+        } else if (format === 'json') {
+          try {
+            const obj = JSON.parse(String(content || '{}'));
+            obj.segments = trimmedSegments;
+            obj.duration = Math.min(orig.duration || maxSec, maxSec);
+            delete obj.speakers;
+            content = JSON.stringify(obj, null, 2);
+          } catch {
+            const obj = { text: trimmedSegments.map((s: any) => s.text).join(' '), segments: trimmedSegments, duration: Math.min(orig.duration || maxSec, maxSec) };
+            content = JSON.stringify(obj, null, 2);
+          }
+        } else if (format === 'txt' || format === 'md') {
+          const txt = trimmedSegments.length > 0 ? trimmedSegments.map((s: any) => s.text).join(' ') : (orig.text || '');
+          content = txt;
+        }
       }
       const title = result.data.videoInfo?.title || 'transcription';
       const safeTitle = title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
@@ -2144,13 +2198,21 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                               if (jobId) {
                                 await fetchAndDownload(`/api/transcriptions/${jobId}/export?format=docx`, `transcription_${new Date().toISOString().split('T')[0]}.docx`);
                               } else {
-                                // fallback: client-side export (rare)
+                                // fallback: client-side export (rare) — enforce Free preview trim
+                                const maxSec = 300;
+                                const orig = result.data.transcription;
+                                const trimmedSegments = (orig.segments || [])
+                                  .filter((s: any) => s.start < maxSec)
+                                  .map((s: any) => ({ ...s, end: Math.min(s.end, maxSec) }));
+                                const clientText = trimmedSegments.length > 0
+                                  ? trimmedSegments.map((s: any) => s.text).join(' ')
+                                  : (orig.text || '');
                                 const blob = await DocumentExportService.exportToWord(
                                   {
-                                    text: result.data.transcription.text,
-                                    segments: result.data.transcription.segments,
-                                    language: result.data.transcription.language,
-                                    duration: result.data.transcription.duration
+                                    text: isFreeTier ? clientText : (orig.text || clientText),
+                                    segments: isFreeTier ? trimmedSegments : (orig.segments || trimmedSegments),
+                                    language: orig.language,
+                                    duration: isFreeTier ? Math.min(orig.duration || maxSec, maxSec) : (orig.duration || maxSec)
                                   },
                                   generatedChapters,
                                   generatedSummary,
@@ -2158,8 +2220,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                                     metadata: {
                                       title: 'Transcription',
                                       date: new Date().toLocaleDateString(),
-                                      language: result.data.transcription.language,
-                                      duration: result.data.transcription.duration
+                                      language: orig.language,
+                                      duration: isFreeTier ? Math.min(orig.duration || maxSec, maxSec) : (orig.duration || maxSec)
                                     },
                                     includeTimestamps: true,
                                     includeChapters: true,
@@ -2167,7 +2229,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                                     includeSpeakers: !isFreeTier
                                   }
                                 );
-                                const url = URL.createObjectURL(blob);
+                                const url = URL.createObjectURL(blob as any);
                                 const link = document.createElement('a');
                                 link.href = url; link.download = `transcription_${new Date().toISOString().split('T')[0]}.docx`; link.click(); URL.revokeObjectURL(url);
                               }
@@ -2221,12 +2283,21 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                               if (jobId) {
                                 await fetchAndDownload(`/api/transcriptions/${jobId}/export?format=pdf`, `transcription_${new Date().toISOString().split('T')[0]}.pdf`);
                               } else {
+                                // fallback: client-side export (rare) — enforce Free preview trim
+                                const maxSec = 300;
+                                const orig = result.data.transcription;
+                                const trimmedSegments = (orig.segments || [])
+                                  .filter((s: any) => s.start < maxSec)
+                                  .map((s: any) => ({ ...s, end: Math.min(s.end, maxSec) }));
+                                const clientText = trimmedSegments.length > 0
+                                  ? trimmedSegments.map((s: any) => s.text).join(' ')
+                                  : (orig.text || '');
                                 const blob = await DocumentExportService.exportToPDF(
                                   {
-                                    text: result.data.transcription.text,
-                                    segments: result.data.transcription.segments,
-                                    language: result.data.transcription.language,
-                                    duration: result.data.transcription.duration
+                                    text: isFreeTier ? clientText : (orig.text || clientText),
+                                    segments: isFreeTier ? trimmedSegments : (orig.segments || trimmedSegments),
+                                    language: orig.language,
+                                    duration: isFreeTier ? Math.min(orig.duration || maxSec, maxSec) : (orig.duration || maxSec)
                                   },
                                   generatedChapters,
                                   generatedSummary,
@@ -2234,8 +2305,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                                     metadata: {
                                       title: 'Transcription',
                                       date: new Date().toLocaleDateString(),
-                                      language: result.data.transcription.language,
-                                      duration: result.data.transcription.duration
+                                      language: orig.language,
+                                      duration: isFreeTier ? Math.min(orig.duration || maxSec, maxSec) : (orig.duration || maxSec)
                                     },
                                     includeTimestamps: true,
                                     includeChapters: true,
@@ -2243,7 +2314,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                                     includeSpeakers: !isFreeTier
                                   }
                                 );
-                                const url = URL.createObjectURL(blob);
+                                const url = URL.createObjectURL(blob as any);
                                 const link = document.createElement('a');
                                 link.href = url; link.download = `transcription_${new Date().toISOString().split('T')[0]}.pdf`; link.click(); URL.revokeObjectURL(url);
                               }

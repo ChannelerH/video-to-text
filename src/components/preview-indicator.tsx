@@ -12,6 +12,7 @@ interface PreviewIndicatorProps {
   locale?: string;
   className?: string;
   showUnlockButton?: boolean;
+  forceShow?: boolean;
 }
 
 export default function PreviewIndicator({
@@ -21,7 +22,8 @@ export default function PreviewIndicator({
   totalSeconds,
   locale: localeProp,
   className = '',
-  showUnlockButton = true
+  showUnlockButton = true,
+  forceShow = false
 }: PreviewIndicatorProps) {
   const t = useTranslations('tool_interface.preview');
   const localeFromHook = useLocale();
@@ -46,8 +48,8 @@ export default function PreviewIndicator({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Don't show if no content is locked
-  if (totalSec <= previewSeconds) {
+  // Don't show if no content is locked (unless forceShow)
+  if (!forceShow && totalSec <= previewSeconds) {
     return null;
   }
   

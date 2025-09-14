@@ -254,7 +254,7 @@ export class TranscriptionService {
 
       // 下载字幕
       let captionText = await this.time('youtube.captions.text', YouTubeService.downloadCaption(bestCaption.url));
-      const captionSRT = await this.time('youtube.captions.srt', YouTubeService.convertCaptionToSRT(bestCaption.url));
+      let captionSRT = await this.time('youtube.captions.srt', YouTubeService.convertCaptionToSRT(bestCaption.url));
       if ((!captionText || captionText.trim().length === 0) && captionSRT && captionSRT.length > 0) {
         try {
           const srtLines = captionSRT.split('\n');
@@ -279,12 +279,37 @@ export class TranscriptionService {
         return await this.processYouTubeAudioTranscription(videoInfo, request);
       }
 
+      // 如果是 Free 预览裁剪场景：对字幕按时间截到 trimToSeconds，并据此重建文本/时长
+      let effectiveDuration = videoInfo.duration;
+      if (request.options?.trimToSeconds && captionSRT && captionSRT.length > 0) {
+        try {
+          const maxSec = request.options.trimToSeconds;
+          const trimmedSrt = this.truncateSRT(captionSRT, maxSec);
+          if (trimmedSrt && trimmedSrt.length > 0) {
+            // 用截断后的 SRT 重建纯文本，保证与时间窗一致
+            const srtLines = trimmedSrt.split('\n');
+            const textLines: string[] = [];
+            for (const line of srtLines) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              if (/^\d+$/.test(trimmed)) continue;
+              if (trimmed.includes('-->')) continue;
+              textLines.push(trimmed);
+            }
+            const rebuilt = textLines.join(' ').replace(/\s{2,}/g, ' ').trim();
+            if (rebuilt) captionText = rebuilt;
+            captionSRT = trimmedSrt;
+            effectiveDuration = Math.min(videoInfo.duration, maxSec);
+          }
+        } catch {}
+      }
+
       // 构造转录结果
       const transcription: TranscriptionResult = {
         text: captionText,
         segments: [], // YouTube字幕不提供segment信息
         language: bestCaption.languageCode,
-        duration: videoInfo.duration
+        duration: effectiveDuration
       };
       console.log('[TEST][YT-001] captions.used', { videoId: videoInfo.videoId, lang: transcription.language, duration: transcription.duration });
 
@@ -335,8 +360,10 @@ export class TranscriptionService {
             source_url: request.content,
             title: videoInfo.title,
             language: transcription.language,
-            duration_sec: videoInfo.duration,
-            cost_minutes: Math.ceil(videoInfo.duration/60),
+            // 记录两份：原始总时长 + 实际处理时长
+            duration_sec: transcription.duration,
+            original_duration_sec: videoInfo.duration,
+            cost_minutes: Math.ceil((transcription.duration || 0)/60),
             status: 'completed'
           }));
           jobId = (row as any).job_id || jobId;
@@ -852,6 +879,14 @@ export class TranscriptionService {
       // 2.（已禁用缓存）始终走新转写
       const urlHash = crypto.createHash('sha256').update(url).digest('hex');
 
+      // 2.5 尝试探测原始总时长（展示用）
+      let originalDurationSec: number | null = null;
+      try {
+        const { probeDurationSeconds } = await import('./media-probe');
+        originalDurationSec = await probeDurationSeconds(url);
+        if (originalDurationSec) console.log('[Probe] audio_url original duration:', originalDurationSec, 's');
+      } catch {}
+
       // 3. 下载音频文件
       const audioBuffer = await this.time('audio.download', this.downloadAudioFromUrl(url, audioInfo));
       console.log(`Audio downloaded: ${Math.round(audioBuffer.length / 1024 / 1024 * 100) / 100}MB`);
@@ -1015,6 +1050,7 @@ export class TranscriptionService {
             title: audioInfo.filename,
             language: transcription.language,
             duration_sec: transcription.duration,
+            original_duration_sec: originalDurationSec || transcription.duration || 0,
             cost_minutes: Math.ceil(transcription.duration/60),
             status: 'completed'
           }));
@@ -1360,6 +1396,14 @@ export class TranscriptionService {
         });
       }
 
+      // 先尝试探测原始总时长（展示用）
+      let originalDurationSec: number | null = null;
+      try {
+        const { probeDurationSeconds } = await import('./media-probe');
+        originalDurationSec = await probeDurationSeconds(filePath);
+        if (originalDurationSec) console.log('[Probe] file_upload original duration:', originalDurationSec, 's');
+      } catch {}
+
       // Free用户：先切割音频到5分钟
       let audioForTranscription = filePath;
       if (request.options?.trimToSeconds) {
@@ -1515,6 +1559,7 @@ export class TranscriptionService {
             title: (request.options as any)?.fileName || 'uploaded file',
             language: transcription.language,
             duration_sec: transcription.duration,
+            original_duration_sec: originalDurationSec || transcription.duration || 0,
             cost_minutes: Math.ceil(transcription.duration/60),
             status: 'completed'
           }));

@@ -96,7 +96,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
     firstChapterSample: finalChapters[0]
   });
   
-  const blob = format === 'docx'
+  const resultData = format === 'docx'
     ? await DocumentExportService.exportToWord(
         { text: editedText, segments: finalSegments, language: tdata.language, duration: trow.duration_sec },
         finalChapters,
@@ -110,7 +110,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
         { includeChapters, includeTimestamps, includeSpeakers: tier !== UserTier.FREE, metadata: meta }
       );
 
-  const ab = await blob.arrayBuffer();
+  // Normalize to Buffer
+  let ab: ArrayBuffer | Buffer;
+  if (typeof (resultData as any)?.arrayBuffer === 'function') {
+    ab = await (resultData as Blob).arrayBuffer();
+  } else if (resultData instanceof ArrayBuffer) {
+    ab = resultData as ArrayBuffer;
+  } else {
+    // Assume Node Buffer
+    ab = resultData as unknown as Buffer;
+  }
   const fname = `${(trow.title || 'transcription').replace(/\s+/g,'_')}.${format}`;
   return new Response(Buffer.from(ab), {
     headers: {
@@ -120,3 +129,4 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
     }
   });
 }
+export const runtime = 'nodejs';

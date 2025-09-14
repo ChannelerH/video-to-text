@@ -54,6 +54,7 @@ export default async function EditorPage({
         title: transcriptions.title,
         source_url: transcriptions.source_url,
         duration_sec: transcriptions.duration_sec,
+        original_duration_sec: (transcriptions as any).original_duration_sec,
         language: transcriptions.language
       })
       .from(transcriptions)
@@ -183,8 +184,10 @@ export default async function EditorPage({
 
   console.timeEnd('[EditorPage] Total Load Time');
   
-  // Derive preview mode flag: 仅当原始时长 > 5 分钟才视为预览
-  const isPreview = (transcription.duration_sec || 0) > (POLICY.preview.freePreviewSeconds || 300);
+  // Derive preview mode flag
+  // 规则：Free 用户且（原始时长 > 预览窗，或时长恰等于预览窗——可能来自裁剪路径）
+  const previewWindow = POLICY.preview.freePreviewSeconds || 300;
+  const isPreview = (userTier === UserTier.FREE) && ((transcription.duration_sec || 0) >= previewWindow);
 
   return (
     <div className="h-screen flex flex-col">
@@ -207,19 +210,11 @@ export default async function EditorPage({
       </div>
 
       {/* FREE Preview Notice */}
-      {(() => {
-        // Inline server-side badge for FREE preview
-        const tierPromise = getUserTier(userUuid);
-        // Note: This simple IIFE awaits synchronously through top-level await not supported here.
-        // 仅当原始时长 > 5 分钟才显示横幅
-        const isPreview = (transcription.duration_sec || 0) > (POLICY.preview.freePreviewSeconds || 300);
-        if (!isPreview) return null;
-        return (
-          <div className="px-4 py-2 bg-amber-500/10 text-amber-300 text-sm border-b border-amber-500/20">
-            Preview mode: showing the first 5 minutes only. <a href={`/${locale}/pricing`} className="underline hover:text-amber-200">Upgrade</a> to unlock full transcript, speaker labels, and full AI features.
-          </div>
-        );
-      })()}
+      {isPreview && (
+        <div className="px-4 py-2 bg-amber-500/10 text-amber-300 text-sm border-b border-amber-500/20">
+          Preview mode: showing the first 5 minutes only. <a href={`/${locale}/pricing`} className="underline hover:text-amber-200">Upgrade</a> to unlock full transcript, speaker labels, and full AI features.
+        </div>
+      )}
 
       {/* Editor - Full height */}
       <div className="flex-1 overflow-hidden">
@@ -231,6 +226,7 @@ export default async function EditorPage({
           transcription={transcriptionData}
           backHref={`/${locale}/dashboard/transcriptions`}
           isPreviewMode={isPreview}
+          originalDurationSec={(transcription as any).original_duration_sec || transcription.duration_sec || 0}
         />
       </div>
     </div>

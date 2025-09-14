@@ -40,6 +40,7 @@ interface ThreeColumnEditorProps {
   backHref?: string;
   onSegmentsUpdate?: (segments: any[]) => void;
   isPreviewMode?: boolean;
+  originalDurationSec?: number;
 }
 
 export default function ThreeColumnEditor({ 
@@ -51,7 +52,8 @@ export default function ThreeColumnEditor({
   onClose,
   backHref,
   onSegmentsUpdate,
-  isPreviewMode
+  isPreviewMode,
+  originalDurationSec
 }: ThreeColumnEditorProps) {
   const tPaywall = useTranslations('paywall');
   const { userTier } = useAppContext();
@@ -338,10 +340,7 @@ export default function ThreeColumnEditor({
 
   // Handle export for different formats
   const handleExport = async (format: 'txt' | 'srt' | 'vtt' | 'json' | 'md' | 'docx' | 'pdf') => {
-    if (isPreviewMode && !['txt', 'srt', 'vtt', 'json', 'md'].includes(format)) {
-      setShowUpgrade(true);
-      return;
-    }
+    // Allow DOCX/PDF in preview mode; server route enforces 5-minute trim for Free
 
     try {
       setExporting(format);
@@ -361,7 +360,8 @@ export default function ThreeColumnEditor({
       if (format === 'docx' || format === 'pdf') {
         a.href = `/api/transcriptions/${jobId}/export?format=${format}`;
       } else {
-        a.href = `/api/transcriptions/${jobId}/export-format?format=${format}`;
+        // 使用统一的 simple formats 路由，后端会对 Free 进行 5 分钟裁剪
+        a.href = `/api/transcriptions/${jobId}/file?format=${format}`;
       }
       
       a.click();
@@ -1138,9 +1138,10 @@ export default function ThreeColumnEditor({
       {isPreviewMode && (
         <div className="mx-4 mb-3">
           <PreviewIndicator
-            totalSeconds={transcription?.duration || transcription?.duration_sec || 0}
+            totalSeconds={(Math.max(originalDurationSec || 0, Math.floor(duration || 0)) || transcription?.duration_sec || transcription?.duration || 0) as number}
             previewSeconds={300}
             locale={typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en'}
+            forceShow
           />
         </div>
       )}

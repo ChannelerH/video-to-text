@@ -54,6 +54,38 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
           }),
           duration: Math.min(full.duration || maxSec, maxSec)
         };
+        // 如果没有 segments（典型：字幕路径），尝试基于 SRT 重建 5 分钟内的纯文本
+        if ((!short.segments || short.segments.length === 0) && formats?.srt) {
+          try {
+            const srtStr = String(formats.srt || '');
+            const blocks = srtStr.split(/\n\n+/);
+            const kept: string[] = [];
+            for (const b of blocks) {
+              const lines = b.split(/\n/);
+              const timeLine = lines.find(l => l.includes('-->')) || '';
+              const endMatch = timeLine.match(/-->\s*(\d{2}:\d{2}:\d{2})[,.](\d{3})/);
+              let keep = true;
+              if (endMatch) {
+                const [hh, mm, ss] = endMatch[1].split(':').map(Number);
+                const endSec = hh * 3600 + mm * 60 + ss;
+                keep = endSec <= maxSec;
+              }
+              if (keep) kept.push(b);
+            }
+            const trimmedSrt = kept.join('\n\n');
+            const lines = trimmedSrt.split(/\n/);
+            const textLines: string[] = [];
+            for (const line of lines) {
+              const t = line.trim();
+              if (!t) continue;
+              if (/^\d+$/.test(t)) continue;
+              if (t.includes('-->')) continue;
+              textLines.push(t);
+            }
+            const rebuilt = textLines.join(' ').replace(/\s{2,}/g, ' ').trim();
+            if (rebuilt) (short as any).text = rebuilt;
+          } catch {}
+        }
         if (format === 'json') {
           content = JSON.stringify(short, null, 2);
         } else if (format === 'srt') {
