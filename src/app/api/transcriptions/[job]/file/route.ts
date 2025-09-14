@@ -42,6 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
     try {
       const service = new UnifiedTranscriptionService(process.env.REPLICATE_API_TOKEN || '', process.env.DEEPGRAM_API_KEY);
       // 优先使用 JSON 数据以保证准确截断
+      let trimmedSrtForFree: string | null = null;
       if (formats?.json) {
         const full = JSON.parse(formats.json || '{}');
         const maxSec = POLICY.preview.freePreviewSeconds || 300;
@@ -73,6 +74,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
               if (keep) kept.push(b);
             }
             const trimmedSrt = kept.join('\n\n');
+            trimmedSrtForFree = trimmedSrt;
             const lines = trimmedSrt.split(/\n/);
             const textLines: string[] = [];
             for (const line of lines) {
@@ -89,9 +91,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
         if (format === 'json') {
           content = JSON.stringify(short, null, 2);
         } else if (format === 'srt') {
-          content = service.convertToSRT(short);
+          // 若有截断后的原始 SRT，优先返回，避免时间轴漂移
+          if (trimmedSrtForFree) content = trimmedSrtForFree;
+          else content = service.convertToSRT(short);
         } else if (format === 'vtt') {
-          content = service.convertToVTT(short);
+          if (trimmedSrtForFree) {
+            const toVtt = (srt: string) => 'WEBVTT\n\n' + srt.replace(/\r/g, '').split('\n').map(ln => ln.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})\s+-->\s+(\d{2}:\d{2}:\d{2}),(\d{3})/, '$1.$2 --> $3.$4')).join('\n');
+            content = toVtt(trimmedSrtForFree);
+          } else {
+            content = service.convertToVTT(short);
+          }
         } else if (format === 'txt') {
           content = service.convertToPlainText(short);
         } else if (format === 'md') {
