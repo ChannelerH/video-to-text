@@ -16,7 +16,9 @@ export default function IntlProvider({
     <NextIntlClientProvider
       messages={messages}
       locale={locale}
-      onError={() => {}}
+      onError={(error) => {
+        console.error('[IntlProvider] Translation error:', error);
+      }}
       getMessageFallback={({ namespace, key }) =>
         namespace ? `${namespace}.${key}` : key
       }

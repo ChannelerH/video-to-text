@@ -2,7 +2,7 @@
 
 import { Lock, Unlock } from 'lucide-react';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 
 interface PreviewIndicatorProps {
   previewMinutes?: number;
@@ -19,11 +19,15 @@ export default function PreviewIndicator({
   totalMinutes,
   previewSeconds = 300,
   totalSeconds,
-  locale = 'en',
+  locale: localeProp,
   className = '',
   showUnlockButton = true
 }: PreviewIndicatorProps) {
-  const t = useTranslations('preview');
+  const t = useTranslations('tool_interface.preview');
+  const localeFromHook = useLocale();
+  
+  // Use the locale from the hook which should be more reliable
+  const locale = localeFromHook || localeProp || 'en';
   
   // Convert to consistent format
   const previewMin = previewMinutes || Math.floor(previewSeconds / 60);

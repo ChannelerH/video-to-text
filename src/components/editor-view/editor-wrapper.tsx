@@ -7,7 +7,6 @@ import { Loader2 } from 'lucide-react';
 const ThreeColumnEditor = dynamic(
   () => import('@/components/editor-view/three-column-editor'),
   {
-    ssr: false,
     loading: () => (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
