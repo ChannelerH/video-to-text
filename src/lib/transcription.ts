@@ -4,7 +4,7 @@ import { UnifiedTranscriptionService } from './unified-transcription';
 import { transcriptionCache, CacheEntry } from './cache';
 import { CloudflareR2Service } from './r2-upload';
 import { localChinesePunctuate, localPunctuateSegmentsIfChinese, rebuildTextFromSegments } from './refine-local';
-import { alignSentencesWithSegments, alignSentencesOneToOne } from './sentence-align';
+import { alignSentencesWithSegments } from './sentence-align';
 import { punctuateTextLLM } from './punctuate-llm';
 import { fixLatinNoise, fixLatinNoiseInSegments } from './lexicon-fix';
 import crypto from 'crypto';
@@ -686,24 +686,50 @@ export class TranscriptionService {
       } catch {}
 
       // 对齐最终文本句子到模型时间戳：
-      // - Deepgram：使用一对一映射，保持原始sentence时间戳
-      // - 非 Deepgram：使用原始 segment 窗口按句对齐（中文）
+      // - Deepgram：使用词/字级时间线精确映射润色后的句子边界；
+      // - 非 Deepgram：使用原始 segment 窗口按句对齐（中文）。
       try {
         const { isChineseLangOrText } = await import('./refine-local');
         const isDeepgramOutput = !!(transcription as any).srtText; // DeepgramService 会设置 srtText
         const isZh = isChineseLangOrText(transcription.language, transcription.text);
-        if (isZh) {
-          // 对中文内容重新对齐句子
-          // Deepgram有时会返回超长的sentence（如180秒的单个segment），需要重新分割
+        if (isDeepgramOutput && isZh) {
+          const { alignSentencesWithAnchors, alignSentencesWithWordTimeline } = await import('./sentence-align');
+          const anchors = (transcription as any).anchors as any[] | undefined;
+          const words = (transcription as any).words as any[] | undefined;
+          if (anchors && anchors.length > 0) {
+            // Prefer conservative anchor mapping (keeps model times exact)
+            const advancedSplit = String(process.env.ADVANCED_ANCHOR_WORD_SPLIT || '').toLowerCase() === 'true';
+            transcription.segments = alignSentencesWithAnchors(
+              transcription.text,
+              anchors,
+              transcription.language,
+              { wordUnits: words, advancedSplit }
+            );
+            (transcription as any).srtText = undefined;
+            console.log('[Align] Deepgram anchor-based alignment applied');
+          } else if (words && words.length > 0) {
+            transcription.segments = alignSentencesWithWordTimeline(
+              transcription.text,
+              words,
+              transcription.language,
+              transcription.duration
+            );
+            (transcription as any).srtText = undefined;
+            console.log('[Align] Deepgram word-level alignment applied');
+          } else {
+            console.log('[Align] Deepgram: no anchors/words; skip realignment');
+          }
+        } else if (!isDeepgramOutput && isZh) {
           transcription.segments = alignSentencesWithSegments(
             transcription.text,
             transcription.segments as any,
-            transcription.language
+            transcription.language,
+            transcription.duration
           );
           (transcription as any).srtText = undefined;
-          console.log('[Align] Sentence realignment applied for Chinese');
+          console.log('[Align] Non-Deepgram sentence alignment applied');
         } else {
-          console.log('[Align] Skipped sentence realignment (not Chinese)');
+          console.log('[Align] Skipped sentence realignment (not applicable)');
         }
       } catch {}
 
@@ -929,20 +955,17 @@ export class TranscriptionService {
       // 对齐最终文本句子到模型时间戳：仅在中文等需要强可读性的场景执行
       try {
         const { isChineseLangOrText } = await import('./refine-local');
-        const isDeepgramOutput = !!(transcription as any).srtText; // DeepgramService 会设置 srtText
-        const isZh = isChineseLangOrText(transcription.language, transcription.text);
-        if (isZh) {
-          // 对中文内容重新对齐句子
-          // Deepgram有时会返回超长的sentence（如180秒的单个segment），需要重新分割
+        const shouldAlign = isChineseLangOrText(transcription.language, transcription.text);
+        if (shouldAlign) {
           transcription.segments = alignSentencesWithSegments(
             transcription.text,
             transcription.segments as any,
-            transcription.language
+            transcription.language,
+            transcription.duration
           );
           (transcription as any).srtText = undefined;
-          console.log('[Align] Sentence realignment applied for Chinese');
         } else {
-          console.log('[Align] Skipped sentence realignment (not Chinese)');
+          console.log('[Align] Skipped sentence realignment for non-Chinese to preserve timing');
         }
       } catch {}
 
@@ -1439,30 +1462,13 @@ export class TranscriptionService {
 
       // 对齐最终文本句子到模型时间戳
       try {
-        const { isChineseLangOrText } = await import('./refine-local');
-        const isDeepgramOutput = !!(transcription as any).srtText; // DeepgramService 会设置 srtText
-        const isZh = isChineseLangOrText(transcription.language, transcription.text);
-        if (isDeepgramOutput && isZh) {
-          // Deepgram已经提供了sentence级别的segments，只需一对一映射润色后的文本
-          transcription.segments = alignSentencesOneToOne(
-            transcription.text,
-            transcription.segments as any,
-            transcription.language,
-            transcription.duration
-          );
-          (transcription as any).srtText = undefined;
-          console.log('[Align] Deepgram one-to-one alignment applied');
-        } else if (isZh) {
-          transcription.segments = alignSentencesWithSegments(
-            transcription.text,
-            transcription.segments as any,
-            transcription.language
-          );
-          (transcription as any).srtText = undefined;
-          console.log('[Align] Non-Deepgram sentence alignment applied');
-        } else {
-          console.log('[Align] Skipped sentence realignment (not applicable)');
-        }
+        transcription.segments = alignSentencesWithSegments(
+          transcription.text,
+          transcription.segments as any,
+          transcription.language,
+          transcription.duration
+        );
+        (transcription as any).srtText = undefined;
       } catch {}
 
       // Report formatting phase
