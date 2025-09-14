@@ -132,3 +132,135 @@ export async function punctuateTextLLM(text: string, opts: PunctuateOptions = {}
     return null;
   }
 }
+
+/**
+ * 对每个 segment 单独进行 LLM 润色
+ * 保持原始时间戳不变，只改善文本质量
+ */
+export async function punctuateSegmentsLLM(
+  segments: Array<{ text: string; start?: number; end?: number; [key: string]: any }>,
+  opts: PunctuateOptions = {}
+): Promise<boolean> {
+  try {
+    // 检查是否启用
+    const segmentsEnabled = process.env.PUNCTUATE_LLM_SEGMENTS_ENABLED === 'true';
+    const oneByOne = process.env.PUNCTUATE_LLM_SEG_ONE_BY_ONE === 'true';
+    
+    if (!segmentsEnabled) {
+      console.log('[Punct][LLM] Segments refinement disabled');
+      return false;
+    }
+    
+    const enabled = process.env.PUNCTUATE_LLM_ENABLED === 'true';
+    if (!enabled) return false;
+    
+    const { apiKey, apiBase, model } = getLLMConfig();
+    if (!apiKey) return false;
+    
+    const language = opts.language || 'zh';
+    
+    // 只处理中文内容
+    if (!language.toLowerCase().includes('zh')) {
+      return false;
+    }
+    
+    console.log(`[Punct][LLM] Starting segments refinement: ${segments.length} segments, oneByOne=${oneByOne}`);
+    
+    if (oneByOne) {
+      // 逐个处理每个 segment
+      let refinedCount = 0;
+      const concurrency = parseInt(process.env.PUNCTUATE_LLM_CONCURRENCY || '3');
+      const batchDelayMs = parseInt(process.env.PUNCTUATE_LLM_BATCH_DELAY_MS || '150');
+      
+      const processSegment = async (segment: any) => {
+        const text = segment.text || '';
+        if (!text || text.length < 5) return;
+        
+        // 检查是否有足够的中文内容
+        const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+        if (cjk < 3) return;
+        
+        try {
+          const system = 'You are a strict Chinese copy editor. Only restore missing punctuation, sentence breaks, and CJK/Latin spacing. Never translate or change wording. Return plain text in the original language.';
+          const user = `Language: ${language}\nRules:\n- Use Chinese punctuation（，。！？；：、""''）;\n- Add missing commas/periods based on natural syntax;\n- Keep wording identical; adjust only punctuation/spacing;\n- Return text only.\n\nText:\n${text}`;
+          
+          const resp = await fetch(`${apiBase}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model,
+              messages: [
+                { role: 'system', content: system },
+                { role: 'user', content: user }
+              ],
+              temperature: 0.2,
+              max_tokens: Math.min(1500, text.length * 2)
+            })
+          });
+          
+          if (!resp.ok) {
+            console.warn(`[Punct][LLM] Segment refinement failed: status=${resp.status}`);
+            return;
+          }
+          
+          const data = await resp.json();
+          const refined = data?.choices?.[0]?.message?.content?.trim();
+          
+          if (refined && refined !== text) {
+            segment.text = refined;
+            refinedCount++;
+            console.log(`[Punct][LLM] Segment refined: ${text.length} -> ${refined.length} chars`);
+          }
+        } catch (e) {
+          console.warn(`[Punct][LLM] Segment error:`, (e as Error).message);
+        }
+      };
+      
+      // 批量处理
+      for (let i = 0; i < segments.length; i += concurrency) {
+        const batch = segments.slice(i, i + concurrency).map(processSegment);
+        await Promise.all(batch);
+        
+        if (i + concurrency < segments.length && batchDelayMs > 0) {
+          await new Promise(r => setTimeout(r, batchDelayMs));
+        }
+      }
+      
+      console.log(`[Punct][LLM] Segments refinement completed: ${refinedCount}/${segments.length} refined`);
+      return refinedCount > 0;
+      
+    } else {
+      // 合并所有 segments 文本，统一处理，然后映射回去
+      const originalTexts = segments.map(s => s.text || '');
+      const combined = originalTexts.join('\n');
+      
+      if (!combined || combined.length < 10) return false;
+      
+      const refined = await punctuateTextLLM(combined, opts);
+      if (!refined) return false;
+      
+      // 将润色后的文本按行分割，映射回 segments
+      const refinedLines = refined.split('\n');
+      
+      if (refinedLines.length === segments.length) {
+        segments.forEach((segment, i) => {
+          if (refinedLines[i] && refinedLines[i] !== segment.text) {
+            segment.text = refinedLines[i];
+          }
+        });
+        console.log(`[Punct][LLM] Segments refined using combined approach`);
+        return true;
+      } else {
+        console.warn(`[Punct][LLM] Line count mismatch: ${segments.length} segments vs ${refinedLines.length} lines`);
+        return false;
+      }
+    }
+    
+  } catch (e) {
+    console.error('[Punct][LLM] Segments refinement error:', e);
+    return false;
+  }
+}

@@ -698,13 +698,29 @@ export class TranscriptionService {
         if (isZh) {
           const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
           if (changed) console.log(`[Punct] youtube_audio.segments normalized: ${changed}`);
-          let t = changed
-            ? rebuildTextFromSegments(transcription.segments as any)
-            : localChinesePunctuate(transcription.text || '');
+          
+          // 新增：直接对 segments 进行 LLM 润色
           try {
-            const llm = await punctuateTextLLM(t, { language: 'zh' });
-            if (llm) { console.log('[Punct][LLM] youtube_audio applied'); t = llm; }
-          } catch {}
+            const { punctuateSegmentsLLM } = await import('./punctuate-llm');
+            const segmentsRefined = await punctuateSegmentsLLM(transcription.segments as any, { language: 'zh' });
+            if (segmentsRefined) {
+              console.log('[Punct][LLM] Segments directly refined');
+            }
+          } catch (e) {
+            console.warn('[Punct][LLM] Segments refinement failed:', e);
+          }
+          
+          // 从润色后的 segments 重建全文
+          let t = rebuildTextFromSegments(transcription.segments as any);
+          
+          // 如果 segments 级别的润色失败，尝试全文润色
+          if (!process.env.PUNCTUATE_LLM_SEGMENTS_ENABLED || process.env.PUNCTUATE_LLM_SEGMENTS_ENABLED !== 'true') {
+            try {
+              const llm = await punctuateTextLLM(t, { language: 'zh' });
+              if (llm) { console.log('[Punct][LLM] youtube_audio applied'); t = llm; }
+            } catch {}
+          }
+          
           fixLatinNoiseInSegments(transcription.segments as any);
           const finalText = fixLatinNoise(t);
           if (finalText !== t) console.log('[Punct] youtube_audio.lexicon fixed');
@@ -713,13 +729,19 @@ export class TranscriptionService {
       } catch {}
 
       // 对齐最终文本句子到模型时间戳：
-      // - Deepgram：使用词/字级时间线精确映射润色后的句子边界；
-      // - 非 Deepgram：使用原始 segment 窗口按句对齐（中文）。
+      // - Deepgram：如果已经直接润色了 segments，可以跳过对齐；否则使用词/字级时间线精确映射润色后的句子边界
+      // - 非 Deepgram：使用原始 segment 窗口按句对齐（中文）
       try {
         const { isChineseLangOrText } = await import('./refine-local');
         const isDeepgramOutput = !!(transcription as any).srtText; // DeepgramService 会设置 srtText
         const isZh = isChineseLangOrText(transcription.language, transcription.text);
-        if (isDeepgramOutput && isZh) {
+        const segmentsEnabled = process.env.PUNCTUATE_LLM_SEGMENTS_ENABLED === 'true';
+        
+        // 如果已经对 segments 进行了 LLM 润色，跳过复杂的对齐
+        if (isDeepgramOutput && isZh && segmentsEnabled) {
+          console.log('[Align] Skipped - segments already refined by LLM');
+          (transcription as any).srtText = undefined;
+        } else if (isDeepgramOutput && isZh) {
           const { alignSentencesWithAnchors, alignSentencesWithWordTimeline } = await import('./sentence-align');
           const anchors = (transcription as any).anchors as any[] | undefined;
           const words = (transcription as any).words as any[] | undefined;
@@ -973,13 +995,29 @@ export class TranscriptionService {
         if (isZh) {
           const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
           if (changed) console.log(`[Punct] audio_url.segments normalized: ${changed}`);
-          let t = changed
-            ? rebuildTextFromSegments(transcription.segments as any)
-            : localChinesePunctuate(transcription.text || '');
+          
+          // 新增：直接对 segments 进行 LLM 润色
           try {
-            const llm = await punctuateTextLLM(t, { language: 'zh' });
-            if (llm) { console.log('[Punct][LLM] audio_url applied'); t = llm; }
-          } catch {}
+            const { punctuateSegmentsLLM } = await import('./punctuate-llm');
+            const segmentsRefined = await punctuateSegmentsLLM(transcription.segments as any, { language: 'zh' });
+            if (segmentsRefined) {
+              console.log('[Punct][LLM] audio_url segments directly refined');
+            }
+          } catch (e) {
+            console.warn('[Punct][LLM] audio_url segments refinement failed:', e);
+          }
+          
+          // 从润色后的 segments 重建全文
+          let t = rebuildTextFromSegments(transcription.segments as any);
+          
+          // 如果 segments 级别的润色失败，尝试全文润色
+          if (!process.env.PUNCTUATE_LLM_SEGMENTS_ENABLED || process.env.PUNCTUATE_LLM_SEGMENTS_ENABLED !== 'true') {
+            try {
+              const llm = await punctuateTextLLM(t, { language: 'zh' });
+              if (llm) { console.log('[Punct][LLM] audio_url applied'); t = llm; }
+            } catch {}
+          }
+          
           fixLatinNoiseInSegments(transcription.segments as any);
           const finalText = fixLatinNoise(t);
           if (finalText !== t) console.log('[Punct] audio_url.lexicon fixed');
@@ -1490,13 +1528,29 @@ export class TranscriptionService {
         if (isZh) {
           const changed = localPunctuateSegmentsIfChinese(transcription.segments as any, transcription.language);
           if (changed) console.log(`[Punct] file_upload.segments normalized: ${changed}`);
-          let t = changed
-            ? rebuildTextFromSegments(transcription.segments as any)
-            : localChinesePunctuate(transcription.text || '');
+          
+          // 新增：直接对 segments 进行 LLM 润色
           try {
-            const llm = await punctuateTextLLM(t, { language: 'zh' });
-            if (llm) { console.log('[Punct][LLM] file_upload applied'); t = llm; }
-          } catch {}
+            const { punctuateSegmentsLLM } = await import('./punctuate-llm');
+            const segmentsRefined = await punctuateSegmentsLLM(transcription.segments as any, { language: 'zh' });
+            if (segmentsRefined) {
+              console.log('[Punct][LLM] file_upload segments directly refined');
+            }
+          } catch (e) {
+            console.warn('[Punct][LLM] file_upload segments refinement failed:', e);
+          }
+          
+          // 从润色后的 segments 重建全文
+          let t = rebuildTextFromSegments(transcription.segments as any);
+          
+          // 如果 segments 级别的润色失败，尝试全文润色
+          if (!process.env.PUNCTUATE_LLM_SEGMENTS_ENABLED || process.env.PUNCTUATE_LLM_SEGMENTS_ENABLED !== 'true') {
+            try {
+              const llm = await punctuateTextLLM(t, { language: 'zh' });
+              if (llm) { console.log('[Punct][LLM] file_upload applied'); t = llm; }
+            } catch {}
+          }
+          
           fixLatinNoiseInSegments(transcription.segments as any);
           const finalText = fixLatinNoise(t);
           if (finalText !== t) console.log('[Punct] file_upload.lexicon fixed');
