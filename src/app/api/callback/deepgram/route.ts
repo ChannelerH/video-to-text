@@ -154,7 +154,17 @@ export async function POST(req: NextRequest) {
         }
       }
       
-      language = payload?.results?.channels?.[0]?.detected_language || payload?.results?.channels?.[0]?.alternatives?.[0]?.languages?.[0];
+      // Try multiple paths to get language
+      language = payload?.results?.channels?.[0]?.detected_language || 
+                 payload?.results?.channels?.[0]?.alternatives?.[0]?.languages?.[0] ||
+                 payload?.metadata?.language;
+      
+      console.log('[Deepgram Callback] Language detection:', {
+        detected_language: payload?.results?.channels?.[0]?.detected_language,
+        languages_array: payload?.results?.channels?.[0]?.alternatives?.[0]?.languages,
+        metadata_language: payload?.metadata?.language,
+        final_language: language
+      });
     } catch (e) {
       console.error('[Deepgram Callback] Error parsing segments:', e);
     }

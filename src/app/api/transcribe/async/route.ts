@@ -120,7 +120,8 @@ export async function POST(request: NextRequest) {
           params2.set('punctuate', 'true');   // 启用标点符号
           params2.set('utterances', 'true');  // 启用说话人分离
           params2.set('model', 'nova-2');     // 使用 Nova-2 模型
-          params2.set('language', 'en');      // 自动检测语言也可以用 'auto'
+          params2.set('detect_language', 'true'); // 启用语言检测
+          // 不设置 language 参数，让 Deepgram 自动检测
           console.log('[Deepgram] Request params:', params2.toString());
           const dgResp = await fetch(`https://api.deepgram.com/v1/listen?${params2.toString()}`, {
             method: 'POST',
