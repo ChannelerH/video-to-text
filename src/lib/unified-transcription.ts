@@ -416,8 +416,18 @@ export class UnifiedTranscriptionService {
           return splitSentences(normalized);
         }
       }
+      // 非中文路径：如果全文文本为空，则安全回退到 segments 拼接
+      const baseText = (transcription.text || '').trim();
+      if (!baseText && Array.isArray(transcription.segments) && transcription.segments.length > 0) {
+        return transcription.segments
+          .map((s: any) => String(s?.text || '').trim())
+          .filter(Boolean)
+          .join(' ')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+      }
     } catch {}
-    return transcription.text.trim();
+    return (transcription.text || '').trim();
   }
 
   /**

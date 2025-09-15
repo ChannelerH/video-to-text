@@ -441,7 +441,7 @@
       "chapters": "章节",
       "summary": "摘要",
       "generating": "生成中...",
-      "usage_limits": "Basic：每项每日 10 次 · Pro：不限次",
+      "usage_limits": "Basic：每项每月 10 次 · Pro：不限次",
       "advanced_export": "高级导出",
       "with_toc": "包含目录",
       "exporting": "导出中...",
