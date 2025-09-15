@@ -208,12 +208,43 @@ export async function POST(req: NextRequest) {
     }
 
     const duration = Array.isArray(segments) && segments.length ? Math.ceil(segments[segments.length - 1]?.end || 0) : undefined;
-    await db().update(transcriptions).set({
+    
+    // 获取当前记录，只在标题是默认值时才更新
+    const [currentTranscription] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
+    
+    let updateData: any = {
       status: 'completed',
       completed_at: new Date(),
       language: (language as any) || (undefined as any),
       duration_sec: (duration as any) || (undefined as any)
-    } as any).where(eq(transcriptions.job_id, jobId));
+    };
+    
+    // 只有当标题是默认值（Processing...、YouTube Video 等）时才生成新标题
+    const currentTitle = currentTranscription?.title || '';
+    const isDefaultTitle = currentTitle === 'Processing...' || 
+                          currentTitle === 'YouTube Video' || 
+                          currentTitle === 'Transcription' ||
+                          currentTitle === '';
+    
+    if (isDefaultTitle && text) {
+      // Generate a better title based on the first few words of the transcript
+      const words = text.split(/\s+/).filter(w => w.length > 0);
+      if (words.length > 0) {
+        // Take first 5-8 words as title
+        const titleWords = words.slice(0, Math.min(8, words.length));
+        let betterTitle = titleWords.join(' ');
+        if (words.length > 8) {
+          betterTitle += '...';
+        }
+        // Limit title length to 100 characters
+        if (betterTitle.length > 100) {
+          betterTitle = betterTitle.substring(0, 97) + '...';
+        }
+        updateData.title = betterTitle;
+      }
+    }
+    
+    await db().update(transcriptions).set(updateData).where(eq(transcriptions.job_id, jobId));
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {

@@ -57,6 +57,39 @@ export async function POST(request: NextRequest) {
     const jobId = getUniSeq('job_');
     const sourceHash = crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
 
+    // 确定初始标题
+    let initialTitle = options.title || 'Processing...';
+    
+    // 如果是文件上传，使用原始文件名（去掉扩展名）
+    if (type === 'file_upload' && options.originalFileName) {
+      const fileName = options.originalFileName;
+      // 去掉文件扩展名
+      const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
+      initialTitle = nameWithoutExt;
+    }
+    // 如果是 YouTube URL，可以稍后从视频信息中获取标题
+    else if (type === 'youtube_url') {
+      // YouTube 标题会在 prepare/youtube 路由中获取并更新
+      initialTitle = 'YouTube Video';
+    }
+    // 如果是音频 URL，尝试从 URL 中提取文件名
+    else if (type === 'audio_url' && content) {
+      try {
+        const url = new URL(content);
+        const pathname = url.pathname;
+        const fileName = pathname.split('/').pop() || '';
+        if (fileName && fileName !== '') {
+          // 去掉文件扩展名
+          const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
+          if (nameWithoutExt) {
+            initialTitle = decodeURIComponent(nameWithoutExt);
+          }
+        }
+      } catch {
+        // URL 解析失败，保持默认标题
+      }
+    }
+
     // 5. 创建占位transcription记录
     await db().insert(transcriptions).values({
       job_id: jobId,
@@ -64,7 +97,7 @@ export async function POST(request: NextRequest) {
       source_type: type,
       source_hash: sourceHash,
       source_url: (type === 'youtube_url' || type === 'audio_url' || type === 'file_upload') ? content : null,
-      title: options.title || 'Processing...',
+      title: initialTitle,
       language: options.language || 'auto',
       status: 'queued',
       created_at: new Date(),

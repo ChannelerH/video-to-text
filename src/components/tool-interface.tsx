@@ -718,7 +718,11 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           type: "file_upload",
           content: uploadedFileInfo.publicUrl || uploadedFileInfo.replicateUrl,
           action: action,
-          options: { formats: selectedFormats, r2Key: uploadedFileInfo.r2Key, fileName: uploadedFileInfo.originalName }
+          options: { 
+            formats: selectedFormats, 
+            r2Key: uploadedFileInfo.r2Key, 
+            originalFileName: uploadedFileInfo.originalName  // 改为 originalFileName 以匹配后端
+          }
         };
         if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
           requestData.options.highAccuracyMode = true;
