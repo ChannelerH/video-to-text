@@ -62,7 +62,9 @@ export async function pollJobStatus(
               srt: result.results.srt,
               vtt: result.results.vtt,
               txt: result.results.txt
-            }
+            },
+            // 将 jobId 回传给前端用于“Edit Transcription”跳转
+            jobId
           }
         };
       }
