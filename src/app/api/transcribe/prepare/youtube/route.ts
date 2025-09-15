@@ -14,10 +14,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'missing job_id or video' }, { status: 400 });
     }
 
+    console.log('[YouTube Prepare] Processing job:', job_id, 'video:', video);
+
     // Resolve videoId and get direct audio URL quickly
     const { YouTubeService } = await import('@/lib/youtube');
-    const vid = YouTubeService.validateAndParseUrl(video) || String(video);
-    const audioUrl = await YouTubeService.getAudioStreamUrl(vid);
+    
+    let vid: string | null = null;
+    let audioUrl: string;
+    
+    try {
+      vid = YouTubeService.validateAndParseUrl(video) || String(video);
+      console.log('[YouTube Prepare] Extracted video ID:', vid);
+    } catch (error) {
+      console.error('[YouTube Prepare] Failed to parse YouTube URL:', error);
+      return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
+    }
+
+    try {
+      audioUrl = await YouTubeService.getAudioStreamUrl(vid);
+      console.log('[YouTube Prepare] Got audio URL:', audioUrl ? 'success' : 'failed');
+    } catch (error) {
+      console.error('[YouTube Prepare] Failed to get audio stream:', error);
+      return NextResponse.json({ error: 'Failed to extract audio from YouTube video' }, { status: 500 });
+    }
 
     // Update transcription record with resolved audio url (for traceability)
     await db().update(transcriptions).set({ source_url: audioUrl }).where(eq(transcriptions.job_id, job_id));
@@ -43,6 +62,11 @@ export async function POST(request: NextRequest) {
         (async () => {
           const params2 = new URLSearchParams();
           params2.set('callback', cb);
+          params2.set('paragraphs', 'true');  // 启用段落分割
+          params2.set('punctuate', 'true');   // 启用标点符号
+          params2.set('utterances', 'true');  // 启用说话人分离
+          params2.set('model', 'nova-2');     // 使用 Nova-2 模型
+          params2.set('detect_language', 'true'); // 启用语言检测
           console.log('[Deepgram][prepare/youtube] Request params:', params2.toString());
           const resp = await fetch(`https://api.deepgram.com/v1/listen?${params2.toString()}`, {
             method: 'POST',

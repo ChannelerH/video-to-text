@@ -5,6 +5,9 @@ import { UnifiedTranscriptionService } from "@/lib/unified-transcription";
 import { upsertTranscriptionFormats } from "@/models/transcription";
 import { getUserTier, UserTier } from "@/services/user-tier";
 import { POLICY, trimSegmentsToSeconds } from "@/services/policy";
+import { db } from "@/db";
+import { transcription_edits } from "@/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ job: string }> }) {
   const user_uuid = await getUserUuid();
@@ -15,7 +18,59 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
   const transcriptionData = (await getTranscription(job, user_uuid)) || ({} as any);
   const { job: jobData, formats } = transcriptionData;
   if (!jobData) return NextResponse.json({ success:false, error: 'not_found' }, { status: 404 });
+  
+  // Check for edited segments
   let content = formats?.[format];
+  let useEditedSegments = false;
+  
+  // Get the latest edit if exists
+  const [editRow] = await db()
+    .select()
+    .from(transcription_edits)
+    .where(and(
+      eq(transcription_edits.job_id, job),
+      eq(transcription_edits.user_uuid, user_uuid)
+    ))
+    .orderBy(desc(transcription_edits.updated_at))
+    .limit(1);
+  
+  if (editRow && editRow.content) {
+    try {
+      const edited = JSON.parse(editRow.content);
+      if (edited.segments && edited.segments.length > 0) {
+        useEditedSegments = true;
+        // Generate format from edited segments
+        const service = new UnifiedTranscriptionService(process.env.REPLICATE_API_TOKEN || '', process.env.DEEPGRAM_API_KEY);
+        
+        // Renumber segments sequentially for clean export
+        const renumberedSegments = edited.segments.map((s: any, index: number) => ({
+          ...s,
+          id: index + 1
+        }));
+        
+        const transcriptionObj = {
+          segments: renumberedSegments,
+          text: renumberedSegments.map((s: any) => s.text).join(' '),
+          language: jobData.language || 'en',
+          duration: jobData.duration_sec || 0
+        };
+        
+        if (format === 'json') {
+          content = JSON.stringify(renumberedSegments);
+        } else if (format === 'srt') {
+          content = service.convertToSRT(transcriptionObj);
+        } else if (format === 'vtt') {
+          content = service.convertToVTT(transcriptionObj);
+        } else if (format === 'txt') {
+          content = service.convertToPlainText(transcriptionObj);
+        } else if (format === 'md') {
+          content = service.convertToMarkdown(transcriptionObj, jobData?.title || job);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse edited content:', e);
+    }
+  }
   // 动态补齐缺失格式：优先用 JSON 结果再转换
   if (!content && formats?.json) {
     try {
@@ -43,17 +98,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
       const service = new UnifiedTranscriptionService(process.env.REPLICATE_API_TOKEN || '', process.env.DEEPGRAM_API_KEY);
       // 优先使用 JSON 数据以保证准确截断
       let trimmedSrtForFree: string | null = null;
-      if (formats?.json) {
+      
+      // Use edited segments if available, otherwise use original
+      let segmentsToUse;
+      if (useEditedSegments && editRow) {
+        const edited = JSON.parse(editRow.content);
+        segmentsToUse = edited.segments || [];
+      } else if (formats?.json) {
         const full = JSON.parse(formats.json || '{}');
+        segmentsToUse = full.segments || full || [];
+      } else {
+        segmentsToUse = [];
+      }
+      
+      if (segmentsToUse && (Array.isArray(segmentsToUse) || segmentsToUse.segments)) {
         const maxSec = POLICY.preview.freePreviewSeconds || 300;
-        // 去除说话人元数据，避免免费样例泄露完整话者结构
+        const segments = Array.isArray(segmentsToUse) ? segmentsToUse : (segmentsToUse.segments || []);
+        // 去除说话人元数据，避免免费样例泄露完整话者结构，并重新编号
         const short = {
-          ...full,
-          segments: trimSegmentsToSeconds(full.segments || [], maxSec).map((s: any) => {
+          segments: trimSegmentsToSeconds(segments, maxSec).map((s: any, index: number) => {
             const { speaker, ...rest } = s || {};
-            return { ...rest };
+            return { ...rest, id: index + 1 };
           }),
-          duration: Math.min(full.duration || maxSec, maxSec)
+          duration: Math.min(jobData.duration_sec || maxSec, maxSec),
+          text: '',
+          language: jobData.language || 'en'
         };
         // 如果没有 segments（典型：字幕路径），尝试基于 SRT 重建 5 分钟内的纯文本
         if ((!short.segments || short.segments.length === 0) && formats?.srt) {

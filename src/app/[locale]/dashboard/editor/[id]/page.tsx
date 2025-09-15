@@ -133,8 +133,27 @@ export default async function EditorPage({
     
     try {
       const [parsedTranscription, editedData] = await Promise.all(parsePromises);
-      transcriptionData = parsedTranscription;
-      segments = transcriptionData.segments || [];
+      // 兼容两种存储形态：
+      // A) 仅存 segments 数组（多数供应商回调路径）
+      // B) 存完整对象 { text, segments, language, duration }
+      if (Array.isArray(parsedTranscription)) {
+        segments = parsedTranscription as any[];
+        transcriptionData = {
+          language: (transcription as any).language || 'auto',
+          duration: (transcription as any).duration_sec || 0,
+          text: ''
+        };
+      } else {
+        transcriptionData = parsedTranscription || {};
+        segments = transcriptionData.segments || [];
+        // 补全缺失的基础字段，避免下游 UI 为空
+        if (!('duration' in transcriptionData)) {
+          transcriptionData.duration = (transcription as any).duration_sec || 0;
+        }
+        if (!('language' in transcriptionData)) {
+          transcriptionData.language = (transcription as any).language || 'auto';
+        }
+      }
       console.log('[EditorPage] Segments count:', segments.length);
       
       // Use edited data if available
@@ -179,7 +198,7 @@ export default async function EditorPage({
       const maxSec = POLICY.preview.freePreviewSeconds || 300;
       segments = trimSegmentsToSeconds(segments as any, maxSec) as any[];
       // 不在编辑页做叠加；叠加仅在转写阶段、且显式勾选“说话人分离”时执行
-  }
+    }
   } catch {}
 
   console.timeEnd('[EditorPage] Total Load Time');
