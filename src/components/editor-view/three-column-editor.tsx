@@ -1091,20 +1091,25 @@ export default function ThreeColumnEditor({
                     <Download className="w-3 h-3" />
                     <span>WebVTT (.vtt)</span>
                   </button>
-                  <button
-                    onClick={() => handleExport('json')}
-                    className="w-full px-3 py-2 text-xs text-left hover:bg-gray-800 text-gray-200 flex items-center gap-2"
-                  >
-                    <Download className="w-3 h-3" />
-                    <span>JSON (.json)</span>
-                  </button>
-                  <button
-                    onClick={() => handleExport('md')}
-                    className="w-full px-3 py-2 text-xs text-left hover:bg-gray-800 text-gray-200 flex items-center gap-2"
-                  >
-                    <Download className="w-3 h-3" />
-                    <span>Markdown (.md)</span>
-                  </button>
+                  {/* Free 用户不提供 JSON/MD 导出 */}
+                  {!isFreeTier && (
+                    <>
+                      <button
+                        onClick={() => handleExport('json')}
+                        className="w-full px-3 py-2 text-xs text-left hover:bg-gray-800 text-gray-200 flex items-center gap-2"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>JSON (.json)</span>
+                      </button>
+                      <button
+                        onClick={() => handleExport('md')}
+                        className="w-full px-3 py-2 text-xs text-left hover:bg-gray-800 text-gray-200 flex items-center gap-2"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Markdown (.md)</span>
+                      </button>
+                    </>
+                  )}
                 </div>
                 {isPreviewMode && (
                   <div className="px-3 py-2 border-t border-gray-800 bg-amber-500/10">

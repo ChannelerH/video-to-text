@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
       let formats = map;
 
-      // FREE: export only first 5 minutes (align with single export routes)
+      // FREE: export only allowed formats and only first 5 minutes
       if (tier === UserTier.FREE) {
         try {
           const maxSec = POLICY.preview.freePreviewSeconds || 300;
@@ -58,13 +58,12 @@ export async function POST(req: NextRequest) {
               language: language || 'unknown',
               duration: maxSec
             } as any;
+            // 仅保留 TXT/SRT/VTT（FREE 不导出 JSON/MD）
             formats = {
               txt: service.convertToPlainText(short),
               srt: service.convertToSRT(short),
-              vtt: service.convertToVTT(short),
-              md: service.convertToMarkdown(short, job.title || job.job_id),
-              json: JSON.stringify(short, null, 2)
-            };
+              vtt: service.convertToVTT(short)
+            } as any;
           } else if (formats.txt) {
             const str = String(formats.txt);
             formats.txt = str.length > 5000 ? str.slice(0, 5000) + '\n\n[Preview only — upgrade to unlock full export]\n' : str;
@@ -74,7 +73,8 @@ export async function POST(req: NextRequest) {
 
       // Add available formats to zip under job folder
       const base = (job.title || job.job_id).replace(/\s+/g, '_');
-      for (const key of ['txt', 'srt', 'vtt', 'json', 'md']) {
+      const keys = tier === UserTier.FREE ? ['txt', 'srt', 'vtt'] : ['txt', 'srt', 'vtt', 'json', 'md'];
+      for (const key of keys) {
         const content = formats[key];
         if (!content) continue;
         entries.push({ name: `${base}/${base}.${key}`, data: new TextEncoder().encode(content) });

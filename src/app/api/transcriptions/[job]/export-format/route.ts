@@ -43,6 +43,12 @@ export async function GET(
       return new Response(JSON.stringify({ success: false, error: 'not_found' }), { status: 404 });
     }
 
+    // Restrict formats for FREE tier
+    const tier = await getUserTier(user_uuid);
+    if (tier === UserTier.FREE && (format === 'json' || format === 'md')) {
+      return new Response(JSON.stringify({ success: false, error: 'forbidden_format' }), { status: 403 });
+    }
+
     // Load transcription results
     const results = await db()
       .select()
@@ -55,7 +61,6 @@ export async function GET(
     });
 
     // Check user tier for preview limitations
-    const tier = await getUserTier(user_uuid);
     const service = new UnifiedTranscriptionService(
       process.env.REPLICATE_API_TOKEN || '', 
       process.env.DEEPGRAM_API_KEY

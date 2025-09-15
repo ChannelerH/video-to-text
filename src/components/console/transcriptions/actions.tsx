@@ -11,9 +11,12 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { FileText, FileCode, FileJson, FileDown, RefreshCw, Trash2, RotateCcw } from "lucide-react";
+import { useAppContext } from "@/contexts/app";
 
 export default function Actions({ row, i18n }: { row: any; i18n: any }) {
   const router = useRouter();
+  const { userTier } = useAppContext();
+  const isFreeTier = (userTier || 'free') === 'free';
   const [rerunning, setRerunning] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);
@@ -131,7 +134,11 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
     <div className="space-y-3">
       {/* 下载格式按钮组 - 包含所有导出格式 */}
       <div className="flex flex-wrap gap-2">
-        {['txt', 'srt', 'vtt', 'json', 'md'].map((format) => {
+        {(
+          isFreeTier
+            ? ['txt', 'srt', 'vtt']
+            : ['txt', 'srt', 'vtt', 'json', 'md']
+        ).map((format) => {
           const Icon = formatIcons[format as keyof typeof formatIcons] || FileDown;
           return (
             <button

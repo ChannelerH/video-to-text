@@ -18,6 +18,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
   const transcriptionData = (await getTranscription(job, user_uuid)) || ({} as any);
   const { job: jobData, formats } = transcriptionData;
   if (!jobData) return NextResponse.json({ success:false, error: 'not_found' }, { status: 404 });
+
+  // 权益限制：FREE 禁止导出 JSON/MD
+  try {
+    const tierEarly = await getUserTier(user_uuid);
+    if (tierEarly === UserTier.FREE && (format === 'json' || format === 'md')) {
+      return NextResponse.json({ success:false, error: 'forbidden_format' }, { status: 403 });
+    }
+  } catch {}
   
   // Check for edited segments
   let content = formats?.[format];
