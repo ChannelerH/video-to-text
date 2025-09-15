@@ -21,11 +21,21 @@ export default getRequestConfig(async ({ requestLocale }) => {
     return {
       locale: locale,
       messages: messages,
-    };
+      timeZone:
+        process.env.NEXT_PUBLIC_TIME_ZONE ||
+        process.env.TIME_ZONE ||
+        'UTC',
+      now: new Date()
+    } as any;
   } catch (e) {
     return {
       locale: "en",
       messages: (await import(`./messages/en.json`)).default,
-    };
+      timeZone:
+        process.env.NEXT_PUBLIC_TIME_ZONE ||
+        process.env.TIME_ZONE ||
+        'UTC',
+      now: new Date()
+    } as any;
   }
 });

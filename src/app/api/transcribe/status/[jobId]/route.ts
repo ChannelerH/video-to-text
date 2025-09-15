@@ -8,10 +8,10 @@ export const maxDuration = 10;
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const { jobId } = params;
+    const { jobId } = await params;
     
     // 验证用户
     const userUuid = await getUserUuid();

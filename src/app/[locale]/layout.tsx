@@ -46,8 +46,9 @@ export default async function LocaleLayout({
 
   const messages = await getMessages();
 
+  const timeZone = process.env.NEXT_PUBLIC_TIME_ZONE || process.env.TIME_ZONE || 'UTC';
   return (
-    <IntlProvider messages={messages} locale={locale}>
+    <IntlProvider messages={messages} locale={locale} timeZone={timeZone}>
       <NextAuthSessionProvider>
         <AppContextProvider>
           <ThemeProvider>{children}</ThemeProvider>

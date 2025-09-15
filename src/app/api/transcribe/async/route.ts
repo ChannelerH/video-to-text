@@ -64,14 +64,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       job_id: jobId,
-      status: 'queued',
-      message: 'Transcription job created successfully'
+      status: 'processing',  // 改为processing，不暴露queued状态
+      message: 'Transcription started successfully'
     });
 
   } catch (error) {
     console.error('[Transcribe Async] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to create transcription job' },
+      { error: 'Failed to start transcription' },
       { status: 500 }
     );
   }

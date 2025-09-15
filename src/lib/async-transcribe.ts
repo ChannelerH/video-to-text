@@ -38,12 +38,12 @@ export async function pollJobStatus(
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to get job status');
+        throw new Error(result.error || 'Unable to process transcription');
       }
 
-      // Update progress
+      // Update progress with status only (message handled by caller)
       if (onProgress) {
-        onProgress(result.status, result.message || 'Processing...');
+        onProgress(result.status, '');
       }
 
       // Check if completed
@@ -97,37 +97,38 @@ export async function transcribeAsync(
   requestData: any,
   onProgress?: (stage: string, percentage: number, message: string) => void
 ): Promise<any> {
-  // Step 1: Submit job
+  // Step 1: Submit job - hide queue messaging
   if (onProgress) {
-    onProgress('submit', 10, 'Submitting transcription job...');
+    onProgress('processing', 10, 'Starting transcription...');
   }
   
   const submitResult = await submitTranscriptionJob(requestData);
   
   if (!submitResult.success || !submitResult.job_id) {
-    throw new Error(submitResult.error || 'Failed to submit job');
+    throw new Error(submitResult.error || 'Failed to start transcription');
   }
 
-  // Step 2: Poll for result
+  // Step 2: Poll for result - use friendly messages
   if (onProgress) {
-    onProgress('processing', 30, 'Processing transcription...');
+    onProgress('processing', 30, 'Processing your audio...');
   }
 
   const result = await pollJobStatus(
     submitResult.job_id,
     (status, message) => {
-      // Map status to progress percentage
-      const progressMap: Record<string, number> = {
-        'queued': 20,
-        'downloading': 40,
-        'transcribing': 60,
-        'refining': 80,
-        'completed': 100
+      // Map status to user-friendly messages without queue references
+      const friendlyMessages: Record<string, { percentage: number; message: string }> = {
+        'queued': { percentage: 20, message: 'Preparing transcription...' },
+        'downloading': { percentage: 40, message: 'Loading media file...' },
+        'transcribing': { percentage: 60, message: 'Transcribing audio...' },
+        'refining': { percentage: 80, message: 'Enhancing transcript quality...' },
+        'processing': { percentage: 50, message: 'Processing your request...' },
+        'completed': { percentage: 100, message: 'Transcription complete!' }
       };
       
-      const percentage = progressMap[status] || 50;
+      const friendly = friendlyMessages[status] || { percentage: 50, message: 'Processing...' };
       if (onProgress) {
-        onProgress(status, percentage, message);
+        onProgress(status, friendly.percentage, friendly.message);
       }
     }
   );
