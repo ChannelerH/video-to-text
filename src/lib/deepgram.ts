@@ -183,6 +183,10 @@ export class DeepgramService {
         console.log(`User tier: ${options.userTier || 'free'}`);
       }
 
+      // Add timeout control - 4 minutes for transcription
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 240000);
+      
       const response = await fetch(`${this.apiUrl}?${params.toString()}`, {
         method: 'POST',
         headers: {
@@ -191,8 +195,11 @@ export class DeepgramService {
         },
         body: JSON.stringify({
           url: audioUrl
-        })
+        }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -237,10 +244,7 @@ export class DeepgramService {
       const channel = result.results?.channels?.[0];
       if (!channel) {
         console.warn('[Deepgram] No channels in response');
-        return {
-          success: true,
-          transcription: { text: '', segments: [], language: 'unknown', duration: 0 }
-        };
+        return { text: '', segments: [], language: 'unknown', duration: 0 };
       }
       
       const alternative = channel.alternatives?.[0];
@@ -310,7 +314,7 @@ export class DeepgramService {
 
       // Enrich segments with speaker info using diarization data (utterances or word-level speakers)
       try {
-        const utterances = (result.results as any)?.utterances as DeepgramResponse['results']['utterances'] | undefined;
+        const utterances = (result as any)?.metadata?.utterances as any[] | undefined;
         if (utterances && utterances.length > 0) {
           // Assign speaker based on the utterance that overlaps most with the segment
           segments = segments.map((seg) => {

@@ -5,9 +5,13 @@ import { users, transcriptions, orders } from '@/db/schema';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia',
-});
+export const runtime = 'nodejs';
+
+function makeStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_PRIVATE_KEY || '';
+  if (!key) throw new Error('stripe-key-missing');
+  return new Stripe(key);
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,6 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. 获取订阅信息
+    const stripe = makeStripe();
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     
     // 4. 计算订阅时长

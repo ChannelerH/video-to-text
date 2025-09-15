@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const customerId = (user as any)?.stripe_customer_id;
     if (!customerId) return NextResponse.json({ error: 'no_stripe_customer' }, { status: 400 });
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || process.env.STRIPE_PRIVATE_KEY!, { apiVersion: '2024-11-20.acacia' });
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || process.env.STRIPE_PRIVATE_KEY!);
     const origin = new URL(req.url).origin;
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
@@ -26,4 +26,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'failed' }, { status: 500 });
   }
 }
-

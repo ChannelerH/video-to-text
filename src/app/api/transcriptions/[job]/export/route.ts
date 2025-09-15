@@ -23,8 +23,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
   if (!trow) return new Response('not-found', { status: 404 });
   const [jsonRow] = await db().select({ content: transcription_results.content }).from(transcription_results).where(and(eq(transcription_results.job_id, job), eq(transcription_results.format, 'json'))).limit(1);
   if (!jsonRow) return new Response('no-json', { status: 404 });
-  const tdata = JSON.parse(jsonRow.content || '{}');
-  const segments = tdata.segments || [];
+  const parsed = JSON.parse(jsonRow.content || '[]');
+  const segments = Array.isArray(parsed) ? parsed : (parsed.segments || []);
+  const lang = (Array.isArray(parsed) ? (trow as any).language : (parsed.language || (trow as any).language));
 
   // fetch edits if any
   const [editRow] = await db().select({ content: transcription_edits.content }).from(transcription_edits).where(and(eq(transcription_edits.job_id, job), eq(transcription_edits.user_uuid, user_uuid))).limit(1);
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
   const meta = {
     title: trow.title || job,
     date: new Date(trow.created_at || Date.now()).toISOString().slice(0,10),
-    language: tdata.language,
+    language: lang,
     duration: trow.duration_sec
   };
 
@@ -98,30 +99,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
   
   const resultData = format === 'docx'
     ? await DocumentExportService.exportToWord(
-        { text: editedText, segments: finalSegments, language: tdata.language, duration: trow.duration_sec },
+        { text: editedText, segments: finalSegments, language: lang, duration: trow.duration_sec },
         finalChapters,
         summary,
         { includeChapters, includeTimestamps, includeSpeakers: tier !== UserTier.FREE, metadata: meta }
       )
     : await DocumentExportService.exportToPDF(
-        { text: editedText, segments: finalSegments, language: tdata.language, duration: trow.duration_sec },
+        { text: editedText, segments: finalSegments, language: lang, duration: trow.duration_sec },
         finalChapters,
         summary,
         { includeChapters, includeTimestamps, includeSpeakers: tier !== UserTier.FREE, metadata: meta }
       );
 
   // Normalize to Buffer
-  let ab: ArrayBuffer | Buffer;
+  let outBuf: Buffer;
   if (typeof (resultData as any)?.arrayBuffer === 'function') {
-    ab = await (resultData as Blob).arrayBuffer();
+    const ab = await (resultData as Blob).arrayBuffer();
+    outBuf = Buffer.from(new Uint8Array(ab));
   } else if (resultData instanceof ArrayBuffer) {
-    ab = resultData as ArrayBuffer;
+    outBuf = Buffer.from(new Uint8Array(resultData));
   } else {
     // Assume Node Buffer
-    ab = resultData as unknown as Buffer;
+    outBuf = resultData as unknown as Buffer;
   }
   const fname = `${(trow.title || 'transcription').replace(/\s+/g,'_')}.${format}`;
-  return new Response(Buffer.from(ab), {
+  return new Response(outBuf, {
     headers: {
       'Content-Type': format === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf',
       'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fname)}`,

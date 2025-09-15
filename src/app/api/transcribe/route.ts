@@ -436,7 +436,7 @@ export async function POST(request: NextRequest) {
               })}\n\n`));
               controller.close();
             } finally {
-              try { await markDone(jobId); } catch {}
+              try { if (jobId) await markDone(jobId); } catch {}
             }
           }
         });

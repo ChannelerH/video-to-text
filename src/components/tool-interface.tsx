@@ -738,61 +738,49 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       // Send request with SSE support for authenticated users
       let result: any = null;
       
-      if (isAuthenticated && requestData?.options?.streamProgress) {
-        // Use EventSource for progress updates
-        const response = await fetch("/api/transcribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestData)
-        });
-
-        if (response.headers.get('content-type')?.includes('text/event-stream')) {
-          // Handle SSE response
-          const reader = response.body?.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
-
-          if (reader) {
-            try {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-                
-                for (const line of lines) {
-                  if (line.startsWith('data: ')) {
-                    try {
-                      const data = JSON.parse(line.slice(6));
-                      
-                      if (data.type === 'progress') {
-                        setProgressInfo({
-                          stage: data.stage,
-                          percentage: data.percentage,
-                          message: data.message,
-                          estimatedTime: data.estimatedTime
-                        });
-                        setProgress(data.message);
-                      } else if (data.type === 'complete') {
-                        result = data.result;
-                        break;
-                      } else if (data.type === 'error') {
-                        throw new Error(data.error);
-                      }
-                    } catch (e) {
-                      console.error('Failed to parse SSE data:', e);
-                    }
-                  }
-                }
-              }
-            } finally {
-              reader.releaseLock();
+      // Use async transcription for authenticated users
+      if (isAuthenticated) {
+        // Import async helper
+        const { transcribeAsync } = await import('@/lib/async-transcribe');
+        
+        try {
+          result = await transcribeAsync(
+            requestData,
+            (stage, percentage, message) => {
+              const uiStage: 'upload' | 'download' | 'transcribe' | 'process' | null =
+                stage === 'downloading' ? 'download' :
+                stage === 'transcribing' ? 'transcribe' :
+                stage === 'refining' ? 'process' : null;
+              setProgressInfo({
+                stage: uiStage,
+                percentage,
+                message,
+                estimatedTime: uiStage === 'transcribe' ? '≈2m' : undefined
+              });
+              setProgress(message);
             }
-          }
-        } else {
-          // Non-SSE response, parse as JSON
+          );
+        } catch (error) {
+          console.error('[Async Transcribe] Error:', error);
+          setProgress(error instanceof Error ? error.message : 'Transcription failed');
+          setIsProcessing(false);
+          return;
+        }
+      } else {
+        // Non-authenticated preview request - use sync API with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 9000); // 9s timeout
+        
+        try {
+          const response = await fetch("/api/transcribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestData),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
           try {
             result = await response.json();
           } catch (e) {
@@ -801,20 +789,13 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             setIsProcessing(false);
             return;
           }
-        }
-      } else {
-        // Non-authenticated or preview request
-        const response = await fetch("/api/transcribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestData)
-        });
-        
-        try {
-          result = await response.json();
-        } catch (e) {
-          console.error('[Main] Failed to parse JSON:', e);
-          setProgress('Failed to parse server response. Please try again.');
+        } catch (error) {
+          clearTimeout(timeoutId);
+          if (error instanceof Error && error.name === 'AbortError') {
+            setProgress('Request timeout. Please try a shorter audio file.');
+          } else {
+            setProgress('Transcription failed. Please try again.');
+          }
           setIsProcessing(false);
           return;
         }

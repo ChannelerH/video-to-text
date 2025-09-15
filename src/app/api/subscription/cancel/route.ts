@@ -5,9 +5,13 @@ import { users, transcriptions, refunds } from '@/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia',
-});
+export const runtime = 'nodejs';
+
+function makeStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_PRIVATE_KEY || '';
+  if (!key) throw new Error('stripe-key-missing');
+  return new Stripe(key);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,6 +58,7 @@ export async function POST(request: NextRequest) {
 
     // 4. 获取用户的使用统计（用于决定是否退款）
     // 4. 获取 Stripe 订阅，计算本周期开始时间
+    const stripe = makeStripe();
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const periodStart = new Date(subscription.current_period_start * 1000);
 
@@ -222,6 +227,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 恢复订阅（取消"将要取消"状态）
+    const stripe = makeStripe();
     await stripe.subscriptions.update(subscriptionId, {
       cancel_at_period_end: false
     });

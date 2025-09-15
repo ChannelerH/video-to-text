@@ -5,6 +5,10 @@ import { db } from "@/db";
 import { users, orders } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
+// Ensure Node runtime for crypto used by Stripe webhook signature verification
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
     // Support both STRIPE_PRIVATE_KEY and STRIPE_SECRET_KEY for compatibility
@@ -71,6 +75,7 @@ export async function POST(req: Request) {
         break;
       }
 
+      case "customer.subscription.created":
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
         const subId = sub.id;

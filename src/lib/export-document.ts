@@ -432,9 +432,9 @@ export class DocumentExportService {
         // If chapter has no segments, add a note
         content.push(
           new Paragraph({
-            text: '(No segments in this chapter)',
-            italics: true,
-            color: '999999',
+            children: [
+              new TextRun({ text: '(No segments in this chapter)', italics: true, color: '999999' })
+            ],
             spacing: { after: 150 }
           })
         );

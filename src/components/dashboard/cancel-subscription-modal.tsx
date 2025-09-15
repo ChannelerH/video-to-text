@@ -165,9 +165,18 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
             <h2 className="text-2xl font-bold text-white mb-2">
               Wait! Here are some alternatives
             </h2>
-            <p className="text-gray-400 mb-6">
+            <p className="text-gray-400 mb-4">
               Before you cancel, consider these options:
             </p>
+            
+            {/* Refund eligibility notice */}
+            {refundEligible && (
+              <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <p className="text-sm text-green-400">
+                  ✓ You're eligible for a refund if you proceed with cancellation
+                </p>
+              </div>
+            )}
 
             <div className="space-y-4 mb-6">
               {/* Pause Option - Hidden for v1 */}

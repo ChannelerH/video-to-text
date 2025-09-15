@@ -42,7 +42,7 @@ export async function POST(
         return NextResponse.json({ success: false, error: 'AI 章节（预览）本月次数已用尽（按功能分别计数）', requiredTier: UserTier.BASIC, limit, used }, { status: 403 });
       }
       workingSegments = trimSegmentsToSeconds(segments, POLICY.preview.freePreviewSeconds);
-      await db().insert(usage_records).values({ user_id: userUuid, date: new Date().toISOString().slice(0,10), minutes: 0, model_type: 'preview_ai_chapters', created_at: new Date() }).catch(() => {});
+      await db().insert(usage_records).values({ user_id: userUuid, date: new Date().toISOString().slice(0,10), minutes: '0', model_type: 'preview_ai_chapters', created_at: new Date() }).catch(() => {});
     }
 
     // BASIC/PRO: ensure feature is enabled (BASIC and above)
@@ -61,7 +61,7 @@ export async function POST(
       if (usedToday >= dailyLimit) {
         return NextResponse.json({ success: false, error: 'AI 章节今日次数已达上限（10 次/天，按功能分别计数）', requiredTier: UserTier.PRO, limit: dailyLimit, used: usedToday }, { status: 403 });
       }
-      await db().insert(usage_records).values({ user_id: userUuid || '', date: new Date().toISOString().slice(0,10), minutes: 0, model_type: 'ai_chapters', created_at: new Date() }).catch(() => {});
+      await db().insert(usage_records).values({ user_id: userUuid || '', date: new Date().toISOString().slice(0,10), minutes: '0', model_type: 'ai_chapters', created_at: new Date() }).catch(() => {});
     }
 
     const chapters = await AIChapterService.generateAIChapters(workingSegments, {
