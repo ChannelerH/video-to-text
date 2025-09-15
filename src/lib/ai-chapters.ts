@@ -229,14 +229,30 @@ The title${generateSummary ? ' and summary' : ''} must be in ${languageName}:
       // Convert AI response to chapters with segments
       const chapters: AIChapter[] = [];
       
-      for (const item of parsed) {
+      // First, ensure all segments are assigned to chapters
+      const assignedSegments = new Set<number>();
+      
+      for (let i = 0; i < parsed.length; i++) {
+        const item = parsed[i];
         const startTime = this.parseTime(item.startTime);
         const endTime = this.parseTime(item.endTime);
         
         // Find segments within this chapter's time range
-        const chapterSegments = segments.filter(s => 
-          s.start >= startTime && s.start < endTime
-        );
+        // Use more inclusive logic: segment overlaps with chapter time range
+        const chapterSegments = segments.filter((s, idx) => {
+          // Check if segment overlaps with chapter time range
+          const segmentOverlaps = (
+            (s.start >= startTime && s.start < endTime) || // Segment starts within chapter
+            (s.end > startTime && s.end <= endTime) || // Segment ends within chapter
+            (s.start <= startTime && s.end >= endTime) // Segment spans entire chapter
+          );
+          
+          if (segmentOverlaps) {
+            assignedSegments.add(idx);
+            return true;
+          }
+          return false;
+        });
         
         if (chapterSegments.length > 0) {
           chapters.push({
@@ -249,6 +265,43 @@ The title${generateSummary ? ' and summary' : ''} must be in ${languageName}:
             summary: item.summary,
             confidence: item.confidence || 0.9
           });
+        }
+      }
+      
+      // Check for unassigned segments and add them to nearest chapter
+      const unassignedSegments = segments.filter((_, idx) => !assignedSegments.has(idx));
+      if (unassignedSegments.length > 0 && chapters.length > 0) {
+        console.log(`[ParseChapters] Found ${unassignedSegments.length} unassigned segments, adding to nearest chapters`);
+        
+        for (const segment of unassignedSegments) {
+          // Find the nearest chapter
+          let nearestChapter = chapters[0];
+          let minDistance = Math.abs(segment.start - chapters[0].startTime);
+          
+          for (const chapter of chapters) {
+            // Calculate distance to chapter (closest edge)
+            const distToStart = Math.abs(segment.start - chapter.startTime);
+            const distToEnd = Math.abs(segment.start - chapter.endTime);
+            const distance = Math.min(distToStart, distToEnd);
+            
+            if (distance < minDistance) {
+              minDistance = distance;
+              nearestChapter = chapter;
+            }
+          }
+          
+          // Add segment to nearest chapter
+          nearestChapter.segments.push(segment);
+          nearestChapter.segments.sort((a, b) => a.start - b.start); // Keep segments sorted
+          nearestChapter.wordCount += segment.text.split(' ').length;
+          
+          // Update chapter time boundaries if needed
+          if (segment.start < nearestChapter.startTime) {
+            nearestChapter.startTime = segment.start;
+          }
+          if (segment.end > nearestChapter.endTime) {
+            nearestChapter.endTime = segment.end;
+          }
         }
       }
       
