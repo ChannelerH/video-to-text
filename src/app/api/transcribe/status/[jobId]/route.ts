@@ -13,26 +13,18 @@ export async function GET(
   try {
     const { jobId } = await params;
     
-    // 验证用户
+    // 验证用户（允许匿名预览：userUuid 为空时仅允许访问 user_uuid 为空的任务）
     const userUuid = await getUserUuid();
-    if (!userUuid) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
 
     // 查询任务状态
-    const [transcription] = await db()
-      .select()
-      .from(transcriptions)
-      .where(
-        and(
-          eq(transcriptions.job_id, jobId),
-          eq(transcriptions.user_uuid, userUuid)
-        )
-      )
-      .limit(1);
+    let whereClause;
+    if (userUuid) {
+      whereClause = and(eq(transcriptions.job_id, jobId), eq(transcriptions.user_uuid, userUuid));
+    } else {
+      // 仅允许匿名访问匿名任务
+      whereClause = and(eq(transcriptions.job_id, jobId), eq(transcriptions.user_uuid, ''));
+    }
+    const [transcription] = await db().select().from(transcriptions).where(whereClause as any).limit(1);
 
     if (!transcription) {
       return NextResponse.json(

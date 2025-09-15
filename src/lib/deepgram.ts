@@ -187,6 +187,12 @@ export class DeepgramService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 240000);
       
+      // Ensure we pass a clean HTTPS URL string
+      const cleanUrl = typeof audioUrl === 'string' ? audioUrl.trim() : String(audioUrl || '');
+      if (!/^https?:\/\//i.test(cleanUrl)) {
+        throw new Error(`invalid-audio-url: ${cleanUrl}`);
+      }
+
       const response = await fetch(`${this.apiUrl}?${params.toString()}`, {
         method: 'POST',
         headers: {
@@ -194,7 +200,7 @@ export class DeepgramService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          url: audioUrl
+          url: cleanUrl
         }),
         signal: controller.signal
       });

@@ -625,7 +625,7 @@ export class TranscriptionService {
       ));
 
       // Free用户：先切割音频到5分钟
-      let audioUrlForTranscription = uploadResult.url;
+      let audioUrlForTranscription = uploadResult.publicUrl || uploadResult.url;
       if (request.options?.trimToSeconds) {
         console.log(`[FREE_CLIP] Starting audio clip for Free user:`, {
           originalUrl: uploadResult.url,
@@ -658,11 +658,11 @@ export class TranscriptionService {
             makePublic: true
           }
         );
-        audioUrlForTranscription = clipUpload.url;
+        audioUrlForTranscription = clipUpload.publicUrl || clipUpload.url;
         
         console.log(`[FREE_CLIP] Clipped audio uploaded:`, {
           uploadDurationMs: Date.now() - uploadStartTime,
-          clippedUrl: clipUpload.url,
+          clippedUrl: clipUpload.publicUrl || clipUpload.url,
           originalDuration: videoInfo.duration,
           clippedDuration: request.options.trimToSeconds,
           savingsPercent: ((1 - request.options.trimToSeconds / videoInfo.duration) * 100).toFixed(1)
@@ -931,7 +931,7 @@ export class TranscriptionService {
       console.log(`Audio uploaded to R2: ${uploadResult.key} (${Math.round(audioBuffer.length / 1024 / 1024)}MB)`);
 
       // Free用户：先切割音频到5分钟
-      let audioUrlForTranscription = uploadResult.url;
+      let audioUrlForTranscription = uploadResult.publicUrl || uploadResult.url;
       if (request.options?.trimToSeconds) {
         console.log(`[FREE_CLIP] Starting audio URL clip for Free user:`, {
           originalUrl: uploadResult.url,
@@ -962,11 +962,11 @@ export class TranscriptionService {
             makePublic: true
           }
         );
-        audioUrlForTranscription = clipUpload.url;
+        audioUrlForTranscription = clipUpload.publicUrl || clipUpload.url;
         
         console.log(`[FREE_CLIP] Clipped audio URL uploaded:`, {
           uploadDurationMs: Date.now() - uploadStartTime,
-          clippedUrl: clipUpload.url,
+          clippedUrl: clipUpload.publicUrl || clipUpload.url,
           clippedDuration: request.options.trimToSeconds
         });
       } else {

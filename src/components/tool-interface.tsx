@@ -649,7 +649,6 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   };
 
   const handleTranscribe = async () => {
-    console.log('[DEBUG] handleTranscribe called, url:', url, 'uploadedFileInfo:', uploadedFileInfo, 'file:', file?.name);
     
     // 检查是否有URL或已上传的文件
     if (!url && !uploadedFileInfo) {
@@ -711,9 +710,13 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           ? t("progress.generating_preview")
           : t("progress.processing_file");
         setProgress(progressText);
+        if (!isAuthenticated) {
+          // 匿名预览提示（速记）
+          setProgress(`${progressText} · Anonymous preview limit: ${process.env.NEXT_PUBLIC_ANON_PREVIEW_DAILY_LIMIT || 10}/day · Max file size: 100MB`);
+        }
         requestData = {
           type: "file_upload",
-          content: uploadedFileInfo.replicateUrl,
+          content: uploadedFileInfo.publicUrl || uploadedFileInfo.replicateUrl,
           action: action,
           options: { formats: selectedFormats, r2Key: uploadedFileInfo.r2Key, fileName: uploadedFileInfo.originalName }
         };
@@ -767,35 +770,28 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           return;
         }
       } else {
-        // Non-authenticated preview request - use sync API with timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 9000); // 9s timeout
-        
+        // 未登录也走异步提交 + 轮询（供应商异步 + 回调）
+        const { transcribeAsync } = await import('@/lib/async-transcribe');
         try {
-          const response = await fetch("/api/transcribe", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(requestData),
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-          
-          try {
-            result = await response.json();
-          } catch (e) {
-            console.error('[Main] Failed to parse JSON:', e);
-            setProgress('Failed to parse server response. Please try again.');
-            setIsProcessing(false);
-            return;
-          }
+          result = await transcribeAsync(
+            requestData,
+            (stage, percentage, message) => {
+              const uiStage: 'upload' | 'download' | 'transcribe' | 'process' | null =
+                stage === 'downloading' ? 'download' :
+                stage === 'transcribing' ? 'transcribe' :
+                stage === 'refining' ? 'process' : null;
+              setProgressInfo({
+                stage: uiStage,
+                percentage,
+                message,
+                estimatedTime: uiStage === 'transcribe' ? '≈2m' : undefined
+              });
+              setProgress(message);
+            }
+          );
         } catch (error) {
-          clearTimeout(timeoutId);
-          if (error instanceof Error && error.name === 'AbortError') {
-            setProgress('Request timeout. Please try a shorter audio file.');
-          } else {
-            setProgress('Transcription failed. Please try again.');
-          }
+          console.error('[Async Transcribe Anon] Error:', error);
+          setProgress(error instanceof Error ? error.message : 'Transcription failed');
           setIsProcessing(false);
           return;
         }

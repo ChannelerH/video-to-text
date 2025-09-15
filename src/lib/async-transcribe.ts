@@ -108,6 +108,18 @@ export async function transcribeAsync(
     throw new Error(submitResult.error || 'Failed to start transcription');
   }
 
+  // 可选的本地长任务兜底（默认关闭）。
+  // 仅当构建时注入 NEXT_PUBLIC_PROCESS_ONE_FALLBACK==='true' 时才触发。
+  try {
+    if (process.env.NEXT_PUBLIC_PROCESS_ONE_FALLBACK === 'true') {
+      fetch('/api/transcribe/process-one', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: submitResult.job_id })
+      }).catch(() => {});
+    }
+  } catch {}
+
   // Step 2: Poll for result - use friendly messages
   if (onProgress) {
     onProgress('processing', 30, 'Processing your audio...');
