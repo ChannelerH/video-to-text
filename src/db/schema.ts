@@ -30,6 +30,20 @@ export const users = pgTable(
     updated_at: timestamp({ withTimezone: true }),
     invited_by: varchar({ length: 255 }).notNull().default(""),
     is_affiliate: boolean().notNull().default(false),
+    // Stripe subscription fields
+    stripe_customer_id: varchar({ length: 255 }),
+    stripe_subscription_id: varchar({ length: 255 }),
+    stripe_price_id: varchar({ length: 255 }),
+    subscription_status: varchar({ length: 50 }).default("free"),
+    subscription_current_period_start: timestamp({ withTimezone: true }),
+    subscription_current_period_end: timestamp({ withTimezone: true }),
+    subscription_paused_at: timestamp({ withTimezone: true }),
+    subscription_resumes_at: timestamp({ withTimezone: true }),
+    subscription_cancelled_at: timestamp({ withTimezone: true }),
+    subscription_cancel_at_period_end: boolean().default(false),
+    subscription_cancel_reason: varchar({ length: 255 }),
+    subscription_cancel_feedback: text(),
+    subscription_trial_end: timestamp({ withTimezone: true }),
   },
   (table) => [
     uniqueIndex("email_provider_unique_idx").on(
@@ -215,4 +229,15 @@ export const user_minutes = pgTable("v2tx_user_minutes", {
   std_balance: integer().notNull().default(0),
   ha_balance: integer().notNull().default(0),
   updated_at: timestamp({ withTimezone: true }).notNull(),
+});
+
+// Refunds table
+export const refunds = pgTable("v2tx_refunds", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  user_uuid: varchar({ length: 255 }).notNull(),
+  stripe_payment_intent: varchar({ length: 255 }).notNull(),
+  amount_cents: integer().notNull().default(0),
+  currency: varchar({ length: 16 }).notNull().default('usd'),
+  reason: varchar({ length: 128 }).notNull().default(''),
+  created_at: timestamp({ withTimezone: true })
 });

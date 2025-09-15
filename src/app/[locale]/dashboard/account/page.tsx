@@ -38,7 +38,13 @@ export default async function AccountPage({
 
   // Get user data directly from database
   const [user] = await db()
-    .select()
+    .select({
+      uuid: users.uuid,
+      email: users.email,
+      created_at: users.created_at,
+      subscription_status: users.subscription_status,
+      stripe_price_id: users.stripe_price_id
+    })
     .from(users)
     .where(eq(users.uuid, userUuid))
     .limit(1);
@@ -63,15 +69,13 @@ export default async function AccountPage({
   const minutesUsed = Number(monthlyUsage[0]?.totalMinutes || 0);
   
   // Determine tier limits
-  const tierLimits: Record<string, number> = {
-    free: 10,
-    basic: 100,
-    pro: 1000,
-    premium: -1 // Unlimited
-  };
-
-  const userTier = (user as any)?.tier || 'free';
-  const minutesLimit = tierLimits[userTier] || 10;
+  // Map plan based on price id; fallback to subscription_status
+  const priceId = user?.stripe_price_id || '';
+  const status = (user as any)?.subscription_status || 'free';
+  const inferredTier = priceId.includes('pro') ? 'pro' : priceId.includes('basic') ? 'basic' : (status === 'active' ? 'basic' : 'free');
+  const tierLimits: Record<string, number> = { free: 10, basic: 100, pro: 1000, premium: -1 };
+  const userTier = inferredTier;
+  const minutesLimit = tierLimits[userTier];
 
   const email = user?.email || '';
   const joinedDate = user?.created_at ? new Date(user.created_at) : new Date();

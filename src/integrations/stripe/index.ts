@@ -7,10 +7,11 @@ export class StripeClient {
   };
 
   constructor({ privateKey }: { privateKey?: string }) {
+    // Prefer STRIPE_SECRET_KEY; fallback to STRIPE_PRIVATE_KEY for backward compatibility
     if (!privateKey) {
-      privateKey = process.env.STRIPE_PRIVATE_KEY;
+      privateKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_PRIVATE_KEY;
       if (!privateKey) {
-        throw new Error("STRIPE_PRIVATE_KEY is not set");
+        throw new Error("Stripe secret key is not set (STRIPE_SECRET_KEY)");
       }
     }
 
@@ -19,7 +20,7 @@ export class StripeClient {
     };
 
     this.client = new Stripe(privateKey, {
-      // Cloudflare Workers use the Fetch API for their API requests.
+      // Cloudflare Workers/Node fetch client
       httpClient: Stripe.createFetchHttpClient(),
     });
   }

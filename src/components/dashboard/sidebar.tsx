@@ -11,6 +11,7 @@ import {
   LogOut,
   MessageSquare,
   Users,
+  User,
   Loader2
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app';
@@ -49,6 +50,11 @@ export default function DashboardSidebar({ locale, userUuid }: DashboardSidebarP
       name: t('nav.transcriptions'),
       href: `/${locale}/dashboard/transcriptions`,
       icon: FileText,
+    },
+    {
+      name: t('nav.account'),
+      href: `/${locale}/dashboard/account`,
+      icon: User,
     }
   ];
 
