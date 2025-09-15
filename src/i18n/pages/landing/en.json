@@ -58,7 +58,7 @@
   },
   "comparison": {
     "title": "Why choose us? Data speaks",
-    "description": "\n\n                    Us        Others\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nFree quota          10min/day    3min/day\nFile size limit     500MB        100MB\nExport formats      5 formats    2 formats\nBatch processing    ✓            ✗\nNo watermark        ✓            ✗\nProcessing speed    2min/hour    5min/hour"
+    "description": "\n\n                    Us            Others\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nFree quota          30min/month    3min/day\nFile size limit     500MB          100MB\nExport formats      5 formats      2 formats\nBatch processing    ✓              ✗\nNo watermark        ✓              ✗\nProcessing speed    2min/hour      5min/hour"
   },
   "conversion_cases": {
     "title": "Real conversion examples",
@@ -338,7 +338,7 @@
       },
       {
         "title": "What are free plan limits?",
-        "description": "Daily 10 minutes (resets at 00:00 UTC+8). 100MB/file. Exports: SRT/TXT. No batch. Standard queue (3–5m wait at peak)."
+        "description": "30 minutes per month. 100MB/file. Exports: SRT/TXT (first 5 minutes preview). No batch. Standard queue (3–5m at peak)."
       },
       {
         "title": "How to run batch processing?",
@@ -807,7 +807,7 @@
   "core_value": {
     "name": "core-value",
     "title": "Why choose us? Real numbers",
-    "description": "100h processing: Manual ¥20,000 → Us ¥29 (save 99.8%).\n10min free/day • 2min per 1h • 95% accuracy • 500MB/file.",
+    "description": "100h processing: Manual ¥20,000 → Us ¥29 (save 99.8%).\n30min free/month • 2min per 1h • 95% accuracy • 500MB/file.",
     "items": [
       {
         "title": "Cost (100h/month)",
@@ -819,7 +819,7 @@
       },
       {
         "title": "Capabilities (at a glance)",
-        "description": "Free quota   10min/day • Others: 3min\nFile size    500MB/file • Others: 100MB\nBatch        ✓ • Others: ✗\nAPI          ✓ • Others: paid/✗\nAccuracy     95% (typical)\nAvailability 24/7"
+        "description": "Free quota   30min/month • Others: 3min/day\nFile size    500MB/file   • Others: 100MB\nBatch        ✓            • Others: ✗\nAPI          ✓            • Others: paid/✗\nAccuracy     95% (typical)\nAvailability 24/7"
       }
     ]
   },

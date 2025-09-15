@@ -48,12 +48,16 @@ export async function POST(req: NextRequest) {
         try {
           const maxSec = POLICY.preview.freePreviewSeconds || 300;
           if (formats.json) {
-            const full = JSON.parse(formats.json);
+            const parsed = JSON.parse(formats.json || '[]');
+            // 兼容两种形态：segments 数组 或 带 segments 的对象
+            const segments = Array.isArray(parsed) ? parsed : (parsed.segments || []);
+            const language = Array.isArray(parsed) ? undefined : parsed.language;
             const short = {
-              ...full,
-              segments: trimSegmentsToSeconds(full.segments || [], maxSec),
-              duration: Math.min(full.duration || maxSec, maxSec)
-            };
+              text: '',
+              segments: trimSegmentsToSeconds(segments, maxSec),
+              language: language || 'unknown',
+              duration: maxSec
+            } as any;
             formats = {
               txt: service.convertToPlainText(short),
               srt: service.convertToSRT(short),
@@ -94,4 +98,3 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ success: false, error: 'internal_error' }), { status: 500 });
   }
 }
-

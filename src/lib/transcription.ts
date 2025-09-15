@@ -203,12 +203,13 @@ export class TranscriptionService {
       const tier = (request.options?.userTier as any) || UserTier.FREE;
       const limits = POLICY.limits(tier);
       const maxSec = (limits.maxFileMinutes || 0) * 60;
-      if (maxSec > 0 && videoInfo.duration > maxSec) {
+      // 对非 Free 等级仍执行文件时长上限；Free 走预览裁剪（由上层设置 trimToSeconds）
+      if (tier !== UserTier.FREE && maxSec > 0 && videoInfo.duration > maxSec) {
         return {
           success: false,
           error: `This video is too long for your plan. Max ${limits.maxFileMinutes} minutes. Upgrade`,
-          upgrade: { url: '/pricing', reason: 'file_duration_limit', required: 'upgrade' }
-        };
+          // upgrade 字段不在类型中，仅在 API 层组合提示；这里仅返回标准字段
+        } as any;
       }
     } catch {}
 

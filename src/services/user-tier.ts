@@ -36,7 +36,7 @@ export const TIER_FEATURES: Record<UserTier, TierFeatures> = {
     timestamps: true,
     basicSegmentation: false,
     aiChapters: true,     // FREE: 仅预览（由路由限制）
-    aiSummary: false,     // FREE: 不开放全片，仅预览由路由控制
+    aiSummary: true,     // FREE: 不开放全片，仅预览由路由控制
     speakerIdentification: false, // FREE: 不开放全片，仅预览由路由控制
     batchProcessing: false,
     apiAccess: false,
