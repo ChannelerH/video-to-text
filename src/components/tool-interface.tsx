@@ -1016,7 +1016,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     return contentTypes[format] || 'text/plain';
   };
 
-  const getAcceptTypes = () => (mode === "video" ? ".mp4,.mov,.webm,.avi" : ".mp3,.m4a,.wav,.ogg,.flac");
+  const getAcceptTypes = () => (mode === "video" 
+    ? ".mp4,.mov,.webm,.avi,video/mp4,video/quicktime,video/webm,video/x-msvideo" 
+    : ".mp3,.m4a,.mp4,.wav,.ogg,.flac,audio/mpeg,audio/mp3,audio/mp4,video/mp4,audio/m4a,audio/wav,audio/ogg,audio/flac,audio/x-m4a,audio/webm");
 
   const getPlaceholder = () =>
     mode === "video"
@@ -1333,7 +1335,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
               {url ? t("upload_disabled_url") : file ? t("click_to_replace") : t("upload_tip")}
             </div>
             <div className="upload-desc">
-              {file ? `${file.name} • ${(file.size / (1024 * 1024)).toFixed(1)} MB` : t("supported_formats")}
+              {file ? `${file.name} • ${(file.size / (1024 * 1024)).toFixed(1)} MB` : t(mode === "video" ? "supported_formats_video" : "supported_formats_audio")}
             </div>
           </div>
           
@@ -1407,7 +1409,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             )}
           </div>
           <div className="url-help-text">
-            <span className="text-xs text-gray-400">{t("url_help_text")}</span>
+            <span className="text-xs text-gray-400">{t(mode === "video" ? "url_help_text_video" : "url_help_text_audio")}</span>
             <span className="text-xs text-gray-500 ml-2">•</span>
             <span className="text-xs text-gray-500 ml-2">{t("url_not_supported")}</span>
           </div>
