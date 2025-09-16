@@ -166,7 +166,8 @@ export const transcriptions = pgTable("v2tx_transcriptions", {
   user_uuid: varchar({ length: 255 }).notNull().default(""),
   source_type: varchar({ length: 50 }).notNull(), // youtube_url | audio_url | file_upload
   source_hash: varchar({ length: 255 }).notNull(), // videoId / url sha256 / r2 key hash
-  source_url: varchar({ length: 1024 }),
+  // Store long provider URLs safely (YouTube audio links can exceed 1KB)
+  source_url: text(),
   title: varchar({ length: 512 }),
   language: varchar({ length: 50 }),
   duration_sec: integer().notNull().default(0),

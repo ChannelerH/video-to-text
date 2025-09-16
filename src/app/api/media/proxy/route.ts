@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import ytdl from '@distube/ytdl-core';
 import { Readable } from 'stream';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: NextRequest) {
   const src = req.nextUrl.searchParams.get('url');
   if (!src) return new Response('missing url', { status: 400 });
@@ -38,7 +40,8 @@ export async function GET(req: NextRequest) {
         return new Response(webStream, {
           status: 200,
           headers: {
-            'Content-Type': 'audio/mp4',
+            // Most YouTube audioonly streams are webm/opus; use a safe default
+            'Content-Type': 'audio/webm',
             'Cache-Control': 'no-store',
             'Access-Control-Allow-Origin': '*'
           }
