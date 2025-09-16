@@ -170,18 +170,6 @@ export class TranscriptionService {
   private async processYouTubeTranscription(request: TranscriptionRequest): Promise<TranscriptionResponse> {
     const url = request.content;
     
-    // Check if this is an R2/processed URL (from Re-run)
-    const isProcessedUrl = url.includes('.r2.dev/') || url.includes('pub-') || url.includes('/api/media/proxy');
-    
-    if (isProcessedUrl) {
-      // This is a Re-run using processed URL, treat as audio URL to skip YouTube validation
-      console.log('[Re-run] Detected processed URL, bypassing YouTube validation:', url.substring(0, 50) + '...');
-      return this.processAudioUrlTranscription({
-        ...request,
-        type: 'audio_url' as TranscriptionType
-      });
-    }
-    
     // 1. 验证和解析 YouTube URL
     const videoId = YouTubeService.validateAndParseUrl(url);
     if (!videoId) {

@@ -57,26 +57,16 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
   };
 
   const onRerun = async () => {
-    // Check for available URL (prefer processed_url for speed)
-    const urlToUse = row.processed_url || row.source_url;
-    if (!urlToUse) {
-      toast.error('No URL available for re-run');
-      return;
-    }
-    
+    if (!row.source_url) return;
     setRerunning(true);
     try {
       if (row.source_type === 'file_upload') {
         alert(i18n.rerun_file_hint);
         return;
       }
-      
-      // Log which URL we're using
-      console.log('[Re-run] Using URL:', row.processed_url ? 'processed_url (fast)' : 'source_url (original)');
-      
       const body = {
         type: row.source_type as 'youtube_url' | 'audio_url',
-        content: urlToUse,  // Use the selected URL
+        content: row.source_url,
         action: 'transcribe',
         options: { formats: ['txt','srt','vtt','json','md'] }
       };
