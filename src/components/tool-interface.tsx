@@ -76,6 +76,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     requiredTier: 'basic' | 'pro';
     feature: string;
   }>({ isOpen: false, requiredTier: 'basic', feature: '' });
+  const [isNavigatingToHistory, setIsNavigatingToHistory] = useState(false);
   const { toast, showToast, hideToast } = useToast();
   // Progress tracking
   const [progressInfo, setProgressInfo] = useState<{
@@ -271,14 +272,19 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   }, [result]);
 
   const goToHistory = () => {
-    const href = locale && locale !== 'en' ? `/${locale}/my-transcriptions` : `/my-transcriptions`;
+    setIsNavigatingToHistory(true);
+    const href = locale && locale !== 'en' ? `/${locale}/dashboard/transcriptions` : `/dashboard/transcriptions`;
     try {
-      router.push('/my-transcriptions');
+      router.push(href);
       // 保险兜底：如果 SPA 跳转被阻塞，fallback 到硬跳转
       setTimeout(() => {
         if (typeof window !== 'undefined') {
           window.location.assign(href);
         }
+        // 如果 2 秒后还在这个页面，说明跳转可能失败了，移除 loading
+        setTimeout(() => {
+          setIsNavigatingToHistory(false);
+        }, 2000);
       }, 400);
     } catch {
       if (typeof window !== 'undefined') {
@@ -2426,7 +2432,24 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           </p>
           <div className="mt-4 flex items-center justify-center gap-2">
             <button className="balloon-button" onClick={() => setShowSuccess(false)}>{t("success.continue")}</button>
-            <button className="design-btn-primary" onClick={goToHistory}>{t("success.view_history")}</button>
+            <button 
+              className="design-btn-primary" 
+              onClick={goToHistory}
+              disabled={isNavigatingToHistory}
+              style={{ opacity: isNavigatingToHistory ? 0.7 : 1 }}
+            >
+              {isNavigatingToHistory ? (
+                <span className="inline-flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {t("success.view_history")}
+                </span>
+              ) : (
+                t("success.view_history")
+              )}
+            </button>
           </div>
         </div>
       </div>
