@@ -141,6 +141,22 @@ export async function POST(request: NextRequest) {
       const supplier = (process.env.SUPPLIER_ASYNC || '').toLowerCase();
       const cbBase = process.env.CALLBACK_BASE_URL || origin;
       if (type === 'audio_url' || type === 'file_upload') {
+        // For FREE users with file_upload, clip the audio to 5 minutes
+        let audioUrlForSupplier = content;
+        if (type === 'file_upload' && userTier === 'free') {
+          const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
+          const clippedUrl = await clipAudioForFreeTier(content, jobId, 'file');
+          
+          if (clippedUrl) {
+            audioUrlForSupplier = clippedUrl;
+            // Update the processed_url in database for future reference
+            await db().update(transcriptions)
+              .set({ processed_url: audioUrlForSupplier })
+              .where(eq(transcriptions.job_id, jobId));
+          }
+          // If clipping fails, audioUrlForSupplier remains as the original content
+        }
+        
         if ((supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
           let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(jobId)}`;
           console.log('[Deepgram] Webhook secret configured:', !!process.env.DEEPGRAM_WEBHOOK_SECRET);
@@ -173,7 +189,7 @@ export async function POST(request: NextRequest) {
               'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ url: content })
+            body: JSON.stringify({ url: audioUrlForSupplier })
           }).catch((e) => { console.error('[Deepgram] enqueue failed(request):', e); });
           try {
             if (dgResp && !dgResp.ok) {
@@ -195,7 +211,7 @@ export async function POST(request: NextRequest) {
               // Use the same whisper model as in ReplicateService
               // You can also use 'version' here; keeping model id for compatibility
               model: 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
-              input: { audio_file: content, model: 'large-v3' },
+              input: { audio_file: audioUrlForSupplier, model: 'large-v3' },
               webhook: cb,
               webhook_events_filter: ['completed', 'failed'],
               ...(process.env.REPLICATE_WEBHOOK_SECRET ? { webhook_secret: process.env.REPLICATE_WEBHOOK_SECRET } : {})

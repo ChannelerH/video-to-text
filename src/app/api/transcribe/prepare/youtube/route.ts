@@ -29,26 +29,14 @@ export async function POST(request: NextRequest) {
       
       // For FREE users, need to clip the R2 URL
       if (user_tier === 'free' || user_tier === 'FREE') {
-        try {
-          console.log('[YouTube Prepare] FREE user with R2 URL, clipping to 5 minutes');
-          const { createWavClipFromUrl } = await import('@/lib/audio-clip');
-          const { POLICY } = await import('@/services/policy');
-          const maxSeconds = POLICY.preview.freePreviewSeconds || 300;
-          
-          const clippedBuffer = await createWavClipFromUrl(video, maxSeconds);
-          
-          // Upload clipped audio to R2
-          const r2 = new CloudflareR2Service();
-          const upload = await r2.uploadFile(
-            clippedBuffer, 
-            `rerun_free_${job_id}_${maxSeconds}s.wav`,
-            'audio/wav',
-            { folder: 'youtube-audio', expiresIn: 24, makePublic: true }
-          );
-          supplierAudioUrl = upload.publicUrl || upload.url;
+        const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
+        const clippedUrl = await clipAudioForFreeTier(video, job_id, 'rerun');
+        
+        if (clippedUrl) {
+          supplierAudioUrl = clippedUrl;
           console.log(`[YouTube Prepare] FREE user R2 audio clipped and uploaded: ${supplierAudioUrl}`);
-        } catch (e: any) {
-          console.error('[YouTube Prepare] Failed to clip R2 URL for FREE user:', e);
+        } else {
+          console.error('[YouTube Prepare] Failed to clip R2 URL for FREE user, using full audio');
           // Fall back to full audio
         }
       }
@@ -193,41 +181,30 @@ export async function POST(request: NextRequest) {
         console.log('[YouTube Prepare] Audio buffered for R2 upload, size:', buf.length);
         
         // For FREE users, clip the audio to 5 minutes before uploading
-        let audioToUpload = buf;
-        let fileName = `${vid}.webm`;
-        
         if (user_tier === 'free' || user_tier === 'FREE') {
-          try {
-            // First upload the full audio temporarily
-            const tempUpload = await r2.uploadFile(buf, `temp_${vid}.webm`, 'audio/webm', { 
-              folder: 'youtube-audio-temp', 
-              expiresIn: 1, // 1 hour for temp file
-              makePublic: true 
-            });
-            
-            // Clip to 5 minutes using existing audio-clip utility
-            console.log('[YouTube Prepare] FREE user detected, clipping audio to 5 minutes');
-            const { createWavClipFromUrl } = await import('@/lib/audio-clip');
-            const { POLICY } = await import('@/services/policy');
-            const maxSeconds = POLICY.preview.freePreviewSeconds || 300;
-            
-            const clippedBuffer = await createWavClipFromUrl(tempUpload.url, maxSeconds);
-            audioToUpload = clippedBuffer;
-            fileName = `${vid}_free_${maxSeconds}s.wav`;
-            
-            console.log(`[YouTube Prepare] Audio clipped for FREE user: ${clippedBuffer.length} bytes (${maxSeconds}s)`);
-          } catch (clipError: any) {
-            console.error('[YouTube Prepare] Failed to clip audio for FREE user:', clipError?.message || clipError);
-            // Fall back to full audio if clipping fails
+          const { clipAudioFromBuffer } = await import('@/lib/audio-clip-helper');
+          const clippedUrl = await clipAudioFromBuffer(buf, vid!, 'webm');
+          
+          if (clippedUrl) {
+            // We already have the clipped audio uploaded, just update supplierAudioUrl
+            supplierAudioUrl = clippedUrl;
+            console.log(`[YouTube Prepare] FREE user audio clipped and uploaded: ${supplierAudioUrl}`);
+          } else {
+            // Clipping failed, fall back to uploading full audio
+            console.warn('[YouTube Prepare] Clipping failed for FREE user, falling back to full audio');
+            const upload = await r2.uploadFile(buf, `${vid}.webm`, 'audio/webm', 
+              { folder: 'youtube-audio', expiresIn: 24, makePublic: true }
+            );
+            supplierAudioUrl = upload.publicUrl || upload.url;
           }
+        } else {
+          // Non-FREE users: upload full audio
+          const upload = await r2.uploadFile(buf, `${vid}.webm`, 'audio/webm', 
+            { folder: 'youtube-audio', expiresIn: 24, makePublic: true }
+          );
+          supplierAudioUrl = upload.publicUrl || upload.url;
+          console.log('[YouTube Prepare] R2 upload ok, url len:', supplierAudioUrl.length);
         }
-        
-        const upload = await r2.uploadFile(audioToUpload, fileName, 
-          fileName.endsWith('.wav') ? 'audio/wav' : 'audio/webm', 
-          { folder: 'youtube-audio', expiresIn: 24, makePublic: true }
-        );
-        supplierAudioUrl = upload.publicUrl || upload.url;
-        console.log('[YouTube Prepare] R2 upload ok, url len:', supplierAudioUrl.length, 'file:', fileName);
       }
     } catch (e: any) {
       console.warn('[YouTube Prepare] R2 upload skipped/fail, will fallback to proxy URL:', e?.message || e);
