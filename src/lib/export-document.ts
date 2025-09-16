@@ -97,17 +97,20 @@ export class DocumentExportService {
           
           // Main Content
           new PageBreak(),
-          new Paragraph({
-            text: 'Full Transcription',
-            heading: HeadingLevel.HEADING_1,
-            spacing: { after: 400 }
-          }),
           
           // Content by chapters or flat
-          ...(chapters.length > 0 && options.includeChapters !== false ? 
-            await this.generateChapterContent(chapters, options.includeTimestamps !== false, options.includeSpeakers !== false) :
-            await this.generateFlatContent(transcription, options.includeTimestamps !== false)
-          )
+          ...(chapters.length > 0 && options.includeChapters !== false ? [
+            // If chapters exist, show them directly without "Full Transcription" header
+            ...(await this.generateChapterContent(chapters, options.includeTimestamps !== false, options.includeSpeakers !== false))
+          ] : [
+            // Only show "Full Transcription" if there are no chapters
+            new Paragraph({
+              text: 'Full Transcription',
+              heading: HeadingLevel.HEADING_1,
+              spacing: { after: 400 }
+            }),
+            ...(await this.generateFlatContent(transcription, options.includeTimestamps !== false))
+          ])
         ]
       }]
     });
@@ -316,11 +319,10 @@ export class DocumentExportService {
     // Main Content
     doc.addPage();
     yPosition = margins.top;
-    addText('Full Transcription', 18, true);
-    yPosition += 5;
     
     // Content
     if (chapters.length > 0 && options.includeChapters !== false) {
+      // If chapters exist, don't add "Full Transcription" header
       chapters.forEach((chapter, idx) => {
         if (yPosition > pageHeight - 40) {
           doc.addPage();
@@ -344,6 +346,10 @@ export class DocumentExportService {
         yPosition += 5;
       });
     } else {
+      // Only show "Full Transcription" if there are no chapters
+      addText('Full Transcription', 18, true);
+      yPosition += 5;
+      
       // Flat content
       if (transcription.segments && options.includeTimestamps !== false) {
         transcription.segments.forEach(segment => {

@@ -59,14 +59,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
   
   // Ensure chapters have proper segments
   let finalChapters = chapters.map((chapter: any) => {
-    if (!chapter.segments || chapter.segments.length === 0) {
-      // Rebuild segments for this chapter based on time range
-      const chapterSegments = finalSegments.filter((seg: any) => 
-        seg.start < chapter.endTime && seg.end > chapter.startTime
-      );
-      return { ...chapter, segments: chapterSegments };
-    }
-    return chapter;
+    // Always rebuild segments to ensure correct assignment
+    // A segment belongs to a chapter if its start time is within the chapter's range
+    const chapterSegments = finalSegments.filter((seg: any) => 
+      seg.start >= chapter.startTime && seg.start < chapter.endTime
+    );
+    return { ...chapter, segments: chapterSegments };
   });
 
   // Enforce FREE export as preview-only (first 5 minutes)
@@ -97,15 +95,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
     firstChapterSample: finalChapters[0]
   });
   
+  // If chapters exist, don't pass segments to avoid duplication
+  const transcriptionData = finalChapters.length > 0 
+    ? { text: editedText, language: lang, duration: trow.duration_sec }
+    : { text: editedText, segments: finalSegments, language: lang, duration: trow.duration_sec };
+  
   const resultData = format === 'docx'
     ? await DocumentExportService.exportToWord(
-        { text: editedText, segments: finalSegments, language: lang, duration: trow.duration_sec },
+        transcriptionData,
         finalChapters,
         summary,
         { includeChapters, includeTimestamps, includeSpeakers: tier !== UserTier.FREE, metadata: meta }
       )
     : await DocumentExportService.exportToPDF(
-        { text: editedText, segments: finalSegments, language: lang, duration: trow.duration_sec },
+        transcriptionData,
         finalChapters,
         summary,
         { includeChapters, includeTimestamps, includeSpeakers: tier !== UserTier.FREE, metadata: meta }

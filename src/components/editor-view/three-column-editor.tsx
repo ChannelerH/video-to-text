@@ -833,10 +833,15 @@ export default function ThreeColumnEditor({
     const left = newChapters[idx - 1];
     const right = newChapters[idx];
     
+    // Rebuild segments based on the merged time range to avoid duplicates
+    const mergedSegments = segments.filter((seg: any) => 
+      seg.start >= left.startTime && seg.start < right.endTime
+    );
+    
     const mergedChapter = {
       ...left,
       endTime: right.endTime,
-      segments: [...(left.segments || []), ...(right.segments || [])]
+      segments: mergedSegments
     };
     
     newChapters.splice(idx - 1, 2, mergedChapter);
@@ -855,10 +860,15 @@ export default function ThreeColumnEditor({
     const left = newChapters[idx];
     const right = newChapters[idx + 1];
     
+    // Rebuild segments based on the merged time range to avoid duplicates
+    const mergedSegments = segments.filter((seg: any) => 
+      seg.start >= left.startTime && seg.start < right.endTime
+    );
+    
     const mergedChapter = {
       ...left,
       endTime: right.endTime,
-      segments: [...(left.segments || []), ...(right.segments || [])]
+      segments: mergedSegments
     };
     
     newChapters.splice(idx, 2, mergedChapter);
