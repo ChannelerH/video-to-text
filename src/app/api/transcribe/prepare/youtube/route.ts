@@ -244,7 +244,8 @@ export async function POST(request: NextRequest) {
 
     const tasks: Promise<any>[] = [];
 
-    if ((supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
+    // Only send to Deepgram if we have a public R2 URL (proxy URL is not accessible from outside)
+    if (supplierAudioUrl && (supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
       let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(job_id)}`;
       if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
         const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(job_id).digest('hex');
@@ -271,8 +272,8 @@ export async function POST(request: NextRequest) {
               'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
               'Content-Type': 'application/json'
             },
-            // Use proxy URL so Deepgram can fetch without YouTube CDN restrictions
-            body: JSON.stringify({ url: supplierUrl })
+            // Use R2 URL that Deepgram can access (not proxy URL)
+            body: JSON.stringify({ url: supplierAudioUrl })
           }).catch((e) => { console.error('[Deepgram][prepare/youtube] enqueue failed(request):', e); return undefined as any; });
           try {
             if (resp && !resp.ok) {
@@ -288,7 +289,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if ((supplier.includes('replicate') || supplier === 'both') && process.env.REPLICATE_API_TOKEN) {
+    // Only send to Replicate if we have a public R2 URL
+    if (supplierAudioUrl && (supplier.includes('replicate') || supplier === 'both') && process.env.REPLICATE_API_TOKEN) {
       const cb = `${cbBase}/api/callback/replicate?job_id=${encodeURIComponent(job_id)}`;
       tasks.push(
         fetch('https://api.replicate.com/v1/predictions', {
@@ -299,8 +301,8 @@ export async function POST(request: NextRequest) {
           },
           body: JSON.stringify({
             model: 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
-            // Use proxy URL so Replicate can fetch without YouTube CDN restrictions
-            input: { audio_file: supplierUrl, model: 'large-v3' },
+            // Use R2 URL that Replicate can access
+            input: { audio_file: supplierAudioUrl, model: 'large-v3' },
             webhook: cb,
             webhook_events_filter: ['completed', 'failed']
           })

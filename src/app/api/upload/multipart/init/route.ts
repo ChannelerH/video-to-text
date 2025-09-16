@@ -34,12 +34,13 @@ export async function POST(request: NextRequest) {
     const key = `multipart-uploads/${userId || 'anonymous'}/${timestamp}-${randomId}-${sanitizedFileName}`;
     
     // 初始化分片上传
+    // S3 metadata 只支持 ASCII 字符，需要对文件名进行编码
     const command = new CreateMultipartUploadCommand({
       Bucket: process.env.STORAGE_BUCKET || '',
       Key: key,
       ContentType: fileType,
       Metadata: {
-        'original-name': fileName,
+        'original-name': encodeURIComponent(fileName), // 编码文件名以支持中文等特殊字符
         'user-id': userId || 'anonymous',
         'upload-time': new Date().toISOString(),
         'file-size': fileSize.toString(),

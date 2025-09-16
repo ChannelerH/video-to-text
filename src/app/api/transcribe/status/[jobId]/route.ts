@@ -24,7 +24,20 @@ export async function GET(
       // 仅允许匿名访问匿名任务
       whereClause = and(eq(transcriptions.job_id, jobId), eq(transcriptions.user_uuid, ''));
     }
-    const [transcription] = await db().select().from(transcriptions).where(whereClause as any).limit(1);
+    let transcription;
+    try {
+      const result = await db().select().from(transcriptions).where(whereClause as any).limit(1);
+      transcription = result[0];
+    } catch (error: any) {
+      // 如果是连接错误，返回临时错误状态
+      if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+        return NextResponse.json(
+          { error: 'Database connection temporarily unavailable. Please try again.' },
+          { status: 503 }
+        );
+      }
+      throw error; // 其他错误继续抛出
+    }
 
     if (!transcription) {
       return NextResponse.json(
