@@ -208,7 +208,10 @@ export async function POST(request: NextRequest) {
       const userTier = await getUserTier(user_uuid);
       
       // Free用户限制：检查视频时长（YouTube URL）
-      if (userTier === UserTier.FREE && type === 'youtube_url') {
+      // Skip check if this is a processed URL (R2/proxy) from Re-run
+      const isProcessedUrl = content.includes('.r2.dev/') || content.includes('pub-') || content.includes('/api/media/proxy');
+      
+      if (userTier === UserTier.FREE && type === 'youtube_url' && !isProcessedUrl) {
         try {
           const { YouTubeService } = await import('@/lib/youtube');
           const videoInfo = await YouTubeService.getVideoInfo(content);
@@ -235,6 +238,16 @@ export async function POST(request: NextRequest) {
           console.error('[FREE_CLIP][API] Failed to check video duration:', error);
           // Continue if we can't get video info
         }
+      }
+      
+      // Free用户限制：处理后的URL（R2/proxy）也需要限制5分钟
+      if (userTier === UserTier.FREE && type === 'youtube_url' && isProcessedUrl) {
+        options.trimToSeconds = POLICY.preview.freePreviewSeconds || 300;
+        console.log('[FREE_CLIP][API] Free user with processed URL - applying 5min limit:', {
+          userTier,
+          isProcessedUrl: true,
+          trimToSeconds: options.trimToSeconds
+        });
       }
       
       // Free用户限制：上传文件（用户文件）

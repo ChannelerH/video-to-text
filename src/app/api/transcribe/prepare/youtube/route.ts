@@ -145,12 +145,13 @@ export async function POST(request: NextRequest) {
       console.warn('[YouTube Prepare] R2 upload skipped/fail, will fallback to proxy URL:', e?.message || e);
     }
 
-    // Update transcription record with the best source url we have
+    // Store processed URL separately (keep original source_url intact)
     try {
-      const toStore = supplierAudioUrl || audioUrl;
-      console.log('[YouTube Prepare] Updating DB with source URL (length):', (toStore || '').length, supplierAudioUrl ? '(r2)' : '(yt)');
-      await db().update(transcriptions).set({ source_url: toStore }).where(eq(transcriptions.job_id, job_id));
-      console.log('[YouTube Prepare] DB update success');
+      const processedUrl = supplierAudioUrl || audioUrl;
+      console.log('[YouTube Prepare] Updating DB with processed URL (length):', (processedUrl || '').length, supplierAudioUrl ? '(r2)' : '(proxy)');
+      // Only update processed_url, leave source_url as the original YouTube URL
+      await db().update(transcriptions).set({ processed_url: processedUrl }).where(eq(transcriptions.job_id, job_id));
+      console.log('[YouTube Prepare] DB update success - processed_url saved');
     } catch (e) {
       console.error('[YouTube Prepare] DB update failed:', e);
       return NextResponse.json({ error: 'db_update_failed' }, { status: 500 });
