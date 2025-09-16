@@ -77,11 +77,10 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
       const body = {
         type: row.source_type as 'youtube_url' | 'audio_url',
         content: urlToUse,  // Use the selected URL
-        action: 'transcribe',
         options: { formats: ['txt','srt','vtt','json','md'] }
       };
       toast.message(i18n.rerun_ok);
-      const res = await fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch('/api/transcribe/async', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (!data?.success) {
         toast.error(i18n.rerun_failed);

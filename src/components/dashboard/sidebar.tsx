@@ -95,7 +95,7 @@ export default function DashboardSidebar({ locale, userUuid }: DashboardSidebarP
           )}
         </div>
         <Link
-          href={`/${locale}/dashboard/account`}
+          href={`/${locale}/pricing`}
           className="block w-full py-2 bg-purple-600 hover:bg-purple-700 
             text-white text-sm font-medium rounded-lg text-center transition-colors"
         >

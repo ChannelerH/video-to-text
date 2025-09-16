@@ -18,7 +18,84 @@ export async function POST(request: NextRequest) {
 
     console.log('[YouTube Prepare] Processing job:', job_id, 'video:', video, 'user_tier:', user_tier);
 
-    // Resolve videoId and get direct audio URL quickly
+    // Check if this is already an R2/processed URL (from Re-run)
+    const isProcessedUrl = video.includes('.r2.dev/') || video.includes('pub-') || video.includes('/api/media/proxy');
+    
+    if (isProcessedUrl) {
+      console.log('[YouTube Prepare] Detected R2/processed URL from Re-run, skipping YouTube processing');
+      
+      // Directly use the R2 URL as supplier URL
+      let supplierAudioUrl = video;
+      
+      // For FREE users, need to clip the R2 URL
+      if (user_tier === 'free' || user_tier === 'FREE') {
+        try {
+          console.log('[YouTube Prepare] FREE user with R2 URL, clipping to 5 minutes');
+          const { createWavClipFromUrl } = await import('@/lib/audio-clip');
+          const { POLICY } = await import('@/services/policy');
+          const maxSeconds = POLICY.preview.freePreviewSeconds || 300;
+          
+          const clippedBuffer = await createWavClipFromUrl(video, maxSeconds);
+          
+          // Upload clipped audio to R2
+          const r2 = new CloudflareR2Service();
+          const upload = await r2.uploadFile(
+            clippedBuffer, 
+            `rerun_free_${job_id}_${maxSeconds}s.wav`,
+            'audio/wav',
+            { folder: 'youtube-audio', expiresIn: 24, makePublic: true }
+          );
+          supplierAudioUrl = upload.publicUrl || upload.url;
+          console.log(`[YouTube Prepare] FREE user R2 audio clipped and uploaded: ${supplierAudioUrl}`);
+        } catch (e: any) {
+          console.error('[YouTube Prepare] Failed to clip R2 URL for FREE user:', e);
+          // Fall back to full audio
+        }
+      }
+      
+      // Store the URL and proceed to Deepgram
+      try {
+        await db().update(transcriptions).set({ processed_url: supplierAudioUrl }).where(eq(transcriptions.job_id, job_id));
+      } catch (e) {
+        console.error('[YouTube Prepare] DB update failed:', e);
+      }
+      
+      // Send to Deepgram
+      const supplier = (process.env.SUPPLIER_ASYNC || '').toLowerCase();
+      const origin = new URL(request.url).origin;
+      const cbBase = process.env.CALLBACK_BASE_URL || origin;
+      
+      if ((supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
+        let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(job_id)}`;
+        if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
+          const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(job_id).digest('hex');
+          cb = `${cb}&cb_sig=${sig}`;
+        }
+        
+        const params = new URLSearchParams();
+        params.set('callback', cb);
+        params.set('paragraphs', 'true');
+        params.set('punctuate', 'true');
+        params.set('utterances', 'true');
+        params.set('model', 'nova-2');
+        params.set('detect_language', 'true');
+        
+        fetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ url: supplierAudioUrl })
+        }).catch((e) => { 
+          console.error('[Deepgram][prepare/youtube] R2 URL enqueue failed:', e); 
+        });
+      }
+      
+      return NextResponse.json({ ok: true, rerun: true });
+    }
+    
+    // Normal YouTube URL processing
     const { YouTubeService } = await import('@/lib/youtube');
     
     let vid: string | null = null;

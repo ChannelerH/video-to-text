@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
 
 export const runtime = 'nodejs';
-export const maxDuration = 10;
+export const maxDuration = 10; // Vercel limit
 
 // Accept Deepgram callback. We map job_id via query string (?job_id=...)
 // In prod, consider validating signature using DEEPGRAM_WEBHOOK_SECRET.
@@ -22,13 +22,23 @@ export async function POST(req: NextRequest) {
 
     const simulate = process.env.SIMULATE_CALLBACK === 'true';
 
-    // Idempotency: if already completed, acknowledge
+    // Idempotency: check if already processing or completed
     try {
       const [tr] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
-      if (tr && (tr as any).status === 'completed') {
-        return NextResponse.json({ ok: true, skipped: 'already_completed' });
+      if (tr && ((tr as any).status === 'completed' || (tr as any).status === 'processing')) {
+        console.log(`[Deepgram Callback] Job ${jobId} already ${(tr as any).status}, skipping`);
+        return NextResponse.json({ ok: true, skipped: `already_${(tr as any).status}` });
       }
-    } catch {}
+      
+      // Immediately mark as processing to prevent duplicates
+      if (tr) {
+        await db().update(transcriptions)
+          .set({ status: 'processing' })
+          .where(eq(transcriptions.job_id, jobId));
+      }
+    } catch (e) {
+      console.error('[Deepgram Callback] Failed to check/update status:', e);
+    }
 
     // Get raw body for signature validation
     const raw = await req.text();

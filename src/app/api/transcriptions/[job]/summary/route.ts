@@ -49,6 +49,20 @@ export async function POST(
       if (!hasFeature(userTier, 'aiSummary')) {
         return NextResponse.json({ success: false, error: 'AI summary not available for your plan', requiredTier: UserTier.BASIC }, { status: 403 });
       }
+      // FREE: monthly limit (from policy)
+      if (userTier === UserTier.FREE) {
+        const now = new Date();
+        const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        const [month] = await db().select({ count: count() }).from(usage_records)
+          .where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, monthStart), eq(usage_records.model_type, 'ai_summary')));
+        const usedThisMonth = Number(month?.count || 0);
+        const monthlyLimit = POLICY.preview.freeMonthlyAiSummary;
+        if (usedThisMonth >= monthlyLimit) {
+          return NextResponse.json({ success: false, error: 'Monthly AI summary limit reached', requiredTier: UserTier.BASIC, limit: monthlyLimit, used: usedThisMonth }, { status: 403 });
+        }
+        await db().insert(usage_records).values({ user_id: userUuid || '', date: new Date().toISOString().slice(0,10), minutes: '0', model_type: 'ai_summary', created_at: new Date() }).catch(() => {});
+      }
+      
       // BASIC: daily limit (e.g., <= 10 per day)
       if (userTier === UserTier.BASIC) {
         const now = new Date();
@@ -58,7 +72,7 @@ export async function POST(
         const usedToday = Number(day?.count || 0);
         const dailyLimit = 10;
         if (usedToday >= dailyLimit) {
-          return NextResponse.json({ success: false, error: 'AI 总结今日次数已达上限（10 次/天，按功能分别计数）', requiredTier: UserTier.PRO, limit: dailyLimit, used: usedToday }, { status: 403 });
+          return NextResponse.json({ success: false, error: 'Daily AI summary limit reached', requiredTier: UserTier.PRO, limit: dailyLimit, used: usedToday, isDaily: true }, { status: 403 });
         }
         await db().insert(usage_records).values({ user_id: userUuid || '', date: new Date().toISOString().slice(0,10), minutes: '0', model_type: 'ai_summary', created_at: new Date() }).catch(() => {});
       }

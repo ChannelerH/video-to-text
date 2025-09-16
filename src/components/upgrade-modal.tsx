@@ -8,9 +8,10 @@ interface UpgradeModalProps {
   onClose: () => void;
   requiredTier: 'basic' | 'pro';
   feature: string;
+  currentTier?: 'free' | 'basic' | 'pro';
 }
 
-export function UpgradeModal({ isOpen, onClose, requiredTier, feature }: UpgradeModalProps) {
+export function UpgradeModal({ isOpen, onClose, requiredTier, feature, currentTier = 'free' }: UpgradeModalProps) {
   const t = useTranslations('tool_interface.results');
   
   if (!isOpen) return null;
@@ -20,23 +21,25 @@ export function UpgradeModal({ isOpen, onClose, requiredTier, feature }: Upgrade
       icon: <Sparkles className="w-6 h-6" />,
       color: 'from-blue-500 to-cyan-500',
       benefits: [
-        'Basic Segmentation',
-        '60 min max duration',
-        '100 transcriptions/month',
-        'SRT/VTT export'
+        '500 minutes/month transcription',
+        '120 min max file duration',
+        '10 AI features per day',
+        'All export formats',
+        'Speaker diarization',
+        '90 days retention'
       ]
     },
     pro: {
       icon: <Crown className="w-6 h-6" />,
       color: 'from-purple-500 to-pink-500',
       benefits: [
-        'AI-powered chapters',
-        'Smart summaries',
-        'Speaker identification',
-        'API access',
+        '2000 minutes/month standard',
+        '200 minutes/month high-accuracy',
+        'Unlimited AI features',
         'Priority processing',
-        '3 hour max duration',
-        '500 transcriptions/month'
+        '240 min max file duration',
+        '365 days retention',
+        'Batch export'
       ]
     }
   };
@@ -68,7 +71,11 @@ export function UpgradeModal({ isOpen, onClose, requiredTier, feature }: Upgrade
 
         {/* Title */}
         <h2 className="text-2xl font-bold mb-2">
-          {requiredTier === 'basic' ? t('upgrade_required_basic') : t('upgrade_required_pro')}
+          {currentTier === 'free' && requiredTier === 'basic' 
+            ? 'This feature requires Basic subscription'
+            : currentTier === 'basic' && requiredTier === 'pro'
+            ? 'This feature requires Pro subscription'
+            : `This feature requires ${requiredTier === 'basic' ? 'Basic' : 'Pro'} subscription`}
         </h2>
 
         {/* Description */}

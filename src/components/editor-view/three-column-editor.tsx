@@ -257,7 +257,6 @@ export default function ThreeColumnEditor({
                 </a>
               </div>
             );
-            setShowUpgrade(true);
           } else if (result.error?.includes('今日次数已达上限') || result.error?.includes('daily limit')) {
             toast.error('Daily AI chapter limit reached. Try again tomorrow.');
           } else {
@@ -269,7 +268,6 @@ export default function ThreeColumnEditor({
                 </a>
               </div>
             );
-            setShowUpgrade(true);
           }
         } else {
           toast.error(result.error || 'Failed to generate AI chapters. Please try again.');
@@ -1164,8 +1162,9 @@ export default function ThreeColumnEditor({
       <UpgradeModal 
         isOpen={showUpgrade}
         onClose={() => setShowUpgrade(false)}
-        requiredTier={'basic'}
-        feature={'Full export'}
+        requiredTier={userTier === 'free' ? 'basic' : 'pro'}
+        feature={userTier === 'free' ? 'Speaker diarization' : 'Advanced speaker features'}
+        currentTier={userTier as 'free' | 'basic' | 'pro'}
       />
       
       {/* Main Content Area - Three Columns - Takes remaining space minus audio player */}

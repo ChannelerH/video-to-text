@@ -1904,8 +1904,12 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                               setGeneratedChapters(data.data.chapters);
                             } else {
                               if (response.status === 403) {
-                                const msg = data?.limit ? `Basic 每日限 ${data.limit} 次，今天已用 ${data.used || 0} 次。升级 Pro 可不限次。` : (data?.error || '当前套餐受限，升级以解锁完整功能。');
-                                showToast('error', '需要升级或稍后重试', msg);
+                                const msg = data?.limit 
+                                  ? data.isDaily 
+                                    ? t('results.basic_daily_limit', { limit: data.limit, used: data.used || 0 })
+                                    : t('results.free_monthly_limit', { limit: data.limit, used: data.used || 0 })
+                                  : (data?.error || t('results.plan_limited'));
+                                showToast('error', t('results.upgrade_or_retry'), msg);
                               } else {
                                 showToast('error', t("results.generation_failed"), data.error || t("results.try_again_later"));
                               }
@@ -1969,8 +1973,12 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                               // Store summary in state for display
                               setGeneratedSummary(data.data.summary);
                             } else if (response.status === 403) {
-                              const msg = data?.limit ? `Basic 每日限 ${data.limit} 次，今天已用 ${data.used || 0} 次。升级 Pro 可不限次。` : (data?.error || '当前套餐受限，升级以解锁完整功能。');
-                              showToast('error', '需要升级或稍后重试', msg);
+                              const msg = data?.limit 
+                                ? data.isDaily
+                                  ? t('results.basic_daily_limit', { limit: data.limit, used: data.used || 0 })
+                                  : t('results.free_monthly_limit', { limit: data.limit, used: data.used || 0 })
+                                : (data?.error || t('results.plan_limited'));
+                              showToast('error', t('results.upgrade_or_retry'), msg);
                             } else {
                               showToast('error', t("results.generation_failed"), data.error || t("results.try_again_later"));
                             }
@@ -2005,7 +2013,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                           </>
                         )}
                       </button>
-                      <div className="mt-2 text-[11px] text-gray-400">
+                      <div className="mt-2 text-[11px] text-gray-400 whitespace-nowrap">
                         {t("results.usage_limits")}
                       </div>
                     </div>
