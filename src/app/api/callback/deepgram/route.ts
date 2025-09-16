@@ -173,6 +173,32 @@ export async function POST(req: NextRequest) {
     if (!text && typeof payload?.transcript === 'string') text = payload.transcript;
     if ((!segments || segments.length === 0) && Array.isArray(payload?.segments)) segments = payload.segments;
 
+    // Apply Chinese refinement if detected
+    if (language && text && segments) {
+      try {
+        // For Deepgram callback, trust the detected language since text may have spaces
+        const isZh = language && language.toLowerCase().includes('zh');
+        
+        console.log('[Deepgram Callback] Chinese detection:', { language, isZh, textSample: text.substring(0, 50) });
+        
+        if (isZh) {
+          console.log('[Deepgram Callback] Chinese detected, applying refinement');
+          console.log('[Deepgram Callback] Original text with spaces:', text.substring(0, 100));
+          
+          // Use shared refinement logic
+          const { applyChineseRefinement } = await import('@/lib/chinese-refinement');
+          const refined = await applyChineseRefinement(text, segments, language);
+          
+          text = refined.text;
+          segments = refined.segments;
+          
+          console.log('[Deepgram Callback] Chinese refinement completed, final text:', text.substring(0, 100));
+        }
+      } catch (e) {
+        console.error('[Deepgram Callback] Error applying Chinese refinement:', e);
+      }
+    }
+
     // Persist results (txt + json + srt + vtt when possible)
     const txt = text || (Array.isArray(segments) ? segments.map((s: any) => s.text).join('\n') : '');
     const json = JSON.stringify(segments || []);

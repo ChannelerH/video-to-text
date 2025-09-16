@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserUuid } from '@/services/user';
+import { getUserTier, UserTier } from '@/services/user-tier';
 import { db } from '@/db';
 import { q_jobs, transcriptions, usage_records } from '@/db/schema';
 import { getUniSeq } from '@/lib/hash';
@@ -32,6 +33,16 @@ export async function POST(request: NextRequest) {
     }
 
     const userUuid = maybeUserUuid || '';
+    
+    // Get user tier for FREE user audio clipping
+    let userTier: UserTier = UserTier.FREE;
+    if (userUuid) {
+      try {
+        userTier = await getUserTier(userUuid);
+      } catch (e) {
+        console.warn('[Async] Failed to get user tier:', e);
+      }
+    }
 
     // 3.1 匿名预览限流（按 IP 每日次数）
     if (!maybeUserUuid && isPreview) {
@@ -196,7 +207,7 @@ export async function POST(request: NextRequest) {
         fetch(`${origin}/api/transcribe/prepare/youtube`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ job_id: jobId, video: content })
+          body: JSON.stringify({ job_id: jobId, video: content, user_tier: userTier })
         }).catch(() => {});
       } else {
         // 其他类型仅在显式开启兜底时触发本地处理
