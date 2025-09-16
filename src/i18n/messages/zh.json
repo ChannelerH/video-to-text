@@ -551,6 +551,10 @@
       "wait_for_upload": "请等待文件上传完成或输入 URL。",
       "general_error": "发生错误。请重试。"
     },
+    "free_tier_notice": {
+      "title": "免费版限制",
+      "message": "超过5分钟的视频将仅转录前5分钟内容。升级到 Pro 版可享受无限制时长。"
+    },
     "success": {
       "title": "转录完成！",
       "message": "您的音频已转换为文本。",

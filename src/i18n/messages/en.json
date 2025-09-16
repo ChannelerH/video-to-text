@@ -696,6 +696,10 @@
       "wait_for_upload": "Please wait for file upload to complete or enter a URL.",
       "general_error": "An error occurred. Please try again."
     },
+    "free_tier_notice": {
+      "title": "Free Plan Limitation",
+      "message": "Videos longer than 5 minutes will be transcribed for the first 5 minutes only. Upgrade to Pro for unlimited duration."
+    },
     "success": {
       "title": "Transcription Complete!",
       "message": "Your audio has been transformed into text.",

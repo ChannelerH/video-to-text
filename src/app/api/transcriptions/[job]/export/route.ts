@@ -122,7 +122,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
     // Assume Node Buffer
     outBuf = resultData as unknown as Buffer;
   }
-  const fname = `${(trow.title || 'transcription').replace(/\s+/g,'_')}.${format}`;
+  // Use original filename for file uploads, title for URLs  
+  const baseName = trow.source_type === 'file_upload' && trow.title
+    ? trow.title.replace(/\.[^/.]+$/, '') // Remove extension if exists
+    : (trow.title || 'transcription');
+  const fname = `${baseName.replace(/\s+/g,'_')}.${format}`;
   return new Response(outBuf, {
     headers: {
       'Content-Type': format === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf',

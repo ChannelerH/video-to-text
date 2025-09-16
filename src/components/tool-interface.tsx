@@ -661,6 +661,11 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       return;
     }
 
+    // Show Free tier limitation notice
+    if (isFreeTier && isAuthenticated) {
+      showToast('info', t("free_tier_notice.title"), t("free_tier_notice.message"));
+    }
+
     // reset duplicate-guard and any previous banner for a new run
     setZhBannerShown(false);
     setShowChineseUpgrade(false);

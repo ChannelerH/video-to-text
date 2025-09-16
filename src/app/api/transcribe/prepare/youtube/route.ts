@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
     
     let vid: string | null = null;
     let audioUrl: string = '';
+    let videoTitle: string | null = null;
     
     try {
       vid = YouTubeService.validateAndParseUrl(video) || String(video);
@@ -160,6 +161,16 @@ export async function POST(request: NextRequest) {
       } else {
         console.log('[YouTube Prepare] Starting short R2 upload window');
         const ytdl = (await import('@distube/ytdl-core')).default;
+        
+        // Get video info while we're at it (reuse ytdl import)
+        try {
+          const info = await ytdl.getBasicInfo(vid!);
+          videoTitle = info.videoDetails?.title || null;
+          console.log('[YouTube Prepare] Got video title:', videoTitle);
+        } catch (error) {
+          console.warn('[YouTube Prepare] Failed to get video title:', error);
+        }
+        
         // Stream audio (audioonly) and collect into buffer with a time cap to respect function limits
         const stream: any = ytdl(vid!, {
           quality: 'highestaudio',
@@ -222,13 +233,23 @@ export async function POST(request: NextRequest) {
       console.warn('[YouTube Prepare] R2 upload skipped/fail, will fallback to proxy URL:', e?.message || e);
     }
 
-    // Store processed URL separately (keep original source_url intact)
+    // Store processed URL and title separately (keep original source_url intact)
     try {
       const processedUrl = supplierAudioUrl || audioUrl;
       console.log('[YouTube Prepare] Updating DB with processed URL (length):', (processedUrl || '').length, supplierAudioUrl ? '(r2)' : '(proxy)');
-      // Only update processed_url, leave source_url as the original YouTube URL
-      await db().update(transcriptions).set({ processed_url: processedUrl }).where(eq(transcriptions.job_id, job_id));
-      console.log('[YouTube Prepare] DB update success - processed_url saved');
+      
+      // Build update object
+      const updateData: any = { processed_url: processedUrl };
+      
+      // Update title if we got it from YouTube
+      if (videoTitle) {
+        updateData.title = videoTitle;
+        console.log('[YouTube Prepare] Updating title to:', videoTitle);
+      }
+      
+      // Update both processed_url and title (if available)
+      await db().update(transcriptions).set(updateData).where(eq(transcriptions.job_id, job_id));
+      console.log('[YouTube Prepare] DB update success - processed_url and title saved');
     } catch (e) {
       console.error('[YouTube Prepare] DB update failed:', e);
       return NextResponse.json({ error: 'db_update_failed' }, { status: 500 });

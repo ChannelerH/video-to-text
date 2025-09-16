@@ -230,7 +230,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
     }
   }
 
-  const filename = `${jobData.title || jobData.job_id}.${format}`;
+  // Use original filename for file uploads, title for URLs
+  const baseName = jobData.source_type === 'file_upload' && jobData.title
+    ? jobData.title.replace(/\.[^/.]+$/, '') // Remove extension if exists
+    : (jobData.title || jobData.job_id);
+  const filename = `${baseName}.${format}`;
   const typeMap: Record<string,string> = {
     txt: 'text/plain; charset=utf-8',
     srt: 'application/x-subrip',

@@ -187,7 +187,10 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
               const blob = await res.blob();
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
-              a.href = url; a.download = `${(row.title || 'transcription').replace(/\s+/g,'_')}.docx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+              const baseName = row.source_type === 'file_upload' && row.title
+                ? row.title.replace(/\.[^/.]+$/, '') // Remove extension if exists
+                : (row.title || 'transcription');
+              a.href = url; a.download = `${baseName.replace(/\s+/g,'_')}.docx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
               toast.success('Word exported successfully');
             } catch { 
               toast.error('Word export failed'); 
@@ -225,7 +228,10 @@ export default function Actions({ row, i18n }: { row: any; i18n: any }) {
               const blob = await res.blob();
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
-              a.href = url; a.download = `${(row.title || 'transcription').replace(/\s+/g,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+              const baseName = row.source_type === 'file_upload' && row.title
+                ? row.title.replace(/\.[^/.]+$/, '') // Remove extension if exists
+                : (row.title || 'transcription');
+              a.href = url; a.download = `${baseName.replace(/\s+/g,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
               toast.success('PDF exported successfully');
             } catch { 
               toast.error('PDF export failed'); 
