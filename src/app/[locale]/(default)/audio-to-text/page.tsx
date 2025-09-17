@@ -1,5 +1,6 @@
 import { setRequestLocale } from "next-intl/server";
 import Link from "next/link";
+import ToolInterface from "@/components/tool-interface";
 import React from "react";
 
 export const revalidate = 60;
@@ -135,7 +136,6 @@ export default async function AudioToTextPage({
                   {[
                     { label: "📁 Browse Files" },
                     { label: "📋 Paste URL" },
-                    { label: "☁️ Cloud Import" },
                   ].map((x) => (
                     <span
                       key={x.label}
