@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useSession } from "next-auth/react";
 import { ToastNotification, useToast } from "@/components/toast-notification";
 import { useTranslations } from "next-intl";
+import { useAppContext } from "@/contexts/app";
 
 interface Props {
   locale: string;
@@ -19,16 +20,27 @@ export default function AudioUploadWidget({ locale }: Props) {
   const [busy, setBusy] = useState(false);
   const { toast, showToast, hideToast } = useToast();
   const t = useTranslations('tool_interface');
+  const { userTier } = useAppContext();
+  const isProUser = userTier === 'pro';
+  const [highAccuracy, setHighAccuracy] = useState(false);
+  const [speakerDiarization, setSpeakerDiarization] = useState(false);
+  const [showUrlDialog, setShowUrlDialog] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
 
   const triggerBrowse = () => {
     if (busy) return;
     fileInputRef.current?.click();
   };
 
-  const handlePasteUrl = async () => {
+  const handlePasteUrl = () => {
     if (busy) return;
-    const url = window.prompt("Paste an audio URL (MP3/M4A/WAV/OGG/FLAC)");
+    setShowUrlDialog(true);
+  };
+
+  const handleUrlSubmit = async () => {
+    const url = urlInput.trim();
     if (!url) return;
+    setShowUrlDialog(false);
     try {
       setBusy(true);
       const isYouTube = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)/i.test(url);
@@ -36,7 +48,10 @@ export default function AudioUploadWidget({ locale }: Props) {
         type: isYouTube ? "youtube_url" : "audio_url",
         content: url,
         action: isAuthenticated ? "transcribe" : "preview",
-        options: {}
+        options: {
+          high_accuracy: highAccuracy,
+          speaker_diarization: speakerDiarization
+        }
       } as any;
 
       const resp = await fetch("/api/transcribe/async", {
@@ -58,6 +73,7 @@ export default function AudioUploadWidget({ locale }: Props) {
       showToast('error', t('errors.general_error'), e?.message || t('errors.general_error'));
     } finally {
       setBusy(false);
+      setUrlInput(''); // Clear input after use
     }
   };
 
@@ -101,7 +117,12 @@ export default function AudioUploadWidget({ locale }: Props) {
         type: "file_upload",
         content: downloadUrl || publicUrl,
         action: isAuthenticated ? "transcribe" : "preview",
-        options: { r2Key: key, originalFileName: file.name },
+        options: { 
+          r2Key: key, 
+          originalFileName: file.name,
+          high_accuracy: highAccuracy,
+          speaker_diarization: speakerDiarization
+        },
       };
 
       const resp = await fetch("/api/transcribe/async", {
@@ -137,6 +158,58 @@ export default function AudioUploadWidget({ locale }: Props) {
         isOpen={toast.isOpen}
         onClose={hideToast}
       />
+      
+      {/* Custom URL Dialog */}
+      {showUrlDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowUrlDialog(false)} />
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <button
+              onClick={() => setShowUrlDialog(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            <h3 className="text-xl font-semibold mb-2">Paste Audio URL</h3>
+            <p className="text-sm text-slate-400 mb-4">
+              Enter a direct link to an audio file or YouTube video
+            </p>
+            
+            <input
+              type="url"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
+              placeholder="https://example.com/audio.mp3"
+              className="w-full px-4 py-3 rounded-lg bg-slate-800 border border-slate-700 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-colors text-white placeholder-slate-500"
+              autoFocus
+            />
+            
+            <div className="mt-2 text-xs text-slate-500">
+              Supports: MP3, M4A, WAV, OGG, FLAC, YouTube links
+            </div>
+            
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setShowUrlDialog(false)}
+                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-700 hover:bg-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUrlSubmit}
+                disabled={!urlInput.trim()}
+                className="flex-1 px-4 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-slate-900 font-medium"
+              >
+                Start Transcription
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] opacity-40" aria-hidden>
         <div
           className="w-full h-full"
@@ -145,41 +218,83 @@ export default function AudioUploadWidget({ locale }: Props) {
       </div>
 
       <div className="relative">
-        <label
-          className="block cursor-pointer mx-auto w-56 h-56 rounded-full border-2 border-dashed border-cyan-400/60 bg-cyan-500/10 flex flex-col items-center justify-center gap-2 text-center hover:scale-[1.02] transition-transform"
-          onClick={(e) => { e.preventDefault(); triggerBrowse(); }}
+        <div
+          className="cursor-pointer mx-auto w-56 h-56 rounded-full border-2 border-dashed border-cyan-400/60 bg-cyan-500/10 flex flex-col items-center justify-center gap-2 text-center hover:scale-[1.02] transition-transform relative"
+          onClick={triggerBrowse}
         >
           <div className="absolute inset-0 rounded-full animate-[pulse_2s_ease_infinite]" />
           <div className="text-5xl">🎙️</div>
           <div className="text-sm">Upload Audio</div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="audio/*"
-            className="hidden"
-            onChange={handleFileChange}
-            disabled={busy}
-          />
-        </label>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*"
+          className="hidden"
+          onChange={handleFileChange}
+          disabled={busy}
+        />
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           {[{ label: "📁 Browse Files", onClick: triggerBrowse }, { label: "📋 Paste URL", onClick: handlePasteUrl }].map((x) => (
-            <span
+            <button
               key={x.label}
-              className="px-3 py-2 rounded-2xl text-cyan-400 border border-cyan-500/40 bg-cyan-500/10 text-sm"
-              onClick={(e) => { e.preventDefault(); x.onClick(); }}
-              role="button"
-              aria-disabled={busy}
-              style={{ opacity: busy ? 0.7 : 1, pointerEvents: busy ? "none" : "auto" }}
+              className="px-3 py-2 rounded-2xl text-cyan-400 border border-cyan-500/40 bg-cyan-500/10 text-sm hover:bg-cyan-500/20 transition-colors cursor-pointer"
+              onClick={x.onClick}
+              disabled={busy}
+              style={{ opacity: busy ? 0.7 : 1 }}
             >
               {x.label}
-            </span>
+            </button>
           ))}
         </div>
 
         <p className="mt-4 text-center text-slate-400 text-sm">
           Supports: MP3, WAV, M4A, AAC, OGG, FLAC, and more
         </p>
+
+        {/* Transcription Options */}
+        <div className="mt-6 space-y-3">
+          <label className={`flex items-center justify-between px-4 py-3 rounded-xl border ${isProUser ? 'border-slate-800 bg-slate-900/60 hover:border-cyan-500/50 cursor-pointer' : 'border-slate-800/50 bg-slate-900/30 cursor-not-allowed opacity-60'} transition-colors`}>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🎯</span>
+              <div>
+                <div className="font-medium flex items-center gap-2">
+                  High Accuracy Mode
+                  {!isProUser && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">PRO</span>}
+                </div>
+                <div className="text-xs text-slate-400">Best for professional use</div>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={highAccuracy && isProUser}
+              onChange={(e) => isProUser && setHighAccuracy(e.target.checked)}
+              disabled={!isProUser}
+              className="w-5 h-5 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </label>
+
+          <label className={`flex items-center justify-between px-4 py-3 rounded-xl border ${isProUser ? 'border-slate-800 bg-slate-900/60 hover:border-cyan-500/50 cursor-pointer' : 'border-slate-800/50 bg-slate-900/30 cursor-not-allowed opacity-60'} transition-colors`}>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">👥</span>
+              <div>
+                <div className="font-medium flex items-center gap-2">
+                  Speaker Detection
+                  {!isProUser && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">PRO</span>}
+                </div>
+                <div className="text-xs text-slate-400">Identify different speakers</div>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={speakerDiarization && isProUser}
+              onChange={(e) => isProUser && setSpeakerDiarization(e.target.checked)}
+              disabled={!isProUser}
+              className="w-5 h-5 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </label>
+        </div>
 
         <div className="mt-6 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3">
           <div className="flex items-center gap-2">
