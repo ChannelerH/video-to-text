@@ -20,8 +20,7 @@ interface PageProps {
 export default async function EditorPage({ 
   params 
 }: PageProps) {
-  console.time('[EditorPage] Total Load Time');
-  console.time('[EditorPage] Initial Setup');
+  // Start page load (timers removed to reduce noisy logs)
   
   // Parallelize initial setup
   const [{ locale, id }, t, userUuid] = await Promise.all([
@@ -30,7 +29,7 @@ export default async function EditorPage({
     getUserUuid()
   ]);
   
-  console.timeEnd('[EditorPage] Initial Setup');
+  // Initial setup complete
   
   if (!userUuid) {
     return null; // Layout will handle redirect
@@ -44,7 +43,7 @@ export default async function EditorPage({
   cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
   
   // Run all database queries in parallel for better performance
-  console.time('[EditorPage] All Database Queries (Parallel)');
+  // Run DB queries in parallel
   
   const [transcriptionResult, resultsData, editsData] = await Promise.all([
     // Query 1: Fetch transcription (only necessary fields)
@@ -87,7 +86,7 @@ export default async function EditorPage({
       .limit(1)
   ]);
   
-  console.timeEnd('[EditorPage] All Database Queries (Parallel)');
+  // DB queries complete
   
   const transcription = transcriptionResult[0];
 
@@ -119,11 +118,11 @@ export default async function EditorPage({
   let audioUrl: string | null = null;
 
   // Parse JSON result and edited data
-  console.time('[EditorPage] Data Processing');
+  // Parse transcription data
   
   const jsonResult = resultsData[0];  // Now we only get JSON format
   if (jsonResult && jsonResult.content) {
-    console.log('[EditorPage] JSON content size:', jsonResult.content.length, 'bytes');
+    // Using JSON result content
     
     // Parse both JSON results in parallel if both exist
     const parsePromises = [JSON.parse(jsonResult.content)];
@@ -154,7 +153,7 @@ export default async function EditorPage({
           transcriptionData.language = (transcription as any).language || 'auto';
         }
       }
-      console.log('[EditorPage] Segments count:', segments.length);
+      // Segments parsed
       
       // Use edited data if available
       if (editedData) {
@@ -172,7 +171,6 @@ export default async function EditorPage({
         chapters = transcriptionData.chapters;
       } else {
         // Don't generate AI chapters on server - let client handle it asynchronously
-        console.log('[EditorPage] Skipping server-side AI generation, will generate on client');
         chapters = [{
           id: 'full',
           title: transcription.title || 'Full Transcription',
@@ -186,7 +184,7 @@ export default async function EditorPage({
       console.error('Failed to parse transcription JSON:', error);
     }
   }
-  console.timeEnd('[EditorPage] Data Processing');
+  // Data processing complete
 
   // 先提取音频 URL，供后续话者叠加使用
   audioUrl = transcription.source_url || null;
@@ -201,12 +199,26 @@ export default async function EditorPage({
     }
   } catch {}
 
-  console.timeEnd('[EditorPage] Total Load Time');
+  // Page load complete
   
   // Derive preview mode flag
-  // 规则：Free 用户且（原始时长 > 预览窗，或时长恰等于预览窗——可能来自裁剪路径）
+  // 规则：Free 用户且时长接近预览窗口（299-300秒都算，考虑浮点数舍入）
   const previewWindow = POLICY.preview.freePreviewSeconds || 300;
-  const isPreview = (userTier === UserTier.FREE) && ((transcription.duration_sec || 0) >= previewWindow);
+  // 计算更稳健的“总时长”来源：DB 写入时长 / 解析结果时长 / 片段最后结束时间
+  const lastEnd = Array.isArray(segments) && segments.length > 0 
+    ? Math.max(...segments.map((s: any) => Number(s?.end) || 0)) 
+    : 0;
+  const candidateDurations = [
+    Number(transcription.duration_sec) || 0,
+    Number((transcription as any).original_duration_sec) || 0,
+    Number((transcriptionData as any)?.duration) || 0,
+    lastEnd || 0
+  ];
+  const totalDuration = Math.max(...candidateDurations);
+  // 容差1秒：部分流程会写入 299.x 或四舍五入成 299
+  const isPreview = (userTier === UserTier.FREE) && (totalDuration >= (previewWindow - 1));
+  
+  // Preview mode derived using tolerant duration check
 
   return (
     <div className="h-screen flex flex-col">
@@ -245,7 +257,7 @@ export default async function EditorPage({
           transcription={transcriptionData}
           backHref={`/${locale}/dashboard/transcriptions`}
           isPreviewMode={isPreview}
-          originalDurationSec={(transcription as any).original_duration_sec || transcription.duration_sec || 0}
+          originalDurationSec={(transcription as any).original_duration_sec || Math.max(transcription.duration_sec || 0, lastEnd || 0)}
         />
       </div>
     </div>

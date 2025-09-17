@@ -11,8 +11,8 @@ export interface TierLimits {
 export const POLICY = {
   preview: {
     freePreviewSeconds: 300,      // 5 minutes preview for AI/diarization/export
-    freeMonthlyAiChapters: 20,     // per month
-    freeMonthlyAiSummary: 20       // per month
+    freeMonthlyAiChapters: 10,     // per month
+    freeMonthlyAiSummary: 10       // per month
   },
   limits: (tier: UserTier): TierLimits => {
     switch (tier) {

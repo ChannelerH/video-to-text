@@ -699,8 +699,17 @@
       "wait_for_upload": "Please wait for file upload to complete or enter a URL.",
       "general_error": "An error occurred. Please try again.",
       "transcription_failed_title": "Transcription Failed",
-      "please_try_again": "Please try again"
+      "please_try_again": "Please try again",
+      "retry_suggestion": "Click Retry to try again.",
+      "timeout": "The operation is taking longer than expected. Please try again.",
+      "server_error": "Server error occurred. Please try again in a moment.",
+      "network": "Network connection failed. Please check your connection and try again."
     },
+    "warnings": {
+      "staging_failed_title": "Processing Notice",
+      "staging_failed_message": "The video is being processed through an alternative method. This may take slightly longer."
+    },
+    "retry": "Retry",
     "free_tier_notice": {
       "title": "Free Plan Limitation",
       "message": "Videos longer than 5 minutes will be transcribed for the first 5 minutes only. Upgrade to Pro for unlimited duration."
@@ -787,6 +796,20 @@
     "home": "Home",
     "transcriptions": "All Transcriptions",
     "account": "Account"
+  },
+  "error_dialog": {
+    "error_title": "Error Occurred",
+    "timeout_title": "Operation Timeout",
+    "server_error_title": "Server Error",
+    "network_error_title": "Network Error",
+    "timeout_description": "The operation is taking longer than expected. This might be due to server load or file size.",
+    "server_error_description": "The server encountered an error. Please try again in a moment.",
+    "network_error_description": "Unable to connect to the server. Please check your internet connection.",
+    "timeout_suggestion": "You can retry the operation or try again later with a smaller file.",
+    "server_error_suggestion": "If the problem persists, please contact support.",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "close": "Close"
   },
   "upgrade": "Upgrade",
   "audio_track_selector": {

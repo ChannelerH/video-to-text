@@ -10,7 +10,8 @@ export const maxDuration = 10; // keep it short
 
 export async function POST(request: NextRequest) {
   try {
-    const { job_id, video, user_tier, preferred_language } = await request.json();
+    const body = await request.json();
+    const { job_id, video, user_tier, preferred_language } = body;
     if (!job_id || !video) {
       return NextResponse.json({ error: 'missing job_id or video' }, { status: 400 });
     }
@@ -99,7 +100,6 @@ export async function POST(request: NextRequest) {
     try {
       audioUrl = await YouTubeService.getAudioStreamUrl(vid, preferred_language);
     } catch (error) {
-      console.log(`[YouTube Prepare] Failed to get audio stream with preferred language '${preferred_language}':`, error);
       // Fallback 1: use optimized audio formats (but try to respect language preference)
       try {
         const fmts = await YouTubeService.getOptimizedAudioFormats(vid, preferred_language);
@@ -108,10 +108,8 @@ export async function POST(request: NextRequest) {
         const pick = fmts.find(f => !!f.url) || fmts[0];
         if (pick?.url) {
           audioUrl = pick.url;
-          console.log('[YouTube Prepare] Using fallback audio format');
         }
       } catch (e) {
-        console.log('[YouTube Prepare] Fallback 1 failed:', e);
       }
 
       // Fallback 2: accept any playable format url (video/mp4 with audio)
@@ -141,6 +139,7 @@ export async function POST(request: NextRequest) {
       const r2 = new CloudflareR2Service();
       const cfg = r2.validateConfig();
       if (!cfg.isValid) {
+        console.warn('[YouTube Prepare] R2 not configured properly:', cfg);
       } else {
         const ytdl = (await import('@distube/ytdl-core')).default;
         
@@ -168,63 +167,175 @@ export async function POST(request: NextRequest) {
           if (typeMatch) expectedTrackType = typeMatch[1];
         }
         
+        
         // 使用 ytdl 下载，通过过滤器选择正确的音轨
-        const stream: any = ytdl(vid!, {
-          filter: (format: any) => {
-            // 只选择音频格式
-            if (!format.hasAudio || format.hasVideo) return false;
-            
-            // 检查格式URL中的语言标签
-            if (format.url && expectedLang) {
-              try {
-                const formatUrl = new URL(format.url);
-                const formatXtags = formatUrl.searchParams.get('xtags');
-                if (formatXtags) {
-                  // 确保语言和类型都匹配
-                  const hasExpectedLang = formatXtags.includes(`lang=${expectedLang}`);
-                  const hasExpectedType = expectedTrackType ? formatXtags.includes(`acont=${expectedTrackType}`) : true;
-                  
-                  // 优先选择 iTAG 140
-                  if (hasExpectedLang && hasExpectedType) {
-                    if (format.itag === 140) {
-                      return true;
+        let stream: any;
+        
+        // 如果已经有了特定语言的URL，直接使用它（不要重新选择）
+        if (audioUrl && expectedLang && itag) {
+          try {
+            // 直接使用已经选择好的URL，通过itag过滤确保获取正确的流
+            stream = ytdl(vid!, {
+              filter: (format: any) => {
+                // 必须是音频格式
+                if (!format.hasAudio || format.hasVideo) return false;
+                
+                // 检查itag
+                const itagMatch = format.itag == itag || format.itag === Number(itag);
+                if (!itagMatch) return false;
+                
+                // 检查语言标签
+                if (format.url) {
+                  try {
+                    const fUrl = new URL(format.url);
+                    const fXtags = fUrl.searchParams.get('xtags');
+                    
+                    // 必须匹配期望的语言和类型
+                    if (fXtags) {
+                      // 使用更精确的匹配，避免 en-US 匹配到 es-US
+                      const xtagParts = fXtags.split(':');
+                      const langTag = xtagParts.find(part => part.startsWith('lang='));
+                      const typeTag = xtagParts.find(part => part.startsWith('acont='));
+                      
+                      const hasExpectedLang = langTag === `lang=${expectedLang}`;
+                      const hasExpectedType = !expectedTrackType || typeTag === `acont=${expectedTrackType}`;
+                      
+                      if (hasExpectedLang && hasExpectedType) {
+                        return true;
+                      }
                     }
+                  } catch (e) {}
+                }
+                return false;
+              },
+              highWaterMark: 1 << 24,
+              requestOptions: {
+                headers: { 
+                  'User-Agent': 'Mozilla/5.0', 
+                  'Accept-Language': 'en-US,en;q=0.9' 
+                }
+              }
+            });
+            
+            // 不需要测试stream，ytdl会自动处理
+            // 如果filter匹配到format，stream就是有效的
+          } catch (e) {
+            stream = null;
+          }
+        }
+        
+        // 如果没有预选的URL或失败了，尝试用filter选择特定语言
+        if (!stream && expectedLang) {
+          try {
+            stream = ytdl(vid!, {
+              filter: (format: any) => {
+                // 只选择音频格式
+                if (!format.hasAudio || format.hasVideo) return false;
+                
+                // 检查格式URL中的语言标签
+                if (format.url && expectedLang) {
+                  try {
+                    const formatUrl = new URL(format.url);
+                    const formatXtags = formatUrl.searchParams.get('xtags');
+                    if (formatXtags) {
+                      // 使用更精确的匹配，避免 en-US 匹配到 es-US
+                      const xtagParts = formatXtags.split(':');
+                      const langTag = xtagParts.find(part => part.startsWith('lang='));
+                      const typeTag = xtagParts.find(part => part.startsWith('acont='));
+                      
+                      const hasExpectedLang = langTag === `lang=${expectedLang}`;
+                      const hasExpectedType = !expectedTrackType || typeTag === `acont=${expectedTrackType}`;
+                      
+                      // 优先选择 iTAG 140
+                      if (hasExpectedLang && hasExpectedType) {
+                        if (format.itag === 140) {
+                          return true;
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    // URL 解析失败，跳过
                   }
                 }
-              } catch (e) {
-                // URL 解析失败，跳过
+                return false;
+              },
+              highWaterMark: 1 << 24, // 16MB buffer
+              requestOptions: {
+                headers: { 
+                  'User-Agent': 'Mozilla/5.0', 
+                  'Accept-Language': 'en-US,en;q=0.9' 
+                }
               }
-            }
-            return false;
-          },
-          highWaterMark: 1 << 24, // 16MB buffer
-          requestOptions: {
-            headers: { 
-              'User-Agent': 'Mozilla/5.0', 
-              'Accept-Language': 'en-US,en;q=0.9' 
+            });
+            
+            // 不测试stream，让ytdl自己处理
+            // stream将在实际使用时验证
+          } catch (e) {
+            stream = null;
+          }
+        }
+        
+        // 如果没有stream或者语言过滤失败，使用默认的最高质量音频
+        if (!stream) {
+          // 保留原始audioUrl的音轨选择（如果有）
+          if (audioUrl && expectedLang) {
+            // 尝试通过itag或其他方式获取特定音轨
+            try {
+              const urlObj = new URL(audioUrl);
+              const itag = urlObj.searchParams.get('itag');
+              if (itag) {
+                // 使用特定的itag
+                stream = ytdl(vid!, {
+                  quality: itag,
+                  highWaterMark: 1 << 24,
+                  requestOptions: {
+                    headers: { 
+                      'User-Agent': 'Mozilla/5.0', 
+                      'Accept-Language': 'en-US,en;q=0.9' 
+                    }
+                  }
+                });
+              }
+            } catch (e) {
             }
           }
-        });
-        
-        const chunks: Buffer[] = [];
-        const buf: Buffer = await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Download timeout after 30 seconds'));
-          }, 30000);
           
-          stream.on('data', (c: Buffer) => chunks.push(Buffer.from(c)));
-          stream.on('end', () => { 
-            clearTimeout(timeout);
-            resolve(Buffer.concat(chunks)); 
-          });
-          stream.on('error', (e: any) => { 
-            clearTimeout(timeout);
-            reject(e); 
-          });
-        });
+          // 最终fallback：默认最高质量音频
+          if (!stream) {
+            stream = ytdl(vid!, {
+              quality: 'highestaudio',
+              filter: 'audioonly',
+              highWaterMark: 1 << 24,
+              requestOptions: {
+                headers: { 
+                  'User-Agent': 'Mozilla/5.0', 
+                  'Accept-Language': 'en-US,en;q=0.9' 
+                }
+              }
+            });
+          }
+        }
         
-        // For FREE users, clip the audio to 5 minutes before uploading
+        // For FREE users, we need to clip first (requires buffer)
         if (user_tier === 'free' || user_tier === 'FREE') {
+          // Free users: download to buffer for clipping
+          const chunks: Buffer[] = [];
+          const buf: Buffer = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error('Download timeout after 30 seconds'));
+            }, 30000);
+            
+            stream.on('data', (c: Buffer) => chunks.push(Buffer.from(c)));
+            stream.on('end', () => { 
+              clearTimeout(timeout);
+              resolve(Buffer.concat(chunks)); 
+            });
+            stream.on('error', (e: any) => { 
+              clearTimeout(timeout);
+              reject(e); 
+            });
+          });
+          
           const { clipAudioFromBuffer } = await import('@/lib/audio-clip-helper');
           const clippedUrl = await clipAudioFromBuffer(buf, vid!, 'webm');
           
@@ -239,14 +350,124 @@ export async function POST(request: NextRequest) {
             supplierAudioUrl = upload.publicUrl || upload.url;
           }
         } else {
-          // Non-FREE users: upload full audio
-          const upload = await r2.uploadFile(buf, `${vid}.webm`, 'audio/webm', 
-            { folder: 'youtube-audio', expiresIn: 24, makePublic: true }
-          );
-          supplierAudioUrl = upload.publicUrl || upload.url;
+          // Non-FREE users: use stream upload directly (no buffering)
+          try {
+            // Use S3Client directly for streaming upload
+            const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+            const s3 = new S3Client({ 
+              region: process.env.STORAGE_REGION || 'auto', 
+              endpoint: process.env.STORAGE_ENDPOINT,
+              credentials: {
+                accessKeyId: process.env.STORAGE_ACCESS_KEY || '',
+                secretAccessKey: process.env.STORAGE_SECRET_KEY || ''
+              }
+            });
+            
+            const key = `youtube-audio/${vid}_${Date.now()}.webm`;
+            const bucket = process.env.STORAGE_BUCKET || '';
+            const publicDomain = process.env.STORAGE_DOMAIN || process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN;
+            
+            // Stream upload without buffering
+            await s3.send(new PutObjectCommand({
+              Bucket: bucket,
+              Key: key,
+              Body: stream as any,  // Direct stream, no buffering
+              ContentType: 'audio/webm',
+              Metadata: {
+                'upload-time': new Date().toISOString(),
+                'source': 'youtube-prepare'
+              }
+            }));
+            
+            const publicUrl = (publicDomain ? 
+              (publicDomain.startsWith('http') ? publicDomain : `https://${publicDomain}`) : 
+              `https://pub-${bucket}.r2.dev`) + `/${key}`;
+            
+            supplierAudioUrl = publicUrl;
+          } catch (streamError) {
+            console.error('[YouTube Prepare] Stream upload failed, falling back to buffer upload:', streamError);
+            
+            // Fallback: create new stream and buffer it (保留语言选择)
+            let fallbackStream;
+            
+            // 如果有语言偏好，尝试重新创建带语言过滤的stream
+            if (expectedLang) {
+              try {
+                fallbackStream = ytdl(vid!, {
+                  filter: (format: any) => {
+                    if (!format.hasAudio || format.hasVideo) return false;
+                    if (format.url && expectedLang) {
+                      try {
+                        const formatUrl = new URL(format.url);
+                        const formatXtags = formatUrl.searchParams.get('xtags');
+                        if (formatXtags) {
+                          const hasExpectedLang = formatXtags.includes(`lang=${expectedLang}`);
+                          const hasExpectedType = expectedTrackType ? formatXtags.includes(`acont=${expectedTrackType}`) : true;
+                          if (hasExpectedLang && hasExpectedType && format.itag === 140) {
+                            return true;
+                          }
+                        }
+                      } catch (e) {}
+                    }
+                    return false;
+                  },
+                  highWaterMark: 1 << 24,
+                  requestOptions: {
+                    headers: { 
+                      'User-Agent': 'Mozilla/5.0', 
+                      'Accept-Language': 'en-US,en;q=0.9' 
+                    }
+                  }
+                });
+                
+                // 不测试stream，让ytdl自己处理
+              } catch (e) {
+                fallbackStream = null;
+              }
+            }
+            
+            // 如果语言过滤失败，使用默认音频
+            if (!fallbackStream) {
+              fallbackStream = ytdl(vid!, {
+                quality: 'highestaudio',
+                filter: 'audioonly',
+                highWaterMark: 1 << 24,
+                requestOptions: {
+                  headers: { 
+                    'User-Agent': 'Mozilla/5.0', 
+                    'Accept-Language': 'en-US,en;q=0.9' 
+                  }
+                }
+              });
+            }
+            
+            const chunks: Buffer[] = [];
+            const buf: Buffer = await new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                reject(new Error('Download timeout after 30 seconds'));
+              }, 30000);
+              
+              fallbackStream.on('data', (c: Buffer) => chunks.push(Buffer.from(c)));
+              fallbackStream.on('end', () => { 
+                clearTimeout(timeout);
+                resolve(Buffer.concat(chunks)); 
+              });
+              fallbackStream.on('error', (e: any) => { 
+                clearTimeout(timeout);
+                reject(e); 
+              });
+            });
+            
+            const upload = await r2.uploadFile(buf, `${vid}.webm`, 'audio/webm', 
+              { folder: 'youtube-audio', expiresIn: 24, makePublic: true }
+            );
+            supplierAudioUrl = upload.publicUrl || upload.url;
+          }
         }
       }
     } catch (e: any) {
+      console.error('[YouTube Prepare] Failed to upload to R2:', e);
+      // Don't fail the whole request, continue with direct YouTube URL if available
     }
 
     // Store processed URL and title separately (keep original source_url intact)
@@ -346,29 +567,167 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If we couldn't prepare R2 and video looks long, schedule staging worker and return quickly
-    try {
-      const { YouTubeService } = await import('@/lib/youtube');
-      const info = await YouTubeService.getVideoInfo(vid!);
-      const longVideo = (info.duration || 0) > 180; // >3 minutes
-      if (longVideo && !supplierAudioUrl) {
-        fetch(`${origin}/api/transcribe/stage/youtube`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ job_id, video })
-        }).catch(() => {});
-        // Return early; staging will fan-out with R2 URL
-        return NextResponse.json({ ok: true, staged: true });
+    // If we couldn't prepare R2 URL, try alternative S3 upload method (from staging logic)
+    if (!supplierAudioUrl && vid) {
+      try {
+        
+        // Use S3 client directly (more reliable for R2)
+        const endpoint = process.env.STORAGE_ENDPOINT;
+        const accessKeyId = process.env.STORAGE_ACCESS_KEY || '';
+        const secretAccessKey = process.env.STORAGE_SECRET_KEY || '';
+        const bucket = process.env.STORAGE_BUCKET || '';
+        
+        if (endpoint && accessKeyId && secretAccessKey && bucket) {
+          const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+          const s3 = new S3Client({ 
+            region: process.env.STORAGE_REGION || 'auto', 
+            endpoint, 
+            credentials: { accessKeyId, secretAccessKey },
+            forcePathStyle: true // Important for R2
+          });
+          
+          const ytdl = (await import('@distube/ytdl-core')).default;
+          const key = `youtube-audio/${vid}_${Date.now()}.webm`;
+          
+          // Download audio with fallback
+          let stream: any;
+          try {
+            // Try to get the audio with the already obtained audioUrl if available
+            if (audioUrl) {
+              // Use the URL directly for downloading
+              const response = await fetch(audioUrl, {
+                headers: { 
+                  'User-Agent': 'Mozilla/5.0', 
+                  'Accept-Language': 'en-US,en;q=0.9' 
+                }
+              });
+              if (response.ok && response.body) {
+                // Convert response to stream-like object
+                const reader = response.body.getReader();
+                stream = new (await import('stream')).Readable({
+                  async read() {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                      this.push(null);
+                    } else {
+                      this.push(Buffer.from(value));
+                    }
+                  }
+                });
+              }
+            }
+          } catch (e) {
+          }
+          
+          // Fallback to ytdl if stream is not available
+          if (!stream) {
+            stream = ytdl(vid, {
+              quality: 'highestaudio',
+              filter: 'audioonly',
+              highWaterMark: 1 << 24,
+              requestOptions: { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'en-US,en;q=0.9' } }
+            });
+          }
+          
+          // Collect into buffer
+          const chunks: Buffer[] = [];
+          const buffer: Buffer = await new Promise((resolve, reject) => {
+            stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+            stream.on('end', () => resolve(Buffer.concat(chunks)));
+            stream.on('error', reject);
+            // Add timeout
+            setTimeout(() => reject(new Error('Download timeout')), 60000);
+          });
+          
+          // Handle Free tier 5-minute limit
+          let uploadBuffer = buffer;
+          let uploadKey = key;
+          if (user_tier === 'free' || user_tier === 'FREE') {
+            const { clipAudioFromBuffer } = await import('@/lib/audio-clip-helper');
+            const clippedUrl = await clipAudioFromBuffer(buffer, vid, 'webm');
+            if (clippedUrl) {
+              supplierAudioUrl = clippedUrl;
+            } else {
+              // If clipping fails, upload the full buffer but mark it for frontend limiting
+              console.warn('[YouTube Prepare] Failed to clip audio for free tier, uploading full audio');
+            }
+          }
+          
+          // If we don't have a clipped URL yet, upload the buffer
+          if (!supplierAudioUrl) {
+            await s3.send(new PutObjectCommand({
+              Bucket: bucket,
+              Key: uploadKey,
+              Body: uploadBuffer,
+              ContentType: 'audio/webm',
+              ContentLength: uploadBuffer.length,
+              Metadata: {
+                'upload-time': new Date().toISOString(),
+                'source': 'youtube-prepare',
+                'user-tier': user_tier || 'unknown'
+              }
+            }));
+            
+            const publicDomain = process.env.STORAGE_DOMAIN || process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN;
+            supplierAudioUrl = (publicDomain ? (publicDomain.startsWith('http') ? publicDomain : `https://${publicDomain}`) : `https://pub-${bucket}.r2.dev`) + `/${uploadKey}`;
+          }
+        }
+      } catch (fallbackError) {
+        console.error('[YouTube Prepare] S3 fallback upload also failed:', fallbackError);
+        // Continue without R2 URL, will use direct YouTube URL
       }
-    } catch {}
+    }
+
+    // Check if we have at least one supplier task or a valid URL
+    if (tasks.length === 0 && !supplierAudioUrl) {
+      // No supplier can be called, mark as failed
+      console.error('[YouTube Prepare] No supplier available, marking job as failed');
+      await db().update(transcriptions)
+        .set({ 
+          status: 'failed',
+          error_message: 'Failed to prepare audio for transcription. Please try again.',
+          completed_at: new Date()
+        })
+        .where(eq(transcriptions.job_id, job_id));
+      
+      return NextResponse.json({ ok: true, warning: 'prepare_failed' });
+    }
 
     // Fire-and-forget
     Promise.allSettled(tasks).then((rs) => {
+      // Check if all tasks failed
+      const allFailed = rs.every(r => r.status === 'rejected');
+      if (allFailed && rs.length > 0) {
+        console.error('[YouTube Prepare] All supplier tasks failed');
+        // Update status to failed if all suppliers failed
+        db().update(transcriptions)
+          .set({ 
+            status: 'failed',
+            error_message: 'All transcription services failed. Please try again.',
+            completed_at: new Date()
+          })
+          .where(eq(transcriptions.job_id, job_id))
+          .catch(err => console.error('[YouTube Prepare] Failed to update status:', err));
+      }
     }).catch((e) => console.warn('[YouTube Prepare] Fan-out settle failed:', e));
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     console.error('[YouTube Prepare] Uncaught error:', e);
+    
+    // Update database status to failed
+    try {
+      await db().update(transcriptions)
+        .set({ 
+          status: 'failed',
+          error_message: e?.message || 'Preparation failed',
+          completed_at: new Date()
+        })
+        .where(eq(transcriptions.job_id, job_id));
+    } catch (dbError) {
+      console.error('[YouTube Prepare] Failed to update error status:', dbError);
+    }
+    
     return NextResponse.json({ error: e?.message || 'prepare failed' }, { status: 500 });
   }
 }

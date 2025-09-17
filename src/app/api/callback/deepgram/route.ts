@@ -47,6 +47,14 @@ export async function POST(req: NextRequest) {
     // Deepgram支持两种验证方式：
     // 1. 使用callback_secret参数（推荐）
     // 2. 使用API key作为HMAC密钥
+    console.log('[Deepgram Callback] Starting signature validation...');
+    console.log('[Deepgram Callback] DEEPGRAM_WEBHOOK_SECRET configured:', !!process.env.DEEPGRAM_WEBHOOK_SECRET);
+    console.log('[Deepgram Callback] DEEPGRAM_REQUIRE_SIGNATURE:', process.env.DEEPGRAM_REQUIRE_SIGNATURE);
+    console.log('[Deepgram Callback] URL params:', {
+      job_id: jobId,
+      cb_sig: req.nextUrl.searchParams.get('cb_sig')
+    });
+    
     if (!simulate && process.env.DEEPGRAM_WEBHOOK_SECRET) {
       // 优先检查 Deepgram 官方签名头（不同命名变体）
       const sigHeader =
@@ -71,18 +79,40 @@ export async function POST(req: NextRequest) {
 
       // 若无官方签名或不匹配，允许使用我们埋在回调URL里的 HMAC 进行二次校验
       if (!verified) {
+        console.log('[Deepgram Callback] Official signature not verified, checking URL signature...');
         const urlSig = req.nextUrl.searchParams.get('cb_sig') || '';
+        console.log('[Deepgram Callback] URL signature present:', !!urlSig);
+        
         if (urlSig) {
           const computedUrlSig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(jobId).digest('hex');
+          console.log('[Deepgram Callback] URL sig comparison:');
+          console.log('  - Expected (computed):', computedUrlSig);
+          console.log('  - Received (from URL):', urlSig);
+          console.log('  - Match:', computedUrlSig === urlSig);
+          
           if (computedUrlSig === urlSig) {
             verified = true;
-            console.log('[Deepgram Callback] URL token verified');
+            console.log('[Deepgram Callback] URL token verified successfully');
+          } else {
+            console.log('[Deepgram Callback] URL token verification failed');
           }
+        } else {
+          console.log('[Deepgram Callback] No URL signature found in callback');
         }
       }
 
       if (!verified && process.env.DEEPGRAM_REQUIRE_SIGNATURE === 'true') {
+        console.error('[Deepgram Callback] Signature verification failed, returning 401');
+        console.log('[Deepgram Callback] Final verification status:', {
+          verified,
+          hadOfficialSignature: !!sigHeader,
+          hadUrlSignature: !!req.nextUrl.searchParams.get('cb_sig')
+        });
         return NextResponse.json({ error: 'signature required' }, { status: 401 });
+      }
+      
+      if (!verified) {
+        console.warn('[Deepgram Callback] Signature not verified but not required, proceeding...');
       }
     } else if (!simulate && process.env.DEEPGRAM_REQUIRE_SIGNATURE === 'true') {
       console.warn('[Deepgram Callback] DEEPGRAM_WEBHOOK_SECRET not configured but signature required');
@@ -169,12 +199,6 @@ export async function POST(req: NextRequest) {
                  payload?.results?.channels?.[0]?.alternatives?.[0]?.languages?.[0] ||
                  payload?.metadata?.language;
       
-      console.log('[Deepgram Callback] Language detection:', {
-        detected_language: payload?.results?.channels?.[0]?.detected_language,
-        languages_array: payload?.results?.channels?.[0]?.alternatives?.[0]?.languages,
-        metadata_language: payload?.metadata?.language,
-        final_language: language
-      });
     } catch (e) {
       console.error('[Deepgram Callback] Error parsing segments:', e);
     }

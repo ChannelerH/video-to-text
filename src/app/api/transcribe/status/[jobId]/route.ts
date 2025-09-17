@@ -71,13 +71,26 @@ export async function GET(
       });
     }
 
+    // Check for staging issues
+    let warning = null;
+    if (transcription.processed_url && typeof transcription.processed_url === 'string' && 
+        transcription.processed_url.startsWith('staging_failed:')) {
+      warning = 'staging_failed';
+      console.log('[Job Status] Staging failure detected for job:', jobId);
+    }
+
     // 返回当前状态
     return NextResponse.json({
       status: transcription.status,
       job_id: jobId,
       title: transcription.title,
       created_at: transcription.created_at,
-      message: getStatusMessage(transcription.status)
+      message: getStatusMessage(transcription.status),
+      ...(warning && { warning }),
+      // Include error message if status is failed
+      ...(transcription.status === 'failed' && transcription.error_message && { 
+        error: transcription.error_message 
+      })
     });
 
   } catch (error) {

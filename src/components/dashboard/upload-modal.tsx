@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Upload, Youtube, X, FileVideo, Loader2 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { useLocale } from 'next-intl';
+import { MultipartUploader } from '@/lib/multipart-upload';
+import { useToast, ToastNotification } from '@/components/toast-notification';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -21,6 +23,7 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const locale = useLocale();
+  const { toast, showToast, hideToast } = useToast();
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -32,22 +35,103 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
   const handleSubmit = async () => {
     if (mode === 'youtube' && !url) return;
     if (mode === 'upload' && !file) return;
-
     setIsProcessing(true);
-    
-    // Store the data in sessionStorage to pass to the main page
-    if (mode === 'youtube') {
-      sessionStorage.setItem('pendingYoutubeUrl', url);
-    } else if (file) {
-      // For file upload, we'll need to handle it differently
-      // Store file info temporarily
-      sessionStorage.setItem('pendingFileUpload', 'true');
-      sessionStorage.setItem('pendingFileName', file.name);
+    try {
+      if (mode === 'youtube') {
+        // Start async job for YouTube URL
+        const resp = await fetch('/api/transcribe/async', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'youtube_url',
+            content: url,
+            action: 'transcribe',
+            options: {}
+          })
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data?.success || !data?.job_id) throw new Error(data?.error || 'Failed to start job');
+        router.push(`/${locale}/dashboard/transcriptions?highlight=${encodeURIComponent(data.job_id)}`);
+        onClose();
+        return;
+      }
+
+      // Upload file to R2: multipart (large) or presigned PUT with CORS-fallback
+      const modeHint = file!.type.startsWith('audio/') ? 'audio' : 'video';
+      let r2Key = '';
+      let fileUrl = '';
+
+      if (MultipartUploader.shouldUseMultipart(file!.size)) {
+        // Multipart upload for large files
+        const uploader = new MultipartUploader();
+        const abort = new AbortController();
+        try {
+          await uploader.upload({
+            file: file!,
+            abortSignal: abort.signal,
+            onProgress: () => {}
+          });
+          const result = uploader.getResult?.();
+          r2Key = result?.key || '';
+          fileUrl = result?.downloadUrl || result?.publicUrl || '';
+        } catch (e) {
+          throw new Error('Multipart upload failed');
+        }
+      } else {
+        // Presign then PUT
+        const presignResp = await fetch('/api/upload/presigned', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file!.name, fileType: file!.type || 'application/octet-stream', fileSize: file!.size, mode: modeHint })
+        });
+        const presign = await presignResp.json();
+        if (!presignResp.ok || !presign?.success) throw new Error(presign?.error || 'Failed to get upload URL');
+        const { uploadUrl, key, publicUrl, downloadUrl } = presign.data as { uploadUrl: string; key: string; publicUrl: string; downloadUrl?: string };
+        r2Key = key;
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', uploadUrl);
+            if (file!.type) xhr.setRequestHeader('Content-Type', file!.type);
+            xhr.onload = () => (xhr.status === 200 || xhr.status === 204) ? resolve() : reject(new Error(`Upload failed (${xhr.status})`));
+            xhr.onerror = () => reject(new Error('Upload error'));
+            xhr.onabort = () => reject(new Error('Upload aborted'));
+            xhr.send(file);
+          });
+          fileUrl = downloadUrl || publicUrl;
+        } catch (e) {
+          // CORS fallback to /api/upload
+          const form = new FormData();
+          form.append('file', file!);
+          form.append('mode', modeHint);
+          const up = await fetch('/api/upload', { method: 'POST', body: form });
+          const js = await up.json();
+          if (!up.ok || !js?.success) throw new Error(js?.error || 'Upload failed');
+          r2Key = js.data?.r2Key || js.data?.key || r2Key;
+          fileUrl = js.data?.publicUrl || js.data?.replicateUrl || '';
+        }
+      }
+
+      // Start transcription
+      const startResp = await fetch('/api/transcribe/async', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'file_upload',
+          content: fileUrl,
+          action: 'transcribe',
+          options: { r2Key, originalFileName: file!.name }
+        })
+      });
+      const startData = await startResp.json();
+      if (!startResp.ok || !startData?.success || !startData?.job_id) throw new Error(startData?.error || 'Failed to start job');
+      router.push(`/${locale}/dashboard/transcriptions?highlight=${encodeURIComponent(startData.job_id)}`);
+      onClose();
+    } catch (e) {
+      console.error('Quick action failed:', e);
+      showToast('error', 'Failed to start transcription', e instanceof Error ? e.message : 'Please try again');
+      setIsProcessing(false);
     }
-    
-    // Navigate to main page
-    router.push(`/${locale}`);
-    onClose();
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -65,6 +149,7 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md bg-gray-900 border-gray-800">
+        <ToastNotification type={toast.type} title={toast.title} message={toast.message} isOpen={toast.isOpen} onClose={hideToast} />
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             {mode === 'upload' ? (

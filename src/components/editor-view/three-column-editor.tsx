@@ -59,13 +59,9 @@ export default function ThreeColumnEditor({
   const { userTier } = useAppContext();
   const isFreeTier = (userTier || 'free') === 'free';
   
-  // Debug: Log props on mount
-  console.log('[Audio Debug] ThreeColumnEditor mounted with audioUrl:', audioUrl);
-  
   // Show warning if no audio URL
   useEffect(() => {
     if (!audioUrl) {
-      console.warn('[Audio Debug] No audio URL provided to editor');
       toast.warning('No audio file available for this transcription');
     }
   }, [audioUrl]);
@@ -1051,6 +1047,7 @@ export default function ThreeColumnEditor({
                 <>
                   <Download className="w-3 h-3" />
                   <span>Export</span>
+                  {console.log('[ThreeColumnEditor Debug] Export button preview badge:', { isPreviewMode, shouldShow: !!isPreviewMode })}
                   {isPreviewMode && (
                     <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">5 min</span>
                   )}
@@ -1148,6 +1145,7 @@ export default function ThreeColumnEditor({
         </div>
       </div>
       {/* Preview mode indicator for Free users */}
+      {console.log('[ThreeColumnEditor Debug] Rendering preview indicator check:', { isPreviewMode, shouldShow: !!isPreviewMode })}
       {isPreviewMode && (
         <div className="mx-4 mb-3">
           <PreviewIndicator

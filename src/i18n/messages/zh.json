@@ -554,8 +554,17 @@
       "wait_for_upload": "请等待文件上传完成或输入 URL。",
       "general_error": "发生错误。请重试。",
       "transcription_failed_title": "转录失败",
-      "please_try_again": "请重试"
+      "please_try_again": "请重试",
+      "retry_suggestion": "点击重试按钮重新尝试。",
+      "timeout": "操作超时，请重试。",
+      "server_error": "服务器错误，请稍后重试。",
+      "network": "网络连接失败，请检查网络后重试。"
     },
+    "warnings": {
+      "staging_failed_title": "处理提示",
+      "staging_failed_message": "视频正在通过备用方式处理，可能需要稍长时间。"
+    },
+    "retry": "重试",
     "free_tier_notice": {
       "title": "免费版限制",
       "message": "超过5分钟的视频将仅转录前5分钟内容。升级到 Pro 版可享受无限制时长。"
@@ -1105,6 +1114,20 @@
     "home": "首页",
     "transcriptions": "所有转录",
     "account": "账户"
+  },
+  "error_dialog": {
+    "error_title": "发生错误",
+    "timeout_title": "操作超时",
+    "server_error_title": "服务器错误",
+    "network_error_title": "网络错误",
+    "timeout_description": "操作时间超出预期。这可能是由于服务器负载或文件大小导致的。",
+    "server_error_description": "服务器遇到错误。请稍后重试。",
+    "network_error_description": "无法连接到服务器。请检查您的网络连接。",
+    "timeout_suggestion": "您可以重试操作或稍后使用较小的文件重试。",
+    "server_error_suggestion": "如果问题持续存在，请联系技术支持。",
+    "retry": "重试",
+    "cancel": "取消",
+    "close": "关闭"
   },
   "audio_track_selector": {
     "title": "选择音轨",

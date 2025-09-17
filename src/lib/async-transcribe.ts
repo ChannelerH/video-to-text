@@ -1,11 +1,14 @@
 // Helper functions for async transcription with polling
+import { callApiWithRetry, pollStatus } from '@/lib/api-utils';
 
 export async function submitTranscriptionJob(requestData: any): Promise<{ success: boolean; job_id?: string; error?: string }> {
   try {
-    const response = await fetch('/api/transcribe/async', {
+    const response = await callApiWithRetry('/api/transcribe/async', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestData)
+      body: JSON.stringify(requestData),
+      timeout: 30000, // 30 seconds
+      retries: 3
     });
 
     const result = await response.json();
@@ -26,78 +29,91 @@ export async function submitTranscriptionJob(requestData: any): Promise<{ succes
 
 export async function pollJobStatus(
   jobId: string,
-  onProgress?: (status: string, message: string) => void,
+  onProgress?: (status: string, message: string, warning?: string) => void,
   maxAttempts: number = 180, // 15 minutes max (5s intervals)
-  interval: number = 5000 // 5 seconds
+  interval: number = 5000, // 5 seconds
+  signal?: AbortSignal
 ): Promise<any> {
-  let attempts = 0;
+  const maxDuration = maxAttempts * interval; // Maximum duration in milliseconds
   
-  while (attempts < maxAttempts) {
-    try {
-      const response = await fetch(`/api/transcribe/status/${jobId}`);
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Unable to process transcription');
-      }
-
-      // Update progress with status only (message handled by caller)
-      if (onProgress) {
-        onProgress(result.status, '');
-      }
-
-      // Check if completed
-      if (result.status === 'completed') {
-        return {
-          success: true,
-          data: {
-            transcription: {
-              segments: JSON.parse(result.results.json || '[]'),
-              text: result.results.txt || '',
-              language: result.language,
-              duration: result.duration
-            },
-            title: result.title,
-            formats: {
-              srt: result.results.srt,
-              vtt: result.results.vtt,
-              txt: result.results.txt
-            },
-            // 将 jobId 回传给前端用于“Edit Transcription”跳转
-            jobId
+  try {
+    const result = await pollStatus(
+      `/api/transcribe/status/${jobId}`,
+      (data) => {
+        // Check if the job is complete
+        if (data.status === 'completed' || data.status === 'failed') {
+          return true;
+        }
+        
+        // Update progress with warning if present
+        if (onProgress) {
+          onProgress(data.status, '', data.warning);
+        }
+        
+        return false;
+      },
+      {
+        interval,
+        maxDuration,
+        signal,
+        onProgress: (data) => {
+          if (onProgress && data.status) {
+            onProgress(data.status, '', data.warning);
           }
-        };
+        }
       }
+    );
 
-      // Check if failed
-      if (result.status === 'failed') {
-        throw new Error('Transcription failed');
-      }
-
-      // Wait before next poll
-      await new Promise(resolve => setTimeout(resolve, interval));
-      attempts++;
-
-    } catch (error) {
-      console.error('Poll error:', error);
-      
-      // If it's a network error, retry a few times
-      if (attempts < 3) {
-        await new Promise(resolve => setTimeout(resolve, interval));
-        attempts++;
-        continue;
-      }
-      
-      throw error;
+    // Check the final status
+    if (result.status === 'completed') {
+      return {
+        success: true,
+        data: {
+          transcription: {
+            segments: JSON.parse(result.results.json || '[]'),
+            text: result.results.txt || '',
+            language: result.language,
+            duration: result.duration
+          },
+          title: result.title,
+          formats: {
+            srt: result.results.srt,
+            vtt: result.results.vtt,
+            txt: result.results.txt
+          },
+          // 将 jobId 回传给前端用于"Edit Transcription"跳转
+          jobId
+        }
+      };
+    } else if (result.status === 'failed') {
+      throw new Error(result.error || 'Transcription failed');
     }
-  }
 
-  throw new Error('Transcription timeout - job took too long');
+    throw new Error('Unexpected status: ' + result.status);
+  } catch (error) {
+    console.error('[pollJobStatus] Error:', error);
+    
+    // Handle timeout errors with better messaging
+    if (error instanceof Error && (error.message.includes('timeout') || (error as any).isTimeout)) {
+      const waitedMinutes = Math.round((maxAttempts * interval) / 60000);
+      const timeoutError = new Error(`Transcription is taking longer than expected (${waitedMinutes}+ minutes). The service might be experiencing delays. Please try again later or contact support if the issue persists.`);
+      (timeoutError as any).isTimeout = true;
+      throw timeoutError;
+    }
+    
+    // Handle other errors
+    if (error instanceof Error && error.message.includes('cancelled')) {
+      throw new Error('Transcription was cancelled.');
+    }
+    
+    throw error;
+  }
 }
 
 export async function transcribeAsync(
   requestData: any,
-  onProgress?: (stage: string, percentage: number, message: string) => void
+  onProgress?: (stage: string, percentage: number, message: string, warning?: string) => void,
+  signal?: AbortSignal
 ): Promise<any> {
   // Step 1: Submit job - hide queue messaging
   if (onProgress) {
@@ -110,6 +126,9 @@ export async function transcribeAsync(
     throw new Error(submitResult.error || 'Failed to start transcription');
   }
 
+  // Store jobId for potential retry
+  const jobId = submitResult.job_id;
+
   // 可选的本地长任务兜底（默认关闭）。
   // 仅当构建时注入 NEXT_PUBLIC_PROCESS_ONE_FALLBACK==='true' 时才触发。
   try {
@@ -117,7 +136,7 @@ export async function transcribeAsync(
       fetch('/api/transcribe/process-one', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_id: submitResult.job_id })
+        body: JSON.stringify({ job_id: jobId })
       }).catch(() => {});
     }
   } catch {}
@@ -128,8 +147,8 @@ export async function transcribeAsync(
   }
 
   const result = await pollJobStatus(
-    submitResult.job_id,
-    (status, message) => {
+    jobId,
+    (status, message, warning) => {
       // Map status to user-friendly messages without queue references
       const friendlyMessages: Record<string, { percentage: number; message: string }> = {
         'queued': { percentage: 20, message: 'Preparing transcription...' },
@@ -142,9 +161,12 @@ export async function transcribeAsync(
       
       const friendly = friendlyMessages[status] || { percentage: 50, message: 'Processing...' };
       if (onProgress) {
-        onProgress(status, friendly.percentage, friendly.message);
+        onProgress(status, friendly.percentage, friendly.message, warning);
       }
-    }
+    },
+    180, // maxAttempts
+    5000, // interval
+    signal // Pass the abort signal
   );
 
   return result;

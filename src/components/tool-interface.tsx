@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
-import { FileText, Download, Copy, Check, Code } from "lucide-react";
+import { FileText, Download, Copy, Check, Code, RefreshCw, AlertCircle } from "lucide-react";
 import PyramidLoader from "@/components/ui/pyramid-loader";
 import { useRouter, Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
@@ -19,6 +19,8 @@ import { usePlayerStore } from "@/stores/player-store";
 import dynamic from 'next/dynamic';
 import AudioTrackSelector from '@/components/audio-track-selector';
 import type { AudioTrack } from '@/components/audio-track-selector';
+import { callApiWithRetry, pollStatus, getErrorType } from "@/lib/api-utils";
+import { ErrorDialog } from '@/components/error-dialog';
 
 // Lazy load editor views
 const EditorView = dynamic(() => import('@/components/editor-view'), {
@@ -100,6 +102,17 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const router = useRouter();
   const locale = useLocale();
   
+  // Error handling state
+  const [errorState, setErrorState] = useState<{
+    type: 'api_error' | 'timeout' | 'network' | 'server' | null;
+    message: string;
+    canRetry: boolean;
+    retryAction?: () => void;
+  }>({ type: null, message: '', canRetry: false });
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Audio track selection state
   const [showTrackSelector, setShowTrackSelector] = useState(false);
   const [availableTracks, setAvailableTracks] = useState<AudioTrack[]>([]);
@@ -135,6 +148,20 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const viewMode = usePlayerStore((state) => state.viewMode);
   const setViewMode = usePlayerStore((state) => state.setViewMode);
   useEffect(() => { setMounted(true); }, []);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Cancel any ongoing requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      // Clear any polling timeouts
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Helper to display and auto-hide the Chinese upgrade toast (disabled)
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -687,15 +714,26 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         });
         
         if (detectResponse.ok) {
-          const { tracks, videoTitle, hasMultipleTracks } = await detectResponse.json();
+          const response = await detectResponse.json();
+          console.log('[YouTube] Detect tracks response:', response);
+          const { tracks, videoTitle, hasMultipleTracks } = response;
+          
+          console.log('[YouTube] Track detection result:', {
+            hasMultipleTracks,
+            tracksLength: tracks?.length,
+            shouldShowSelector: hasMultipleTracks && tracks?.length > 1
+          });
           
           if (hasMultipleTracks && tracks.length > 1) {
             // 显示音轨选择对话框
+            console.log('[YouTube] Showing track selector with tracks:', tracks);
             setAvailableTracks(tracks);
             setTrackVideoTitle(videoTitle);
             setShowTrackSelector(true);
             setProgress("");
             return; // 等待用户选择
+          } else {
+            console.log('[YouTube] Not showing track selector, proceeding with default');
           }
         }
       } catch (error) {
@@ -709,6 +747,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   
   // 音轨选择后继续转录
   const handleTrackSelected = async (languageCode: string) => {
+    console.log('[AudioTrack] User selected language:', languageCode);
     setSelectedLanguage(languageCode);
     setShowTrackSelector(false);
     
@@ -808,8 +847,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       }
 
       // Add preferred language if provided
+      console.log('[performTranscription] preferredLanguage:', preferredLanguage);
       if (preferredLanguage) {
         requestData.options = { ...requestData.options, preferred_language: preferredLanguage };
+        console.log('[performTranscription] Added preferred_language to options:', requestData.options.preferred_language);
       }
       
       // Send request with SSE support for authenticated users
@@ -820,10 +861,14 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         // Import async helper
         const { transcribeAsync } = await import('@/lib/async-transcribe');
         
+        // Create abort controller for cancellation
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+        
         try {
           result = await transcribeAsync(
             requestData,
-            (stage, percentage, message) => {
+            (stage, percentage, message, warning) => {
               const uiStage: 'upload' | 'download' | 'transcribe' | 'process' | null =
                 stage === 'downloading' ? 'download' :
                 stage === 'transcribing' ? 'transcribe' :
@@ -835,17 +880,43 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                 estimatedTime: uiStage === 'transcribe' ? '≈2m' : undefined
               });
               setProgress(message);
-            }
+              
+              // Handle staging warning
+              if (warning === 'staging_failed') {
+                showToast(
+                  'warning',
+                  t("warnings.staging_failed_title") || "Processing Notice",
+                  t("warnings.staging_failed_message") || "The video is being processed through an alternative method. This may take slightly longer."
+                );
+              }
+              
+              // Store job ID if available for retry
+              if (stage === 'processing' && (result as any)?.job_id) {
+                setCurrentJobId((result as any).job_id);
+              }
+            },
+            abortController.signal
           );
         } catch (error) {
           console.error('[Async Transcribe] Error:', error);
           const errorMessage = error instanceof Error ? error.message : 'Transcription failed';
+          const errorType = getErrorType(error as Error);
           
-          // Show error toast with retry suggestion
+          // Set error state with retry capability
+          setErrorState({
+            type: errorType === 'timeout' ? 'timeout' : 
+                  errorType === 'server' ? 'server' : 
+                  errorType === 'network' ? 'network' : 'api_error',
+            message: errorMessage,
+            canRetry: errorType !== 'cancelled',
+            retryAction: () => performTranscription(preferredLanguage)
+          });
+          
+          // Show error toast with retry option
           showToast(
             'error', 
             t("errors.transcription_failed_title") || "Transcription Failed",
-            `${errorMessage}. ${t("errors.please_try_again") || "Please try again."}`
+            `${errorMessage}. ${errorType !== 'cancelled' ? t("errors.retry_suggestion") || "Click Retry to try again." : ""}`
           );
           
           // Reset UI state
@@ -853,14 +924,21 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           setIsProcessing(false);
           setProgressInfo({ stage: null, percentage: 0, message: '' });
           return;
+        } finally {
+          abortControllerRef.current = null;
         }
       } else {
         // 未登录也走异步提交 + 轮询（供应商异步 + 回调）
         const { transcribeAsync } = await import('@/lib/async-transcribe');
+        
+        // Create abort controller for cancellation
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+        
         try {
           result = await transcribeAsync(
             requestData,
-            (stage, percentage, message) => {
+            (stage, percentage, message, warning) => {
               const uiStage: 'upload' | 'download' | 'transcribe' | 'process' | null =
                 stage === 'downloading' ? 'download' :
                 stage === 'transcribing' ? 'transcribe' :
@@ -872,17 +950,43 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                 estimatedTime: uiStage === 'transcribe' ? '≈2m' : undefined
               });
               setProgress(message);
-            }
+              
+              // Handle staging warning
+              if (warning === 'staging_failed') {
+                showToast(
+                  'warning',
+                  t("warnings.staging_failed_title") || "Processing Notice",
+                  t("warnings.staging_failed_message") || "The video is being processed through an alternative method. This may take slightly longer."
+                );
+              }
+              
+              // Store job ID if available for retry
+              if (stage === 'processing' && (result as any)?.job_id) {
+                setCurrentJobId((result as any).job_id);
+              }
+            },
+            abortController.signal
           );
         } catch (error) {
           console.error('[Async Transcribe Anon] Error:', error);
           const errorMessage = error instanceof Error ? error.message : 'Transcription failed';
+          const errorType = getErrorType(error as Error);
+          
+          // Set error state with retry capability
+          setErrorState({
+            type: errorType === 'timeout' ? 'timeout' : 
+                  errorType === 'server' ? 'server' : 
+                  errorType === 'network' ? 'network' : 'api_error',
+            message: errorMessage,
+            canRetry: errorType !== 'cancelled',
+            retryAction: () => performTranscription(preferredLanguage)
+          });
           
           // Show error toast with retry suggestion
           showToast(
             'error',
             t("errors.transcription_failed_title") || "Transcription Failed", 
-            `${errorMessage}. ${t("errors.please_try_again") || "Please try again."}`
+            `${errorMessage}. ${errorType !== 'cancelled' ? t("errors.retry_suggestion") || "Click Retry to try again." : ""}`
           );
           
           // Reset UI state
@@ -890,6 +994,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           setIsProcessing(false);
           setProgressInfo({ stage: null, percentage: 0, message: '' });
           return;
+        } finally {
+          abortControllerRef.current = null;
         }
       }
 
@@ -2571,6 +2677,14 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         onSelect={handleTrackSelected}
         tracks={availableTracks}
         videoTitle={trackVideoTitle}
+      />
+      
+      {/* Error Dialog */}
+      <ErrorDialog
+        isOpen={errorState.type !== null}
+        error={errorState}
+        onClose={() => setErrorState({ type: null, message: '', canRetry: false })}
+        onRetry={errorState.retryAction}
       />
     </div>
   );
