@@ -67,30 +67,30 @@ export function ErrorDialog({ isOpen, error, onClose, onRetry }: ErrorDialogProp
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-gray-950 border-gray-800 text-gray-200">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-red-500" />
+          <DialogTitle className="flex items-center gap-2 text-white">
+            <AlertCircle className="h-5 w-5 text-red-400" />
             {getTitle()}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          <DialogDescription className="text-sm">
+          <DialogDescription className="text-sm text-gray-300">
             {getDescription()}
           </DialogDescription>
 
           {error.type === 'timeout' && (
-            <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
-              <AlertDescription className="text-sm">
+            <Alert className="bg-amber-500/10 border border-amber-500/30">
+              <AlertDescription className="text-sm text-amber-200">
                 {t("timeout_suggestion") || "You can retry the operation or try again later with a smaller file."}
               </AlertDescription>
             </Alert>
           )}
 
           {error.type === 'server' && (
-            <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
-              <AlertDescription className="text-sm">
+            <Alert className="bg-red-500/10 border border-red-500/30">
+              <AlertDescription className="text-sm text-red-200">
                 {t("server_error_suggestion") || "If the problem persists, please contact support."}
               </AlertDescription>
             </Alert>
@@ -111,7 +111,7 @@ export function ErrorDialog({ isOpen, error, onClose, onRetry }: ErrorDialogProp
           <Button 
             variant="outline" 
             onClick={onClose} 
-            className="flex-1 sm:flex-none"
+            className="flex-1 sm:flex-none border-gray-700 text-gray-300 hover:bg-gray-800"
           >
             {error.canRetry ? (t("cancel") || "Cancel") : (t("close") || "Close")}
           </Button>
