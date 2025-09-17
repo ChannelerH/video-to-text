@@ -189,3 +189,27 @@ export function getRequiredTierForFeature(feature: keyof TierFeatures): UserTier
   if (TIER_FEATURES[UserTier.PRO][feature]) return UserTier.PRO;
   return null;
 }
+
+/**
+ * Check if user has high accuracy features through tier OR minute packs
+ * This allows users with high_accuracy minute packs to use pro features
+ */
+export async function hasHighAccuracyAccess(userUuid: string): Promise<boolean> {
+  if (!userUuid) return false;
+  
+  try {
+    // Check 1: User has Pro/Premium tier
+    const userTier = await getUserTier(userUuid);
+    if (userTier === UserTier.PRO || userTier === UserTier.PREMIUM) {
+      return true;
+    }
+    
+    // Check 2: User has high_accuracy minute packs with balance
+    const { getMinuteBalances } = await import('@/services/minutes');
+    const balances = await getMinuteBalances(userUuid);
+    return balances.ha > 0; // Has high accuracy minutes available
+  } catch (error) {
+    console.error('Error checking high accuracy access:', error);
+    return false;
+  }
+}

@@ -22,7 +22,10 @@ export default async function DashboardPage({
   params: Promise<{ locale: string }> 
 }) {
   const { locale } = await params;
-  const t = await getTranslations();
+  // Use the actual path where messages live: tool_interface.dashboard
+  const t = await getTranslations({ namespace: 'tool_interface.dashboard' });
+  // Global translations for shared keys
+  const tGlobal = await getTranslations();
   const userUuid = await getUserUuid();
   
   // Fetch user's recent transcriptions
@@ -145,7 +148,7 @@ export default async function DashboardPage({
                       </div>
                       <div>
                         <h3 className="font-medium text-white group-hover:text-purple-400 transition-colors">
-                          {item.title || t('untitled_transcription')}
+                          {item.title || tGlobal('untitled_transcription')}
                         </h3>
                         <div className="flex items-center gap-4 mt-1">
                           <span className="text-xs text-gray-500 flex items-center gap-1">

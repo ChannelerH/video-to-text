@@ -21,6 +21,14 @@ async function getActivePacks(userId: string, packType: PackType): Promise<Minut
 }
 
 async function insertPack(userId: string, packType: PackType, minutes: number, expiresAt?: Date, orderNo?: string) {
+  // Check if pack with this order_no already exists (prevent duplicates from webhook + redirect)
+  if (orderNo) {
+    const existing = await db().execute(sql`SELECT id FROM v2tx_minute_packs WHERE order_no = ${orderNo} AND pack_type = ${packType} LIMIT 1`);
+    if ((existing as any).rows?.length > 0) {
+      return;
+    }
+  }
+  
   await db().execute(sql`INSERT INTO v2tx_minute_packs(user_id, pack_type, minutes_total, minutes_left, created_at, expires_at, order_no) VALUES (${userId}, ${packType}, ${Math.ceil(minutes)}, ${Math.ceil(minutes)}, NOW(), ${expiresAt || null}, ${orderNo || ''})`);
 }
 

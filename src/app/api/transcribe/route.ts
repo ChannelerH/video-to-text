@@ -207,6 +207,10 @@ export async function POST(request: NextRequest) {
       // 获取用户等级
       const userTier = await getUserTier(user_uuid);
       
+      // Check if user has high accuracy access (through tier or minute packs)
+      const { hasHighAccuracyAccess } = await import('@/services/user-tier');
+      const canUseHighAccuracy = await hasHighAccuracyAccess(user_uuid);
+      
       // Free用户限制：检查视频时长（YouTube URL）
       // Skip check if this is a processed URL (R2/proxy) from Re-run
       const isProcessedUrl = content.includes('.r2.dev/') || content.includes('pub-') || content.includes('/api/media/proxy');
@@ -298,14 +302,14 @@ export async function POST(request: NextRequest) {
       let estimatedMinutes = 10; // 估算的转录时长，实际应根据音频长度计算
       try {
         const { getEstimatedPackCoverage } = await import('@/services/minutes');
-        const cover = await getEstimatedPackCoverage(user_uuid, estimatedMinutes, (options?.highAccuracyMode && userTier === 'pro') ? 'high_accuracy' : 'standard');
+        const cover = await getEstimatedPackCoverage(user_uuid, estimatedMinutes, (options?.highAccuracyMode && canUseHighAccuracy) ? 'high_accuracy' : 'standard');
         estimatedMinutes = Math.max(0, estimatedMinutes - cover);
       } catch {}
       const quotaStatus = await quotaTracker.checkQuota(
         user_uuid,
         userTier,
         estimatedMinutes,
-        options?.highAccuracyMode && userTier === 'pro' ? 'high_accuracy' : 'standard'
+        options?.highAccuracyMode && canUseHighAccuracy ? 'high_accuracy' : 'standard'
       );
       
       if (!quotaStatus.isAllowed) {
@@ -384,7 +388,7 @@ export async function POST(request: NextRequest) {
               const durationSec = result?.data?.transcription?.duration || 0;
               if (result.success && durationSec > 0) {
                 const actualMinutes = durationSec / 60;
-                const usedHighAccuracy = !!options?.highAccuracyMode && userTier === 'pro';
+                const usedHighAccuracy = !!options?.highAccuracyMode && canUseHighAccuracy;
                 // 先扣分钟包，再把剩余分钟计入月配额
                 try {
                   const { deductFromPacks } = await import('@/services/minutes');

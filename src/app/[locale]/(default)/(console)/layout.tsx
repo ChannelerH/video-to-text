@@ -5,8 +5,8 @@ import { getTranslations } from "next-intl/server";
 import { getUserInfo } from "@/services/user";
 import { redirect } from "next/navigation";
 
-export default async function ({ children, params }: { children: ReactNode; params: { locale: string } }) {
-  const { locale } = params;
+export default async function ({ children, params }: { children: ReactNode; params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
   const userInfo = await getUserInfo();
   if (!userInfo || !userInfo.email) {
     redirect("/auth/signin");

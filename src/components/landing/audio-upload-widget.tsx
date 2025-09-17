@@ -21,11 +21,31 @@ export default function AudioUploadWidget({ locale }: Props) {
   const { toast, showToast, hideToast } = useToast();
   const t = useTranslations('tool_interface');
   const { userTier } = useAppContext();
-  const isProUser = userTier === 'pro';
+  const [hasHighAccuracyAccess, setHasHighAccuracyAccess] = useState(false);
   const [highAccuracy, setHighAccuracy] = useState(false);
   const [speakerDiarization, setSpeakerDiarization] = useState(false);
   const [showUrlDialog, setShowUrlDialog] = useState(false);
   const [urlInput, setUrlInput] = useState('');
+  
+  // Check if user has high accuracy access (pro tier or high accuracy minute packs)
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!isAuthenticated) {
+        setHasHighAccuracyAccess(false);
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/user/has-high-accuracy');
+        const data = await response.json();
+        setHasHighAccuracyAccess(data.hasAccess || false);
+      } catch {
+        setHasHighAccuracyAccess(false);
+      }
+    };
+    
+    checkAccess();
+  }, [isAuthenticated]);
 
   const triggerBrowse = () => {
     if (busy) return;
@@ -255,42 +275,42 @@ export default function AudioUploadWidget({ locale }: Props) {
 
         {/* Transcription Options */}
         <div className="mt-6 space-y-3">
-          <label className={`flex items-center justify-between px-4 py-3 rounded-xl border ${isProUser ? 'border-slate-800 bg-slate-900/60 hover:border-cyan-500/50 cursor-pointer' : 'border-slate-800/50 bg-slate-900/30 cursor-not-allowed opacity-60'} transition-colors`}>
+          <label className={`flex items-center justify-between px-4 py-3 rounded-xl border ${hasHighAccuracyAccess ? 'border-slate-800 bg-slate-900/60 hover:border-cyan-500/50 cursor-pointer' : 'border-slate-800/50 bg-slate-900/30 cursor-not-allowed opacity-60'} transition-colors`}>
             <div className="flex items-center gap-3">
               <span className="text-2xl">🎯</span>
               <div>
                 <div className="font-medium flex items-center gap-2">
                   High Accuracy Mode
-                  {!isProUser && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">PRO</span>}
+                  {!hasHighAccuracyAccess && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">Requires High Accuracy Minutes</span>}
                 </div>
                 <div className="text-xs text-slate-400">Best for professional use</div>
               </div>
             </div>
             <input
               type="checkbox"
-              checked={highAccuracy && isProUser}
-              onChange={(e) => isProUser && setHighAccuracy(e.target.checked)}
-              disabled={!isProUser}
+              checked={highAccuracy && hasHighAccuracyAccess}
+              onChange={(e) => hasHighAccuracyAccess && setHighAccuracy(e.target.checked)}
+              disabled={!hasHighAccuracyAccess}
               className="w-5 h-5 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </label>
 
-          <label className={`flex items-center justify-between px-4 py-3 rounded-xl border ${isProUser ? 'border-slate-800 bg-slate-900/60 hover:border-cyan-500/50 cursor-pointer' : 'border-slate-800/50 bg-slate-900/30 cursor-not-allowed opacity-60'} transition-colors`}>
+          <label className={`flex items-center justify-between px-4 py-3 rounded-xl border ${hasHighAccuracyAccess ? 'border-slate-800 bg-slate-900/60 hover:border-cyan-500/50 cursor-pointer' : 'border-slate-800/50 bg-slate-900/30 cursor-not-allowed opacity-60'} transition-colors`}>
             <div className="flex items-center gap-3">
               <span className="text-2xl">👥</span>
               <div>
                 <div className="font-medium flex items-center gap-2">
                   Speaker Detection
-                  {!isProUser && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">PRO</span>}
+                  {!hasHighAccuracyAccess && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">Requires High Accuracy Minutes</span>}
                 </div>
                 <div className="text-xs text-slate-400">Identify different speakers</div>
               </div>
             </div>
             <input
               type="checkbox"
-              checked={speakerDiarization && isProUser}
-              onChange={(e) => isProUser && setSpeakerDiarization(e.target.checked)}
-              disabled={!isProUser}
+              checked={speakerDiarization && hasHighAccuracyAccess}
+              onChange={(e) => hasHighAccuracyAccess && setSpeakerDiarization(e.target.checked)}
+              disabled={!hasHighAccuracyAccess}
               className="w-5 h-5 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </label>
