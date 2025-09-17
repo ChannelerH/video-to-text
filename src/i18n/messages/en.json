@@ -522,6 +522,7 @@
   },
   "tool_interface": {
     "loading": "Loading...",
+    "detecting_audio_tracks": "Detecting audio tracks...",
     "upload_tip": "Drop your file here or click to browse",
     "click_to_replace": "Click to replace file",
     "supported_formats_audio": "MP3, M4A, MP4, WAV, OGG, FLAC supported",
@@ -696,7 +697,9 @@
     "errors": {
       "upload_failed": "Upload failed. Please try again.",
       "wait_for_upload": "Please wait for file upload to complete or enter a URL.",
-      "general_error": "An error occurred. Please try again."
+      "general_error": "An error occurred. Please try again.",
+      "transcription_failed_title": "Transcription Failed",
+      "please_try_again": "Please try again"
     },
     "free_tier_notice": {
       "title": "Free Plan Limitation",
@@ -731,39 +734,6 @@
       "pricing_link": "Upgrade",
       "speed_hint": "Higher accuracy, slightly slower"
     }
-  },
-  "welcome_back": "Welcome Back",
-  "dashboard_subtitle": "Manage your transcriptions and account",
-  "nav": {
-    "home": "Home",
-    "transcriptions": "All Transcriptions",
-    "account": "Account"
-  },
-  "quick_actions": "Quick Actions",
-  "actions": {
-    "upload_file": "Upload File",
-    "upload_description": "Upload audio or video files for transcription",
-    "youtube_link": "YouTube Link",
-    "youtube_description": "Transcribe YouTube videos by URL"
-  },
-  "usage": {
-    "monthly_usage": "Monthly Usage",
-    "minutes": "minutes",
-    "near_limit": "Approaching limit",
-    "limit_reached": "Limit reached",
-    "upgrade_for_more": "Upgrade for unlimited transcriptions"
-  },
-  "upgrade": "Upgrade",
-  "upgrade_now": "Upgrade Now",
-  "upgrade_available": "Upgrade for more features",
-  "recent_transcriptions": "Recent Transcriptions",
-  "view_all": "View All",
-  "no_transcriptions_yet": "No transcriptions yet",
-  "start_transcribing": "Start by uploading a file or pasting a YouTube link",
-  "stats": {
-    "total_transcriptions": "Total Transcriptions",
-    "minutes_transcribed": "Minutes Transcribed",
-    "this_month": "This Month"
   },
   "tiers": {
     "features": {
@@ -812,5 +782,21 @@
     "multiple_speakers": "Multiple speakers",
     "long_audio": "Long audio",
     "sample_only": "Sample only (first 5 minutes)"
+  },
+  "nav": {
+    "home": "Home",
+    "transcriptions": "All Transcriptions",
+    "account": "Account"
+  },
+  "upgrade": "Upgrade",
+  "audio_track_selector": {
+    "title": "Select Audio Track",
+    "description": "Choose between original and AI-dubbed audio tracks for this YouTube video",
+    "original_tracks": "Original Tracks",
+    "dubbed_tracks": "AI-Dubbed Tracks",
+    "dubbed_note": "AI-dubbed tracks are generated automatically and may contain inaccuracies",
+    "use_default": "Use Default Track",
+    "confirm": "Confirm Selection",
+    "recommended": "Recommended"
   }
 }

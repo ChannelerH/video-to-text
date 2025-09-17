@@ -24,6 +24,48 @@ export interface DeepSeekResponse {
 export class AIChapterService {
   private static readonly DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
   private static readonly DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+
+  /**
+   * Normalize language code and map to a readable language name.
+   * - Supports ISO-639-1 (en, de, fr, ...), common ISO-639-3 (eng, deu, fra, spa, zho, por, rus, ara, heb, jpn, kor, ...)
+   * - Handles legacy aliases (iw->he, in->id, ji->yi)
+   * - Strips region subtags (de-DE -> de)
+   * - Falls back to simple detection from text when code is missing/unknown
+   */
+  private static normalizeLanguage(raw?: string, text?: string): { code: string; name: string } {
+    const langNames: Record<string, string> = {
+      zh: 'Chinese', en: 'English', ja: 'Japanese', ko: 'Korean', es: 'Spanish', fr: 'French', de: 'German', it: 'Italian', pt: 'Portuguese', ru: 'Russian', ar: 'Arabic', he: 'Hebrew', hi: 'Hindi', th: 'Thai', vi: 'Vietnamese', id: 'Indonesian', tr: 'Turkish', pl: 'Polish', nl: 'Dutch', sv: 'Swedish', no: 'Norwegian', da: 'Danish', fi: 'Finnish', cs: 'Czech', sk: 'Slovak', sl: 'Slovenian', ro: 'Romanian', bg: 'Bulgarian', uk: 'Ukrainian', el: 'Greek', hu: 'Hungarian', ca: 'Catalan', eu: 'Basque', gl: 'Galician', ms: 'Malay', bn: 'Bengali', ta: 'Tamil', te: 'Telugu', ur: 'Urdu', fa: 'Persian', sw: 'Swahili', mr: 'Marathi', gu: 'Gujarati', pa: 'Punjabi', lt: 'Lithuanian', lv: 'Latvian', et: 'Estonian'
+    };
+
+    const iso3to1: Record<string, string> = {
+      eng: 'en', deu: 'de', ger: 'de', fra: 'fr', fre: 'fr', spa: 'es', zho: 'zh', chi: 'zh', por: 'pt', rus: 'ru', ara: 'ar', heb: 'he', jpn: 'ja', kor: 'ko', ita: 'it', nld: 'nl', swe: 'sv', nor: 'no', dan: 'da', fin: 'fi', ces: 'cs', cze: 'cs', slk: 'sk', slo: 'sk', slv: 'sl', ron: 'ro', rum: 'ro', bul: 'bg', ukr: 'uk', ell: 'el', gre: 'el', hun: 'hu', cat: 'ca', eus: 'eu', glg: 'gl', msa: 'ms', ben: 'bn', tam: 'ta', tel: 'te', urd: 'ur', fas: 'fa', per: 'fa', swa: 'sw', mar: 'mr', guj: 'gu', pan: 'pa', lit: 'lt', lav: 'lv', est: 'et', vie: 'vi', tur: 'tr', pol: 'pl', ind: 'id'
+    };
+
+    let code = (raw || '').toLowerCase().replace('_', '-').trim();
+    if (code) {
+      // drop region subtag (de-DE -> de)
+      code = code.split('-')[0];
+      // legacy aliases
+      if (code === 'iw') code = 'he';
+      if (code === 'in') code = 'id';
+      if (code === 'ji') code = 'yi';
+      // map ISO-639-3 to 1 if provided
+      if (iso3to1[code]) code = iso3to1[code];
+    }
+
+    // If empty or unknown, best-effort detection from text
+    if (!code || !langNames[code]) {
+      const detected = this.detectLanguage(text || '');
+      if (detected && langNames[detected]) {
+        code = detected;
+      }
+    }
+
+    // Final fallback
+    if (!code) code = 'en';
+    const name = langNames[code] || code;
+    return { code, name };
+  }
   
   /**
    * Generate AI-enhanced chapters using DeepSeek
@@ -748,6 +790,7 @@ Return strictly in this JSON format (no additional text):
   private static async callDeepSeekAPI(prompt: string, language: string): Promise<string | null> {
     try {
       console.log('Calling DeepSeek API with key:', this.DEEPSEEK_API_KEY ? 'Present' : 'Missing');
+      const { name: languageName, code } = this.normalizeLanguage(language);
       const response = await fetch(this.DEEPSEEK_API_URL, {
         method: 'POST',
         headers: {
@@ -759,9 +802,12 @@ Return strictly in this JSON format (no additional text):
           messages: [
             {
               role: 'system',
-              content: language === 'zh' 
-                ? '你是一个专业的内容编辑，擅长为视频和音频内容生成章节标题和摘要。请用中文回复。'
-                : 'You are a professional content editor, skilled at generating chapter titles and summaries for video and audio content.'
+              content: (() => {
+                if (code === 'zh') {
+                  return '你是一个专业的内容编辑，擅长为视频和音频内容生成章节标题和摘要。请用中文回复。';
+                }
+                return `You are a professional content editor, skilled at generating chapter titles and summaries for video and audio content. Always respond in ${languageName}.`;
+              })()
             },
             {
               role: 'user',
@@ -863,7 +909,7 @@ Return strictly in this JSON format (no additional text):
   static async generateSummary(
     segments: TranscriptionSegment[],
     options?: {
-      language?: 'en' | 'zh';
+      language?: string; // accept broader language codes like 'de', 'de-DE'
       maxLength?: number;
     }
   ): Promise<string | null> {
@@ -875,15 +921,16 @@ Return strictly in this JSON format (no additional text):
 
     const text = segments.map(s => s.text).join(' ');
     const truncatedText = text.length > 3000 ? text.substring(0, 3000) + '...' : text;
-    const language = options?.language || (/[\u4e00-\u9fff]/.test(text) ? 'zh' : 'en');
     const maxLength = options?.maxLength || 200;
 
-    const prompt = language === 'zh'
-      ? `请为以下内容生成一个${maxLength}字以内的摘要，概括主要观点和关键信息：\n\n${truncatedText}`
-      : `Generate a summary under ${maxLength} words that captures the main points and key information:\n\n${truncatedText}`;
+    const { code: lang, name: languageName } = this.normalizeLanguage(options?.language, text);
+
+    const prompt = lang === 'zh'
+      ? `请用中文为以下内容生成一个${maxLength}字以内的摘要，概括主要观点和关键信息：\n\n${truncatedText}`
+      : `Generate a summary under ${maxLength} words in ${languageName}. Capture the main points and key information, and write naturally in ${languageName}:\n\n${truncatedText}`;
 
     try {
-      const response = await this.callDeepSeekAPI(prompt, language);
+      const response = await this.callDeepSeekAPI(prompt, lang);
       return response;
     } catch (error) {
       console.error('Error generating summary:', error);

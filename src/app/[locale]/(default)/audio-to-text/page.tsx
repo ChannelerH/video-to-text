@@ -1,6 +1,7 @@
 import { setRequestLocale } from "next-intl/server";
 import Link from "next/link";
 import ToolInterface from "@/components/tool-interface";
+import AudioUploadWidget from "@/components/landing/audio-upload-widget";
 import React from "react";
 
 export const revalidate = 60;
@@ -113,54 +114,9 @@ export default async function AudioToTextPage({
             </div>
           </div>
 
-          {/* Right - Upload widget (UI only) */}
+          {/* Right - Upload widget (wired) */}
           <div>
-            <div className="relative rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900/80 to-slate-800/60 p-8 overflow-hidden">
-              <div className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] opacity-40" aria-hidden>
-                {/* glowing radial backdrop */}
-                <div className="w-full h-full" style={{
-                  background:
-                    "radial-gradient(circle, rgba(6,182,212,0.12) 0%, transparent 60%)",
-                }} />
-              </div>
-
-              <div className="relative">
-                <label className="block cursor-pointer mx-auto w-56 h-56 rounded-full border-2 border-dashed border-cyan-400/60 bg-cyan-500/10 flex flex-col items-center justify-center gap-2 text-center hover:scale-[1.02] transition-transform">
-                  <div className="absolute inset-0 rounded-full animate-[pulse_2s_ease_infinite]" />
-                  <div className="text-5xl">🎙️</div>
-                  <div className="text-sm">Upload Audio</div>
-                  <input type="file" accept="audio/*" className="hidden" />
-                </label>
-
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                  {[
-                    { label: "📁 Browse Files" },
-                    { label: "📋 Paste URL" },
-                  ].map((x) => (
-                    <span
-                      key={x.label}
-                      className="px-3 py-2 rounded-2xl text-cyan-400 border border-cyan-500/40 bg-cyan-500/10 text-sm"
-                    >
-                      {x.label}
-                    </span>
-                  ))}
-                </div>
-
-                <p className="mt-4 text-center text-slate-400 text-sm">
-                  Supports: MP3, WAV, M4A, AAC, OGG, FLAC, and more
-                </p>
-
-                <div className="mt-6 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                    <span>Live Recording Available</span>
-                  </div>
-                  <button className="w-12 h-12 rounded-full bg-red-500/90 border-4 border-red-500/30 text-lg">
-                    🔴
-                  </button>
-                </div>
-              </div>
-            </div>
+            <AudioUploadWidget locale={locale} />
           </div>
         </div>
       </section>

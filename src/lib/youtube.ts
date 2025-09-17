@@ -49,6 +49,14 @@ export interface OptimizedAudioFormat {
   audioQuality: string;
   approxDurationMs: number;
   supportsRangeRequests?: boolean;
+  isDrc?: boolean; // 是否使用了动态范围压缩
+}
+
+export interface AudioTrackInfo {
+  languageCode: string;
+  trackType: 'original' | 'dubbed-auto';
+  displayName: string;
+  formats: number; // 可用格式数量
 }
 
 export class YouTubeService {
@@ -65,6 +73,88 @@ export class YouTubeService {
   }
 
   /**
+   * 检测视频的可用音轨语言
+   */
+  static async detectAudioTracks(videoId: string): Promise<AudioTrackInfo[]> {
+    try {
+      const info = await ytdl.getInfo(videoId);
+      const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
+      
+      const tracks = new Map<string, AudioTrackInfo>();
+      
+      audioFormats.forEach(format => {
+        if (format.url) {
+          try {
+            const url = new URL(format.url);
+            const xtags = url.searchParams.get('xtags');
+            
+            if (xtags) {
+              const langMatch = xtags.match(/lang=([a-z]{2}(-[A-Z]{2})?)/i);
+              const typeMatch = xtags.match(/acont=(original|dubbed-auto)/i);
+              
+              if (langMatch) {
+                const languageCode = langMatch[1];
+                const trackType = (typeMatch ? typeMatch[1] : 'original') as 'original' | 'dubbed-auto';
+                const key = `${languageCode}_${trackType}`;
+                
+                if (!tracks.has(key)) {
+                  // 生成显示名称
+                  const languageNames: Record<string, string> = {
+                    'en-US': 'English (US)',
+                    'en': 'English',
+                    'zh-CN': 'Chinese (Simplified)',
+                    'zh-TW': 'Chinese (Traditional)',
+                    'es-US': 'Spanish (US)',
+                    'es': 'Spanish',
+                    'fr-FR': 'French',
+                    'de-DE': 'German',
+                    'ja': 'Japanese',
+                    'ko': 'Korean',
+                    'pt-BR': 'Portuguese (Brazil)',
+                    'ru': 'Russian',
+                    'it': 'Italian',
+                    'pl': 'Polish',
+                    'pl-PL': 'Polish',
+                    'hi': 'Hindi',
+                    'id': 'Indonesian'
+                  };
+                  
+                  const baseName = languageNames[languageCode] || languageCode;
+                  const displayName = trackType === 'dubbed-auto' 
+                    ? `${baseName} (AI Dubbed)` 
+                    : `${baseName} (Original)`;
+                  
+                  tracks.set(key, {
+                    languageCode,
+                    trackType,
+                    displayName,
+                    formats: 1
+                  });
+                } else {
+                  tracks.get(key)!.formats++;
+                }
+              }
+            }
+          } catch (e) {
+            // 忽略解析错误
+          }
+        }
+      });
+      
+      // 按原始音轨优先，然后按语言代码排序
+      return Array.from(tracks.values()).sort((a, b) => {
+        if (a.trackType !== b.trackType) {
+          return a.trackType === 'original' ? -1 : 1;
+        }
+        return a.languageCode.localeCompare(b.languageCode);
+      });
+    } catch (error) {
+      console.error('Error detecting audio tracks:', error);
+      return [];
+    }
+  }
+
+  /**
    * 获取视频信息和字幕
    */
   static async getVideoInfo(videoId: string, retryCount = 0): Promise<VideoInfo> {
@@ -73,7 +163,6 @@ export class YouTubeService {
     const baseDelay = 500; // 500ms基础延迟（原为1秒）
     
     try {
-      console.log(`[YouTube] Getting video info (attempt ${retryCount + 1}/${maxRetries + 1})...`);
       
       const info = await ytdl.getInfo(videoId, {
         requestOptions: {
@@ -110,7 +199,6 @@ export class YouTubeService {
         captions: captions.length > 0 ? captions : undefined
       };
       
-      console.log(`Video info retrieved: "${videoInfo.title}" (${videoInfo.duration}s)`);
       return videoInfo;
     } catch (error: any) {
       console.error(`Error getting video info (attempt ${retryCount + 1}):`, {
@@ -129,7 +217,6 @@ export class YouTubeService {
       
       if (isNetworkError && retryCount < maxRetries) {
         const delay = Math.min(baseDelay * Math.pow(1.5, retryCount), 2000); // 更快的重试，最多2秒
-        console.log(`[YouTube] Network error, retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.getVideoInfo(videoId, retryCount + 1);
       }
@@ -155,13 +242,15 @@ export class YouTubeService {
   /**
    * 获取音频流 URL（用于转录）
    * 包含增强的重试机制处理 ECONNRESET 错误
+   * @param videoId YouTube视频ID
+   * @param preferredLanguage 偏好的音轨语言代码（如 'en-US', 'zh-CN' 等）
+   * @param retryCount 重试次数
    */
-  static async getAudioStreamUrl(videoId: string, retryCount = 0): Promise<string> {
+  static async getAudioStreamUrl(videoId: string, preferredLanguage?: string, retryCount = 0): Promise<string> {
     const maxRetries = 3;
     const baseDelay = 1000;
     
     try {
-      console.log(`Attempting to get audio stream info (attempt ${retryCount + 1}/${maxRetries + 1})...`);
       
       // 添加 User-Agent 和其他请求头来避免被封
       const info = await ytdl.getInfo(videoId, {
@@ -174,27 +263,174 @@ export class YouTubeService {
         }
       });
       
-      // 选择最佳音频格式
+      // 选择最佳音频格式 - 智能选择主音轨
       const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
       
       if (audioFormats.length === 0) {
         throw new Error('No audio formats available');
       }
 
-      // 优先选择高质量音频，但也考虑稳定性
-      const bestFormat = audioFormats
-        .filter(format => format.url && format.audioBitrate) // 确保有效
-        .sort((a, b) => {
-          const aQuality = parseInt(String(a.audioBitrate || '0'));
-          const bQuality = parseInt(String(b.audioBitrate || '0'));
-          return bQuality - aQuality;
-        })[0];
+      // 检测多语言音轨
+      const languageTracks = new Map<string, any[]>();
+      audioFormats.forEach(format => {
+        if (format.url) {
+          try {
+            const url = new URL(format.url);
+            const xtags = url.searchParams.get('xtags');
+            
+            // 解析 xtags 中的语言信息
+            // 格式: "acont=original:lang=en-US" 或 "acont=dubbed-auto:lang=fr-FR"
+            let languageCode = 'default';
+            let trackType = 'original';
+            
+            if (xtags) {
+              const langMatch = xtags.match(/lang=([a-z]{2}(-[A-Z]{2})?)/i);
+              const typeMatch = xtags.match(/acont=(original|dubbed-auto)/i);
+              
+              if (langMatch) {
+                languageCode = langMatch[1];
+              }
+              if (typeMatch) {
+                trackType = typeMatch[1];
+              }
+            }
+            
+            const trackKey = `${languageCode}_${trackType}`;
+            if (!languageTracks.has(trackKey)) {
+              languageTracks.set(trackKey, []);
+            }
+            languageTracks.get(trackKey)!.push({
+              ...format,
+              languageCode,
+              trackType
+            });
+            
+          } catch (e) {
+            // URL 解析失败，使用默认分组
+            if (!languageTracks.has('default_original')) {
+              languageTracks.set('default_original', []);
+            }
+            languageTracks.get('default_original')!.push(format);
+          }
+        }
+      });
+      
+      
+      const drcFormats = audioFormats.filter(f => f.isDrc === true);
+      const nonDrcFormats = audioFormats.filter(f => !f.isDrc);
+
+      // 智能音轨选择策略（考虑语言偏好）
+      let bestFormat: any = null;
+      
+      // 如果指定了语言偏好
+      if (preferredLanguage && languageTracks.size > 1) {
+        // 先找原始音轨的指定语言
+        const preferredOriginalKey = `${preferredLanguage}_original`;
+        const preferredDubbedKey = `${preferredLanguage}_dubbed-auto`;
+        
+        // 处理语言代码兼容性（如 'pl' 匹配 'pl-PL'）
+        let candidateFormats = 
+          languageTracks.get(preferredOriginalKey) || 
+          languageTracks.get(preferredDubbedKey) ||
+          [];
+        
+        // 如果没找到，尝试匹配带区域码的版本（如 pl -> pl-PL）
+        if (candidateFormats.length === 0 && !preferredLanguage.includes('-')) {
+          // 遍历所有音轨，找到语言代码开头匹配的
+          for (const [key, formats] of languageTracks) {
+            if (key.startsWith(`${preferredLanguage}-`) && key.endsWith('_original')) {
+              candidateFormats = formats;
+              break;
+            }
+          }
+          // 如果还没找到原始音轨，尝试配音音轨
+          if (candidateFormats.length === 0) {
+            for (const [key, formats] of languageTracks) {
+              if (key.startsWith(`${preferredLanguage}-`) && key.endsWith('_dubbed-auto')) {
+                candidateFormats = formats;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (candidateFormats.length > 0) {
+          // 在候选格式中选择最佳
+          bestFormat = candidateFormats.find(format => 
+            format.itag === 140 && format.url && !format.isDrc
+          ) || candidateFormats.find(format =>
+            format.url && !format.isDrc
+          );
+        }
+      }
+      
+      // 如果没有找到偏好语言，或没有指定语言，使用原始策略
+      if (!bestFormat) {
+        // 如果用户明确选择了语言但没找到，记录日志
+        if (preferredLanguage) {
+          console.log(`[YouTube] Preferred language '${preferredLanguage}' not found in available tracks. Available tracks:`, 
+            Array.from(languageTracks.keys()));
+        }
+        
+        // 优先选择原始英文音轨
+        const originalTracks = languageTracks.get('en-US_original') || 
+                              languageTracks.get('en_original') ||
+                              languageTracks.get('default_original') ||
+                              [];
+        
+        if (originalTracks.length > 0) {
+          bestFormat = originalTracks.find(format => 
+            format.itag === 140 && format.url && !format.isDrc
+          );
+        }
+        
+        // 如果还是没有，使用原始的选择逻辑
+        if (!bestFormat) {
+          bestFormat = audioFormats.find(format => 
+            format.itag === 140 && // 标准 AAC 128k 格式
+            format.url && 
+            !format.isDrc // 非DRC版本（原始音轨）
+          );
+        }
+      }
+
+
+      // 如果没有找到理想的格式，尝试其他非DRC格式
+      if (!bestFormat) {
+        bestFormat = audioFormats.find(format =>
+          format.url &&
+          format.audioBitrate && 
+          format.audioBitrate >= 96 && // 至少96kbps保证质量
+          !format.isDrc // 非DRC版本
+        );
+      }
+
+      // 如果还是没有，选择任何非DRC的音频
+      if (!bestFormat) {
+        bestFormat = audioFormats.find(format => 
+          format.url && !format.isDrc
+        );
+      }
+
+      // 最后的备选：选择最高质量的音频（即使是DRC）
+      if (!bestFormat) {
+        bestFormat = audioFormats
+          .filter(format => format.url && format.audioBitrate)
+          .sort((a, b) => {
+            // 优先选择标准格式
+            if (a.itag === 140 && b.itag !== 140) return -1;
+            if (b.itag === 140 && a.itag !== 140) return 1;
+            // 然后按比特率排序
+            const aQuality = parseInt(String(a.audioBitrate || '0'));
+            const bQuality = parseInt(String(b.audioBitrate || '0'));
+            return bQuality - aQuality;
+          })[0];
+      }
 
       if (!bestFormat || !bestFormat.url) {
         throw new Error('No valid audio format found');
       }
 
-      console.log(`Selected audio format: ${bestFormat.mimeType}, ${bestFormat.audioBitrate}kbps`);
       return bestFormat.url;
     } catch (error: any) {
       console.error(`Error getting audio stream (attempt ${retryCount + 1}):`, {
@@ -212,9 +448,8 @@ export class YouTubeService {
       
       if (isNetworkError && retryCount < maxRetries) {
         const delay = baseDelay * Math.pow(2, retryCount); // 指数退避
-        console.log(`Network error detected, retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        return this.getAudioStreamUrl(videoId, retryCount + 1);
+        return this.getAudioStreamUrl(videoId, preferredLanguage, retryCount + 1);
       }
       
       throw new Error(`Failed to get audio stream after ${retryCount + 1} attempts: ${error.message}`);
@@ -224,10 +459,40 @@ export class YouTubeService {
   /**
    * 获取优化的音频格式列表（用于快速下载）
    */
-  static async getOptimizedAudioFormats(videoId: string): Promise<OptimizedAudioFormat[]> {
+  static async getOptimizedAudioFormats(videoId: string, preferredLanguage?: string): Promise<OptimizedAudioFormat[]> {
     try {
       const info = await ytdl.getInfo(videoId);
-      const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
+      let audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
+      
+      // 如果指定了语言偏好，优先筛选该语言的音轨
+      if (preferredLanguage && audioFormats.length > 0) {
+        const preferredFormats = audioFormats.filter(format => {
+          if (format.url) {
+            try {
+              const url = new URL(format.url);
+              const xtags = url.searchParams.get('xtags');
+              if (xtags) {
+                // 处理语言代码兼容性
+                const hasExactMatch = xtags.includes(`lang=${preferredLanguage}`);
+                const hasPartialMatch = !preferredLanguage.includes('-') && 
+                  new RegExp(`lang=${preferredLanguage}-[A-Z]{2}`, 'i').test(xtags);
+                return hasExactMatch || hasPartialMatch;
+              }
+            } catch (e) {
+              // URL解析失败，忽略
+            }
+          }
+          return false;
+        });
+        
+        // 如果找到了偏好语言的格式，使用它们；否则使用所有格式
+        if (preferredFormats.length > 0) {
+          audioFormats = preferredFormats;
+          console.log(`[YouTube] Found ${preferredFormats.length} audio formats for language: ${preferredLanguage}`);
+        } else {
+          console.log(`[YouTube] No audio formats found for language: ${preferredLanguage}, using all formats`);
+        }
+      }
       
       if (audioFormats.length === 0) {
         throw new Error('No audio formats available');
@@ -244,14 +509,20 @@ export class YouTubeService {
           quality: format.quality || 'unknown',
           audioQuality: format.audioQuality || 'unknown',
           approxDurationMs: parseInt(format.approxDurationMs || '0'),
-          supportsRangeRequests: format.hasAudio && !format.isLive
+          supportsRangeRequests: format.hasAudio && !format.isLive,
+          isDrc: format.isDrc || false // 添加 DRC 信息
         }))
         .filter(format => format.bitrate > 0) // 过滤无效格式
         .sort((a, b) => {
           // 优先选择适合转录的格式：
-          // 1. 优先选择较小的文件（更快下载）
-          // 2. 但保证音频质量足够用于转录（至少64kbps）
+          // 1. 优先选择非DRC格式（原始音轨）
+          // 2. 保证音频质量足够用于转录（至少64kbps）
           // 3. 优先选择支持范围请求的格式（可以并行下载）
+          
+          // 首先按DRC状态排序（非DRC优先）
+          if (a.isDrc !== b.isDrc) {
+            return a.isDrc ? 1 : -1; // 非DRC排在前面
+          }
           
           const minBitrate = 64; // 转录最低要求
           const aValidBitrate = a.bitrate >= minBitrate ? a.bitrate : 999999;
@@ -288,15 +559,21 @@ export class YouTubeService {
       throw new Error('No suitable audio formats found');
     }
 
+    // 优先选择非DRC格式（原始音轨）
+    const nonDrcFormats = formats.filter(f => !f.isDrc);
+    const availableFormats = nonDrcFormats.length > 0 ? nonDrcFormats : formats;
+
     // 如果偏好小文件，选择第一个（已按大小排序）
     if (options?.preferSmallSize) {
-      return formats[0];
+      return availableFormats[0];
     }
 
-    // 否则选择质量和大小的平衡
-    const balancedFormat = formats.find(f => 
+    // 否则选择质量和大小的平衡，优先选择非DRC格式
+    const balancedFormat = availableFormats.find(f => 
+      f.bitrate >= 96 && f.bitrate <= 128 && f.supportsRangeRequests && !f.isDrc
+    ) || availableFormats.find(f => 
       f.bitrate >= 96 && f.bitrate <= 128 && f.supportsRangeRequests
-    ) || formats[0];
+    ) || availableFormats[0];
 
     return balancedFormat;
   }
@@ -326,7 +603,6 @@ export class YouTubeService {
         preferSmallSize: false 
       });
 
-      console.log(`Selected audio format: ${audioFormat.mimeType}, ${audioFormat.bitrate}kbps, ${audioFormat.contentLength ? Math.round(audioFormat.contentLength / 1024 / 1024) + 'MB' : 'unknown size'}`);
 
       let audioUrl = audioFormat.url;
       
@@ -393,7 +669,6 @@ export class YouTubeService {
     let bytesDownloaded = 0;
     const startTime = Date.now();
 
-    console.log(`Starting parallel download: ${totalChunks} chunks of ${Math.round(chunkSize / 1024)}KB each`);
 
     // 创建分块任务
     const chunkTasks: Promise<{ index: number; buffer: Buffer }>[] = [];
@@ -458,7 +733,6 @@ export class YouTubeService {
     results.sort((a, b) => a.index - b.index);
     const finalBuffer = Buffer.concat(results.map(r => r.buffer));
     
-    console.log(`Parallel download completed: ${finalBuffer.length} bytes in ${Math.round((Date.now() - startTime) / 1000)}s`);
     
     return finalBuffer;
   }
@@ -501,7 +775,6 @@ export class YouTubeService {
           throw new Error(`Unexpected status code: ${response.status}`);
         }
       } catch (error) {
-        console.log(`Chunk ${chunkIndex} attempt ${attempt} failed:`, error);
         
         if (attempt === retryAttempts) {
           throw error;
@@ -591,7 +864,6 @@ export class YouTubeService {
 
         return Buffer.concat(chunks);
       } catch (error) {
-        console.log(`Stream download attempt ${attempt} failed:`, error);
         
         if (attempt === retryAttempts) {
           if (onError) {
@@ -641,7 +913,6 @@ export class YouTubeService {
 
     for (let attempt = 1; attempt <= retryAttempts; attempt++) {
       try {
-        console.log(`Starting ytdl-core stream download for ${videoId}, attempt ${attempt}`);
 
         const info = await ytdl.getInfo(videoId);
         const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
@@ -659,7 +930,6 @@ export class YouTubeService {
             return aSize - bSize; // 选择最小文件
           })[0] || audioFormats[0];
 
-        console.log(`Using format: ${bestFormat.mimeType}, ${bestFormat.audioBitrate}kbps`);
 
         const audioStream = ytdl(videoId, {
           format: bestFormat,
@@ -698,7 +968,6 @@ export class YouTubeService {
 
           audioStream.on('end', () => {
             const finalBuffer = Buffer.concat(chunks);
-            console.log(`ytdl-core download completed: ${finalBuffer.length} bytes in ${Math.round((Date.now() - startTime) / 1000)}s`);
             resolve(finalBuffer);
           });
 
@@ -709,7 +978,6 @@ export class YouTubeService {
 
         return await Promise.race([downloadPromise, timeoutPromise]);
       } catch (error) {
-        console.log(`ytdl-core download attempt ${attempt} failed:`, error);
         
         if (attempt === retryAttempts) {
           if (onError) {

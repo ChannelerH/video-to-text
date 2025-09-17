@@ -377,6 +377,7 @@
   },
   "tool_interface": {
     "loading": "加载中...",
+    "detecting_audio_tracks": "正在检测音轨...",
     "upload_tip": "拖放文件到此处或点击浏览",
     "click_to_replace": "点击替换文件",
     "supported_formats_audio": "支持 MP3、M4A、MP4、WAV、OGG、FLAC 格式",
@@ -551,7 +552,9 @@
     "errors": {
       "upload_failed": "上传失败。请重试。",
       "wait_for_upload": "请等待文件上传完成或输入 URL。",
-      "general_error": "发生错误。请重试。"
+      "general_error": "发生错误。请重试。",
+      "transcription_failed_title": "转录失败",
+      "please_try_again": "请重试"
     },
     "free_tier_notice": {
       "title": "免费版限制",
@@ -586,39 +589,6 @@
       "pricing_link": "去升级",
       "speed_hint": "精度更高，速度稍慢"
     }
-  },
-  "welcome_back": "欢迎回来",
-  "dashboard_subtitle": "管理您的转录记录和账户",
-  "nav": {
-    "home": "首页",
-    "transcriptions": "所有转录",
-    "account": "账户"
-  },
-  "quick_actions": "快速操作",
-  "actions": {
-    "upload_file": "上传文件",
-    "upload_description": "上传音频或视频文件进行转录",
-    "youtube_link": "YouTube链接",
-    "youtube_description": "通过URL转录YouTube视频"
-  },
-  "usage": {
-    "monthly_usage": "本月使用量",
-    "minutes": "分钟",
-    "near_limit": "接近限制",
-    "limit_reached": "已达到限制",
-    "upgrade_for_more": "升级获得无限转录"
-  },
-  "upgrade": "升级",
-  "upgrade_now": "立即升级",
-  "upgrade_available": "升级获得更多功能",
-  "recent_transcriptions": "最近转录",
-  "view_all": "查看全部",
-  "no_transcriptions_yet": "还没有转录记录",
-  "start_transcribing": "从上传文件或粘贴YouTube链接开始",
-  "stats": {
-    "total_transcriptions": "总转录数",
-    "minutes_transcribed": "转录分钟数",
-    "this_month": "本月"
   },
   "why_choose_us": {
     "title": "🚀 为什么选择 V2TX 脱颖而出",
@@ -1130,5 +1100,20 @@
     "multiple_speakers": "多人说话",
     "long_audio": "长音频",
     "sample_only": "仅样例（前 5 分钟）"
+  },
+  "nav": {
+    "home": "首页",
+    "transcriptions": "所有转录",
+    "account": "账户"
+  },
+  "audio_track_selector": {
+    "title": "选择音轨",
+    "description": "为此 YouTube 视频选择原声音轨或 AI 配音音轨",
+    "original_tracks": "原声音轨",
+    "dubbed_tracks": "AI 配音音轨",
+    "dubbed_note": "AI 配音音轨为自动生成，可能存在不准确之处",
+    "use_default": "使用默认音轨",
+    "confirm": "确认选择",
+    "recommended": "推荐"
   }
 }

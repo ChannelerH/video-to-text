@@ -223,7 +223,12 @@ export async function POST(request: NextRequest) {
         fetch(`${origin}/api/transcribe/prepare/youtube`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ job_id: jobId, video: content, user_tier: userTier })
+          body: JSON.stringify({ 
+            job_id: jobId, 
+            video: content, 
+            user_tier: userTier,
+            preferred_language: options?.preferred_language // 传递用户选择的语言
+          })
         }).catch(() => {});
       } else {
         // 其他类型仅在显式开启兜底时触发本地处理

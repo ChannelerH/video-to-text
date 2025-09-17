@@ -718,15 +718,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   
   // 抽取实际的转录逻辑
   const performTranscription = async (preferredLanguage?: string) => {
-    setIsProcessing(true);  // 开启加载动画
     setProgress(t("progress.starting"));
     setResult(null);
-    // 设置初始进度状态，显示进度条
-    setProgressInfo({ 
-      stage: 'process', 
-      percentage: 0, 
-      message: t("progress.starting") || 'Starting transcription...' 
-    });
+    setProgressInfo({ stage: null, percentage: 0, message: '' });
     setGeneratedChapters([]);
     setGeneratedSummary("");
 
@@ -750,12 +744,6 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           : (action === "preview" ? t("progress.generating_preview") : t("progress.processing_audio_url"));
         
         setProgress(progressText);
-        // 更新进度条显示
-        setProgressInfo({
-          stage: 'download',
-          percentage: 10,
-          message: progressText
-        });
         requestData = {
           type: urlType,
           content: url,
@@ -1094,6 +1082,210 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     }
   };
 
+
+    try {
+      const requestData: any = {
+        high_accuracy: highAccuracy,
+        enable_diarization_after_whisper: enableDiarizationAfterWhisper,
+        user_tier: tier,
+        preferred_language: preferredLanguage // 添加语言参数
+      };
+
+      let result: any;
+
+      if (url) {
+        requestData.url = url;
+        
+        // 如果是上传的文件并且 URL 是从上传得到的，记录文件信息
+        if (uploadedFileInfo && url === uploadedFileInfo.publicUrl) {
+          requestData.file_info = {
+            name: uploadedFileInfo.fileName,
+            size: uploadedFileInfo.fileSize,
+            duration: uploadedFileInfo.duration,
+            isUploaded: true
+          };
+        }
+        // 已移除语言探针：仅在拿到模型结果后再判定是否显示中文润色提示
+      } else {
+        setProgress(t("errors.wait_for_upload"));
+        setIsProcessing(false);
+        return;
+      }
+
+      // Add streamProgress flag for authenticated users
+      requestData.streamProgress = isAuthenticated;
+
+      // 使用异步转录
+      if (isAuthenticated) {
+        // Import async helper
+        const { transcribeAsync } = await import('@/lib/async-transcribe');
+        
+        try {
+          result = await transcribeAsync(
+            requestData,
+            (stage, percentage, message) => {
+              const uiStage: 'upload' | 'download' | 'transcribe' | 'process' | null =
+                stage === 'downloading' ? 'download' :
+                stage === 'transcribing' ? 'transcribe' :
+                stage === 'refining' ? 'process' : null;
+              setProgressInfo({
+                stage: uiStage,
+                percentage,
+                message,
+                estimatedTime: undefined
+              });
+              setProgress(message);
+            }
+          );
+        } catch (error) {
+          console.error('[Async Transcribe] Error:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Transcription failed';
+          
+          // Show error toast with retry suggestion
+          showToast(
+            'error', 
+            t("errors.transcription_failed_title") || "Transcription Failed",
+            `${errorMessage}. ${t("errors.please_try_again") || "Please try again."}`
+          );
+          
+          // Reset UI state
+          setProgress("");
+          setIsProcessing(false);
+          setProgressInfo({ stage: null, percentage: 0, message: '' });
+          return;
+        }
+      } else {
+        // 未登录也走异步提交 + 轮询（供应商异步 + 回调）
+        const { transcribeAsync } = await import('@/lib/async-transcribe');
+        try {
+          result = await transcribeAsync(
+            requestData,
+            (stage, percentage, message) => {
+              const uiStage: 'upload' | 'download' | 'transcribe' | 'process' | null =
+                stage === 'downloading' ? 'download' :
+                stage === 'transcribing' ? 'transcribe' :
+                stage === 'refining' ? 'process' : null;
+              setProgressInfo({
+                stage: uiStage,
+                percentage,
+                message,
+                estimatedTime: undefined
+              });
+              setProgress(message);
+            }
+          );
+        } catch (error) {
+          console.error('[Async Transcribe Anon] Error:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Transcription failed';
+          
+          // Show error toast with retry suggestion
+          showToast(
+            'error',
+            t("errors.transcription_failed_title") || "Transcription Failed", 
+            `${errorMessage}. ${t("errors.please_try_again") || "Please try again."}`
+          );
+          
+          // Reset UI state
+          setProgress("");
+          setIsProcessing(false);
+          setProgressInfo({ stage: null, percentage: 0, message: '' });
+          return;
+        }
+      }
+
+      if (result.success && result.data) {
+        try {
+          const orig = result.data;
+          const txt = orig?.text;
+          const lang = orig?.lang;
+          const raw = orig?.raw || txt;
+          const isZh = (lang && lang.toLowerCase().includes('zh')) || /[\u4e00-\u9fff]/.test(raw || '');
+          if (isZh) showChineseToast(); else setShowChineseUpgrade(false);
+        } catch {}
+        setResult({ type: "full", data: result.data });
+        // Set audio URL for editor view
+        if (uploadedFileInfo?.publicUrl) {
+          setAudioUrl(uploadedFileInfo.publicUrl);
+        } else if (uploadedFileInfo?.replicateUrl) {
+          setAudioUrl(uploadedFileInfo.replicateUrl);
+        }
+        
+        // Store jobId
+        const jobId = result.data?.jobId;
+        if (jobId && typeof window !== 'undefined') {
+          sessionStorage.setItem('lastJobId', jobId);
+        }
+        setShowSuccess(true);
+        setProgress(t("progress.complete"));
+      } else if (result?.success && result?.preview) {
+        try {
+          const txt = result.preview?.text || '';
+          const raw = result.preview?.raw || txt;
+          const lang = result.preview?.lang;
+          const isZh = (lang && lang.toLowerCase().includes('zh')) || /[\u4e00-\u9fff]/.test(raw || '');
+          if (isZh) showChineseToast(); else setShowChineseUpgrade(false);
+        } catch {}
+        setResult({ type: "preview", data: result.preview, authRequired: result.authRequired });
+        setProgress(t("progress.preview_ready"));
+      } else if (result?.success && !result?.data && !result?.preview) {
+        setProgress('Received empty success response. Please try again or refresh.');
+      } else {
+        console.error('Transcription API error:', result.error);
+        let userFriendlyError = '';
+        
+        if (result.error.includes('null response')) {
+          userFriendlyError = 'The audio file appears to be invalid or corrupted. Please try uploading a valid audio/video file.';
+        } else if (result.error.includes('No transcription content')) {
+          userFriendlyError = 'No speech was detected in the file. Please ensure your audio contains clear speech.';
+        } else if (result.error.includes('Invalid YouTube URL')) {
+          userFriendlyError = 'Invalid YouTube URL. Please check the URL format and try again.';
+        } else if (result.error.includes('Unable to access URL')) {
+          userFriendlyError = 'Cannot access the audio URL. The file may not exist, require authentication, or the link may have expired.';
+        } else if (result.error.includes('Unsupported content type')) {
+          userFriendlyError = 'Unsupported file format. Please use MP3, WAV, OGG, AAC, M4A, or FLAC files.';
+        } else if (result.error.includes('File too large')) {
+          userFriendlyError = 'Audio file is too large. Please use files smaller than 100MB.';
+        } else if (result.error.includes('timeout')) {
+          userFriendlyError = 'Request timeout. The audio file may be too large or the connection is slow. Please try again.';
+        } else {
+          // Check if error contains "Upgrade" to make it a link
+          if (result.error.includes('Upgrade')) {
+            // Parse the error message to make "Upgrade" clickable
+            const errorParts = result.error.split('Upgrade');
+            setProgress(
+              <span>
+                {`Transcription failed: ${errorParts[0]}`}
+                <Link href="/pricing" className="text-blue-400 hover:text-blue-300 underline">
+                  Upgrade
+                </Link>
+                {errorParts[1] || ''}
+              </span>
+            );
+          } else {
+            userFriendlyError = `Transcription failed: ${result.error}`;
+            setProgress(userFriendlyError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Transcription error:", error);
+      
+      // Show user-friendly error with retry suggestion
+      const errorMessage = error instanceof Error ? error.message : t("errors.general_error");
+      showToast(
+        'error',
+        t("errors.transcription_failed_title") || "Transcription Failed",
+        `${errorMessage}. ${t("errors.please_try_again") || "Please try again."}`
+      );
+      
+      // Reset all UI states to allow retry
+      setProgress("");
+      setProgressInfo({ stage: null, percentage: 0, message: '' });
+    } finally {
+      // Always reset processing state to re-enable the button
+      setIsProcessing(false);
+    }
+  };
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -2562,15 +2754,6 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         message={toast.message}
         isOpen={toast.isOpen}
         onClose={hideToast}
-      />
-      
-      {/* Audio Track Selector Dialog */}
-      <AudioTrackSelector
-        isOpen={showTrackSelector}
-        onClose={() => setShowTrackSelector(false)}
-        onSelect={handleTrackSelected}
-        tracks={availableTracks}
-        videoTitle={trackVideoTitle}
       />
     </div>
   );

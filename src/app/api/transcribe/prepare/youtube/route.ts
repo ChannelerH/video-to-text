@@ -10,19 +10,16 @@ export const maxDuration = 10; // keep it short
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('[YouTube Prepare] POST begin');
-    const { job_id, video, user_tier } = await request.json();
+    const { job_id, video, user_tier, preferred_language } = await request.json();
     if (!job_id || !video) {
       return NextResponse.json({ error: 'missing job_id or video' }, { status: 400 });
     }
 
-    console.log('[YouTube Prepare] Processing job:', job_id, 'video:', video, 'user_tier:', user_tier);
 
     // Check if this is already an R2/processed URL (from Re-run)
     const isProcessedUrl = video.includes('.r2.dev/') || video.includes('pub-') || video.includes('/api/media/proxy');
     
     if (isProcessedUrl) {
-      console.log('[YouTube Prepare] Detected R2/processed URL from Re-run, skipping YouTube processing');
       
       // Directly use the R2 URL as supplier URL
       let supplierAudioUrl = video;
@@ -34,9 +31,7 @@ export async function POST(request: NextRequest) {
         
         if (clippedUrl) {
           supplierAudioUrl = clippedUrl;
-          console.log(`[YouTube Prepare] FREE user R2 audio clipped and uploaded: ${supplierAudioUrl}`);
         } else {
-          console.error('[YouTube Prepare] Failed to clip R2 URL for FREE user, using full audio');
           // Fall back to full audio
         }
       }
@@ -74,9 +69,13 @@ export async function POST(request: NextRequest) {
             'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ url: supplierAudioUrl })
+          body: JSON.stringify({ url: supplierAudioUrl }),
+          signal: AbortSignal.timeout(30000) // 30秒超时
+        }).then(resp => {
+          if (!resp.ok) {
+          } else {
+          }
         }).catch((e) => { 
-          console.error('[Deepgram][prepare/youtube] R2 URL enqueue failed:', e); 
         });
       }
       
@@ -92,27 +91,27 @@ export async function POST(request: NextRequest) {
     
     try {
       vid = YouTubeService.validateAndParseUrl(video) || String(video);
-      console.log('[YouTube Prepare] Extracted video ID:', vid);
     } catch (error) {
       console.error('[YouTube Prepare] Failed to parse YouTube URL:', error);
       return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
     }
 
     try {
-      audioUrl = await YouTubeService.getAudioStreamUrl(vid);
-      console.log('[YouTube Prepare] Got audio URL:', audioUrl ? 'success' : 'failed');
+      audioUrl = await YouTubeService.getAudioStreamUrl(vid, preferred_language);
     } catch (error) {
-      console.warn('[YouTube Prepare] Primary audio URL extraction failed, applying fallbacks...', error);
-      // Fallback 1: use optimized audio formats
+      console.log(`[YouTube Prepare] Failed to get audio stream with preferred language '${preferred_language}':`, error);
+      // Fallback 1: use optimized audio formats (but try to respect language preference)
       try {
-        const fmts = await YouTubeService.getOptimizedAudioFormats(vid);
+        const fmts = await YouTubeService.getOptimizedAudioFormats(vid, preferred_language);
+        const nonDrcFmts = fmts.filter(f => !f.isDrc);
+        
         const pick = fmts.find(f => !!f.url) || fmts[0];
         if (pick?.url) {
           audioUrl = pick.url;
-          console.log('[YouTube Prepare] Fallback(optimized formats) succeeded');
+          console.log('[YouTube Prepare] Using fallback audio format');
         }
       } catch (e) {
-        console.warn('[YouTube Prepare] Fallback optimized formats failed:', e);
+        console.log('[YouTube Prepare] Fallback 1 failed:', e);
       }
 
       // Fallback 2: accept any playable format url (video/mp4 with audio)
@@ -125,15 +124,12 @@ export async function POST(request: NextRequest) {
             .sort((a: any, b: any) => (Number(b.bitrate || b.audioBitrate || 0) - Number(a.bitrate || a.audioBitrate || 0)));
           if (playable.length > 0) {
             audioUrl = playable[0].url;
-            console.log('[YouTube Prepare] Fallback(any playable) succeeded');
           }
         } catch (e) {
-          console.warn('[YouTube Prepare] Fallback(any playable) failed:', e);
         }
       }
 
       if (!audioUrl) {
-        console.warn('[YouTube Prepare] All fallbacks failed to get audio URL');
         // As a last resort, do not fail the whole request; return ok with note
         return NextResponse.json({ ok: true, fallback: 'no_audio_url' });
       }
@@ -145,40 +141,87 @@ export async function POST(request: NextRequest) {
       const r2 = new CloudflareR2Service();
       const cfg = r2.validateConfig();
       if (!cfg.isValid) {
-        console.warn('[YouTube Prepare] R2 config missing, skip upload:', cfg.missing);
       } else {
-        console.log('[YouTube Prepare] Starting short R2 upload window');
         const ytdl = (await import('@distube/ytdl-core')).default;
         
         // Get video info while we're at it (reuse ytdl import)
         try {
           const info = await ytdl.getBasicInfo(vid!);
           videoTitle = info.videoDetails?.title || null;
-          console.log('[YouTube Prepare] Got video title:', videoTitle);
         } catch (error) {
-          console.warn('[YouTube Prepare] Failed to get video title:', error);
         }
         
         // Stream audio (audioonly) and collect into buffer with a time cap to respect function limits
+        
+        // 从选定的音轨URL中提取关键参数
+        const urlObj = new URL(audioUrl);
+        const itag = urlObj.searchParams.get('itag');
+        const xtags = urlObj.searchParams.get('xtags');
+        
+        // 提取期望的语言标签
+        let expectedLang = '';
+        let expectedTrackType = '';
+        if (xtags) {
+          const langMatch = xtags.match(/lang=([a-z]{2}(-[A-Z]{2})?)/i);
+          const typeMatch = xtags.match(/acont=(original|dubbed-auto)/i);
+          if (langMatch) expectedLang = langMatch[1];
+          if (typeMatch) expectedTrackType = typeMatch[1];
+        }
+        
+        // 使用 ytdl 下载，通过过滤器选择正确的音轨
         const stream: any = ytdl(vid!, {
-          quality: 'highestaudio',
-          filter: 'audioonly',
+          filter: (format: any) => {
+            // 只选择音频格式
+            if (!format.hasAudio || format.hasVideo) return false;
+            
+            // 检查格式URL中的语言标签
+            if (format.url && expectedLang) {
+              try {
+                const formatUrl = new URL(format.url);
+                const formatXtags = formatUrl.searchParams.get('xtags');
+                if (formatXtags) {
+                  // 确保语言和类型都匹配
+                  const hasExpectedLang = formatXtags.includes(`lang=${expectedLang}`);
+                  const hasExpectedType = expectedTrackType ? formatXtags.includes(`acont=${expectedTrackType}`) : true;
+                  
+                  // 优先选择 iTAG 140
+                  if (hasExpectedLang && hasExpectedType) {
+                    if (format.itag === 140) {
+                      return true;
+                    }
+                  }
+                }
+              } catch (e) {
+                // URL 解析失败，跳过
+              }
+            }
+            return false;
+          },
           highWaterMark: 1 << 24, // 16MB buffer
           requestOptions: {
-            headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'en-US,en;q=0.9' }
+            headers: { 
+              'User-Agent': 'Mozilla/5.0', 
+              'Accept-Language': 'en-US,en;q=0.9' 
+            }
           }
         });
+        
         const chunks: Buffer[] = [];
         const buf: Buffer = await new Promise((resolve, reject) => {
-          const timer = setTimeout(() => {
-            try { stream.destroy(); } catch {}
-            reject(new Error('r2_upload_timeout'));
-          }, 8000);
+          const timeout = setTimeout(() => {
+            reject(new Error('Download timeout after 30 seconds'));
+          }, 30000);
+          
           stream.on('data', (c: Buffer) => chunks.push(Buffer.from(c)));
-          stream.on('end', () => { clearTimeout(timer); resolve(Buffer.concat(chunks)); });
-          stream.on('error', (e: any) => { clearTimeout(timer); reject(e); });
+          stream.on('end', () => { 
+            clearTimeout(timeout);
+            resolve(Buffer.concat(chunks)); 
+          });
+          stream.on('error', (e: any) => { 
+            clearTimeout(timeout);
+            reject(e); 
+          });
         });
-        console.log('[YouTube Prepare] Audio buffered for R2 upload, size:', buf.length);
         
         // For FREE users, clip the audio to 5 minutes before uploading
         if (user_tier === 'free' || user_tier === 'FREE') {
@@ -188,10 +231,8 @@ export async function POST(request: NextRequest) {
           if (clippedUrl) {
             // We already have the clipped audio uploaded, just update supplierAudioUrl
             supplierAudioUrl = clippedUrl;
-            console.log(`[YouTube Prepare] FREE user audio clipped and uploaded: ${supplierAudioUrl}`);
           } else {
             // Clipping failed, fall back to uploading full audio
-            console.warn('[YouTube Prepare] Clipping failed for FREE user, falling back to full audio');
             const upload = await r2.uploadFile(buf, `${vid}.webm`, 'audio/webm', 
               { folder: 'youtube-audio', expiresIn: 24, makePublic: true }
             );
@@ -203,17 +244,14 @@ export async function POST(request: NextRequest) {
             { folder: 'youtube-audio', expiresIn: 24, makePublic: true }
           );
           supplierAudioUrl = upload.publicUrl || upload.url;
-          console.log('[YouTube Prepare] R2 upload ok, url len:', supplierAudioUrl.length);
         }
       }
     } catch (e: any) {
-      console.warn('[YouTube Prepare] R2 upload skipped/fail, will fallback to proxy URL:', e?.message || e);
     }
 
     // Store processed URL and title separately (keep original source_url intact)
     try {
       const processedUrl = supplierAudioUrl || audioUrl;
-      console.log('[YouTube Prepare] Updating DB with processed URL (length):', (processedUrl || '').length, supplierAudioUrl ? '(r2)' : '(proxy)');
       
       // Build update object
       const updateData: any = { processed_url: processedUrl };
@@ -221,12 +259,10 @@ export async function POST(request: NextRequest) {
       // Update title if we got it from YouTube
       if (videoTitle) {
         updateData.title = videoTitle;
-        console.log('[YouTube Prepare] Updating title to:', videoTitle);
       }
       
       // Update both processed_url and title (if available)
       await db().update(transcriptions).set(updateData).where(eq(transcriptions.job_id, job_id));
-      console.log('[YouTube Prepare] DB update success - processed_url and title saved');
     } catch (e) {
       console.error('[YouTube Prepare] DB update failed:', e);
       return NextResponse.json({ error: 'db_update_failed' }, { status: 500 });
@@ -240,7 +276,6 @@ export async function POST(request: NextRequest) {
     const youtubeWatchUrl = `https://www.youtube.com/watch?v=${vid}`;
     const proxyUrl = `${origin}/api/media/proxy?url=${encodeURIComponent(youtubeWatchUrl)}`;
     const supplierUrl = supplierAudioUrl || proxyUrl;
-    console.log('[YouTube Prepare] Supplier config:', { supplier, hasDG: !!process.env.DEEPGRAM_API_KEY, hasRep: !!process.env.REPLICATE_API_TOKEN, cbBase, via: supplierAudioUrl ? 'r2' : 'proxy' });
 
     const tasks: Promise<any>[] = [];
 
@@ -257,7 +292,6 @@ export async function POST(request: NextRequest) {
       // Deepgram 要求在 query 传 callback（不要传 callback_secret / callback_method）
       tasks.push(
         (async () => {
-          console.log('[Deepgram][prepare/youtube] enqueue start');
           const params2 = new URLSearchParams();
           params2.set('callback', cb);
           params2.set('paragraphs', 'true');  // 启用段落分割
@@ -265,25 +299,27 @@ export async function POST(request: NextRequest) {
           params2.set('utterances', 'true');  // 启用说话人分离
           params2.set('model', 'nova-2');     // 使用 Nova-2 模型
           params2.set('detect_language', 'true'); // 启用语言检测
-          console.log('[Deepgram][prepare/youtube] Request params:', params2.toString());
-          const resp = await fetch(`https://api.deepgram.com/v1/listen?${params2.toString()}`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            // Use R2 URL that Deepgram can access (not proxy URL)
-            body: JSON.stringify({ url: supplierAudioUrl })
-          }).catch((e) => { console.error('[Deepgram][prepare/youtube] enqueue failed(request):', e); return undefined as any; });
+          
           try {
-            if (resp && !resp.ok) {
+            const resp = await fetch(`https://api.deepgram.com/v1/listen?${params2.toString()}`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
+                'Content-Type': 'application/json'
+              },
+              // Use R2 URL that Deepgram can access (not proxy URL)
+              body: JSON.stringify({ url: supplierAudioUrl }),
+              // 添加超时控制
+              signal: AbortSignal.timeout(30000) // 30秒超时
+            });
+            
+            if (!resp.ok) {
               const t = await resp.text();
               console.error('[Deepgram][prepare/youtube] enqueue non-200:', resp.status, t);
             } else {
-              console.log('[Deepgram][prepare/youtube] enqueue ok');
             }
           } catch (e) {
-            console.error('[Deepgram][prepare/youtube] enqueue post-check failed:', e);
+            // 更详细的错误处理
           }
         })()
       );
@@ -316,7 +352,6 @@ export async function POST(request: NextRequest) {
       const info = await YouTubeService.getVideoInfo(vid!);
       const longVideo = (info.duration || 0) > 180; // >3 minutes
       if (longVideo && !supplierAudioUrl) {
-        console.log('[YouTube Prepare] Long video without R2; scheduling staging worker');
         fetch(`${origin}/api/transcribe/stage/youtube`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -329,10 +364,8 @@ export async function POST(request: NextRequest) {
 
     // Fire-and-forget
     Promise.allSettled(tasks).then((rs) => {
-      try { console.log('[YouTube Prepare] Fan-out settled:', rs.map(r => r.status)); } catch {}
     }).catch((e) => console.warn('[YouTube Prepare] Fan-out settle failed:', e));
 
-    console.log('[YouTube Prepare] Done. Returning ok');
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     console.error('[YouTube Prepare] Uncaught error:', e);

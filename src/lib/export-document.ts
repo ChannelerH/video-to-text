@@ -38,8 +38,26 @@ export class DocumentExportService {
   ): Promise<Blob | ArrayBuffer | Buffer> {
     // Dynamic import to reduce bundle size
     const { Document, Packer, Paragraph, TextRun, HeadingLevel, PageBreak, AlignmentType, TableOfContents } = await import('docx');
+
+    // Detect Indic scripts for Word export as well (fonts are not embedded in DOCX by default)
+    const hasIndicDocx = (s: string) => /[\u0900-\u0DFF]/.test(s);
+    const textPool = [
+      options.metadata?.title || '',
+      transcription.text || '',
+      ...(transcription.segments || []).map(s => s.text)
+    ].join('\n');
+    const useIndicFont = hasIndicDocx(textPool);
+    // Prefer a broad-coverage Indic UI font on Windows; Word will fallback appropriately on other OS
+    const defaultIndicFont = 'Nirmala UI'; // covers many Indic scripts on Windows
     
     const doc = new Document({
+      styles: useIndicFont ? {
+        default: {
+          document: {
+            run: { font: defaultIndicFont }
+          }
+        }
+      } : undefined,
       sections: [{
         properties: {},
         children: [
@@ -140,11 +158,53 @@ export class DocumentExportService {
     summary: string = '',
     options: Partial<ExportOptions> = {}
   ): Promise<Blob | ArrayBuffer | Buffer> {
+    // Smart routing: for complex scripts, prefer server-side Chromium HTML->PDF if enabled
+    const hasArabic = (s: string) => /[\u0600-\u06FF\u0750-\u077F]/.test(s);
+    const hasHebrew = (s: string) => /[\u0590-\u05FF]/.test(s);
+    const hasThai = (s: string) => /[\u0E00-\u0E7F]/.test(s);
+    const hasLao = (s: string) => /[\u0E80-\u0EFF]/.test(s);
+    const hasMyanmar = (s: string) => /[\u1000-\u109F]/.test(s);
+    const hasKhmer = (s: string) => /[\u1780-\u17FF]/.test(s);
+    const hasIndic = (s: string) => /[\u0900-\u0DFF]/.test(s);
+    const hasCJK = (s: string) => /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(s);
+
+    const combinedForDetect = [
+      options.metadata?.title || '',
+      transcription.text || '',
+      ...(transcription.segments || []).map(s => s.text).join('\n'),
+      ...(chapters || []).map(c => `${c.title} ${(c.segments||[]).map(s => s.text).join(' ')}`).join('\n')
+    ].join('\n');
+    const complex = hasArabic(combinedForDetect) || hasHebrew(combinedForDetect) || hasThai(combinedForDetect) || hasLao(combinedForDetect) || hasMyanmar(combinedForDetect) || hasKhmer(combinedForDetect) || hasIndic(combinedForDetect) || hasCJK(combinedForDetect);
+
+    // If complex scripts detected, try server-export first (if running in browser)
+    if (complex && typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_ENABLE_SERVER_PDF === 'true' || process.env.ENABLE_SERVER_PDF === 'true')) {
+      try {
+        const resp = await fetch('/api/export/pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: options.metadata?.title || 'Transcription Document',
+            language: transcription.language,
+            duration: transcription.duration,
+            summary,
+            chapters: options.includeChapters !== false ? chapters : [],
+            text: transcription.text,
+            includeChapters: options.includeChapters !== false,
+            includeTimestamps: options.includeTimestamps !== false
+          })
+        });
+        if (resp.ok) {
+          const blob = await resp.blob();
+          return blob;
+        }
+      } catch (e) {
+        try { console.warn('[PDF] server export failed, falling back to jsPDF:', e); } catch {}
+      }
+    }
     // Use jsPDF for PDF generation
     const { jsPDF } = await import('jspdf');
     
     // Helpers
-    const hasCJK = (s: string) => /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(s);
     const toBase64 = (ab: ArrayBuffer): string => {
       if (typeof Buffer !== 'undefined') {
         // Node
@@ -199,7 +259,58 @@ export class DocumentExportService {
       } catch {}
       return null;
     };
-    // Determine if we need a CJK font
+    // Indic script detection (Devanagari, Bengali, Gurmukhi, Gujarati, Oriya, Tamil, Telugu, Kannada, Malayalam, Sinhala)
+    const pickIndicFontCdn = (s: string): { url: string; family: string } | null => {
+      // Choose a suitable Noto font per script block
+      if (/[\u0900-\u097F]/.test(s)) return { url: 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/notosansdevanagari/NotoSansDevanagari-Regular.ttf', family: 'NotoSansDevanagari' };
+      if (/[\u0980-\u09FF]/.test(s)) return { url: 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/notosansbengali/NotoSansBengali-Regular.ttf', family: 'NotoSansBengali' };
+      if (/[\u0A00-\u0A7F]/.test(s)) return { url: 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/notosansgurmukhi/NotoSansGurmukhi-Regular.ttf', family: 'NotoSansGurmukhi' };
+      if (/[\u0A80-\u0AFF]/.test(s)) return { url: 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf', family: 'NotoSansGujarati' };
+      if (/[\u0B00-\u0B7F]/.test(s)) return { url: 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/notosansoriya/NotoSansOriya-Regular.ttf', family: 'NotoSansOriya' };
+      if (/[\u0B80-\u0BFF]/.test(s)) return { url: 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/notosanstamil/NotoSansTamil-Regular.ttf', family: 'NotoSansTamil' };
+      if (/[\u0C00-\u0C7F]/.test(s)) return { url: 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/notosanstelugu/NotoSansTelugu-Regular.ttf', family: 'NotoSansTelugu' };
+      if (/[\u0C80-\u0CFF]/.test(s)) return { url: 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/notosanskannada/NotoSansKannada-Regular.ttf', family: 'NotoSansKannada' };
+      if (/[\u0D00-\u0D7F]/.test(s)) return { url: 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/notosansmalayalam/NotoSansMalayalam-Regular.ttf', family: 'NotoSansMalayalam' };
+      if (/[\u0D80-\u0DFF]/.test(s)) return { url: 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/notosanssinhala/NotoSansSinhala-Regular.ttf', family: 'NotoSansSinhala' };
+      return null;
+    };
+
+    const tryLoadIndicFont = async (sample: string): Promise<null | { name: string; family: string; file: string }> => {
+      const pick = pickIndicFontCdn(sample);
+      if (!pick) return null;
+      const localName = `${pick.family}-Regular.ttf`;
+      // 1) Prefer local font in public/fonts (Node runtime)
+      if (typeof window === 'undefined') {
+        try {
+          const { readFile } = await import('fs/promises');
+          const p = `${process.cwd()}/public/fonts/${localName}`;
+          const buf = await readFile(p);
+          return { name: localName, family: pick.family, file: buf.toString('base64') };
+        } catch {}
+      } else {
+        // 2) Prefer local font via fetch in browser
+        try {
+          const respLocal = await fetch(`/fonts/${localName}`);
+          if (respLocal.ok) {
+            const ab = await respLocal.arrayBuffer();
+            return { name: localName, family: pick.family, file: toBase64(ab) };
+          }
+        } catch {}
+      }
+      // 3) Fallback to CDN
+      try {
+        const resp = await fetch(pick.url);
+        if (resp.ok) {
+          const ab = await resp.arrayBuffer();
+          const file = toBase64(ab);
+          const name = pick.url.split('/').pop() || localName;
+          return { name, family: pick.family, file };
+        }
+      } catch {}
+      return null;
+    };
+
+    // Determine if we need a CJK or Indic font
     const title = options.metadata?.title || 'Transcription Document';
     const combined = [
       title,
@@ -208,6 +319,8 @@ export class DocumentExportService {
     ].join('\n');
     let cjkLoaded = false;
     let cjkFontName = 'NotoSansSC';
+    let indicLoaded = false;
+    let indicFontFamily = 'NotoSansDevanagari';
 
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -215,7 +328,8 @@ export class DocumentExportService {
       format: 'a4'
     });
 
-    // Try to load CJK font if Chinese/Japanese/Korean detected
+    // Try to load script fonts
+    // CJK
     if (hasCJK(combined)) {
       try {
         const f = await tryLoadCJKFont();
@@ -227,7 +341,21 @@ export class DocumentExportService {
         }
       } catch {}
     }
+    // Indic
+    if (!cjkLoaded && hasIndic(combined)) {
+      try {
+        const f = await tryLoadIndicFont(combined);
+        if (f) {
+          (doc as any).addFileToVFS(f.name, f.file);
+          (doc as any).addFont(f.name, f.family, 'normal');
+          doc.setFont(f.family, 'normal');
+          indicLoaded = true;
+          indicFontFamily = f.family;
+        }
+      } catch {}
+    }
     try { console.log('[PDF] CJK detection:', { detected: hasCJK(combined), cjkLoaded, cjkFontName }); } catch {}
+    try { console.log('[PDF] Indic detection:', { detected: hasIndic(combined), indicLoaded, indicFontFamily }); } catch {}
     
     let yPosition = 20;
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -237,16 +365,25 @@ export class DocumentExportService {
     
     // Helper function to add text with automatic page breaks
     const addText = (text: string, fontSize: number = 12, isBold: boolean = false) => {
-      // 1) 清洗文本：去零宽字符、统一换行
-      const sanitize = (s: string) => s
-        .replace(/[\u200B-\u200D\uFEFF]/g, '')
-        .replace(/\r\n/g, '\n');
-      const content = sanitize(text || '');
+      // 1) 清洗文本：去控制符/零宽字符/特殊分隔符，并做 NFC 规范化
+      const sanitizeLine = (s: string) => {
+        let v = String(s || '');
+        v = v
+          .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F]/g, '') // 控制符
+          .replace(/[\u200B-\u200D\uFEFF]/g, '') // 零宽/BOM
+          .replace(/[\u2028\u2029]/g, '\\n') // 行/段落分隔符
+          .replace(/\r\n/g, '\\n');
+        try { v = v.normalize('NFC'); } catch {}
+        return v;
+      };
+      const content = sanitizeLine(text);
 
       // 2) 字体与字号
       doc.setFontSize(fontSize);
       if (cjkLoaded) {
         doc.setFont(cjkFontName, 'normal');
+      } else if (indicLoaded) {
+        doc.setFont(indicFontFamily, 'normal');
       } else {
         doc.setFont('helvetica', isBold ? 'bold' : 'normal');
       }
@@ -263,6 +400,7 @@ export class DocumentExportService {
           yPosition = margins.top;
           // 新页需继续设置字体
           if (cjkLoaded) doc.setFont(cjkFontName, 'normal');
+          else if (indicLoaded) doc.setFont(indicFontFamily, 'normal');
           else doc.setFont('helvetica', isBold ? 'bold' : 'normal');
           doc.setFontSize(fontSize);
         }
@@ -275,8 +413,13 @@ export class DocumentExportService {
     
     // Title (wrap and center)
     doc.setFontSize(24);
-    if (!cjkLoaded) doc.setFont('helvetica', 'bold'); else doc.setFont(cjkFontName, 'normal');
-    const titleLines = doc.splitTextToSize(title, contentWidth);
+    if (cjkLoaded) doc.setFont(cjkFontName, 'normal');
+    else if (indicLoaded) doc.setFont(indicFontFamily, 'normal');
+    else doc.setFont('helvetica', 'bold');
+    const safeTitle = ((): string => {
+      try { return String(title || '').normalize('NFC').replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F]/g,'').replace(/[\u200B-\u200D\uFEFF]/g,''); } catch { return String(title || ''); }
+    })();
+    const titleLines = doc.splitTextToSize(safeTitle, contentWidth);
     titleLines.forEach((line: string, idx: number) => {
       doc.text(line, pageWidth / 2, yPosition + idx * 9, { align: 'center' });
     });
@@ -285,7 +428,9 @@ export class DocumentExportService {
     // Metadata
     if (options.metadata) {
       doc.setFontSize(12);
-      if (!cjkLoaded) doc.setFont('helvetica', 'normal'); else doc.setFont(cjkFontName, 'normal');
+      if (cjkLoaded) doc.setFont(cjkFontName, 'normal');
+      else if (indicLoaded) doc.setFont(indicFontFamily, 'normal');
+      else doc.setFont('helvetica', 'normal');
       doc.text(`Date: ${options.metadata.date || new Date().toLocaleDateString()}`, pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 7;
       doc.text(`Language: ${transcription.language || 'Unknown'}`, pageWidth / 2, yPosition, { align: 'center' });
@@ -375,12 +520,18 @@ export class DocumentExportService {
   private static async generateChapterContent(chapters: BasicChapter[], includeTimestamps: boolean, includeSpeakers: boolean = true): Promise<any[]> {
     const { Paragraph, TextRun, HeadingLevel } = await import('docx');
     const content: any[] = [];
+    const clean = (s: string) => {
+      let v = String(s || '');
+      v = v.replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F]/g,'').replace(/[\u200B-\u200D\uFEFF]/g,'').replace(/[\u2028\u2029]/g,'\n');
+      try { v = v.normalize('NFC'); } catch {}
+      return v;
+    };
     
     chapters.forEach((chapter, idx) => {
       // Chapter heading
       content.push(
         new Paragraph({
-          text: `Chapter ${idx + 1}: ${chapter.title}`,
+          text: `Chapter ${idx + 1}: ${clean(chapter.title)}`,
           heading: HeadingLevel.HEADING_2,
           spacing: { before: 400, after: 200 }
         })
@@ -418,9 +569,7 @@ export class DocumentExportService {
                     bold: true,
                     color: '0066CC'
                   }),
-                  new TextRun({
-                    text: `${speakerPrefix}${segment.text}`
-                  })
+                  new TextRun({ text: `${speakerPrefix}${clean(segment.text)}` })
                 ],
                 spacing: { after: 150 }
               })
@@ -428,7 +577,7 @@ export class DocumentExportService {
           } else {
             content.push(
               new Paragraph({
-                text: `${speakerPrefix}${segment.text}`,
+              text: `${speakerPrefix}${clean(segment.text)}`,
                 spacing: { after: 150 }
               })
             );
@@ -456,6 +605,12 @@ export class DocumentExportService {
   private static async generateFlatContent(transcription: any, includeTimestamps: boolean): Promise<any[]> {
     const { Paragraph, TextRun } = await import('docx');
     const content: any[] = [];
+    const clean = (s: string) => {
+      let v = String(s || '');
+      v = v.replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F]/g,'').replace(/[\u200B-\u200D\uFEFF]/g,'').replace(/[\u2028\u2029]/g,'\n');
+      try { v = v.normalize('NFC'); } catch {}
+      return v;
+    };
     
     // Handle both segments array and text
     if (transcription.segments && transcription.segments.length > 0) {
@@ -469,9 +624,7 @@ export class DocumentExportService {
                   bold: true,
                   color: '0066CC'
                 }),
-                new TextRun({
-                  text: segment.text
-                })
+                new TextRun({ text: clean(segment.text) })
               ],
               spacing: { after: 150 }
             })
@@ -481,10 +634,7 @@ export class DocumentExportService {
         // Without timestamps, just add segment text
         transcription.segments.forEach((segment: TranscriptionSegment) => {
           content.push(
-            new Paragraph({
-              text: segment.text,
-              spacing: { after: 150 }
-            })
+            new Paragraph({ text: clean(segment.text), spacing: { after: 150 } })
           );
         });
       }
@@ -493,10 +643,7 @@ export class DocumentExportService {
       transcription.text.split('\n').forEach((paragraph: string) => {
         if (paragraph.trim()) {
           content.push(
-            new Paragraph({
-              text: paragraph,
-              spacing: { after: 200 }
-            })
+            new Paragraph({ text: clean(paragraph), spacing: { after: 200 } })
           );
         }
       });
