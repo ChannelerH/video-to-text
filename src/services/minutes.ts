@@ -15,16 +15,16 @@ interface MinutePack {
   order_no?: string;
 }
 
-async function getActivePacks(userId: string, packType: PackType): Promise<MinutePack[]> {
-  const rows = await db().execute(sql`SELECT * FROM v2tx_minute_packs WHERE user_id = ${userId} AND pack_type = ${packType} AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY expires_at NULLS LAST, created_at ASC`);
-  return (rows as any).rows || [];
+async function getActivePacks(userId: string, _packType?: PackType): Promise<MinutePack[]> {
+  const rows = await db().execute(sql`SELECT * FROM v2tx_minute_packs WHERE user_id = ${userId} AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY expires_at NULLS LAST, created_at ASC`);
+  return rows as any[];
 }
 
-async function insertPack(userId: string, packType: PackType, minutes: number, expiresAt?: Date, orderNo?: string) {
+async function insertPack(userId: string, _packType: PackType, minutes: number, expiresAt?: Date, orderNo?: string) {
   // Check if pack with this order_no already exists (prevent duplicates from webhook + redirect)
   if (orderNo) {
-    const existing = await db().execute(sql`SELECT id FROM v2tx_minute_packs WHERE order_no = ${orderNo} AND pack_type = ${packType} LIMIT 1`);
-    if (existing.length > 0) {
+    const existing = await db().execute(sql`SELECT id FROM v2tx_minute_packs WHERE order_no = ${orderNo} LIMIT 1`);
+    if ((existing as any).length > 0) {
       return;
     }
   }
@@ -32,24 +32,22 @@ async function insertPack(userId: string, packType: PackType, minutes: number, e
   // Convert Date to ISO string for SQL
   const expiresAtStr = expiresAt ? expiresAt.toISOString() : null;
   
-  await db().execute(sql`INSERT INTO v2tx_minute_packs(user_id, pack_type, minutes_total, minutes_left, created_at, expires_at, order_no) VALUES (${userId}, ${packType}, ${Math.ceil(minutes)}, ${Math.ceil(minutes)}, NOW(), ${expiresAtStr}, ${orderNo || ''})`);
+  await db().execute(sql`INSERT INTO v2tx_minute_packs(user_id, pack_type, minutes_total, minutes_left, created_at, expires_at, order_no) VALUES (${userId}, 'standard', ${Math.ceil(minutes)}, ${Math.ceil(minutes)}, NOW(), ${expiresAtStr}, ${orderNo || ''})`);
 }
 
 export async function getMinuteBalances(userId: string): Promise<{ std: number; ha: number }> {
-  // Sum from active packs to reflect real-time balance
-  const std = await db().execute(sql`SELECT COALESCE(SUM(minutes_left),0) AS sum FROM v2tx_minute_packs WHERE user_id=${userId} AND pack_type='standard' AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`);
-  const ha = await db().execute(sql`SELECT COALESCE(SUM(minutes_left),0) AS sum FROM v2tx_minute_packs WHERE user_id=${userId} AND pack_type='high_accuracy' AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`);
-  const stdVal = Number(std[0]?.sum || 0);
-  const haVal = Number(ha[0]?.sum || 0);
+  // Unified: sum across all active packs
+  const total = await db().execute(sql`SELECT COALESCE(SUM(minutes_left),0) AS sum FROM v2tx_minute_packs WHERE user_id=${userId} AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`);
+  const totalVal = Number((total as any)[0]?.sum || 0);
   // keep aggregated table updated best-effort
   const now = new Date();
   const [row] = await db().select().from(user_minutes).where(eq(user_minutes.user_id, userId));
   if (!row) {
-    await db().insert(user_minutes).values({ user_id: userId, std_balance: stdVal, ha_balance: haVal, updated_at: now });
+    await db().insert(user_minutes).values({ user_id: userId, std_balance: totalVal, ha_balance: 0, updated_at: now });
   } else {
-    await db().update(user_minutes).set({ std_balance: stdVal, ha_balance: haVal, updated_at: now }).where(eq(user_minutes.user_id, userId));
+    await db().update(user_minutes).set({ std_balance: totalVal, ha_balance: 0, updated_at: now }).where(eq(user_minutes.user_id, userId));
   }
-  return { std: stdVal, ha: haVal };
+  return { std: totalVal, ha: 0 };
 }
 
 export async function addMinutes(userId: string, stdAdd: number = 0, haAdd: number = 0): Promise<void> {
@@ -57,8 +55,8 @@ export async function addMinutes(userId: string, stdAdd: number = 0, haAdd: numb
   // Create per-pack entries with 12 months validity
   const exp = new Date(now.getTime());
   exp.setMonth(exp.getMonth() + 12);
-  if (stdAdd > 0) await insertPack(userId, 'standard', stdAdd, exp);
-  if (haAdd > 0) await insertPack(userId, 'high_accuracy', haAdd, exp);
+  const sumAdd = Math.max(0, Math.ceil((stdAdd || 0) + (haAdd || 0)));
+  if (sumAdd > 0) await insertPack(userId, 'standard', sumAdd, exp);
   // Update aggregate
   await getMinuteBalances(userId);
 }
@@ -69,16 +67,16 @@ export async function addMinutesWithExpiry(userId: string, stdAdd: number = 0, h
   const months = Math.max(1, Number(validMonths || 12));
   const exp = new Date(now.getTime());
   exp.setMonth(exp.getMonth() + months);
-  if (stdAdd > 0) await insertPack(userId, 'standard', stdAdd, exp, orderNo);
-  if (haAdd > 0) await insertPack(userId, 'high_accuracy', haAdd, exp, orderNo);
+  const sumAdd = Math.max(0, Math.ceil((stdAdd || 0) + (haAdd || 0)));
+  if (sumAdd > 0) await insertPack(userId, 'standard', sumAdd, exp, orderNo);
   await getMinuteBalances(userId);
 }
 
 // Deduct pack minutes first; returns remaining minutes that should count into monthly quota
-export async function deductFromPacks(userId: string, minutes: number, modelType: 'standard' | 'high_accuracy'): Promise<number> {
+export async function deductFromPacks(userId: string, minutes: number, _modelType: 'standard'): Promise<number> {
   let remain = Math.max(0, Math.ceil(minutes));
   if (remain <= 0) return 0;
-  const packs = await getActivePacks(userId, modelType);
+  const packs = await getActivePacks(userId);
   for (const p of packs) {
     if (remain <= 0) break;
     const use = Math.min(p.minutes_left, remain);
@@ -92,9 +90,9 @@ export async function deductFromPacks(userId: string, minutes: number, modelType
   return remain;
 }
 
-export async function getEstimatedPackCoverage(userId: string, minutes: number, modelType: 'standard' | 'high_accuracy'): Promise<number> {
-  const rows = await db().execute(sql`SELECT COALESCE(SUM(minutes_left),0) AS sum FROM v2tx_minute_packs WHERE user_id=${userId} AND pack_type=${modelType} AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`);
-  const pack = Number((rows as any).rows?.[0]?.sum || 0);
+export async function getEstimatedPackCoverage(userId: string, minutes: number, _modelType: 'standard' | 'high_accuracy'): Promise<number> {
+  const rows = await db().execute(sql`SELECT COALESCE(SUM(minutes_left),0) AS sum FROM v2tx_minute_packs WHERE user_id=${userId} AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`);
+  const pack = Number((rows as any)[0]?.sum || 0);
   const need = Math.max(0, Math.ceil(minutes));
   return Math.min(need, pack);
 }
@@ -107,21 +105,15 @@ export async function getMinuteSummary(userId: string): Promise<{
   stdPacks: number;
   haPacks: number;
 }> {
-  const [stdSum, haSum, stdFirst, haFirst, stdCount, haCount] = await Promise.all([
-    db().execute(sql`SELECT COALESCE(SUM(minutes_left),0) AS sum FROM v2tx_minute_packs WHERE user_id=${userId} AND pack_type='standard' AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`),
-    db().execute(sql`SELECT COALESCE(SUM(minutes_left),0) AS sum FROM v2tx_minute_packs WHERE user_id=${userId} AND pack_type='high_accuracy' AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`),
-    db().execute(sql`SELECT MIN(expires_at) AS exp FROM v2tx_minute_packs WHERE user_id=${userId} AND pack_type='standard' AND (expires_at IS NOT NULL AND expires_at > NOW())`),
-    db().execute(sql`SELECT MIN(expires_at) AS exp FROM v2tx_minute_packs WHERE user_id=${userId} AND pack_type='high_accuracy' AND (expires_at IS NOT NULL AND expires_at > NOW())`),
-    db().execute(sql`SELECT COUNT(*) AS cnt FROM v2tx_minute_packs WHERE user_id=${userId} AND pack_type='standard' AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`),
-    db().execute(sql`SELECT COUNT(*) AS cnt FROM v2tx_minute_packs WHERE user_id=${userId} AND pack_type='high_accuracy' AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`),
+  const [totalSum, firstExp, packCount] = await Promise.all([
+    db().execute(sql`SELECT COALESCE(SUM(minutes_left),0) AS sum FROM v2tx_minute_packs WHERE user_id=${userId} AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`),
+    db().execute(sql`SELECT MIN(expires_at) AS exp FROM v2tx_minute_packs WHERE user_id=${userId} AND (expires_at IS NOT NULL AND expires_at > NOW())`),
+    db().execute(sql`SELECT COUNT(*) AS cnt FROM v2tx_minute_packs WHERE user_id=${userId} AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`),
   ]);
-  const std = Number(stdSum[0]?.sum || 0);
-  const ha = Number(haSum[0]?.sum || 0);
-  const stdEarliestExpire = stdFirst[0]?.exp as string | null || null;
-  const haEarliestExpire = haFirst[0]?.exp as string | null || null;
-  const stdPacks = Number(stdCount[0]?.cnt || 0);
-  const haPacks = Number(haCount[0]?.cnt || 0);
-  return { std, ha, stdEarliestExpire, haEarliestExpire, stdPacks, haPacks };
+  const total = Number((totalSum as any)[0]?.sum || 0);
+  const exp = (firstExp as any)[0]?.exp || null;
+  const cnt = Number((packCount as any)[0]?.cnt || 0);
+  return { std: total, ha: 0, stdEarliestExpire: exp, haEarliestExpire: null, stdPacks: cnt, haPacks: 0 };
 }
 
 // Sum monthly used minutes from transcriptions table

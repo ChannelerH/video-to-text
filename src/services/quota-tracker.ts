@@ -38,8 +38,8 @@ export class QuotaTracker {
     const quotaLimits = this.getQuotaLimits(userTier);
     const usage = await this.getUserUsage(userId);
 
-    // 无限制用户
-    if (quotaLimits.dailyRequests === Infinity) {
+    // 仅当“请求+分钟”都无限时才视为完全无限制
+    if (quotaLimits.dailyRequests === Infinity && quotaLimits.monthlyMinutes === Infinity) {
       return {
         isAllowed: true,
         remaining: {

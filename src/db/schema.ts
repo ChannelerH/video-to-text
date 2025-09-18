@@ -81,6 +81,7 @@ export const orders = pgTable("v2tx_orders", {
   paid_email: varchar({ length: 255 }),
   paid_detail: text(),
   payment_provider: varchar({ length: 50 }).default("stripe"),
+  order_type: varchar({ length: 50 }).default("minute_pack"),
 });
 
 // API Keys table
@@ -212,6 +213,7 @@ export const usage_records = pgTable("v2tx_usage_records", {
   minutes: numeric({ precision: 10, scale: 2 }).notNull().default('0'),
   model_type: varchar({ length: 32 }).notNull().default('standard'),
   created_at: timestamp({ withTimezone: true }),
+  subscription_type: varchar({ length: 50 }),
 });
 
 // Distributed FIFO queue (DB-backed)

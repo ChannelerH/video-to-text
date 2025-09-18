@@ -1,5 +1,9 @@
 import { findUserByUuid } from "@/models/user";
 import { getActiveOrdersByUserUuid } from "@/models/order";
+import { db } from '@/db';
+import { orders } from '@/db/schema';
+import { eq, and, gte, lte, sql, or, isNull } from 'drizzle-orm';
+import { getMinuteSummary } from './minutes';
 
 export enum UserTier {
   FREE = 'free',
@@ -74,45 +78,92 @@ export const TIER_FEATURES: Record<UserTier, TierFeatures> = {
   }
 };
 
+// Helper function to get tier rank
+function getTierRank(tier: UserTier): number {
+  const rank: Record<UserTier, number> = {
+    [UserTier.FREE]: 0,
+    [UserTier.BASIC]: 1,
+    [UserTier.PRO]: 2,
+    [UserTier.PREMIUM]: 3,
+  };
+  return rank[tier];
+}
+
+/**
+ * 检查是否有活跃的分钟包
+ */
+async function checkHasActiveMinutePacks(userUuid: string): Promise<boolean> {
+  try {
+    const packSummary = await getMinuteSummary(userUuid);
+    return packSummary.std > 0;
+  } catch (error) {
+    console.error('Error checking minute packs:', error);
+    return false;
+  }
+}
+
 /**
  * 根据用户UUID获取用户等级
+ * 基于订单类型判断：
+ * - basic_monthly, basic_yearly -> BASIC
+ * - pro_monthly, pro_yearly -> PRO  
+ * - premium_monthly, premium_yearly -> PREMIUM
+ * - 没有订阅 -> FREE
+ * - FREE用户有分钟包 -> BASIC权限
  */
 export async function getUserTier(userUuid: string): Promise<UserTier> {
-  // TODO: integrate real subscription lookup; default to FREE when unknown
-  // return UserTier.PRO;
-
   if (!userUuid) {
     return UserTier.FREE;
   }
 
   try {
-    // 获取用户的"有效期内"的已付费订单
-    const activeOrders = await getActiveOrdersByUserUuid(userUuid);
+    const now = new Date();
     
-    if (!activeOrders || activeOrders.length === 0) {
-      return UserTier.FREE;
-    }
+    // 查询有效期内的订阅类订单
+    const activeSubscriptions = await db()
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.user_uuid, userUuid),
+          eq(orders.status, 'paid'),
+          sql`${orders.order_type} IN ('basic_monthly', 'basic_yearly', 'pro_monthly', 'pro_yearly', 'premium_monthly', 'premium_yearly')`,
+          or(
+            isNull(orders.expired_at),
+            gte(orders.expired_at, now)
+          )
+        )
+      );
 
-    // 根据订单产品ID/名称判断等级（优先使用产品ID，回退到名称）
-    for (const order of activeOrders) {
-      const pid = (order.product_id || '').toLowerCase();
-      const pname = (order.product_name || '').toLowerCase();
-      const idOrName = `${pid} ${pname}`;
-
-      if (/premium|enterprise/.test(idOrName)) {
-        return UserTier.PREMIUM;
-      }
-      if (/pro|professional/.test(idOrName)) {
-        return UserTier.PRO;
-      }
-      if (/basic|starter/.test(idOrName)) {
-        return UserTier.BASIC;
-      }
-    }
-
-    // 如果有付费订单但无法识别具体等级，默认为基础版
-    return UserTier.BASIC;
+    // 如果有多个订阅，取最高等级
+    let highestTier = UserTier.FREE;
     
+    for (const order of activeSubscriptions) {
+      let tier = UserTier.FREE;
+      const orderType = order.order_type || '';
+      
+      if (orderType.includes('premium')) {
+        tier = UserTier.PREMIUM;
+      } else if (orderType.includes('pro')) {
+        tier = UserTier.PRO;
+      } else if (orderType.includes('basic')) {
+        tier = UserTier.BASIC;
+      }
+      
+      if (getTierRank(tier) > getTierRank(highestTier)) {
+        highestTier = tier;
+      }
+    }
+    
+    // 特殊情况：FREE用户有分钟包时，获得BASIC权限
+    if (highestTier === UserTier.FREE) {
+      const hasActivePacks = await checkHasActiveMinutePacks(userUuid);
+      if (hasActivePacks) {
+        return UserTier.BASIC; // 有分钟包的FREE用户享受BASIC权限
+      }
+    }
+    
+    return highestTier;
   } catch (error) {
     console.error('Error getting user tier:', error);
     return UserTier.FREE;
@@ -196,20 +247,65 @@ export function getRequiredTierForFeature(feature: keyof TierFeatures): UserTier
  */
 export async function hasHighAccuracyAccess(userUuid: string): Promise<boolean> {
   if (!userUuid) return false;
-  
   try {
-    // Check 1: User has Pro/Premium tier
+    // New policy: High-accuracy is a Pro/Premium right only.
     const userTier = await getUserTier(userUuid);
-    if (userTier === UserTier.PRO || userTier === UserTier.PREMIUM) {
-      return true;
-    }
-    
-    // Check 2: User has high_accuracy minute packs with balance
-    const { getMinuteBalances } = await import('@/services/minutes');
-    const balances = await getMinuteBalances(userUuid);
-    return balances.ha > 0; // Has high accuracy minutes available
+    return userTier === UserTier.PRO || userTier === UserTier.PREMIUM;
   } catch (error) {
     console.error('Error checking high accuracy access:', error);
     return false;
   }
+}
+
+/**
+ * 获取用户所有活跃订阅的详细信息
+ */
+export async function getUserActiveSubscriptions(userUuid: string) {
+  if (!userUuid) return [];
+  
+  try {
+    const now = new Date();
+    
+    const activeSubscriptions = await db()
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.user_uuid, userUuid),
+          eq(orders.status, 'paid'),
+          sql`${orders.order_type} IN ('basic_monthly', 'basic_yearly', 'pro_monthly', 'pro_yearly', 'premium_monthly', 'premium_yearly')`,
+          or(
+            isNull(orders.expired_at),
+            gte(orders.expired_at, now)
+          )
+        )
+      );
+    
+    return activeSubscriptions.map(order => ({
+      orderNo: order.order_no,
+      type: order.order_type as string,
+      expiresAt: order.expired_at,
+      createdAt: order.created_at,
+      productName: order.product_name
+    }));
+  } catch (error) {
+    console.error('Error getting user subscriptions:', error);
+    return [];
+  }
+}
+
+/**
+ * 获取订阅类型对应的月度分钟数
+ */
+export function getSubscriptionMinutes(orderType: string): number {
+  const minutesMap: Record<string, number> = {
+    'basic_monthly': 500,
+    'basic_yearly': 500,  // 年度订阅也是每月500分钟
+    'pro_monthly': 2000,
+    'pro_yearly': 2000,   // 年度订阅也是每月2000分钟
+    'premium_monthly': -1, // 无限
+    'premium_yearly': -1   // 无限
+  };
+  
+  return minutesMap[orderType] || 0;
 }

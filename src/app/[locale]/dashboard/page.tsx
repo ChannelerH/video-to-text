@@ -10,6 +10,7 @@ import { transcriptions } from '@/db/schema';
 import { eq, and, gte, sql, desc, or, ilike } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { getUserTier, UserTier } from '@/services/user-tier';
+import { getUserUsageSummary } from '@/services/user-minutes';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -46,6 +47,11 @@ export default async function DashboardPage({
   // Calculate cutoff date based on retention period
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+  
+  // Calculate first day of current month for stats
+  const firstDayOfMonth = new Date();
+  firstDayOfMonth.setDate(1);
+  firstDayOfMonth.setHours(0, 0, 0, 0);
 
   // Build where clause with search and retention filter
   let whereClause: any;
@@ -85,44 +91,27 @@ export default async function DashboardPage({
   const totalCount = Number(totalCountResult[0]?.count || 0);
   const totalPages = Math.max(Math.ceil(totalCount / limit), 1);
 
-  // Calculate monthly usage
-  const firstDayOfMonth = new Date();
-  firstDayOfMonth.setDate(1);
-  firstDayOfMonth.setHours(0, 0, 0, 0);
-
-  const monthlyUsage = await db()
-    .select({
-      totalMinutes: sql<number>`COALESCE(SUM(${transcriptions.cost_minutes}), 0)`
-    })
-    .from(transcriptions)
-    .where(
-      and(
-        eq(transcriptions.user_uuid, user_uuid),
-        eq(transcriptions.deleted, false),
-        gte(transcriptions.created_at, firstDayOfMonth)
-      )
-    );
-
-  const minutesUsed = Number(monthlyUsage[0]?.totalMinutes || 0);
+  // Get user tier and usage summary
+  const [userTier, usageSummary] = await Promise.all([
+    getUserTier(user_uuid as string),
+    getUserUsageSummary(user_uuid as string)
+  ]);
   
-  // Determine tier limits via user-tier service
-  const userTier = await getUserTier(user_uuid as string);
-  const minutesLimit = userTier === UserTier.PREMIUM
-    ? -1
-    : (
-      userTier === UserTier.PRO ? 1000 :
-      userTier === UserTier.BASIC ? 100 :
-      10
-    );
+  const minutesUsed = usageSummary.totalUsed;
+  const minutesLimit = usageSummary.subscriptionTotal === 0 ? 30 : usageSummary.subscriptionTotal;
+  const packBalance = usageSummary.packMinutes;
+  const totalAllowance = usageSummary.totalAvailable;
 
   // Create usage object
   const usage = {
     minutesUsed,
     minutesLimit,
+    packBalance,
+    totalAllowance,
     tier: userTier,
-    isUnlimited: minutesLimit === -1,
-    percentageUsed: minutesLimit > 0 ? (minutesUsed / minutesLimit) * 100 : 0
-  };
+    isUnlimited: usageSummary.isUnlimited,
+    percentageUsed: usageSummary.percentageUsed,
+  } as const;
 
   // Get stats (exclude deleted)
   const [statsTotal, statsThisMonth] = await Promise.all([
@@ -335,26 +324,29 @@ export default async function DashboardPage({
               <h3 className="text-sm font-medium text-gray-400">Usage Summary</h3>
             </div>
             
-            <div className="bg-gray-900/30 rounded-lg p-4 border border-gray-800">
-              <div className="flex items-center gap-2 mb-3">
-                <Clock className="w-4 h-4 text-purple-500" />
-                <span className="text-sm font-medium text-purple-400">
-                  {usage.minutesLimit > 0 ? Math.max(0, usage.minutesLimit - usage.minutesUsed) : 'Unlimited'} {usage.minutesLimit > 0 ? 'minutes remaining' : ''}
-                </span>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Used: {usage.minutesUsed || 0}</span>
-                  <span>Total: {usage.minutesLimit > 0 ? usage.minutesLimit : 'Unlimited'}</span>
+              <div className="bg-gray-900/30 rounded-lg p-4 border border-gray-800">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm font-medium text-purple-400">
+                  {usage.minutesLimit === -1 ? 'Unlimited' : Math.max(0, (usage.totalAllowance as number) - usage.minutesUsed)} {usage.minutesLimit === -1 ? '' : 'minutes remaining'}
+                  </span>
                 </div>
-                {usage.minutesLimit > 0 && (
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-gray-500">
+                  <span>Used: {usage.minutesUsed || 0}</span>
+                  <span>Total: {usage.minutesLimit === -1 ? 'Unlimited' : (usage.totalAllowance as number)}</span>
+                  </div>
+                {usage.minutesLimit !== -1 && (
                   <div className="w-full bg-gray-800 rounded-full h-2">
                     <div 
                       className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full"
-                      style={{ width: `${Math.min(100, (usage.minutesUsed / usage.minutesLimit) * 100)}%` }}
+                      style={{ width: `${Math.min(100, usage.percentageUsed)}%` }}
                     />
                   </div>
+                )}
+                {usage.minutesLimit !== -1 && usage.packBalance > 0 && (
+                  <div className="text-[11px] text-gray-500">Includes {usage.packBalance} min from minute packs</div>
                 )}
               </div>
             </div>

@@ -23,4 +23,5 @@ export interface Order {
   paid_at?: string;
   paid_email?: string;
   paid_detail?: string;
+  order_type?: string;
 }

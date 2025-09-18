@@ -219,7 +219,14 @@ export async function POST(request: NextRequest) {
         try {
           const { YouTubeService } = await import('@/lib/youtube');
           const videoInfo = await YouTubeService.getVideoInfo(content);
-          const maxSeconds = POLICY.preview.freePreviewSeconds || 300; // 5分钟
+          // New policy: Free with minute packs can use pack minutes + 5min preview
+          let maxSeconds = POLICY.preview.freePreviewSeconds || 300; // base 5 minutes
+          try {
+            const { getMinuteBalances } = await import('@/services/minutes');
+            const balances = await getMinuteBalances(user_uuid);
+            const packAllowance = Math.max(0, Number(balances.std || 0)) * 60;
+            if (packAllowance > 0) maxSeconds += packAllowance;
+          } catch {}
           
           console.log('[FREE_CLIP][API] Free user YouTube video check:', {
             userTier,
@@ -246,7 +253,14 @@ export async function POST(request: NextRequest) {
       
       // Free用户限制：处理后的URL（R2/proxy）也需要限制5分钟
       if (userTier === UserTier.FREE && type === 'youtube_url' && isProcessedUrl) {
-        options.trimToSeconds = POLICY.preview.freePreviewSeconds || 300;
+        let maxSeconds = POLICY.preview.freePreviewSeconds || 300;
+        try {
+          const { getMinuteBalances } = await import('@/services/minutes');
+          const balances = await getMinuteBalances(user_uuid);
+          const packAllowance = Math.max(0, Number(balances.std || 0)) * 60;
+          if (packAllowance > 0) maxSeconds += packAllowance;
+        } catch {}
+        options.trimToSeconds = maxSeconds;
         console.log('[FREE_CLIP][API] Free user with processed URL - applying 5min limit:', {
           userTier,
           isProcessedUrl: true,
@@ -258,7 +272,14 @@ export async function POST(request: NextRequest) {
       if (userTier === UserTier.FREE && type === 'file_upload') {
         // 对于文件上传，我们无法预先知道时长，但可以在转录后检查
         // 标记需要在转录后截断
-        options.trimToSeconds = POLICY.preview.freePreviewSeconds || 300;
+        let maxSeconds = POLICY.preview.freePreviewSeconds || 300;
+        try {
+          const { getMinuteBalances } = await import('@/services/minutes');
+          const balances = await getMinuteBalances(user_uuid);
+          const packAllowance = Math.max(0, Number(balances.std || 0)) * 60;
+          if (packAllowance > 0) maxSeconds += packAllowance;
+        } catch {}
+        options.trimToSeconds = maxSeconds;
         console.log('[FREE_CLIP][API] Free user file upload - will clip to:', {
           userTier,
           type: 'file',
@@ -268,7 +289,14 @@ export async function POST(request: NextRequest) {
 
       // Free用户限制：直链音频，也统一裁剪到预览时长
       if (userTier === UserTier.FREE && type === 'audio_url') {
-        options.trimToSeconds = POLICY.preview.freePreviewSeconds || 300;
+        let maxSeconds = POLICY.preview.freePreviewSeconds || 300;
+        try {
+          const { getMinuteBalances } = await import('@/services/minutes');
+          const balances = await getMinuteBalances(user_uuid);
+          const packAllowance = Math.max(0, Number(balances.std || 0)) * 60;
+          if (packAllowance > 0) maxSeconds += packAllowance;
+        } catch {}
+        options.trimToSeconds = maxSeconds;
         console.log('[FREE_CLIP][API] Free user audio_url - will clip to:', {
           userTier,
           type: 'audio_url',
@@ -299,7 +327,14 @@ export async function POST(request: NextRequest) {
       // }
       
       // 检查用户配额（先用分钟包抵扣估算，再核配额）
-      let estimatedMinutes = 10; // 估算的转录时长，实际应根据音频长度计算
+      // 预估时长：Free 无包按预览 5 分钟；其余保持默认 10 分钟估算
+      let estimatedMinutes = 10;
+      try {
+        if (userTier === UserTier.FREE) {
+          const previewSec = POLICY.preview.freePreviewSeconds || 300;
+          estimatedMinutes = Math.max(1, Math.ceil((options?.trimToSeconds || previewSec) / 60));
+        }
+      } catch {}
       try {
         const { getEstimatedPackCoverage } = await import('@/services/minutes');
         const cover = await getEstimatedPackCoverage(user_uuid, estimatedMinutes, (options?.highAccuracyMode && canUseHighAccuracy) ? 'high_accuracy' : 'standard');
@@ -389,15 +424,40 @@ export async function POST(request: NextRequest) {
               if (result.success && durationSec > 0) {
                 const actualMinutes = durationSec / 60;
                 const usedHighAccuracy = !!options?.highAccuracyMode && canUseHighAccuracy;
-                // 先扣分钟包，再把剩余分钟计入月配额
                 try {
-                  const { deductFromPacks } = await import('@/services/minutes');
-                  const leftover = await deductFromPacks(user_uuid, actualMinutes, usedHighAccuracy ? 'high_accuracy' : 'standard');
-                  const leftoverRounded = Math.max(0, Math.round(leftover * 100) / 100);
-                  if (leftoverRounded > 0) {
-                    await quotaTracker.recordUsage(user_uuid, leftoverRounded, usedHighAccuracy ? 'high_accuracy' : 'standard');
+                  if (userTier === UserTier.FREE) {
+                    // Free: 优先扣分钟包，不足部分计入订阅月用量（预览额度）
+                    const { deductFromPacks } = await import('@/services/minutes');
+                    const remain = await deductFromPacks(user_uuid, actualMinutes, 'standard');
+                    const leftoverRounded = Math.max(0, Math.round(remain * 100) / 100);
+                    if (leftoverRounded > 0) {
+                      await quotaTracker.recordUsage(user_uuid, leftoverRounded, 'standard');
+                    }
+                  } else {
+                    // Basic/Pro: 订阅优先，再扣分钟包
+                    const qs = await quotaTracker.checkQuota(
+                      user_uuid,
+                      userTier,
+                      0,
+                      usedHighAccuracy ? 'high_accuracy' : 'standard'
+                    );
+                    const remainMonthly = Math.max(0, Number(qs.remaining.monthlyMinutes || 0));
+                    const remainHA = usedHighAccuracy ? Math.max(0, Number(qs.remaining.monthlyHighAccuracyMinutes || 0)) : Infinity;
+                    const subUse = Math.max(0, Math.min(actualMinutes, remainMonthly, remainHA));
+                    if (subUse > 0) {
+                      await quotaTracker.recordUsage(user_uuid, subUse, usedHighAccuracy ? 'high_accuracy' : 'standard');
+                    }
+                    const packNeed = Math.max(0, actualMinutes - subUse);
+                    if (packNeed > 0) {
+                      const { deductFromPacks } = await import('@/services/minutes');
+                      await deductFromPacks(user_uuid, packNeed, 'standard');
+                    }
                   }
-                } catch { await quotaTracker.recordUsage(user_uuid, Math.max(0.01, Math.round(actualMinutes * 100) / 100), usedHighAccuracy ? 'high_accuracy' : 'standard'); }
+                } catch (e) {
+                  if (userTier !== UserTier.FREE) {
+                    await quotaTracker.recordUsage(user_uuid, Math.max(0.01, Math.round(actualMinutes * 100) / 100), usedHighAccuracy ? 'high_accuracy' : 'standard');
+                  }
+                }
                 // 高精度溢出计费（仅记录溢出分钟，统一对账扣费）
                 if (usedHighAccuracy && process.env.OVERAGE_ENABLED !== 'false') {
                   try {
@@ -491,15 +551,39 @@ export async function POST(request: NextRequest) {
       const durationSec = result?.data?.transcription?.duration || 0;
       if (result.success && durationSec > 0) {
         const actualMinutes = durationSec / 60;
-        const usedHighAccuracy = !!options?.highAccuracyMode && userTier === 'pro';
+        const usedHighAccuracy = !!options?.highAccuracyMode && canUseHighAccuracy;
         try {
-          const { deductFromPacks } = await import('@/services/minutes');
-          const leftover = await deductFromPacks(user_uuid, actualMinutes, usedHighAccuracy ? 'high_accuracy' : 'standard');
-          const leftoverRounded = Math.max(0, Math.round(leftover * 100) / 100);
-          if (leftoverRounded > 0) {
-            await quotaTracker.recordUsage(user_uuid, leftoverRounded, usedHighAccuracy ? 'high_accuracy' : 'standard');
+          if (userTier === UserTier.FREE) {
+            const { deductFromPacks } = await import('@/services/minutes');
+            const remain = await deductFromPacks(user_uuid, actualMinutes, 'standard');
+            const leftoverRounded = Math.max(0, Math.round(remain * 100) / 100);
+            if (leftoverRounded > 0) {
+              await quotaTracker.recordUsage(user_uuid, leftoverRounded, 'standard');
+            }
+          } else {
+            const qs = await quotaTracker.checkQuota(
+              user_uuid,
+              userTier,
+              0,
+              usedHighAccuracy ? 'high_accuracy' : 'standard'
+            );
+            const remainMonthly = Math.max(0, Number(qs.remaining.monthlyMinutes || 0));
+            const remainHA = usedHighAccuracy ? Math.max(0, Number(qs.remaining.monthlyHighAccuracyMinutes || 0)) : Infinity;
+            const subUse = Math.max(0, Math.min(actualMinutes, remainMonthly, remainHA));
+            if (subUse > 0) {
+              await quotaTracker.recordUsage(user_uuid, subUse, usedHighAccuracy ? 'high_accuracy' : 'standard');
+            }
+            const packNeed = Math.max(0, actualMinutes - subUse);
+            if (packNeed > 0) {
+              const { deductFromPacks } = await import('@/services/minutes');
+              await deductFromPacks(user_uuid, packNeed, 'standard');
+            }
           }
-        } catch { await quotaTracker.recordUsage(user_uuid, Math.max(0.01, Math.round(actualMinutes * 100) / 100), usedHighAccuracy ? 'high_accuracy' : 'standard'); }
+        } catch {
+          if (userTier !== UserTier.FREE) {
+            await quotaTracker.recordUsage(user_uuid, Math.max(0.01, Math.round(actualMinutes * 100) / 100), usedHighAccuracy ? 'high_accuracy' : 'standard');
+          }
+        }
         if (usedHighAccuracy && process.env.OVERAGE_ENABLED !== 'false') {
           try {
             const now = new Date();

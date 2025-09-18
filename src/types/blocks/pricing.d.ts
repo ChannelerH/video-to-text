@@ -30,6 +30,7 @@ export interface PricingItem {
   credits?: number;
   valid_months?: number;
   group?: string;
+  order_type?: string;
 }
 
 export interface Pricing {

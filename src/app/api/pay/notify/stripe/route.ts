@@ -2,8 +2,9 @@ import Stripe from "stripe";
 import { respOk } from "@/lib/resp";
 import { handleCheckoutSession, handleInvoice } from "@/services/stripe";
 import { db } from "@/db";
-import { users, orders } from "@/db/schema";
+import { users, orders, refunds } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { getOrderType } from "@/services/order-type";
 
 // Ensure Node runtime for crypto used by Stripe webhook signature verification
 export const runtime = "nodejs";
@@ -85,10 +86,22 @@ export async function POST(req: Request) {
           const item = sub.items.data[0];
           const nickname = (item?.plan?.nickname || '').toString();
           const product = (item?.plan?.product as string) || '';
+          const interval = item?.plan?.interval || 'month'; // month or year
           const end = sub.current_period_end
             ? new Date(sub.current_period_end * 1000)
             : null;
           const cancelAtPeriodEnd = sub.cancel_at_period_end;
+
+          // 查询现有订单，保留已有的 order_type
+          const [existingOrder] = await db()
+            .select({ order_type: orders.order_type })
+            .from(orders)
+            .where(eq(orders.sub_id as any, subId))
+            .limit(1);
+          
+          // 只有在订单没有 order_type 时才计算
+          const orderType = existingOrder?.order_type || 
+                           getOrderType(product as string, nickname as string, interval as string);
 
           if (sub.status === "canceled") {
             await db()
@@ -96,6 +109,7 @@ export async function POST(req: Request) {
               .set({
                 product_name: nickname as any,
                 product_id: product as any,
+                order_type: orderType as any,
                 expired_at: new Date(),
               } as any)
               .where(eq(orders.sub_id as any, subId));
@@ -103,18 +117,32 @@ export async function POST(req: Request) {
             const exp = new Date(end.getTime() + 24 * 60 * 60 * 1000);
             await db()
               .update(orders)
-              .set({ product_name: nickname as any, product_id: product as any, expired_at: exp } as any)
+              .set({ 
+                product_name: nickname as any, 
+                product_id: product as any, 
+                order_type: orderType as any,
+                expired_at: exp 
+              } as any)
               .where(eq(orders.sub_id as any, subId));
           } else if (end) {
             const exp = new Date(end.getTime() + 24 * 60 * 60 * 1000);
             await db()
               .update(orders)
-              .set({ product_name: nickname as any, product_id: product as any, expired_at: exp } as any)
+              .set({ 
+                product_name: nickname as any, 
+                product_id: product as any, 
+                order_type: orderType as any,
+                expired_at: exp 
+              } as any)
               .where(eq(orders.sub_id as any, subId));
           } else {
             await db()
               .update(orders)
-              .set({ product_name: nickname as any, product_id: product as any } as any)
+              .set({ 
+                product_name: nickname as any, 
+                product_id: product as any,
+                order_type: orderType as any 
+              } as any)
               .where(eq(orders.sub_id as any, subId));
           }
         } catch {}
@@ -227,7 +255,43 @@ export async function POST(req: Request) {
       }
 
       case "charge.refunded": {
-        // 预留：退款后可根据业务修改额度/状态
+        // 处理退款落库：记录到 refunds 表，便于对账/客服
+        try {
+          const charge = event.data.object as Stripe.Charge;
+          const customerId = (charge.customer || '') as string;
+          const paymentIntent = String((charge.payment_intent as any) || charge.id);
+
+          // 取本次退款金额（尽量取最新一条 refund 的 amount，兜底用 amount_refunded）
+          const refundsList = (charge.refunds && Array.isArray(charge.refunds.data)) ? charge.refunds.data : [];
+          const latestRefund = refundsList.length > 0 ? refundsList[refundsList.length - 1] : undefined;
+          const amountCents = Number((latestRefund?.amount as any) || charge.amount_refunded || 0);
+          const currency = String((latestRefund?.currency as any) || charge.currency || 'usd');
+          const reason = String((latestRefund?.reason as any) || 'charge_refunded');
+
+          // 找到用户 UUID（通过 stripe_customer_id 反查）
+          let userUuid = '';
+          if (customerId) {
+            try {
+              const { users } = await import('@/db/schema');
+              const { eq } = await import('drizzle-orm');
+              const rows = await db().select().from(users).where(eq(users.stripe_customer_id as any, customerId)).limit(1);
+              userUuid = (rows?.[0] as any)?.uuid || '';
+            } catch {}
+          }
+
+          if (userUuid && paymentIntent && amountCents > 0) {
+            await db().insert(refunds).values({
+              user_uuid: userUuid,
+              stripe_payment_intent: paymentIntent,
+              amount_cents: amountCents,
+              currency,
+              reason,
+              created_at: new Date()
+            } as any);
+          }
+        } catch (e) {
+          console.log('[Webhook] charge.refunded handle error:', e);
+        }
         break;
       }
 

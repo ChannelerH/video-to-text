@@ -19,7 +19,10 @@ import AccountActions from "@/components/dashboard/account-actions";
 import { db } from '@/db';
 import { users, orders } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
-import { getMinuteSummary, getMonthlyTranscriptionMinutes } from '@/services/minutes';
+import { getMinuteSummary } from '@/services/minutes';
+import { getUserTier, getUserActiveSubscriptions } from '@/services/user-tier';
+import { getUserUsageSummary } from '@/services/user-minutes';
+import { getUserSubscriptionPlan } from '@/services/user-subscription';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -49,21 +52,17 @@ export default async function AccountPage({
     .where(eq(users.uuid, userUuid))
     .limit(1);
 
-  // Calculate monthly usage
-  const firstDayOfMonth = new Date();
-  firstDayOfMonth.setDate(1);
-  firstDayOfMonth.setHours(0, 0, 0, 0);
-
-  const minutesUsed = await getMonthlyTranscriptionMinutes(userUuid, firstDayOfMonth);
+  // Get user tier, subscription plan and usage summary
+  const [userTier, subscriptionPlan, usageSummary, activeSubscriptions] = await Promise.all([
+    getUserTier(userUuid),
+    getUserSubscriptionPlan(userUuid),
+    getUserUsageSummary(userUuid),
+    getUserActiveSubscriptions(userUuid)
+  ]);
   
-  // Determine tier limits
-  // Map plan based on price id; fallback to subscription_status
-  const priceId = user?.stripe_price_id || '';
-  const status = (user as any)?.subscription_status || 'free';
-  const inferredTier = priceId.includes('pro') ? 'pro' : priceId.includes('basic') ? 'basic' : (status === 'active' ? 'basic' : 'free');
-  const tierLimits: Record<string, number> = { free: 10, basic: 100, pro: 1000, premium: -1 };
-  const userTier = inferredTier;
-  const minutesLimit = tierLimits[userTier];
+  const minutesUsed = usageSummary.totalUsed;
+  const minutesLimit = usageSummary.subscriptionTotal === 0 ? 30 : usageSummary.subscriptionTotal;
+  const totalAllowance = usageSummary.totalAvailable;
 
   const email = user?.email || '';
   const joinedDate = user?.created_at ? new Date(user.created_at) : new Date();
@@ -173,7 +172,7 @@ export default async function AccountPage({
                 <div className="flex items-center justify-between p-4 bg-gray-900/40 rounded-xl border border-gray-800">
                   <div className="flex items-center gap-4">
                     <div className="p-2 rounded-lg bg-purple-500/20">
-                      {userTier === 'free' ? (
+                      {subscriptionPlan === 'FREE' ? (
                         <Zap className="w-5 h-5 text-purple-400" />
                       ) : (
                         <Crown className="w-5 h-5 text-yellow-400" />
@@ -181,12 +180,16 @@ export default async function AccountPage({
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 uppercase tracking-wider">Current plan</p>
-                      <p className="text-lg font-semibold text-white capitalize">
-                        {userTier === 'free' ? 'Free Plan' : `${userTier} Plan`}
+                      <p className="text-lg font-semibold text-white">
+                        {subscriptionPlan === 'FREE' ? 'Free Plan' : `${subscriptionPlan.charAt(0) + subscriptionPlan.slice(1).toLowerCase()} Plan`}
                       </p>
+                      {/* Show if user has elevated permissions from minute packs */}
+                      {subscriptionPlan === 'FREE' && userTier === 'basic' && (
+                        <p className="text-xs text-green-400 mt-1">Basic features enabled with minute pack</p>
+                      )}
                     </div>
                   </div>
-                  {userTier === 'free' && (
+                  {subscriptionPlan === 'FREE' && (
                     <Link
                       href={`/${locale}/pricing`}
                       className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white 
@@ -205,7 +208,7 @@ export default async function AccountPage({
                       Monthly Usage
                     </p>
                     <span className="text-sm text-purple-400 font-medium">
-                      {minutesUsed} / {minutesLimit === -1 ? '∞' : minutesLimit} minutes
+                      {minutesUsed} / {usageSummary.isUnlimited ? '∞' : usageSummary.totalAvailable} minutes
                     </span>
                   </div>
                   <div className="relative h-3 bg-gray-800 rounded-full overflow-hidden">
@@ -213,14 +216,12 @@ export default async function AccountPage({
                       className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full
                         transition-all duration-500 ease-out"
                       style={{ 
-                        width: minutesLimit === -1 
-                          ? '100%' 
-                          : `${Math.min(100, (minutesUsed / minutesLimit) * 100)}%` 
+                        width: `${Math.min(100, usageSummary.percentageUsed)}%`
                       }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-pink-600/20 animate-pulse" />
                   </div>
-                  {minutesLimit > 0 && minutesUsed >= minutesLimit * 0.8 && (
+                  {!usageSummary.isUnlimited && usageSummary.percentageUsed >= 80 && (
                     <p className="text-xs text-yellow-400 flex items-center gap-1">
                       <Activity className="w-3 h-3" />
                       You're approaching your monthly limit
@@ -228,18 +229,40 @@ export default async function AccountPage({
                   )}
                 </div>
 
-                {/* Minute Packs Summary */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
-                  <div className="p-4 rounded-xl bg-gray-900/40 border border-gray-800">
-                    <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Standard minutes</div>
-                    <div className="text-white text-lg font-semibold">{summary.std} min</div>
-                    <div className="text-xs text-gray-400 mt-1">Active packs: {summary.stdPacks} · Earliest expiry: {fmt(summary.stdEarliestExpire)}</div>
-                  </div>
-                  <div className="p-4 rounded-xl bg-gray-900/40 border border-gray-800">
-                    <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">High‑accuracy minutes</div>
-                    <div className="text-white text-lg font-semibold">{summary.ha} min</div>
-                    <div className="text-xs text-gray-400 mt-1">Active packs: {summary.haPacks} · Earliest expiry: {fmt(summary.haEarliestExpire)}</div>
-                  </div>
+                {/* Active Subscriptions & Minute Packs */}
+                <div className="space-y-3 mt-6">
+                  {/* Active Subscriptions */}
+                  {usageSummary.subscriptions.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-gray-500 uppercase tracking-wider">Active Subscriptions</div>
+                      {usageSummary.subscriptions.map((sub, idx) => (
+                        <div key={idx} className="p-3 rounded-lg bg-gray-900/40 border border-gray-800">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-white">
+                              {sub.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </span>
+                            <span className="text-sm text-purple-400">
+                              {sub.minutes === -1 ? 'Unlimited' : `${sub.minutes} min/month`}
+                            </span>
+                          </div>
+                          {sub.expiresAt && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Expires: {new Date(sub.expiresAt).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Minute Packs */}
+                  {summary.std > 0 && (
+                    <div className="p-4 rounded-xl bg-gray-900/40 border border-gray-800">
+                      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Minute Packs</div>
+                      <div className="text-white text-lg font-semibold">{summary.std} min</div>
+                      <div className="text-xs text-gray-400 mt-1">Active packs: {summary.stdPacks} · Earliest expiry: {fmt(summary.stdEarliestExpire)}</div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

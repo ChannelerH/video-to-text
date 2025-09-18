@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       return respErr("invalid checkout params");
     }
 
-    let { amount, interval, valid_months, credits, product_name } = item;
+    let { amount, interval, valid_months, credits, product_name, order_type } = item;
 
     if (!["year", "month", "one-time"].includes(interval)) {
       return respErr("invalid interval");
@@ -124,6 +124,7 @@ export async function POST(req: Request) {
       product_id: product_id,
       product_name: product_name,
       valid_months: valid_months,
+      order_type: order_type || 'minute_pack', // Use order_type from pricing JSON
     };
     await insertOrder(order);
 

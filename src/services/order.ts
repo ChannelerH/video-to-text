@@ -7,6 +7,7 @@ import {
   updateOrderSubscription,
 } from "@/models/order";
 import { getIsoTimestr } from "@/lib/time";
+import { getOrderType } from "./order-type";
 
 import { updateAffiliateForOrder } from "./affiliate";
 import { Order } from "@/types/order";
@@ -61,7 +62,7 @@ export async function updateOrder({
         await updateCreditForOrder(order as unknown as Order);
       }
 
-      // grant minutes pack based on product_id
+      // grant unified minutes pack based on product_id
       try {
         const { addMinutesWithExpiry } = await import('./minutes');
         const pid = (order.product_id || '').toLowerCase();
@@ -69,8 +70,8 @@ export async function updateOrder({
         if (pid === 'std-100') await addMinutesWithExpiry(order.user_uuid, 100, 0, months, order.order_no);
         else if (pid === 'std-300') await addMinutesWithExpiry(order.user_uuid, 300, 0, months, order.order_no);
         else if (pid === 'std-1000') await addMinutesWithExpiry(order.user_uuid, 1000, 0, months, order.order_no);
-        else if (pid === 'ha-200') await addMinutesWithExpiry(order.user_uuid, 0, 200, months, order.order_no);
-        else if (pid === 'ha-600') await addMinutesWithExpiry(order.user_uuid, 0, 600, months, order.order_no);
+        else if (pid === 'ha-200') await addMinutesWithExpiry(order.user_uuid, 200, 0, months, order.order_no);
+        else if (pid === 'ha-600') await addMinutesWithExpiry(order.user_uuid, 600, 0, months, order.order_no);
       } catch {}
 
       // update affiliate for paied order
@@ -226,7 +227,13 @@ export async function updateSubOrder({
 
       const paid_at = getIsoTimestr();
 
-      // create renew order
+      // create renew order - use order_type from original order if available
+      const order_type = order.order_type || getOrderType(
+        order.product_id || "",
+        order.product_name || "",
+        order.interval
+      );
+      
       const renew_order: Order = {
         order_no: renew_order_no,
         created_at: created_at,
@@ -252,6 +259,7 @@ export async function updateSubOrder({
         product_name: order.product_name || "",
         valid_months: order.valid_months || 0,
         order_detail: order.order_detail || "",
+        order_type: order_type as any,
       };
 
       await insertOrder(renew_order as unknown as typeof orders.$inferInsert);
