@@ -17,9 +17,9 @@ import {
 import Link from "next/link";
 import AccountActions from "@/components/dashboard/account-actions";
 import { db } from '@/db';
-import { users, transcriptions } from '@/db/schema';
-import { eq, and, gte, sql } from 'drizzle-orm';
-import { getMinuteSummary } from '@/services/minutes';
+import { users, orders } from '@/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
+import { getMinuteSummary, getMonthlyTranscriptionMinutes } from '@/services/minutes';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -54,19 +54,7 @@ export default async function AccountPage({
   firstDayOfMonth.setDate(1);
   firstDayOfMonth.setHours(0, 0, 0, 0);
 
-  const monthlyUsage = await db()
-    .select({
-      totalMinutes: sql<number>`COALESCE(SUM(${transcriptions.cost_minutes}), 0)`
-    })
-    .from(transcriptions)
-    .where(
-      and(
-        eq(transcriptions.user_uuid, userUuid),
-        gte(transcriptions.created_at, firstDayOfMonth)
-      )
-    );
-
-  const minutesUsed = Number(monthlyUsage[0]?.totalMinutes || 0);
+  const minutesUsed = await getMonthlyTranscriptionMinutes(userUuid, firstDayOfMonth);
   
   // Determine tier limits
   // Map plan based on price id; fallback to subscription_status
@@ -81,6 +69,26 @@ export default async function AccountPage({
   const joinedDate = user?.created_at ? new Date(user.created_at) : new Date();
   const summary = await getMinuteSummary(userUuid);
   const fmt = (d?: string | null) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+  
+  // Get recent paid orders only
+  const recentOrders = await db()
+    .select({
+      order_no: orders.order_no,
+      product_name: orders.product_name,
+      amount: orders.amount,
+      currency: orders.currency,
+      status: orders.status,
+      created_at: orders.created_at,
+      interval: orders.interval,
+      credits: orders.credits
+    })
+    .from(orders)
+    .where(and(
+      eq(orders.user_uuid, userUuid),
+      eq(orders.status, 'paid')
+    ))
+    .orderBy(desc(orders.created_at))
+    .limit(10);
 
   return (
     <div className="min-h-full bg-[#0a0a0f]">
@@ -234,6 +242,95 @@ export default async function AccountPage({
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Order History Card */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900/60 to-gray-900/40 
+            border border-gray-800 p-8">
+            <div className="absolute top-0 right-0 w-64 h-64 -mr-32 -mt-32">
+              <div className="w-full h-full bg-gradient-to-br from-blue-600/10 to-indigo-600/10 rounded-full blur-3xl" />
+            </div>
+            
+            <div className="relative">
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600/20 to-indigo-600/20 
+                    border border-blue-500/20 flex items-center justify-center">
+                    <CreditCard className="w-8 h-8 text-blue-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">Order History</h2>
+                    <p className="text-sm text-gray-400">Your recent purchases and subscriptions</p>
+                  </div>
+                </div>
+                {recentOrders.length > 5 && (
+                  <Link
+                    href={`/${locale}/dashboard/orders`}
+                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                  >
+                    View all →
+                  </Link>
+                )}
+              </div>
+              
+              {recentOrders.length > 0 ? (
+                <div className="space-y-3">
+                  {recentOrders.slice(0, 5).map((order) => (
+                    <div key={order.order_no} className="p-4 rounded-xl bg-gray-900/40 border border-gray-800 hover:border-gray-700 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <p className="text-white font-medium">{order.product_name || 'Unknown Product'}</p>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                            <div>
+                              <p className="text-gray-500 mb-1">Order ID</p>
+                              <p className="text-gray-300">#{order.order_no.slice(-8)}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 mb-1">Date</p>
+                              <p className="text-gray-300">{order.created_at ? new Date(order.created_at).toLocaleDateString() : '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 mb-1">Interval</p>
+                              <p className="text-gray-300 capitalize">
+                                {order.interval === 'one-time' ? 'One-Time' : 
+                                 order.interval === 'month' ? 'Monthly' : 
+                                 order.interval === 'year' ? 'Yearly' : order.interval || 'One-Time'}
+                              </p>
+                            </div>
+                            {order.credits > 0 && (
+                              <div>
+                                <p className="text-gray-500 mb-1">Minutes</p>
+                                <p className="text-blue-400">{order.credits}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right ml-6">
+                          <p className="text-white font-semibold text-lg">
+                            {order.currency === 'USD' ? '$' : order.currency}
+                            {(order.amount / 100).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">No orders yet</p>
+                  <Link
+                    href={`/${locale}/pricing`}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 
+                      text-white rounded-xl font-medium hover:opacity-90 transition-opacity"
+                  >
+                    View Pricing
+                    <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
 

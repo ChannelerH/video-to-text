@@ -376,7 +376,7 @@ export class TranscriptionService {
             // 记录两份：原始总时长 + 实际处理时长
             duration_sec: transcription.duration,
             original_duration_sec: videoInfo.duration,
-            cost_minutes: Math.ceil((transcription.duration || 0)/60),
+            cost_minutes: Number(((transcription.duration || 0)/60).toFixed(3)),
             status: 'completed'
           }));
           jobId = (row as any).job_id || jobId;
@@ -849,7 +849,7 @@ export class TranscriptionService {
             title: videoInfo.title,
             language: transcription.language,
             duration_sec: transcription.duration,
-            cost_minutes: Math.ceil(transcription.duration/60),
+            cost_minutes: Number((transcription.duration/60).toFixed(3)),
             status: 'completed'
           });
           jobId = (row as any).job_id || jobId;
@@ -1102,7 +1102,7 @@ export class TranscriptionService {
             language: transcription.language,
             duration_sec: transcription.duration,
             original_duration_sec: originalDurationSec || transcription.duration || 0,
-            cost_minutes: Math.ceil(transcription.duration/60),
+            cost_minutes: Number((transcription.duration/60).toFixed(3)),
             status: 'completed'
           }));
           jobId = (row as any).job_id || jobId;
@@ -1627,7 +1627,7 @@ export class TranscriptionService {
             language: transcription.language,
             duration_sec: transcription.duration,
             original_duration_sec: originalDurationSec || transcription.duration || 0,
-            cost_minutes: Math.ceil(transcription.duration/60),
+            cost_minutes: Number((transcription.duration/60).toFixed(3)),
             status: 'completed'
           }));
           jobId = (row as any).job_id || jobId;

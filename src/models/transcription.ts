@@ -48,7 +48,7 @@ export async function createOrReuseTranscription(params: {
     language: params.language,
     duration_sec: Math.round(params.duration_sec || 0),
     original_duration_sec: Math.round(params.original_duration_sec || params.duration_sec || 0),
-    cost_minutes: Math.ceil((params.cost_minutes || (params.duration_sec / 60))),
+    cost_minutes: Number(((params.cost_minutes ?? (params.duration_sec / 60)) as number).toFixed(3)),
     status: params.status || "completed",
     created_at: now,
     completed_at: now,

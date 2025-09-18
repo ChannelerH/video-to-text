@@ -120,3 +120,21 @@ export async function getMinuteSummary(userId: string): Promise<{
   const haPacks = Number((haCount as any).rows?.[0]?.cnt || 0);
   return { std, ha, stdEarliestExpire, haEarliestExpire, stdPacks, haPacks };
 }
+
+// Sum monthly used minutes from transcriptions table
+export async function getMonthlyTranscriptionMinutes(userId: string, since: Date): Promise<number> {
+  const sinceStr = since.toISOString();
+  // Sum fractional billing minutes directly from cost_minutes
+  const result = await db().execute(sql`SELECT COALESCE(SUM(cost_minutes),0) AS sum FROM v2tx_transcriptions WHERE user_uuid=${userId} AND created_at >= ${sinceStr}`);
+
+  let minutes = 0;
+  if (Array.isArray(result) && result.length > 0) {
+    minutes = Number(result[0]?.sum || 0);
+  } else if ((result as any).rows && Array.isArray((result as any).rows)) {
+    minutes = Number((result as any).rows[0]?.sum || 0);
+  } else if (typeof result === 'object' && result !== null && 'sum' in result) {
+    minutes = Number((result as any).sum || 0);
+  }
+
+  return minutes;
+}

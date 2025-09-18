@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
         title: result.data.title || tr.title,
         duration_sec: Math.ceil(t.duration || 0),
         original_duration_sec: Math.ceil(t.duration || 0),
-        cost_minutes: Math.ceil((t.duration || 0) / 60),
+        cost_minutes: Number(((t.duration || 0) / 60).toFixed(3)),
         completed_at: new Date()
       }).where(eq(transcriptions.job_id, jobRow.job_id));
 
@@ -131,4 +131,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
   }
 }
-

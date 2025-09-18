@@ -6,22 +6,20 @@ import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { signOut } from 'next-auth/react';
 import {
-  Home,
   FileText,
   LogOut,
   MessageSquare,
-  Users,
   User,
+  Users,
   Loader2
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app';
 
 interface DashboardSidebarProps {
   locale: string;
-  userUuid?: string;
 }
 
-export default function DashboardSidebar({ locale, userUuid }: DashboardSidebarProps) {
+export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
   const t = useTranslations();
   const pathname = usePathname();
   const { user, setShowFeedback } = useAppContext();
@@ -44,11 +42,6 @@ export default function DashboardSidebar({ locale, userUuid }: DashboardSidebarP
     {
       name: t('nav.home'),
       href: `/${locale}/dashboard`,
-      icon: Home,
-    },
-    {
-      name: t('nav.transcriptions'),
-      href: `/${locale}/dashboard/transcriptions`,
       icon: FileText,
     },
     {
@@ -58,7 +51,20 @@ export default function DashboardSidebar({ locale, userUuid }: DashboardSidebarP
     }
   ];
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
+  const isActive = (href: string) => {
+    // Remove locale prefix from pathname for comparison if needed
+    const normalizedPath = pathname.startsWith(`/${locale}`) 
+      ? pathname 
+      : `/${locale}${pathname}`;
+    
+    // For dashboard home, match exact path only
+    if (href === `/${locale}/dashboard`) {
+      return normalizedPath === href;
+    }
+    
+    // For other pages, match exact or sub-paths
+    return normalizedPath === href || normalizedPath.startsWith(href + '/');
+  };
 
   const handleFeedback = () => {
     setShowFeedback(true);
@@ -108,20 +114,29 @@ export default function DashboardSidebar({ locale, userUuid }: DashboardSidebarP
         <div className="space-y-1">
           {navigation.map((item) => {
             const isItemLoading = loadingRoute === item.href;
+            const isItemActive = isActive(item.href);
+            
+            if (isItemActive) {
+              // Render as a div (not clickable) when active
+              return (
+                <div
+                  key={item.name}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors bg-purple-600/20 text-purple-400 cursor-default"
+                >
+                  <item.icon className="w-4 h-4" />
+                  <span>{item.name}</span>
+                </div>
+              );
+            }
+            
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 onClick={() => {
-                  if (!isActive(item.href)) {
-                    setLoadingRoute(item.href);
-                  }
+                  setLoadingRoute(item.href);
                 }}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  isActive(item.href)
-                    ? 'bg-purple-600/20 text-purple-400'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-                }`}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-gray-400 hover:text-white hover:bg-gray-800/50"
               >
                 {isItemLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

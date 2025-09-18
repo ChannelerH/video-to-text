@@ -12,6 +12,8 @@ import { updateAffiliateForOrder } from "./affiliate";
 import { Order } from "@/types/order";
 import Stripe from "stripe";
 import { orders } from "@/db/schema";
+import { db } from '@/db';
+import { eq } from 'drizzle-orm';
 
 // update paied order, call by async callback
 export async function updateOrder({
@@ -61,7 +63,7 @@ export async function updateOrder({
 
       // grant minutes pack based on product_id
       try {
-        const { addMinutes, addMinutesWithExpiry } = await import('./minutes');
+        const { addMinutesWithExpiry } = await import('./minutes');
         const pid = (order.product_id || '').toLowerCase();
         const months = order.valid_months || 12;
         if (pid === 'std-100') await addMinutesWithExpiry(order.user_uuid, 100, 0, months, order.order_no);

@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
           title,
           duration_sec: Math.ceil(t.duration || 0),
           original_duration_sec: Math.ceil((vf?.duration || t.duration || 0)),
-          cost_minutes: Math.ceil((t.duration || 0) / 60),
+          cost_minutes: Number(((t.duration || 0) / 60).toFixed(3)),
           completed_at: new Date()
         })
         .where(eq(transcriptions.job_id, job.job_id));
