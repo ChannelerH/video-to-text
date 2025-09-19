@@ -363,6 +363,8 @@ export class DocumentExportService {
     const margins = { left: 20, right: 20, top: 20, bottom: 20 };
     const contentWidth = pageWidth - margins.left - margins.right;
     
+    const includeSpeakers = options.includeSpeakers !== false;
+
     // Helper function to add text with automatic page breaks
     const addText = (text: string, fontSize: number = 12, isBold: boolean = false) => {
       // 1) 清洗文本：去控制符/零宽字符/特殊分隔符，并做 NFC 规范化
@@ -409,6 +411,13 @@ export class DocumentExportService {
       }
       // 段后间距
       yPosition += Math.max(4, fontSize * 0.15);
+    };
+
+    const getSpeakerPrefix = (segment: any): string => {
+      if (!includeSpeakers || !segment || !segment.speaker) return '';
+      const raw = segment.speaker;
+      const label = (typeof raw === 'string' && /^\d+$/.test(raw)) ? `Speaker ${parseInt(raw, 10) + 1}` : String(raw);
+      return label ? `${label}: ` : '';
     };
     
     // Title (wrap and center)
@@ -482,9 +491,10 @@ export class DocumentExportService {
         // Chapter segments
         if (chapter.segments) {
           chapter.segments.forEach(segment => {
+            const speakerPrefix = getSpeakerPrefix(segment);
             const segmentText = options.includeTimestamps !== false ?
-              `[${this.formatTime(segment.start)}] ${segment.text}` :
-              segment.text;
+              `[${this.formatTime(segment.start)}] ${speakerPrefix}${segment.text}` :
+              `${speakerPrefix}${segment.text}`;
             addText(segmentText, 11, false);
           });
         }
@@ -496,9 +506,12 @@ export class DocumentExportService {
       yPosition += 5;
       
       // Flat content
-      if (transcription.segments && options.includeTimestamps !== false) {
+      if (transcription.segments && transcription.segments.length > 0) {
         transcription.segments.forEach(segment => {
-          const segmentText = `[${this.formatTime(segment.start)}] ${segment.text}`;
+          const speakerPrefix = getSpeakerPrefix(segment);
+          const segmentText = options.includeTimestamps !== false ?
+            `[${this.formatTime(segment.start)}] ${speakerPrefix}${segment.text}` :
+            `${speakerPrefix}${segment.text}`;
           addText(segmentText, 11, false);
         });
       } else {
