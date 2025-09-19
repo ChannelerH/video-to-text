@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserUuid } from '@/services/user';
 import { getUserTier, UserTier } from '@/services/user-tier';
+import { quotaTracker } from '@/services/quota-tracker';
 import { db } from '@/db';
 import { q_jobs, transcriptions, usage_records } from '@/db/schema';
 import { getUniSeq } from '@/lib/hash';
 import crypto from 'crypto';
 import { and, gte, eq, count } from 'drizzle-orm';
+import { POLICY } from '@/services/policy';
 
 export const maxDuration = 10; // Vercel hobby limit
 
@@ -35,6 +37,25 @@ export async function POST(request: NextRequest) {
     const userUuid = maybeUserUuid || '';
 
     const isHighAccuracyRequest = !!(options?.highAccuracyMode && maybeUserUuid);
+    let canUseHighAccuracy = false;
+
+    if (isHighAccuracyRequest) {
+      try {
+        const { hasHighAccuracyAccess } = await import('@/services/user-tier');
+        canUseHighAccuracy = await hasHighAccuracyAccess(userUuid);
+      } catch (err) {
+        console.warn('[Async] Failed to verify high accuracy access:', err);
+      }
+
+      if (!canUseHighAccuracy) {
+        return NextResponse.json(
+          { error: 'High accuracy mode not available for your plan. Upgrade at /pricing.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const isHighAccuracyActive = isHighAccuracyRequest && canUseHighAccuracy;
 
     // Get user tier for FREE user audio clipping
     let userTier: UserTier = UserTier.FREE;
@@ -43,6 +64,45 @@ export async function POST(request: NextRequest) {
         userTier = await getUserTier(userUuid);
       } catch (e) {
         console.warn('[Async] Failed to get user tier:', e);
+      }
+    }
+
+    // 登录用户的额度检查（预览请求跳过）
+    if (userUuid && !isPreview) {
+      const estimatedMinutes = await estimateUsageMinutes({
+        userTier,
+        userUuid,
+        options,
+        isHighAccuracy: isHighAccuracyActive
+      });
+
+      try {
+        const quotaStatus = await quotaTracker.checkQuota(
+          userUuid,
+          userTier,
+          estimatedMinutes,
+          isHighAccuracyActive ? 'high_accuracy' : 'standard'
+        );
+
+        if (!quotaStatus.isAllowed) {
+          return NextResponse.json(
+            {
+              error: (quotaStatus.reason || 'Quota exceeded') + ' — Upgrade at /pricing',
+              quotaInfo: {
+                tier: userTier,
+                remaining: quotaStatus.remaining,
+                usage: quotaStatus.usage
+              }
+            },
+            { status: 429 }
+          );
+        }
+      } catch (quotaErr) {
+        console.error('[Async] Quota check failed:', quotaErr);
+        return NextResponse.json(
+          { error: 'Unable to verify quota. Please try again later.' },
+          { status: 503 }
+        );
       }
     }
 
@@ -257,4 +317,36 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+type EstimateUsageParams = {
+  userTier: UserTier;
+  userUuid: string;
+  options: Record<string, any> | undefined;
+  isHighAccuracy: boolean;
+};
+
+async function estimateUsageMinutes(params: EstimateUsageParams) {
+  const { userTier, userUuid, options, isHighAccuracy } = params;
+  let estimatedMinutes = 10;
+
+  try {
+    if (userTier === UserTier.FREE) {
+      const previewSec = POLICY.preview.freePreviewSeconds || 300;
+      const trimSeconds = Number(options?.trimToSeconds) || previewSec;
+      estimatedMinutes = Math.max(1, Math.ceil(trimSeconds / 60));
+    }
+  } catch {}
+
+  try {
+    const { getEstimatedPackCoverage } = await import('@/services/minutes');
+    const cover = await getEstimatedPackCoverage(
+      userUuid,
+      estimatedMinutes,
+      isHighAccuracy ? 'high_accuracy' : 'standard'
+    );
+    estimatedMinutes = Math.max(0, estimatedMinutes - cover);
+  } catch {}
+
+  return estimatedMinutes;
 }

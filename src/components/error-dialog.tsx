@@ -11,13 +11,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RefreshCw, AlertCircle, X } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { ReactNode } from "react";
 
 export interface ErrorDialogProps {
   isOpen: boolean;
   error: {
     type: 'api_error' | 'timeout' | 'network' | 'server' | null;
-    message: string;
+    message: ReactNode;
     canRetry: boolean;
     retryAction?: () => void;
   } | null;
@@ -52,7 +54,7 @@ export function ErrorDialog({ isOpen, error, onClose, onRetry }: ErrorDialogProp
     }
   };
 
-  const getDescription = () => {
+  const getDescription = (): ReactNode => {
     switch (error.type) {
       case 'timeout':
         return t("timeout_description") || "The operation is taking longer than expected. This might be due to server load or file size.";
@@ -61,6 +63,20 @@ export function ErrorDialog({ isOpen, error, onClose, onRetry }: ErrorDialogProp
       case 'network':
         return t("network_error_description") || "Unable to connect to the server. Please check your internet connection.";
       default:
+        if (typeof error.message === 'string') {
+          const upgradeMatch = error.message.match(/^(.*?)(?:\s*[—-]\s*)?Upgrade at \/pricing\.?$/i);
+          if (upgradeMatch) {
+            const prefix = upgradeMatch[1]?.trim();
+            return (
+              <span>
+                {prefix ? `${prefix} ` : ''}
+                <Link href="/pricing" className="text-cyan-300 hover:text-cyan-200 underline">
+                  Upgrade
+                </Link>
+              </span>
+            );
+          }
+        }
         return error.message;
     }
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { FileText, Download, Copy, Check, Code, RefreshCw, AlertCircle } from "lucide-react";
@@ -105,7 +105,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   // Error handling state
   const [errorState, setErrorState] = useState<{
     type: 'api_error' | 'timeout' | 'network' | 'server' | null;
-    message: string;
+    message: ReactNode;
     canRetry: boolean;
     retryAction?: () => void;
   }>({ type: null, message: '', canRetry: false });
