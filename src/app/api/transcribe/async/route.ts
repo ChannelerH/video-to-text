@@ -7,7 +7,7 @@ import { q_jobs, transcriptions, usage_records } from '@/db/schema';
 import { getUniSeq } from '@/lib/hash';
 import crypto from 'crypto';
 import { and, gte, eq, count } from 'drizzle-orm';
-import { POLICY } from '@/services/policy';
+import { computeEstimatedMinutes } from '@/lib/estimate-usage';
 
 export const maxDuration = 10; // Vercel hobby limit
 
@@ -70,6 +70,8 @@ export async function POST(request: NextRequest) {
     // 登录用户的额度检查（预览请求跳过）
     if (userUuid && !isPreview) {
       const estimatedMinutes = await estimateUsageMinutes({
+        type,
+        content,
         userTier,
         userUuid,
         options,
@@ -320,6 +322,8 @@ export async function POST(request: NextRequest) {
 }
 
 type EstimateUsageParams = {
+  type: 'youtube_url' | 'file_upload' | 'audio_url';
+  content: string;
   userTier: UserTier;
   userUuid: string;
   options: Record<string, any> | undefined;
@@ -327,26 +331,13 @@ type EstimateUsageParams = {
 };
 
 async function estimateUsageMinutes(params: EstimateUsageParams) {
-  const { userTier, userUuid, options, isHighAccuracy } = params;
-  let estimatedMinutes = 10;
-
-  try {
-    if (userTier === UserTier.FREE) {
-      const previewSec = POLICY.preview.freePreviewSeconds || 300;
-      const trimSeconds = Number(options?.trimToSeconds) || previewSec;
-      estimatedMinutes = Math.max(1, Math.ceil(trimSeconds / 60));
-    }
-  } catch {}
-
-  try {
-    const { getEstimatedPackCoverage } = await import('@/services/minutes');
-    const cover = await getEstimatedPackCoverage(
-      userUuid,
-      estimatedMinutes,
-      isHighAccuracy ? 'high_accuracy' : 'standard'
-    );
-    estimatedMinutes = Math.max(0, estimatedMinutes - cover);
-  } catch {}
-
-  return estimatedMinutes;
+  const { type, content, userTier, userUuid, options, isHighAccuracy } = params;
+  return computeEstimatedMinutes({
+    type,
+    content,
+    userTier,
+    options,
+    userUuid,
+    modelType: isHighAccuracy ? 'high_accuracy' : 'standard'
+  });
 }

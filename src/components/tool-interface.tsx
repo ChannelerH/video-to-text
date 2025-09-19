@@ -22,6 +22,74 @@ import type { AudioTrack } from '@/components/audio-track-selector';
 import { callApiWithRetry, pollStatus, getErrorType } from "@/lib/api-utils";
 import { ErrorDialog } from '@/components/error-dialog';
 
+function isMediaFileType(mime: string): boolean {
+  return typeof mime === 'string' && (mime.startsWith('audio') || mime.startsWith('video'));
+}
+
+async function measureFileDuration(file: File): Promise<number | null> {
+  if (typeof document === 'undefined') return null;
+  if (!isMediaFileType(file.type)) return null;
+
+  return new Promise((resolve) => {
+    let media: HTMLMediaElement | null = null;
+    let objectUrl = '';
+    let settled = false;
+
+    const cleanup = () => {
+      if (media) {
+        media.removeEventListener('loadedmetadata', onLoaded);
+        media.removeEventListener('error', onError);
+        if (media.parentNode) {
+          media.parentNode.removeChild(media);
+        }
+      }
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+
+    const finish = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(value);
+    };
+
+    const onLoaded = () => {
+      if (!media) return finish(null);
+      const duration = Number(media.duration);
+      finish(Number.isFinite(duration) && duration > 0 ? duration : null);
+    };
+
+    const onError = () => finish(null);
+
+    try {
+      objectUrl = URL.createObjectURL(file);
+      const tagName = file.type.startsWith('video') ? 'video' : 'audio';
+      media = document.createElement(tagName);
+      media.preload = 'metadata';
+      media.muted = true;
+      media.playsInline = true;
+      media.src = objectUrl;
+      media.style.position = 'absolute';
+      media.style.opacity = '0';
+      media.style.pointerEvents = 'none';
+      media.style.width = '1px';
+      media.style.height = '1px';
+
+      media.addEventListener('loadedmetadata', onLoaded, { once: true });
+      media.addEventListener('error', onError, { once: true });
+      document.body.appendChild(media);
+      media.load();
+
+      setTimeout(() => finish(null), 7000);
+    } catch (error) {
+      console.warn('[DEBUG] Unable to create media element for duration probing:', error);
+      finish(null);
+    }
+  });
+}
+
 // Lazy load editor views
 const EditorView = dynamic(() => import('@/components/editor-view'), {
   ssr: false,
@@ -57,17 +125,27 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const isAuthenticated = !!(session?.user || user);
   const tier = (userTier || (user as any)?.userTier || 'free') as string;
   const canUseHighAccuracy = isAuthenticated && (tier === 'pro');
+  const canUseDiarization = isAuthenticated && ['basic', 'pro', 'premium'].includes(tier);
   
   // Debug logging
+  const [enableDiarizationAfterWhisper, setEnableDiarizationAfterWhisper] = useState(false);
+  
   useEffect(() => {
     console.log('[HighAccuracy Debug]', {
       isAuthenticated,
       tier,
       userTier,
       userFromContext: user,
-      canUseHighAccuracy
+      canUseHighAccuracy,
+      canUseDiarization
     });
-  }, [isAuthenticated, tier, userTier, user, canUseHighAccuracy]);
+  }, [isAuthenticated, tier, userTier, user, canUseHighAccuracy, canUseDiarization]);
+  
+  useEffect(() => {
+    if (!canUseDiarization && enableDiarizationAfterWhisper) {
+      setEnableDiarizationAfterWhisper(false);
+    }
+  }, [canUseDiarization, enableDiarizationAfterWhisper]);
   
   const [url, setUrl] = useState("");
   const [selectedFormats, setSelectedFormats] = useState(["txt", "srt", "vtt", "md", "json"]);
@@ -92,7 +170,6 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [uploadProgress, setUploadProgress] = useState(0);
   // AI refine button removed; backend runs optional refinement automatically for Chinese
   const [highAccuracy, setHighAccuracy] = useState(false);
-  const [enableDiarizationAfterWhisper, setEnableDiarizationAfterWhisper] = useState(false);
   const [uploadedFileInfo, setUploadedFileInfo] = useState<any>(null);
   const [copiedText, setCopiedText] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -340,6 +417,16 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     console.log('[DEBUG] handleFileChange called, file:', selectedFile?.name);
     
     if (selectedFile) {
+      let detectedDurationSec: number | null = null;
+      try {
+        detectedDurationSec = await measureFileDuration(selectedFile);
+        if (detectedDurationSec) {
+          console.log('[DEBUG] Detected media duration (sec):', detectedDurationSec);
+        }
+      } catch (err) {
+        console.warn('[DEBUG] Failed to detect media duration:', err);
+      }
+
       // 如果有正在进行的上传，先中断它（静默处理，不报错）
       if (uploadXhrRef.current) {
         console.log('[DEBUG] Aborting previous upload');
@@ -414,7 +501,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
               originalName: selectedFile.name,
               fileType: selectedFile.type,
               fileSize: selectedFile.size,
-              uploadMethod: 'multipart'
+              uploadMethod: 'multipart',
+              durationSec: detectedDurationSec ?? null
             });
             
             setProgress(t("progress.upload_success"));
@@ -574,7 +662,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             originalName: selectedFile.name,
             fileType: selectedFile.type,
             fileSize: selectedFile.size,
-            uploadMethod: 'presigned-url'
+            uploadMethod: 'presigned-url',
+            durationSec: detectedDurationSec ?? null
           };
           
           setUploadedFileInfo(uploadedInfo);
@@ -630,7 +719,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
               const uploadResult = await uploadResponse.json();
               
               if (uploadResult.success) {
-                setUploadedFileInfo(uploadResult.data);
+                setUploadedFileInfo({
+                  ...uploadResult.data,
+                  durationSec: detectedDurationSec ?? uploadResult.data?.durationSec ?? null
+                });
                 setProgress(t("progress.upload_success"));
                 setProgressInfo({ stage: null, percentage: 0, message: '' });
                 setUploadProgress(0);
@@ -803,10 +895,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         };
         if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
           requestData.options.highAccuracyMode = true;
-          // PRO 附加：说话人分离（Deepgram 叠加）开关，默认关闭
-          if (tier === 'pro' && enableDiarizationAfterWhisper) {
-            (requestData.options as any).enableDiarizationAfterWhisper = true;
-          }
+        }
+        if (canUseDiarization && enableDiarizationAfterWhisper) {
+          (requestData.options as any).enableDiarizationAfterWhisper = true;
         }
         // 已移除语言探针：仅在拿到模型结果后再判定是否显示中文润色提示
       } else if (uploadedFileInfo) {
@@ -828,11 +919,14 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             originalFileName: uploadedFileInfo.originalName  // 改为 originalFileName 以匹配后端
           }
         };
+        if (uploadedFileInfo.durationSec) {
+          requestData.options.estimatedDurationSec = uploadedFileInfo.durationSec;
+        }
         if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
           requestData.options.highAccuracyMode = true;
-          if (tier === 'pro' && enableDiarizationAfterWhisper) {
-            (requestData.options as any).enableDiarizationAfterWhisper = true;
-          }
+        }
+        if (canUseDiarization && enableDiarizationAfterWhisper) {
+          (requestData.options as any).enableDiarizationAfterWhisper = true;
         }
         // 已移除语言探针：仅在拿到模型结果后再判定是否显示中文润色提示
       } else {
@@ -1712,20 +1806,6 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                   <>
                     <span className="toggle-label">{t('high_accuracy.enabled_label')}</span>
                     <span className="toggle-hint">{t('high_accuracy.speed_hint')}</span>
-                    {highAccuracy && (
-                      <div 
-                        className="mt-2 flex items-center gap-2 text-xs"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          id="dia-pro"
-                          type="checkbox"
-                          checked={enableDiarizationAfterWhisper}
-                          onChange={(e) => setEnableDiarizationAfterWhisper(e.target.checked)}
-                        />
-                        <label htmlFor="dia-pro" className="opacity-80">Add speaker diarization (Deepgram, PRO)</label>
-                      </div>
-                    )}
                   </>
                 ) : (
                   <>
@@ -1756,6 +1836,37 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             </div>
           </div>
         </div>
+
+        {canUseDiarization && (
+          <div className="high-accuracy-container">
+            <div
+              className={`high-accuracy-toggle ${enableDiarizationAfterWhisper ? 'active' : ''}`}
+              onClick={() => setEnableDiarizationAfterWhisper(prev => !prev)}
+              role="button"
+              aria-pressed={enableDiarizationAfterWhisper}
+              aria-label="Speaker diarization"
+            >
+              <div className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={enableDiarizationAfterWhisper}
+                  onChange={() => {}}
+                  style={{ display: 'none' }}
+                />
+                <div className="toggle-slider">
+                  <div className="toggle-handle" />
+                </div>
+              </div>
+              <div className="toggle-content">
+                <span className="toggle-icon">🗣️</span>
+                <div className="toggle-text">
+                  <span className="toggle-label">Speaker diarization</span>
+                  <span className="toggle-hint">Identify speakers with Deepgram diarization</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Action Button */}
         <div className="balloon-button-container">

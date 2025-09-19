@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserUuid } from '@/services/user';
+import { getUserTier, UserTier } from '@/services/user-tier';
 import { db } from '@/db';
 import { transcriptions, transcription_results } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -47,6 +48,8 @@ export async function GET(
     }
 
     // 如果已完成，返回结果
+    const effectiveTier: UserTier = userUuid ? await getUserTier(userUuid) : UserTier.FREE;
+
     if (transcription.status === 'completed') {
       // 获取转录结果
       const results = await db()
@@ -67,7 +70,8 @@ export async function GET(
         duration: transcription.duration_sec,
         results: resultMap,
         created_at: transcription.created_at,
-        completed_at: transcription.completed_at
+        completed_at: transcription.completed_at,
+        tier: effectiveTier
       });
     }
 
@@ -86,6 +90,7 @@ export async function GET(
       title: transcription.title,
       created_at: transcription.created_at,
       message: getStatusMessage(transcription.status),
+      tier: effectiveTier,
       ...(warning && { warning }),
       // Include error message if status is failed
       ...(transcription.status === 'failed' && transcription.error_message && { 

@@ -379,6 +379,7 @@ async function DashboardTranscriptions({
       <TranscriptionsTable
         rows={rows}
         highlightJobId={highlight}
+        userTier={data.userTier}
         t={{
           select_all: "Select All",
           clear: "Clear",

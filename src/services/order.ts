@@ -67,11 +67,15 @@ export async function updateOrder({
         const { addMinutesWithExpiry } = await import('./minutes');
         const pid = (order.product_id || '').toLowerCase();
         const months = order.valid_months || 12;
-        if (pid === 'std-100') await addMinutesWithExpiry(order.user_uuid, 100, 0, months, order.order_no);
-        else if (pid === 'std-300') await addMinutesWithExpiry(order.user_uuid, 300, 0, months, order.order_no);
-        else if (pid === 'std-1000') await addMinutesWithExpiry(order.user_uuid, 1000, 0, months, order.order_no);
-        else if (pid === 'ha-200') await addMinutesWithExpiry(order.user_uuid, 200, 0, months, order.order_no);
-        else if (pid === 'ha-600') await addMinutesWithExpiry(order.user_uuid, 600, 0, months, order.order_no);
+        const packCatalog: Record<string, number> = {
+          'std-100': 100,
+          'std-300': 300,
+          'std-1000': 1000,
+        };
+        const packMinutes = packCatalog[pid];
+        if (packMinutes) {
+          await addMinutesWithExpiry(order.user_uuid, packMinutes, 0, months, order.order_no);
+        }
       } catch {}
 
       // update affiliate for paied order

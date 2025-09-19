@@ -13,10 +13,17 @@ import { toast } from "sonner";
 import { FileText, FileCode, FileJson, FileDown, RefreshCw, Trash2, RotateCcw } from "lucide-react";
 import { useAppContext } from "@/contexts/app";
 
-export default function Actions({ row, i18n }: { row: any; i18n: any }) {
+type ActionsProps = {
+  row: any;
+  i18n: any;
+  userTier?: string;
+};
+
+export default function Actions({ row, i18n, userTier: userTierOverride }: ActionsProps) {
   const router = useRouter();
-  const { userTier } = useAppContext();
-  const isFreeTier = (userTier || 'free') === 'free';
+  const { userTier: contextTier } = useAppContext();
+  const effectiveTier = (userTierOverride ?? contextTier) || 'free';
+  const isFreeTier = effectiveTier === 'free';
   const [rerunning, setRerunning] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);

@@ -1805,25 +1805,34 @@ export default function ThreeColumnEditor({
                         } else {
                           // Handle specific error cases
                           if (response.status === 403) {
-                            if (data.error?.includes('本月次数已用尽') || data.error?.includes('monthly limit')) {
-                              toast.error(
-                                <div className="flex flex-col gap-1">
-                                  <span>You've used all 10 free AI summaries this month</span>
-                                  <a href="/pricing" className="text-blue-400 hover:text-blue-300 underline text-sm">
-                                    Upgrade to Pro for unlimited AI features
-                                  </a>
-                                </div>
-                              );
-                            } else {
-                              toast.error(
-                                <div className="flex flex-col gap-1">
-                                  <span>AI summary not available for your plan</span>
-                                  <a href="/pricing" className="text-blue-400 hover:text-blue-300 underline text-sm">
-                                    Upgrade to unlock AI features
-                                  </a>
-                                </div>
-                              );
-                            }
+                            toast.error(
+                              <div className="flex flex-col gap-1">
+                                <span>{data.error}</span>
+                                <a href="/pricing" className="text-blue-400 hover:text-blue-300 underline text-sm">
+                                  Upgrade to unlock AI features
+                                </a>
+                              </div>
+                            );
+
+                            // if (data.error?.includes('本月次数已用尽') || data.error?.includes('monthly limit')) {
+                            //   toast.error(
+                            //     <div className="flex flex-col gap-1">
+                            //       <span>You've used all 10 free AI summaries this month</span>
+                            //       <a href="/pricing" className="text-blue-400 hover:text-blue-300 underline text-sm">
+                            //         Upgrade to Pro for unlimited AI features
+                            //       </a>
+                            //     </div>
+                            //   );
+                            // } else {
+                            //   toast.error(
+                            //     <div className="flex flex-col gap-1">
+                            //       <span>AI summary not available for your plan</span>
+                            //       <a href="/pricing" className="text-blue-400 hover:text-blue-300 underline text-sm">
+                            //         Upgrade to unlock AI features
+                            //       </a>
+                            //     </div>
+                            //   );
+                            // }
                           } else {
                             toast.error(data.error || 'Failed to generate summary');
                           }

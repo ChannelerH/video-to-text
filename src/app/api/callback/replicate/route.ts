@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
 import { quotaTracker } from '@/services/quota-tracker';
 import { getUserTier, UserTier } from '@/services/user-tier';
+import { getUserSubscriptionPlan } from '@/services/user-subscription';
 import { deductFromPacks } from '@/services/minutes';
 
 export const runtime = 'nodejs';
@@ -144,7 +145,8 @@ export async function POST(req: NextRequest) {
     if (userUuid && roundedMinutes > 0) {
       try {
         const userTier = await getUserTier(userUuid);
-        if (userTier === UserTier.FREE) {
+        const subscriptionPlan = await getUserSubscriptionPlan(userUuid);
+        if (subscriptionPlan === 'FREE') {
           const remain = await deductFromPacks(userUuid, actualMinutes, 'standard');
           const safeRemain = Math.max(0, remain);
           const packUsed = Math.max(0, actualMinutes - safeRemain);

@@ -66,6 +66,18 @@ export async function pollJobStatus(
 
     // Check the final status
     if (result.status === 'completed') {
+      const tier = (result as any).tier || 'free';
+      const baseFormats: Record<string, string | undefined> = {
+        srt: result.results.srt,
+        vtt: result.results.vtt,
+        txt: result.results.txt,
+      };
+
+      if (tier !== 'free') {
+        if (result.results.json) baseFormats.json = result.results.json;
+        if (result.results.md) baseFormats.md = result.results.md;
+      }
+
       return {
         success: true,
         data: {
@@ -76,11 +88,8 @@ export async function pollJobStatus(
             duration: result.duration
           },
           title: result.title,
-          formats: {
-            srt: result.results.srt,
-            vtt: result.results.vtt,
-            txt: result.results.txt
-          },
+          formats: baseFormats,
+          tier,
           // 将 jobId 回传给前端用于"Edit Transcription"跳转
           jobId
         }

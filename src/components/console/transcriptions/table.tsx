@@ -6,7 +6,14 @@ import Actions from "@/components/console/transcriptions/actions";
 import { toast } from "sonner";
 import { FileAudio, Clock, Calendar, Download, Trash2, CheckCircle2, Circle } from "lucide-react";
 
-export default function TranscriptionsTable({ rows, t, highlightJobId }: { rows: any[]; t: any; highlightJobId?: string }) {
+type TranscriptionsTableProps = {
+  rows: any[];
+  t: any;
+  highlightJobId?: string;
+  userTier?: string;
+};
+
+export default function TranscriptionsTable({ rows, t, highlightJobId, userTier }: TranscriptionsTableProps) {
   const searchParams = useSearchParams();
   const [localRows, setLocalRows] = useState<any[]>(rows || []);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -281,7 +288,8 @@ export default function TranscriptionsTable({ rows, t, highlightJobId }: { rows:
                 {/* 操作按钮 - 更紧凑的设计 */}
                 <div className="border-t pt-4">
                   <Actions 
-                    row={r} 
+                    row={r}
+                    userTier={userTier}
                     i18n={{
                       edit: t.edit ?? 'Edit',
                       rerun: t.rerun ?? 'Re-run',

@@ -125,9 +125,8 @@ export class AIChapterService {
       `[${this.formatTime(s.start)}] ${s.text}`
     ).join('\n');
     
-    // Limit content length to avoid token limits
-    // Increased from 8000 to 15000 for better chapter detection
-    const maxLength = 15000;
+    // Limit content length to avoid token limits (configurable, default 60k)
+    const maxLength = Number(process.env.AI_CHAPTERS_MAX_CHARS || 60000);
     const truncatedText = fullText.length > maxLength 
       ? fullText.substring(0, maxLength) + '...\n[Content truncated]'
       : fullText;
@@ -904,22 +903,64 @@ Return strictly in this JSON format (no additional text):
       return this.generateBasicSummary(segments, options);
     }
 
-    const text = segments.map(s => s.text).join(' ');
-    const truncatedText = text.length > 3000 ? text.substring(0, 3000) + '...' : text;
-    const maxLength = options?.maxLength || 200;
-
+    const text = segments.map(s => s.text).join(' ').trim();
+    const maxLength = options?.maxLength || 400;
     const { code: lang, name: languageName } = this.normalizeLanguage(options?.language, text);
 
-    const prompt = lang === 'zh'
-      ? `请用中文为以下内容生成一个${maxLength}字以内的摘要，概括主要观点和关键信息：\n\n${truncatedText}`
-      : `Generate a summary under ${maxLength} words in ${languageName}. Capture the main points and key information, and write naturally in ${languageName}:\n\n${truncatedText}`;
+    const chunkSize = Number(process.env.AI_SUMMARY_CHUNK_SIZE || 12000);
+    const needsChunking = text.length > chunkSize;
+
+    const summarize = async (content: string, limit: number) => {
+      const prompt = lang === 'zh'
+        ? `请用中文为以下内容生成一个${limit}字以内的摘要，概括主要观点和关键信息：\n\n${content}`
+        : `Generate a summary under ${limit} words in ${languageName}. Capture the main points and key information, and write naturally in ${languageName}:\n\n${content}`;
+      return this.callDeepSeekAPI(prompt, lang);
+    };
 
     try {
-      const response = await this.callDeepSeekAPI(prompt, lang);
-      return response;
+      if (!needsChunking) {
+        return await summarize(text, maxLength);
+      }
+
+      const chunks = this.chunkTextByParagraph(text, chunkSize);
+      const intermediateLimit = Math.min(Math.max(Math.round(maxLength * 1.5), 300), 600);
+      const partialSummaries: string[] = [];
+
+      for (const chunk of chunks) {
+        const summary = await summarize(chunk, intermediateLimit);
+        if (summary) partialSummaries.push(summary.trim());
+      }
+
+      const combined = partialSummaries.join('\n\n');
+      return await summarize(combined, maxLength);
     } catch (error) {
       console.error('Error generating summary:', error);
       return null;
     }
+  }
+
+  private static chunkTextByParagraph(text: string, chunkSize: number): string[] {
+    const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+    if (paragraphs.length === 0) return [text];
+
+    const chunks: string[] = [];
+    let current = '';
+
+    const pushCurrent = () => {
+      if (current.trim()) {
+        chunks.push(current.trim());
+        current = '';
+      }
+    };
+
+    for (const para of paragraphs) {
+      if ((current + '\n\n' + para).length > chunkSize && current.length > 0) {
+        pushCurrent();
+      }
+      current = current ? `${current}\n\n${para}` : para;
+    }
+
+    pushCurrent();
+    return chunks;
   }
 }

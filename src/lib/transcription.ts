@@ -1519,7 +1519,7 @@ export class TranscriptionService {
       } catch {}
 
       // 可选：为 PRO 用户叠加话者分离（Deepgram）
-      const enableOverlayFile = !!request.options?.enableDiarizationAfterWhisper && request.options?.userTier === 'pro';
+      const enableOverlayFile = !!request.options?.enableDiarizationAfterWhisper && ['pro', 'basic', 'premium'].includes((request.options?.userTier as any) || 'free');
       if (enableOverlayFile) {
         try { await this.transcriptionService.addDiarizationFromUrl(audioForTranscription, transcription); } catch {}
       }

@@ -3,6 +3,7 @@ import { TranscriptionService } from '@/lib/transcription';
 import { transcriptionCache } from '@/lib/cache';
 import { getUserUuid } from '@/services/user';
 import { getUserTier, UserTier } from '@/services/user-tier';
+import { getUserSubscriptionPlan, SubscriptionPlan } from '@/services/user-subscription';
 // import { hasFeature } from '@/services/user-tier'; // TODO: 队列功能暂时不启用
 import { RateLimiter, PREVIEW_LIMITS } from '@/lib/rate-limiter';
 import { enqueueJob, waitForTurn, markDone } from '@/services/queue';
@@ -14,6 +15,7 @@ import { AbuseDetector } from '@/lib/abuse-detector';
 import { quotaTracker } from '@/services/quota-tracker';
 import { headers } from 'next/headers';
 import { YouTubeService } from '@/lib/youtube';
+import { computeEstimatedMinutes } from '@/lib/estimate-usage';
 // import { PriorityQueueManager } from '@/lib/priority-queue'; // TODO: 队列功能暂时不启用
 
 // 初始化服务 - 支持两个模型：Deepgram + OpenAI Whisper
@@ -271,6 +273,7 @@ async function handleAuthenticatedRequest(params: AuthenticatedRequestParams) {
   const { type, content, options, userUuid } = params;
 
   const userTier = await getUserTier(userUuid);
+  const subscriptionPlan = await getUserSubscriptionPlan(userUuid);
   const { hasHighAccuracyAccess } = await import('@/services/user-tier');
   const canUseHighAccuracy = await hasHighAccuracyAccess(userUuid);
 
@@ -288,11 +291,13 @@ async function handleAuthenticatedRequest(params: AuthenticatedRequestParams) {
     return queueState.response;
   }
 
-  const estimatedMinutes = await estimateMinutes({
+  const estimatedMinutes = await computeEstimatedMinutes({
+    type,
+    content,
     userTier,
     options: normalizedOptions,
     userUuid,
-    canUseHighAccuracy
+    modelType: normalizedOptions?.highAccuracyMode && canUseHighAccuracy ? 'high_accuracy' : 'standard'
   });
 
   const quotaStatus = await quotaTracker.checkQuota(
@@ -325,6 +330,7 @@ async function handleAuthenticatedRequest(params: AuthenticatedRequestParams) {
       options: normalizedOptions,
       userUuid,
       userTier,
+      subscriptionPlan,
       canUseHighAccuracy,
       quotaStatus,
       jobId: queueState.jobId,
@@ -338,6 +344,7 @@ async function handleAuthenticatedRequest(params: AuthenticatedRequestParams) {
     options: normalizedOptions,
     userUuid,
     userTier,
+    subscriptionPlan,
     canUseHighAccuracy,
     quotaStatus,
     jobId: queueState.jobId,
@@ -365,6 +372,9 @@ async function applyFreeTierConstraints(params: FreeTierConstraintParams) {
   if (type === 'youtube_url' && !isProcessedUrl) {
     try {
       const videoInfo = await YouTubeService.getVideoInfo(content);
+      if (videoInfo?.duration && Number.isFinite(videoInfo.duration)) {
+        options.estimatedDurationSec = videoInfo.duration;
+      }
       let maxSeconds = POLICY.preview.freePreviewSeconds || 300;
       try {
         const { getMinuteBalances } = await import('@/services/minutes');
@@ -403,6 +413,9 @@ async function applyFreeTierConstraints(params: FreeTierConstraintParams) {
       if (packAllowance > 0) maxSeconds += packAllowance;
     } catch {}
     options.trimToSeconds = maxSeconds;
+    if (!options.estimatedDurationSec && Number.isFinite(maxSeconds)) {
+      options.estimatedDurationSec = maxSeconds;
+    }
     console.log('[FREE_CLIP][API] Free user with processed URL - applying 5min limit:', {
       userTier,
       isProcessedUrl: true,
@@ -419,6 +432,9 @@ async function applyFreeTierConstraints(params: FreeTierConstraintParams) {
       if (packAllowance > 0) maxSeconds += packAllowance;
     } catch {}
     options.trimToSeconds = maxSeconds;
+    if (!options.estimatedDurationSec && Number.isFinite(maxSeconds)) {
+      options.estimatedDurationSec = maxSeconds;
+    }
     console.log('[FREE_CLIP][API] Free user file upload - will clip to:', {
       userTier,
       type: 'file',
@@ -435,43 +451,15 @@ async function applyFreeTierConstraints(params: FreeTierConstraintParams) {
       if (packAllowance > 0) maxSeconds += packAllowance;
     } catch {}
     options.trimToSeconds = maxSeconds;
+    if (!options.estimatedDurationSec && Number.isFinite(maxSeconds)) {
+      options.estimatedDurationSec = maxSeconds;
+    }
     console.log('[FREE_CLIP][API] Free user audio_url - will clip to:', {
       userTier,
       type: 'audio_url',
       trimToSeconds: options.trimToSeconds
     });
   }
-}
-
-type EstimateMinutesParams = {
-  userTier: UserTier;
-  options: Record<string, any>;
-  userUuid: string;
-  canUseHighAccuracy: boolean;
-};
-
-async function estimateMinutes(params: EstimateMinutesParams) {
-  const { userTier, options, userUuid, canUseHighAccuracy } = params;
-  let estimatedMinutes = 10;
-
-  try {
-    if (userTier === UserTier.FREE) {
-      const previewSec = POLICY.preview.freePreviewSeconds || 300;
-      estimatedMinutes = Math.max(1, Math.ceil((options?.trimToSeconds || previewSec) / 60));
-    }
-  } catch {}
-
-  try {
-    const { getEstimatedPackCoverage } = await import('@/services/minutes');
-    const cover = await getEstimatedPackCoverage(
-      userUuid,
-      estimatedMinutes,
-      options?.highAccuracyMode && canUseHighAccuracy ? 'high_accuracy' : 'standard'
-    );
-    estimatedMinutes = Math.max(0, estimatedMinutes - cover);
-  } catch {}
-
-  return estimatedMinutes;
 }
 
 type QueueState = {
@@ -505,6 +493,7 @@ type StreamingParams = {
   options: Record<string, any>;
   userUuid: string;
   userTier: UserTier;
+  subscriptionPlan: SubscriptionPlan;
   canUseHighAccuracy: boolean;
   quotaStatus: Awaited<ReturnType<typeof quotaTracker.checkQuota>>;
   jobId?: string;
@@ -512,7 +501,7 @@ type StreamingParams = {
 };
 
 async function runStreamingTranscription(params: StreamingParams) {
-  const { type, content, options, userUuid, userTier, canUseHighAccuracy, quotaStatus, jobId, queueEnabled } = params;
+  const { type, content, options, userUuid, userTier, subscriptionPlan, canUseHighAccuracy, quotaStatus, jobId, queueEnabled } = params;
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -567,6 +556,7 @@ async function runStreamingTranscription(params: StreamingParams) {
           await recordUsageForTranscription({
             userUuid,
             userTier,
+            subscriptionPlan,
             durationSec,
             options,
             canUseHighAccuracy
@@ -625,6 +615,7 @@ type StandardParams = {
   options: Record<string, any>;
   userUuid: string;
   userTier: UserTier;
+  subscriptionPlan: SubscriptionPlan;
   canUseHighAccuracy: boolean;
   quotaStatus: Awaited<ReturnType<typeof quotaTracker.checkQuota>>;
   jobId?: string;
@@ -632,7 +623,7 @@ type StandardParams = {
 };
 
 async function runStandardTranscription(params: StandardParams) {
-  const { type, content, options, userUuid, userTier, canUseHighAccuracy, quotaStatus, jobId, queueEnabled } = params;
+  const { type, content, options, userUuid, userTier, subscriptionPlan, canUseHighAccuracy, quotaStatus, jobId, queueEnabled } = params;
 
   try {
     const procStart = Date.now();
@@ -671,6 +662,7 @@ async function runStandardTranscription(params: StandardParams) {
       await recordUsageForTranscription({
         userUuid,
         userTier,
+        subscriptionPlan,
         durationSec,
         options,
         canUseHighAccuracy
@@ -696,13 +688,14 @@ async function runStandardTranscription(params: StandardParams) {
 type UsageParams = {
   userUuid: string;
   userTier: UserTier;
+  subscriptionPlan: SubscriptionPlan;
   durationSec: number;
   options: Record<string, any>;
   canUseHighAccuracy: boolean;
 };
 
 async function recordUsageForTranscription(params: UsageParams) {
-  const { userUuid, userTier, durationSec, options, canUseHighAccuracy } = params;
+  const { userUuid, userTier, subscriptionPlan, durationSec, options, canUseHighAccuracy } = params;
   if (!durationSec || durationSec <= 0) {
     return;
   }
@@ -711,7 +704,7 @@ async function recordUsageForTranscription(params: UsageParams) {
   const usedHighAccuracy = !!options?.highAccuracyMode && canUseHighAccuracy;
 
   try {
-    if (userTier === UserTier.FREE) {
+    if (subscriptionPlan === 'FREE') {
       const { deductFromPacks } = await import('@/services/minutes');
       const remain = await deductFromPacks(userUuid, actualMinutes, 'standard');
       const safeRemain = Math.max(0, remain);
