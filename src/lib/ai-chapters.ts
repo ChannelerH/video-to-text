@@ -77,13 +77,9 @@ export class AIChapterService {
       generateSummary?: boolean;
     }
   ): Promise<AIChapter[]> {
-    console.log('[AIChapters] Starting generation with', segments.length, 'segments');
-    
     // If no API key, fall back to basic segmentation
     if (!this.DEEPSEEK_API_KEY) {
-      console.warn('DeepSeek API key not configured, using basic chapters');
       const basicChapters = BasicSegmentationService.generateBasicChapters(segments);
-      console.log('[AIChapters] Basic chapters generated:', basicChapters.length);
       return basicChapters.map(ch => ({
         ...ch,
         title: this.generateSmartTitle(ch.segments),
@@ -93,21 +89,17 @@ export class AIChapterService {
 
     // Let AI analyze the entire content and decide chapter breaks
     try {
-      console.log('[AIChapters] Calling AI generation...');
       const aiChapters = await this.generateChaptersWithAI(segments, options);
-      console.log('[AIChapters] AI returned', aiChapters?.length || 0, 'chapters');
       
       if (aiChapters && aiChapters.length > 0) {
         return aiChapters;
       }
-      console.warn('[AIChapters] AI returned no chapters, falling back to basic');
     } catch (error) {
       console.error('[AIChapters] AI chapter generation failed:', error);
     }
 
     // Fallback to basic chapters if AI fails
     const basicChapters = BasicSegmentationService.generateBasicChapters(segments);
-    console.log('[AIChapters] Fallback basic chapters:', basicChapters.length);
     return basicChapters.map(ch => ({
       ...ch,
       title: this.generateSmartTitle(ch.segments),
@@ -127,14 +119,11 @@ export class AIChapterService {
   ): Promise<AIChapter[]> {
     const detectedLanguage = this.detectLanguage(segments[0]?.text || '');
     const language = options?.language || detectedLanguage;
-    console.log('[AIChapters] Detected language:', language);
     
     // Prepare content for AI analysis
     const fullText = segments.map((s, i) => 
       `[${this.formatTime(s.start)}] ${s.text}`
     ).join('\n');
-    
-    console.log('[AIChapters] Full text length:', fullText.length);
     
     // Limit content length to avoid token limits
     // Increased from 8000 to 15000 for better chapter detection
@@ -143,13 +132,10 @@ export class AIChapterService {
       ? fullText.substring(0, maxLength) + '...\n[Content truncated]'
       : fullText;
     
-    console.log('[AIChapters] Sending text length:', truncatedText.length);
-    
     // Build prompt for AI to analyze and segment
     const prompt = this.buildSegmentationPrompt(truncatedText, segments.length, language, options?.generateSummary);
     
     try {
-      console.log('[AIChapters] Calling DeepSeek API...');
       const response = await this.callDeepSeekAPI(prompt, language);
       console.log('[AIChapters] AI Response:', response?.substring(0, 500));
       
@@ -160,7 +146,6 @@ export class AIChapterService {
       
       // Parse AI response
       const chapters = this.parseChapterResponse(response, segments);
-      console.log('[AIChapters] Parsed chapters:', chapters.length);
       return chapters;
     } catch (error) {
       console.error('[AIChapters] Error in AI chapter generation:', error);
@@ -872,7 +857,7 @@ Return strictly in this JSON format (no additional text):
   private static generateBasicSummary(
     segments: TranscriptionSegment[],
     options?: {
-      language?: 'en' | 'zh';
+      language?: string;
       maxLength?: number;
     }
   ): string {

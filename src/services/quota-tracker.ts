@@ -116,27 +116,35 @@ export class QuotaTracker {
   async recordUsage(
     userId: string,
     durationMinutes: number,
-    modelType: string
+    modelType: string,
+    subscriptionType?: string
   ): Promise<void> {
     const today = new Date().toISOString().split('T')[0];
-    
+
     try {
-    try {
-      await db().insert(usage_records).values({
+      const payload: any = {
         user_id: userId,
         date: today,
         minutes: durationMinutes,
         model_type: modelType,
         created_at: new Date()
-      });
-    } catch (e) {
-      // fallback: ignore duplicate or table missing
-      console.log(`Recording usage for ${userId}: ${durationMinutes} minutes with ${modelType}`);
+      };
+
+      if (subscriptionType) {
+        payload.subscription_type = subscriptionType;
+      }
+
+      try {
+        await db().insert(usage_records).values(payload);
+      } catch (e) {
+        // fallback: ignore duplicate or table missing
+        console.log(`Recording usage for ${userId}: ${durationMinutes} minutes with ${modelType}`, e);
+      }
+    } catch (error) {
+      console.error('Failed to record usage:', error);
     }
-  } catch (error) {
-    console.error('Failed to record usage:', error);
   }
-  }
+
 
   /**
    * 获取用户使用情况
@@ -153,17 +161,17 @@ export class QuotaTracker {
 
     try {
       const [daily] = await db().select({
-        count: sql<number>`COUNT(*) as count`,
-        minutes: sql<number>`COALESCE(SUM(${usage_records.minutes}),0) as minutes`
+        count: sql<number>`COALESCE(SUM(CASE WHEN ${usage_records.model_type} NOT LIKE 'pack_%' THEN 1 ELSE 0 END),0)`,
+        minutes: sql<number>`COALESCE(SUM(CASE WHEN ${usage_records.model_type} NOT LIKE 'pack_%' THEN ${usage_records.minutes} ELSE 0 END),0)`
       }).from(usage_records).where(and(eq(usage_records.user_id, userId), eq(usage_records.date, today)));
 
       const [monthly] = await db().select({
-        minutes: sql<number>`COALESCE(SUM(${usage_records.minutes}),0) as minutes`
+        minutes: sql<number>`COALESCE(SUM(CASE WHEN ${usage_records.model_type} NOT LIKE 'pack_%' THEN ${usage_records.minutes} ELSE 0 END),0)`
       }).from(usage_records).where(and(eq(usage_records.user_id, userId), gte(usage_records.created_at, monthStart)));
 
       const [monthlyHA] = await db().select({
-        minutes: sql<number>`COALESCE(SUM(${usage_records.minutes}),0) as minutes`
-      }).from(usage_records).where(and(eq(usage_records.user_id, userId), gte(usage_records.created_at, monthStart), eq(usage_records.model_type, 'high_accuracy')));
+        minutes: sql<number>`COALESCE(SUM(CASE WHEN ${usage_records.model_type} = 'high_accuracy' THEN ${usage_records.minutes} ELSE 0 END),0)`
+      }).from(usage_records).where(and(eq(usage_records.user_id, userId), gte(usage_records.created_at, monthStart)));
 
       return {
         dailyRequests: daily?.count || 0,

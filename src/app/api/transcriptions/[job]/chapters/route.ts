@@ -28,55 +28,94 @@ export async function POST(
     }
     const tier = await getUserTier(userUuid);
 
-    // FREE preview gating: enforce monthly limit and trim to first 5 minutes
+    // Process segments for FREE users (might already be trimmed by frontend)
     let workingSegments = segments;
+    
+    // For FREE users, ensure content doesn't exceed 5 minutes
+    // Note: Frontend might have already trimmed it, but we trim again to be safe
     if (tier === UserTier.FREE) {
-      const now = new Date();
-      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      const [row] = await db().select({
-        count: count()
-      }).from(usage_records).where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, monthStart), eq(usage_records.model_type, 'preview_ai_chapters')));
-      const used = Number(row?.count || 0);
-      const limit = POLICY.preview.freeMonthlyAiChapters;
-      if (used >= limit) {
-        return NextResponse.json({ success: false, error: 'AI 章节（预览）本月次数已用尽（按功能分别计数）', requiredTier: UserTier.BASIC, limit, used }, { status: 403 });
-      }
-      workingSegments = trimSegmentsToSeconds(segments, POLICY.preview.freePreviewSeconds);
-      await db().insert(usage_records).values({ user_id: userUuid, date: new Date().toISOString().slice(0,10), minutes: '0', model_type: 'preview_ai_chapters', created_at: new Date() }).catch(() => {});
-    }
-
-    // BASIC/PRO: ensure feature is enabled (BASIC and above)
-    if (tier !== UserTier.FREE && !hasFeature(tier, 'aiChapters')) {
-      return NextResponse.json({ success: false, error: 'AI chapters not available for your plan', requiredTier: UserTier.BASIC }, { status: 403 });
-    }
-
-    // FREE: monthly limit (from policy)
-    if (tier === UserTier.FREE) {
-      const now = new Date();
-      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      const [month] = await db().select({ count: count() }).from(usage_records)
-        .where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, monthStart), eq(usage_records.model_type, 'ai_chapters')));
-      const usedThisMonth = Number(month?.count || 0);
-      const monthlyLimit = POLICY.preview.freeMonthlyAiChapters;
-      if (usedThisMonth >= monthlyLimit) {
-        return NextResponse.json({ success: false, error: 'Monthly AI chapters limit reached', requiredTier: UserTier.BASIC, limit: monthlyLimit, used: usedThisMonth }, { status: 403 });
-      }
-      await db().insert(usage_records).values({ user_id: userUuid || '', date: new Date().toISOString().slice(0,10), minutes: '0', model_type: 'ai_chapters', created_at: new Date() }).catch(() => {});
+      const maxSeconds = POLICY.preview.freePreviewSeconds || 300;
+      workingSegments = trimSegmentsToSeconds(segments, maxSeconds);
     }
     
-    // BASIC: daily limit (e.g., <= 10 per day)
-    if (tier === UserTier.BASIC) {
-      const now = new Date();
-      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    // Check limits and record usage based on mode
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    
+    if (tier === UserTier.FREE) {
+      // FREE users always use the same type (content is always <=5 min after trimming)
+      const recordType = 'ai_chapters';  // Single type for FREE users
+      
+      // Check monthly limit
+      const [row] = await db().select({ count: count() }).from(usage_records)
+        .where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, monthStart), eq(usage_records.model_type, recordType)));
+      const used = Number(row?.count || 0);
+      const limit = POLICY.preview.freeMonthlyAiChapters;
+      
+      if (used >= limit) {
+        return NextResponse.json({ 
+          success: false, 
+          error: `AI 章节本月次数已用尽 (${used}/${limit})`, 
+          requiredTier: UserTier.BASIC, 
+          limit, 
+          used 
+        }, { status: 403 });
+      }
+      
+      // Record usage
+      await db().insert(usage_records).values({ 
+        user_id: userUuid, 
+        date: new Date().toISOString().slice(0,10), 
+        minutes: '0', 
+        model_type: recordType, 
+        created_at: new Date() 
+      }).catch(() => {});
+      
+    } else if (tier === UserTier.BASIC) {
+      // BASIC users: check feature and daily limit
+      if (!hasFeature(tier, 'aiChapters')) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'AI chapters not available for your plan', 
+          requiredTier: UserTier.PRO 
+        }, { status: 403 });
+      }
+      
+      // Check daily limit
       const [day] = await db().select({ count: count() }).from(usage_records)
         .where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, dayStart), eq(usage_records.model_type, 'ai_chapters')));
       const usedToday = Number(day?.count || 0);
       const dailyLimit = 10;
+      
       if (usedToday >= dailyLimit) {
-        return NextResponse.json({ success: false, error: 'Daily AI chapters limit reached', requiredTier: UserTier.PRO, limit: dailyLimit, used: usedToday, isDaily: true }, { status: 403 });
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Daily AI chapters limit reached', 
+          requiredTier: UserTier.PRO, 
+          limit: dailyLimit, 
+          used: usedToday, 
+          isDaily: true 
+        }, { status: 403 });
       }
-      await db().insert(usage_records).values({ user_id: userUuid || '', date: new Date().toISOString().slice(0,10), minutes: '0', model_type: 'ai_chapters', created_at: new Date() }).catch(() => {});
+      
+      // Record usage
+      await db().insert(usage_records).values({ 
+        user_id: userUuid || '', 
+        date: new Date().toISOString().slice(0,10), 
+        minutes: '0', 
+        model_type: 'ai_chapters', 
+        created_at: new Date() 
+      }).catch(() => {});
+      
+    } else if (!hasFeature(tier, 'aiChapters')) {
+      // PRO/PREMIUM: just check feature
+      return NextResponse.json({ 
+        success: false, 
+        error: 'AI chapters not available for your plan' 
+      }, { status: 403 });
     }
+    // PRO/PREMIUM with feature: no limits, no recording
 
     const chapters = await AIChapterService.generateAIChapters(workingSegments, {
       language: options?.language,

@@ -33,7 +33,9 @@ export async function POST(request: NextRequest) {
     }
 
     const userUuid = maybeUserUuid || '';
-    
+
+    const isHighAccuracyRequest = !!(options?.highAccuracyMode && maybeUserUuid);
+
     // Get user tier for FREE user audio clipping
     let userTier: UserTier = UserTier.FREE;
     if (userUuid) {
@@ -115,17 +117,17 @@ export async function POST(request: NextRequest) {
       deleted: false,
       duration_sec: 0,
       original_duration_sec: 0,
-      cost_minutes: 0
-    });
+      cost_minutes: '0'  // numeric类型需要字符串
+    }).catch(() => {});
 
     // 6. 将任务加入队列（用于非供应商异步类型的兜底处理）
     await db().insert(q_jobs).values({
       job_id: jobId,
-      tier: userUuid ? 'premium' : 'free',
+      tier: userUuid ? String(userTier).toLowerCase() : 'free',
       user_id: userUuid,
       created_at: new Date(),
       done: false
-    });
+    }).catch(() => {});
 
     // 7. 立即返回job_id（先构造响应，再异步触发一次处理）
     const resp = NextResponse.json({
@@ -135,112 +137,116 @@ export async function POST(request: NextRequest) {
       message: 'Transcription started successfully'
     });
 
-    // 8. 根据 SUPPLIER_ASYNC 配置，尝试走供应商异步（仅对 audio_url 可用）；否则由 /process-one 处理
+    // 8. 根据 SUPPLIER_ASYNC 配置派发到对应供应商；否则由本地兜底任务处理
     try {
       const origin = new URL(request.url).origin;
       const supplier = (process.env.SUPPLIER_ASYNC || '').toLowerCase();
-      const cbBase = process.env.CALLBACK_BASE_URL || origin;
+      const hasReplicate = !!process.env.REPLICATE_API_TOKEN;
+      const hasDeepgram = !!process.env.DEEPGRAM_API_KEY;
+
       if (type === 'audio_url' || type === 'file_upload') {
-        // For FREE users with file_upload, clip the audio to 5 minutes
         let audioUrlForSupplier = content;
-        if (type === 'file_upload' && userTier === 'free') {
-          const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
-          const clippedUrl = await clipAudioForFreeTier(content, jobId, 'file');
-          
-          if (clippedUrl) {
-            audioUrlForSupplier = clippedUrl;
-            // Update the processed_url in database for future reference
-            await db().update(transcriptions)
-              .set({ processed_url: audioUrlForSupplier })
-              .where(eq(transcriptions.job_id, jobId));
-          }
-          // If clipping fails, audioUrlForSupplier remains as the original content
-        }
-        
-        if ((supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
-          let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(jobId)}`;
-          console.log('[Deepgram] Webhook secret configured:', !!process.env.DEEPGRAM_WEBHOOK_SECRET);
 
-          // 使用 URLSearchParams 确保参数正确编码
-          const params = new URLSearchParams();
-          // Deepgram 不接受 callback_secret 查询参数；改为把签名放进回调 URL 本身
-          if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
-            const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(jobId).digest('hex');
-            cb = `${cb}&cb_sig=${sig}`;
-          }
-          params.set('callback', cb);
-          // 明确指定回调方法
-          params.set('callback_method', 'POST');
-
-          // Deepgram 要求在 query 传 callback（不要传 callback_secret / callback_method）
-          // 添加必要的参数来启用段落和句子分割
-          const params2 = new URLSearchParams();
-          params2.set('callback', cb);
-          params2.set('paragraphs', 'true');  // 启用段落分割
-          params2.set('punctuate', 'true');   // 启用标点符号
-          params2.set('utterances', 'true');  // 启用说话人分离
-          params2.set('model', 'nova-2');     // 使用 Nova-2 模型
-          params2.set('detect_language', 'true'); // 启用语言检测
-          // 不设置 language 参数，让 Deepgram 自动检测
-          console.log('[Deepgram] Request params:', params2.toString());
-          const dgResp = await fetch(`https://api.deepgram.com/v1/listen?${params2.toString()}`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ url: audioUrlForSupplier })
-          }).catch((e) => { console.error('[Deepgram] enqueue failed(request):', e); });
+        // FREE 用户上传文件时仍需裁剪
+        if (type === 'file_upload' && userTier === UserTier.FREE) {
           try {
-            if (dgResp && !dgResp.ok) {
-              const t = await dgResp.text();
-              console.error('[Deepgram] enqueue non-200:', dgResp.status, t);
+            const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
+            const clippedUrl = await clipAudioForFreeTier(content, jobId, 'file');
+            if (clippedUrl) {
+              audioUrlForSupplier = clippedUrl;
+              await db().update(transcriptions)
+                .set({ processed_url: audioUrlForSupplier })
+                .where(eq(transcriptions.job_id, jobId));
             }
-          } catch {}
+          } catch (clipErr) {
+            console.warn('[Async] Failed to clip audio for free tier:', clipErr);
+          }
         }
-        if ((supplier.includes('replicate') || supplier === 'both') && process.env.REPLICATE_API_TOKEN) {
-          const cb = `${cbBase}/api/callback/replicate?job_id=${encodeURIComponent(jobId)}`;
-          // Use Replicate predictions.create API
-          await fetch('https://api.replicate.com/v1/predictions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Token ${process.env.REPLICATE_API_TOKEN}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              // Use the same whisper model as in ReplicateService
-              // You can also use 'version' here; keeping model id for compatibility
-              model: 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
-              input: { audio_file: audioUrlForSupplier, model: 'large-v3' },
-              webhook: cb,
-              webhook_events_filter: ['completed', 'failed'],
-              ...(process.env.REPLICATE_WEBHOOK_SECRET ? { webhook_secret: process.env.REPLICATE_WEBHOOK_SECRET } : {})
-            })
-          }).catch(() => {});
+
+        const callbackBase = process.env.CALLBACK_BASE_URL || origin;
+        const shouldUseReplicate = (isHighAccuracyRequest && hasReplicate) || ((supplier.includes('replicate') || supplier === 'both') && hasReplicate);
+        const shouldUseDeepgram = !isHighAccuracyRequest && hasDeepgram && (supplier.includes('deepgram') || supplier === 'both' || supplier === '');
+
+        if (shouldUseReplicate) {
+          try {
+            const cbUrl = new URL(`${callbackBase}/api/callback/replicate`);
+            cbUrl.searchParams.set('job_id', jobId);
+            if (isHighAccuracyRequest) cbUrl.searchParams.set('ha', '1');
+
+            await fetch('https://api.replicate.com/v1/predictions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Token ${process.env.REPLICATE_API_TOKEN}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                model: 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
+                input: { audio_file: audioUrlForSupplier, model: 'large-v3' },
+                webhook: cbUrl.toString(),
+                webhook_events_filter: ['completed', 'failed'],
+                ...(process.env.REPLICATE_WEBHOOK_SECRET ? { webhook_secret: process.env.REPLICATE_WEBHOOK_SECRET } : {})
+              })
+            });
+
+            await db().update(transcriptions).set({ status: 'transcribing' }).where(eq(transcriptions.job_id, jobId));
+          } catch (err) {
+            console.error('[Async] Failed to dispatch Replicate job:', err);
+          }
         }
-      } else if (type === 'youtube_url') {
-        // 对 YouTube：快速解析直链并交给供应商（需要 SUPPLIER_ASYNC 设置）
-        fetch(`${origin}/api/transcribe/prepare/youtube`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            job_id: jobId, 
-            video: content, 
-            user_tier: userTier,
-            preferred_language: options?.preferred_language // 传递用户选择的语言
-          })
-        }).catch(() => {});
-      } else {
-        // 其他类型仅在显式开启兜底时触发本地处理
-        if (process.env.PROCESS_ONE_FALLBACK === 'true') {
+
+        if (shouldUseDeepgram) {
+          try {
+            let cb = `${callbackBase}/api/callback/deepgram?job_id=${encodeURIComponent(jobId)}`;
+            if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
+              const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(jobId).digest('hex');
+              cb = `${cb}&cb_sig=${sig}`;
+            }
+
+            const params = new URLSearchParams();
+            params.set('callback', cb);
+            params.set('paragraphs', 'true');
+            params.set('punctuate', 'true');
+            params.set('utterances', 'true');
+            params.set('model', 'nova-2');
+            params.set('detect_language', 'true');
+
+            await fetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ url: audioUrlForSupplier })
+            });
+
+            await db().update(transcriptions).set({ status: 'transcribing' }).where(eq(transcriptions.job_id, jobId));
+          } catch (err) {
+            console.error('[Async] Failed to dispatch Deepgram job:', err);
+          }
+        }
+
+        if (!shouldUseReplicate && !shouldUseDeepgram && process.env.PROCESS_ONE_FALLBACK === 'true') {
           fetch(`${origin}/api/transcribe/process-one`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ job_id: jobId })
           }).catch(() => {});
         }
+      } else if (type === 'youtube_url') {
+        fetch(`${origin}/api/transcribe/prepare/youtube`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            job_id: jobId,
+            video: content,
+            user_tier: userTier,
+            preferred_language: options?.preferred_language
+          })
+        }).catch(() => {});
       }
-    } catch {}
+    } catch (dispatchError) {
+      console.error('[Async] Supplier dispatch error:', dispatchError);
+    }
 
     return resp;
 

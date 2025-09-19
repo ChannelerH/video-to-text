@@ -91,7 +91,7 @@ export async function getUserMinutesUsed(userUuid: string): Promise<number> {
     // 优先从 usage_records 表获取
     const [usageResult] = await db()
       .select({ 
-        total: sql<number>`COALESCE(SUM(${usage_records.minutes}::double precision), 0)` 
+        total: sql<number>`COALESCE(SUM(CASE WHEN ${usage_records.model_type} NOT LIKE 'pack_%' THEN ${usage_records.minutes}::double precision ELSE 0 END), 0)` 
       })
       .from(usage_records)
       .where(

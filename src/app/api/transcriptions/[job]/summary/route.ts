@@ -30,53 +30,94 @@ export async function POST(
       );
     }
 
-    // FREE: preview-only for first 5 minutes, with monthly limit
+    // Process segments for FREE users (might already be trimmed by frontend)
     let workingSegments = segments;
+    
+    // For FREE users, ensure content doesn't exceed 5 minutes
+    // Note: Frontend might have already trimmed it, but we trim again to be safe
     if (userTier === UserTier.FREE) {
-      const now = new Date();
-      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const maxSeconds = POLICY.preview.freePreviewSeconds || 300;
+      workingSegments = trimSegmentsToSeconds(segments, maxSeconds);
+    }
+    
+    // Check limits and record usage based on mode
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    
+    if (userTier === UserTier.FREE) {
+      // FREE users always use the same type (content is always <=5 min after trimming)
+      const recordType = 'ai_summary';  // Single type for FREE users
+      
+      // Check monthly limit
       const [row] = await db().select({ count: count() }).from(usage_records)
-        .where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, monthStart), eq(usage_records.model_type, 'preview_ai_summary')));
+        .where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, monthStart), eq(usage_records.model_type, recordType)));
       const used = Number(row?.count || 0);
       const limit = POLICY.preview.freeMonthlyAiSummary;
+      
       if (used >= limit) {
-        return NextResponse.json({ success: false, error: 'AI 总结（预览）本月次数已用尽（按功能分别计数）', requiredTier: UserTier.BASIC, limit, used }, { status: 403 });
-      }
-      workingSegments = trimSegmentsToSeconds(segments, POLICY.preview.freePreviewSeconds);
-      await db().insert(usage_records).values({ user_id: userUuid, date: new Date().toISOString().slice(0,10), minutes: '0', model_type: 'preview_ai_summary', created_at: new Date() }).catch(() => {});
-    } else {
-      // BASIC/PRO must have feature
-      if (!hasFeature(userTier, 'aiSummary')) {
-        return NextResponse.json({ success: false, error: 'AI summary not available for your plan', requiredTier: UserTier.BASIC }, { status: 403 });
-      }
-      // FREE: monthly limit (from policy)
-      if (userTier === UserTier.FREE) {
-        const now = new Date();
-        const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-        const [month] = await db().select({ count: count() }).from(usage_records)
-          .where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, monthStart), eq(usage_records.model_type, 'ai_summary')));
-        const usedThisMonth = Number(month?.count || 0);
-        const monthlyLimit = POLICY.preview.freeMonthlyAiSummary;
-        if (usedThisMonth >= monthlyLimit) {
-          return NextResponse.json({ success: false, error: 'Monthly AI summary limit reached', requiredTier: UserTier.BASIC, limit: monthlyLimit, used: usedThisMonth }, { status: 403 });
-        }
-        await db().insert(usage_records).values({ user_id: userUuid || '', date: new Date().toISOString().slice(0,10), minutes: '0', model_type: 'ai_summary', created_at: new Date() }).catch(() => {});
+        return NextResponse.json({ 
+          success: false, 
+          error: `AI 总结本月次数已用尽 (${used}/${limit})`, 
+          requiredTier: UserTier.BASIC, 
+          limit, 
+          used 
+        }, { status: 403 });
       }
       
-      // BASIC: daily limit (e.g., <= 10 per day)
-      if (userTier === UserTier.BASIC) {
-        const now = new Date();
-        const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        const [day] = await db().select({ count: count() }).from(usage_records)
-          .where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, dayStart), eq(usage_records.model_type, 'ai_summary')));
-        const usedToday = Number(day?.count || 0);
-        const dailyLimit = 10;
-        if (usedToday >= dailyLimit) {
-          return NextResponse.json({ success: false, error: 'Daily AI summary limit reached', requiredTier: UserTier.PRO, limit: dailyLimit, used: usedToday, isDaily: true }, { status: 403 });
-        }
-        await db().insert(usage_records).values({ user_id: userUuid || '', date: new Date().toISOString().slice(0,10), minutes: '0', model_type: 'ai_summary', created_at: new Date() }).catch(() => {});
+      // Record usage
+      await db().insert(usage_records).values({ 
+        user_id: userUuid, 
+        date: new Date().toISOString().slice(0,10), 
+        minutes: '0', 
+        model_type: recordType, 
+        created_at: new Date() 
+      }).catch(() => {});
+      
+    } else if (userTier === UserTier.BASIC) {
+      // BASIC users: check feature and daily limit
+      if (!hasFeature(userTier, 'aiSummary')) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'AI summary not available for your plan', 
+          requiredTier: UserTier.PRO 
+        }, { status: 403 });
       }
+      
+      // Check daily limit
+      const [day] = await db().select({ count: count() }).from(usage_records)
+        .where(and(eq(usage_records.user_id, userUuid || ''), gte(usage_records.created_at, dayStart), eq(usage_records.model_type, 'ai_summary')));
+      const usedToday = Number(day?.count || 0);
+      const dailyLimit = 10;
+      
+      if (usedToday >= dailyLimit) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Daily AI summary limit reached', 
+          requiredTier: UserTier.PRO, 
+          limit: dailyLimit, 
+          used: usedToday, 
+          isDaily: true 
+        }, { status: 403 });
+      }
+      
+      // Record usage
+      await db().insert(usage_records).values({ 
+        user_id: userUuid || '', 
+        date: new Date().toISOString().slice(0,10), 
+        minutes: '0', 
+        model_type: 'ai_summary', 
+        created_at: new Date() 
+      }).catch(() => {});
+      
+    } else if (!hasFeature(userTier, 'aiSummary')) {
+      // PRO/PREMIUM: just check feature
+      return NextResponse.json({ 
+        success: false, 
+        error: 'AI summary not available for your plan' 
+      }, { status: 403 });
     }
+    // PRO/PREMIUM with feature: no limits, no recording
 
     // Generate AI summary
     const summary = await AIChapterService.generateSummary(workingSegments, {
@@ -100,7 +141,6 @@ export async function POST(
       }
     });
   } catch (error) {
-    console.error('Error generating summary:', error);
     return NextResponse.json(
       { 
         success: false, 

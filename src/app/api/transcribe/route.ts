@@ -426,12 +426,28 @@ export async function POST(request: NextRequest) {
                 const usedHighAccuracy = !!options?.highAccuracyMode && canUseHighAccuracy;
                 try {
                   if (userTier === UserTier.FREE) {
-                    // Free: 优先扣分钟包，不足部分计入订阅月用量（预览额度）
                     const { deductFromPacks } = await import('@/services/minutes');
                     const remain = await deductFromPacks(user_uuid, actualMinutes, 'standard');
-                    const leftoverRounded = Math.max(0, Math.round(remain * 100) / 100);
+                    const safeRemain = Math.max(0, remain);
+                    const packUsed = Math.max(0, actualMinutes - safeRemain);
+                    const packRounded = Math.max(0, Math.round(packUsed * 100) / 100);
+                    console.log('[API] recordUsage', { user_uuid, remain, packUsed });
+                    if (packRounded > 0) {
+                      await quotaTracker.recordUsage(
+                        user_uuid,
+                        packRounded,
+                        usedHighAccuracy ? 'pack_high_accuracy' : 'pack_standard',
+                        'minute_pack'
+                      );
+                    }
+                    const leftoverRounded = Math.max(0, Math.round(safeRemain * 100) / 100);
                     if (leftoverRounded > 0) {
-                      await quotaTracker.recordUsage(user_uuid, leftoverRounded, 'standard');
+                      await quotaTracker.recordUsage(
+                        user_uuid,
+                        leftoverRounded,
+                        'standard',
+                        'subscription'
+                      );
                     }
                   } else {
                     // Basic/Pro: 订阅优先，再扣分钟包
@@ -444,19 +460,48 @@ export async function POST(request: NextRequest) {
                     const remainMonthly = Math.max(0, Number(qs.remaining.monthlyMinutes || 0));
                     const remainHA = usedHighAccuracy ? Math.max(0, Number(qs.remaining.monthlyHighAccuracyMinutes || 0)) : Infinity;
                     const subUse = Math.max(0, Math.min(actualMinutes, remainMonthly, remainHA));
-                    if (subUse > 0) {
-                      await quotaTracker.recordUsage(user_uuid, subUse, usedHighAccuracy ? 'high_accuracy' : 'standard');
+                    const subRounded = Math.max(0, Math.round(subUse * 100) / 100);
+                    if (subRounded > 0) {
+                      await quotaTracker.recordUsage(
+                        user_uuid,
+                        subRounded,
+                        usedHighAccuracy ? 'high_accuracy' : 'standard',
+                        'subscription'
+                      );
                     }
                     const packNeed = Math.max(0, actualMinutes - subUse);
                     if (packNeed > 0) {
                       const { deductFromPacks } = await import('@/services/minutes');
-                      await deductFromPacks(user_uuid, packNeed, 'standard');
+                      const packRemain = await deductFromPacks(user_uuid, packNeed, 'standard');
+                      const safePackRemain = Math.max(0, packRemain);
+                      const packUsed = Math.max(0, packNeed - safePackRemain);
+                      const packRounded = Math.max(0, Math.round(packUsed * 100) / 100);
+                      if (packRounded > 0) {
+                        await quotaTracker.recordUsage(
+                          user_uuid,
+                          packRounded,
+                          usedHighAccuracy ? 'pack_high_accuracy' : 'pack_standard',
+                          'minute_pack'
+                        );
+                      }
+                      const overflowRounded = Math.max(0, Math.round(safePackRemain * 100) / 100);
+                      if (overflowRounded > 0) {
+                        await quotaTracker.recordUsage(
+                          user_uuid,
+                          overflowRounded,
+                          usedHighAccuracy ? 'high_accuracy' : 'standard',
+                          'subscription'
+                        );
+                      }
                     }
                   }
                 } catch (e) {
-                  if (userTier !== UserTier.FREE) {
-                    await quotaTracker.recordUsage(user_uuid, Math.max(0.01, Math.round(actualMinutes * 100) / 100), usedHighAccuracy ? 'high_accuracy' : 'standard');
-                  }
+                  await quotaTracker.recordUsage(
+                    user_uuid,
+                    Math.max(0.01, Math.round(actualMinutes * 100) / 100),
+                    usedHighAccuracy ? 'high_accuracy' : 'standard',
+                    'subscription'
+                  );
                 }
                 // 高精度溢出计费（仅记录溢出分钟，统一对账扣费）
                 if (usedHighAccuracy && process.env.OVERAGE_ENABLED !== 'false') {
@@ -556,9 +601,25 @@ export async function POST(request: NextRequest) {
           if (userTier === UserTier.FREE) {
             const { deductFromPacks } = await import('@/services/minutes');
             const remain = await deductFromPacks(user_uuid, actualMinutes, 'standard');
-            const leftoverRounded = Math.max(0, Math.round(remain * 100) / 100);
+            const safeRemain = Math.max(0, remain);
+            const packUsed = Math.max(0, actualMinutes - safeRemain);
+            const packRounded = Math.max(0, Math.round(packUsed * 100) / 100);
+            if (packRounded > 0) {
+              await quotaTracker.recordUsage(
+                user_uuid,
+                packRounded,
+                usedHighAccuracy ? 'pack_high_accuracy' : 'pack_standard',
+                'minute_pack'
+              );
+            }
+            const leftoverRounded = Math.max(0, Math.round(safeRemain * 100) / 100);
             if (leftoverRounded > 0) {
-              await quotaTracker.recordUsage(user_uuid, leftoverRounded, 'standard');
+              await quotaTracker.recordUsage(
+                user_uuid,
+                leftoverRounded,
+                'standard',
+                'subscription'
+              );
             }
           } else {
             const qs = await quotaTracker.checkQuota(
@@ -570,19 +631,48 @@ export async function POST(request: NextRequest) {
             const remainMonthly = Math.max(0, Number(qs.remaining.monthlyMinutes || 0));
             const remainHA = usedHighAccuracy ? Math.max(0, Number(qs.remaining.monthlyHighAccuracyMinutes || 0)) : Infinity;
             const subUse = Math.max(0, Math.min(actualMinutes, remainMonthly, remainHA));
-            if (subUse > 0) {
-              await quotaTracker.recordUsage(user_uuid, subUse, usedHighAccuracy ? 'high_accuracy' : 'standard');
+            const subRounded = Math.max(0, Math.round(subUse * 100) / 100);
+            if (subRounded > 0) {
+              await quotaTracker.recordUsage(
+                user_uuid,
+                subRounded,
+                usedHighAccuracy ? 'high_accuracy' : 'standard',
+                'subscription'
+              );
             }
             const packNeed = Math.max(0, actualMinutes - subUse);
             if (packNeed > 0) {
               const { deductFromPacks } = await import('@/services/minutes');
-              await deductFromPacks(user_uuid, packNeed, 'standard');
+              const packRemain = await deductFromPacks(user_uuid, packNeed, 'standard');
+              const safePackRemain = Math.max(0, packRemain);
+              const packUsed = Math.max(0, packNeed - safePackRemain);
+              const packRounded = Math.max(0, Math.round(packUsed * 100) / 100);
+              if (packRounded > 0) {
+                await quotaTracker.recordUsage(
+                  user_uuid,
+                  packRounded,
+                  usedHighAccuracy ? 'pack_high_accuracy' : 'pack_standard',
+                  'minute_pack'
+                );
+              }
+              const overflowRounded = Math.max(0, Math.round(safePackRemain * 100) / 100);
+              if (overflowRounded > 0) {
+                await quotaTracker.recordUsage(
+                  user_uuid,
+                  overflowRounded,
+                  usedHighAccuracy ? 'high_accuracy' : 'standard',
+                  'subscription'
+                );
+              }
             }
           }
         } catch {
-          if (userTier !== UserTier.FREE) {
-            await quotaTracker.recordUsage(user_uuid, Math.max(0.01, Math.round(actualMinutes * 100) / 100), usedHighAccuracy ? 'high_accuracy' : 'standard');
-          }
+          await quotaTracker.recordUsage(
+            user_uuid,
+            Math.max(0.01, Math.round(actualMinutes * 100) / 100),
+            usedHighAccuracy ? 'high_accuracy' : 'standard',
+            'subscription'
+          );
         }
         if (usedHighAccuracy && process.env.OVERAGE_ENABLED !== 'false') {
           try {
