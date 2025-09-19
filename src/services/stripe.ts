@@ -12,10 +12,32 @@ export async function handleCheckoutSession(
       throw new Error("not handle unpaid session");
     }
 
-    // get session metadata
-    const metadata = session.metadata;
-    if (!metadata || !metadata.order_no) {
+    // normalize metadata (Stripe.Metadata behaves like a map but we need plain object)
+    const metadata: Record<string, string> = { ...(session.metadata || {}) };
+
+    // fallback: try to read order_no from success_url when metadata missing (Stripe CLI events, etc.)
+    if (!metadata.order_no && session.success_url) {
+      try {
+        const successUrl = new URL(session.success_url);
+        const orderNo = successUrl.searchParams.get('order_no');
+        if (orderNo) {
+          metadata.order_no = orderNo;
+        }
+        const fallbackEmail = successUrl.searchParams.get('user_email');
+        if (fallbackEmail && !metadata.user_email) {
+          metadata.user_email = fallbackEmail;
+        }
+      } catch {}
+    }
+
+    if (!metadata.order_no) {
       throw new Error("no metadata in session");
+    }
+
+    // ensure user email is available for downstream updates
+    if (!metadata.user_email) {
+      metadata.user_email =
+        session.customer_details?.email || session.customer_email || '';
     }
 
     const subId = session.subscription as string;

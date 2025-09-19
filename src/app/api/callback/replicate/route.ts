@@ -61,9 +61,11 @@ export async function POST(req: NextRequest) {
     const txt = transcriptionText || (segments.length ? segments.map((s: any) => s.text).join('\n') : '');
     const json = JSON.stringify(segments || []);
 
-    // Try to generate SRT/VTT when we have segments
+    // Try to generate SRT/VTT/MD when we have segments
     let srt = '';
     let vtt = '';
+    let md = '';
+    let markdownSource: { svc: any; tr: any } | null = null;
     try {
       if (Array.isArray(segments) && segments.length > 0) {
         const { UnifiedTranscriptionService } = await import('@/lib/unified-transcription');
@@ -72,10 +74,22 @@ export async function POST(req: NextRequest) {
         const tr: any = { text: txt, segments, language: language || 'unknown', duration: lastEnd };
         srt = svc.convertToSRT(tr);
         vtt = svc.convertToVTT(tr);
+        markdownSource = { svc, tr };
       }
     } catch {}
 
-    for (const [format, content] of Object.entries({ txt, json, srt, vtt })) {
+    const [currentTranscription] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
+
+    if (!md && markdownSource) {
+      try {
+        md = markdownSource.svc.convertToMarkdown(
+          markdownSource.tr,
+          currentTranscription?.title || 'Transcription'
+        );
+      } catch {}
+    }
+
+    for (const [format, content] of Object.entries({ txt, json, srt, vtt, md })) {
       if (!content) continue;
       await db().insert(transcription_results).values({
         job_id: jobId,
@@ -99,8 +113,6 @@ export async function POST(req: NextRequest) {
     const roundedMinutes = actualMinutes > 0 ? Number(actualMinutes.toFixed(3)) : 0;
     const usedHighAccuracy = req.nextUrl.searchParams.get('ha') === '1' ||
       (body?.input?.model && String(body.input.model).toLowerCase().includes('large'));
-
-    const [currentTranscription] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
 
     // Update transcription metadata
     const updatePayload: any = {

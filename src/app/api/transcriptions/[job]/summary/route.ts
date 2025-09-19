@@ -58,7 +58,7 @@ export async function POST(
       if (used >= limit) {
         return NextResponse.json({ 
           success: false, 
-          error: `AI 总结本月次数已用尽 (${used}/${limit})`, 
+          error: `Monthly AI summary limit reached (${used}/${limit})`, 
           requiredTier: UserTier.BASIC, 
           limit, 
           used 

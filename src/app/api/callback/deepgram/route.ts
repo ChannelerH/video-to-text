@@ -241,6 +241,8 @@ export async function POST(req: NextRequest) {
     const json = JSON.stringify(segments || []);
     let srt = '';
     let vtt = '';
+    let md = '';
+    let markdownSource: { svc: any; tr: any } | null = null;
     try {
       if (Array.isArray(segments) && segments.length > 0) {
         const { UnifiedTranscriptionService } = await import('@/lib/unified-transcription');
@@ -249,10 +251,23 @@ export async function POST(req: NextRequest) {
         const tr: any = { text: txt, segments, language: language || 'unknown', duration: lastEnd };
         srt = svc.convertToSRT(tr);
         vtt = svc.convertToVTT(tr);
+        markdownSource = { svc, tr };
       }
     } catch {}
 
-    for (const [format, content] of Object.entries({ txt, json, srt, vtt })) {
+    // Lazily compute markdown after fetching transcription to avoid extra queries
+    const [currentTranscription] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
+
+    if (!md && markdownSource) {
+      try {
+        md = markdownSource.svc.convertToMarkdown(
+          markdownSource.tr,
+          currentTranscription?.title || 'Transcription'
+        );
+      } catch {}
+    }
+
+    for (const [format, content] of Object.entries({ txt, json, srt, vtt, md })) {
       if (!content) continue;
       await db().insert(transcription_results).values({
         job_id: jobId,
@@ -279,8 +294,6 @@ export async function POST(req: NextRequest) {
     const usedHighAccuracy = false; // Deepgram callbacks correspond to standard accuracy
     
     // 获取当前记录，只在标题是默认值时才更新
-    const [currentTranscription] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
-    
     let updateData: any = {
       status: 'completed',
       completed_at: new Date(),

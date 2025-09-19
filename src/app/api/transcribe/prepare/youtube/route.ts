@@ -362,13 +362,32 @@ export async function POST(request: NextRequest) {
                 secretAccessKey: process.env.STORAGE_SECRET_KEY || ''
               }
             });
+
+            // ytdl exposes format metadata via the `info` event; capture content length if available
+            const contentLengthPromise = new Promise<number | undefined>((resolve) => {
+              let done = false;
+              const finalize = (len?: number) => {
+                if (done) return;
+                done = true;
+                resolve(len);
+              };
+              stream.once('info', (_info: any, format: any) => {
+                const len = format?.contentLength || format?.clen;
+                const parsed = len ? Number(len) : undefined;
+                finalize(Number.isFinite(parsed) ? parsed : undefined);
+              });
+              stream.once('error', () => finalize(undefined));
+              // safety timeout to avoid hanging if info never fires
+              setTimeout(() => finalize(undefined), 5000);
+            });
             
             const key = `youtube-audio/${vid}_${Date.now()}.webm`;
             const bucket = process.env.STORAGE_BUCKET || '';
             const publicDomain = process.env.STORAGE_DOMAIN || process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN;
-            
-            // Stream upload without buffering
-            await s3.send(new PutObjectCommand({
+
+            const contentLength = await contentLengthPromise;
+
+            const putParams: any = {
               Bucket: bucket,
               Key: key,
               Body: stream as any,  // Direct stream, no buffering
@@ -377,7 +396,12 @@ export async function POST(request: NextRequest) {
                 'upload-time': new Date().toISOString(),
                 'source': 'youtube-prepare'
               }
-            }));
+            };
+            if (contentLength && Number.isFinite(contentLength)) {
+              putParams.ContentLength = contentLength;
+            }
+
+            await s3.send(new PutObjectCommand(putParams));
             
             const publicUrl = (publicDomain ? 
               (publicDomain.startsWith('http') ? publicDomain : `https://${publicDomain}`) : 
