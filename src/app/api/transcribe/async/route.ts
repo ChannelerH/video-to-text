@@ -299,10 +299,10 @@ export async function POST(request: NextRequest) {
             params.set('callback', cb);
             params.set('paragraphs', 'true');
             params.set('punctuate', 'true');
-            params.set('utterances', 'true');
             params.set('model', 'nova-2');
             params.set('detect_language', 'true');
             if (enableDiarization) {
+              params.set('utterances', 'true');
               params.set('diarize', 'true');
             }
 

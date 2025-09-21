@@ -149,23 +149,34 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
     return /[\u4e00-\u9fff]/.test(text);
   };
 
-  const enhanceChineseText = (raw: string) => {
-    let text = (raw || '').trim();
-    if (!text) return '';
-    text = text.replace(/[\t\r\f]+/g, ' ').replace(/\u00A0/g, ' ').replace(/\s{2,}/g, ' ');
-    text = text.replace(/([\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])/g, '$1');
-    text = text
+const enhanceChineseText = (raw: string) => {
+  let text = (raw || '').trim();
+  if (!text) return '';
+  text = text.replace(/[\t\r\f]+/g, ' ').replace(/\u00A0/g, ' ').replace(/\s{2,}/g, ' ');
+  text = text.replace(/([\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])/g, '$1');
+  text = text
       .replace(/([\u4e00-\u9fff])([A-Za-z0-9])/g, '$1 $2')
       .replace(/([A-Za-z0-9])([\u4e00-\u9fff])/g, '$1 $2');
-    text = text
-      .replace(/([\u4e00-\u9fff])\s*,\s*/g, '$1，')
-      .replace(/([\u4e00-\u9fff])\s*\.\s*/g, '$1。')
-      .replace(/([\u4e00-\u9fff])\s*!\s*/g, '$1！')
-      .replace(/([\u4e00-\u9fff])\s*\?\s*/g, '$1？')
-      .replace(/([\u4e00-\u9fff])\s*:\s*/g, '$1：')
-      .replace(/([\u4e00-\u9fff])\s*;\s*/g, '$1；');
-    return text;
-  };
+  text = text
+    .replace(/([\u4e00-\u9fff])\s*,\s*/g, '$1，')
+    .replace(/([\u4e00-\u9fff])\s*\.\s*/g, '$1。')
+    .replace(/([\u4e00-\u9fff])\s*!\s*/g, '$1！')
+    .replace(/([\u4e00-\u9fff])\s*\?\s*/g, '$1？')
+    .replace(/([\u4e00-\u9fff])\s*:\s*/g, '$1：')
+    .replace(/([\u4e00-\u9fff])\s*;\s*/g, '$1；');
+  return text;
+};
+
+const formatSpeakerLabel = (value: string | number | undefined | null) => {
+  if (value === undefined || value === null) return '';
+  const str = String(value).trim();
+  if (!str) return '';
+  const num = Number(str);
+  if (!Number.isNaN(num)) {
+    return `Speaker ${num + 1}`;
+  }
+  return str;
+};
 
   const previewIsChinese = transcriptionResult ? isChineseText(transcriptionResult.language, transcriptionResult.text) : false;
 
@@ -174,7 +185,13 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
 
     const filenameBase = (transcriptionResult.title || 'transcription').replace(/\s+/g, '_');
     const segments = transcriptionResult.segments || [];
-    const plainText = transcriptionResult.text || segments.map(seg => seg.text).join('\n\n');
+    const plainText = transcriptionResult.text
+      || segments.map(seg => {
+        const speakerLabel = speakerDiarization && seg.speaker != null && String(seg.speaker).trim() !== ''
+          ? `${formatSpeakerLabel(seg.speaker)}: `
+          : '';
+        return `${speakerLabel}${seg.text}`;
+      }).join('\n\n');
 
     const downloadBlob = (blob: Blob | ArrayBuffer | Buffer, filename: string, mime = 'application/octet-stream') => {
       const fileBlob = blob instanceof Blob ? blob : new Blob([blob as ArrayBuffer], { type: mime });
@@ -274,7 +291,10 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
       ? transcriptionResult.segments
           .map(seg => {
             const payload = previewIsChinese ? enhanceChineseText(seg.text) : seg.text;
-            return `[${formatTimestamp(seg.start)} - ${formatTimestamp(seg.end)}] ${payload}`;
+            const speakerLabel = speakerDiarization && seg.speaker != null && String(seg.speaker).trim() !== ''
+              ? `${formatSpeakerLabel(seg.speaker)}: `
+              : '';
+            return `[${formatTimestamp(seg.start)} - ${formatTimestamp(seg.end)}] ${speakerLabel}${payload}`;
           })
           .join('\n\n')
       : (previewIsChinese ? enhanceChineseText(transcriptionResult.text || '') : transcriptionResult.text || '');
@@ -599,7 +619,7 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
             />
             
             <div className="mt-2 text-xs text-slate-500">
-              Supports: MP3, M4A, WAV, OGG, FLAC, YouTube links
+              Supports: YouTube links
             </div>
             
             <div className="mt-6 flex gap-3">
@@ -860,18 +880,30 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
               <div className="bg-slate-900/60 rounded-xl border border-slate-800 p-4 max-h-72 overflow-y-auto">
                 {transcriptionResult.segments.length > 0 ? (
                   <div className="space-y-3 text-sm">
-                    {transcriptionResult.segments.map((segment, idx) => (
-                      <div key={idx} className="border-b border-slate-800/80 pb-2 last:border-none last:pb-0">
-                        <div className="text-sm">
-                          <span className="font-mono text-xs text-slate-400">
-                            [{formatTimestamp(segment.start)} - {formatTimestamp(segment.end)}]
-                          </span>
-                          <span className="ml-2 text-slate-200 leading-relaxed whitespace-pre-wrap">
-                            {previewIsChinese ? enhanceChineseText(segment.text) : segment.text}
-                          </span>
+                    {transcriptionResult.segments.map((segment, idx) => {
+                      const speakerLabel = speakerDiarization && segment.speaker != null && String(segment.speaker).trim() !== ''
+                        ? formatSpeakerLabel(segment.speaker)
+                        : '';
+                      const speakerNode = speakerLabel ? (
+                        <span className="mr-2 font-semibold text-teal-200">
+                          {speakerLabel}:
+                        </span>
+                      ) : null;
+                      const displayText = previewIsChinese ? enhanceChineseText(segment.text) : segment.text;
+                      return (
+                        <div key={idx} className="border-b border-slate-800/80 pb-2 last:border-none last:pb-0">
+                          <div className="text-sm">
+                            <span className="font-mono text-xs text-slate-400">
+                              [{formatTimestamp(segment.start)} - {formatTimestamp(segment.end)}]
+                            </span>
+                            <span className="ml-2 text-slate-200 leading-relaxed whitespace-pre-wrap">
+                              {speakerNode}
+                              {displayText}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-slate-300 text-sm whitespace-pre-wrap">{transcriptionResult.text}</p>

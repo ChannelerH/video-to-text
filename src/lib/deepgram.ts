@@ -10,6 +10,7 @@ export interface DeepgramOptions {
   highAccuracyMode?: boolean;
   outputFormat?: 'json' | 'srt'; // 输出格式选择
   probeSeconds?: number; // 语言探针秒数（仅转前N秒）
+  enableDiarization?: boolean; // 是否启用说话人分离
 }
 
 interface DeepgramResponse {
@@ -149,15 +150,14 @@ export class DeepgramService {
         model: 'nova-2', // Using Nova-2 as specified
         punctuate: 'true',
         smart_format: 'true',
-        utterances: 'true',
         paragraphs: 'true', // 获取段落信息
         numerals: 'true',
         profanity_filter: 'false',
         redact: 'false'
       });
-      // Free 档节省成本：不打开 diarize
-      const tier = (options.userTier || '').toLowerCase();
-      if (tier && tier !== 'free') {
+
+      if (options.enableDiarization) {
+        params.set('utterances', 'true');
         params.set('diarize', 'true');
       }
 

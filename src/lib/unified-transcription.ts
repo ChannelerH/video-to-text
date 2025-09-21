@@ -7,6 +7,7 @@ export interface UnifiedTranscriptionOptions extends TranscriptionOptions {
   // 语言探针：若 language 未指定/为 auto，则先用前 N 秒进行探测
   languageProbeSeconds?: number; // 默认 10 秒
   forceChinese?: boolean; // 前端已探针判定中文时强制走中文路径
+  enableDiarizationAfterWhisper?: boolean; // 用户是否请求说话人分离
 }
 
 interface TranscriptionStrategy {
@@ -230,12 +231,15 @@ export class UnifiedTranscriptionService {
         throw new Error('Deepgram service not available');
       }
 
+      const diarizationRequested = !!options.enableDiarizationAfterWhisper;
+
       let deepgramOptions: DeepgramOptions = {
         language: options.language,
         userTier: options.userTier,
         isPreview: options.isPreview,
         highAccuracyMode: options.highAccuracyMode,
-        outputFormat: options.outputFormat
+        outputFormat: options.outputFormat,
+        enableDiarization: diarizationRequested
       };
 
       // First pass with auto-detect unless user forced a language
@@ -251,7 +255,7 @@ export class UnifiedTranscriptionService {
       if (!options.language && zhLabelled && englishLike && !options.isPreview) {
         try {
           console.warn('[LangGuard] Deepgram labelled as zh but text looks English. Re-running with language=en');
-          deepgramOptions = { ...deepgramOptions, language: 'en' };
+          deepgramOptions = { ...deepgramOptions, language: 'en', enableDiarization: diarizationRequested };
           const second = await this.deepgramService.transcribeAudio(audioUrl, deepgramOptions);
           // Prefer the one with longer alphabetic content
           const latin2 = (second.text || '').match(/[A-Za-z]/g)?.length || 0;
@@ -347,7 +351,8 @@ export class UnifiedTranscriptionService {
       const dg = await this.deepgramService.transcribeAudio(audioUrl, {
         language: transcription.language || 'auto',
         isPreview: false,
-        outputFormat: 'json'
+        outputFormat: 'json',
+        enableDiarization: true
       } as any);
       const altSegs: any[] = dg.segments || [];
       if (!altSegs.some((s: any) => s.speaker != null)) return false;

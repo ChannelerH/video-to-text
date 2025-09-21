@@ -80,10 +80,10 @@ export async function POST(request: NextRequest) {
         params.set('callback', cb);
         params.set('paragraphs', 'true');
         params.set('punctuate', 'true');
-        params.set('utterances', 'true');
         params.set('model', 'nova-2');
         params.set('detect_language', 'true');
         if (enableDiarization) {
+          params.set('utterances', 'true');
           params.set('diarize', 'true');
         }
         console.log('[YouTube Prepare][Processed] Deepgram params', {
@@ -599,10 +599,10 @@ export async function POST(request: NextRequest) {
           params2.set('callback', cb);
           params2.set('paragraphs', 'true');  // 启用段落分割
           params2.set('punctuate', 'true');   // 启用标点符号
-          params2.set('utterances', 'true');  // 启用说话人分离
           params2.set('model', 'nova-2');     // 使用 Nova-2 模型
           params2.set('detect_language', 'true'); // 启用语言检测
           if (enableDiarization) {
+            params2.set('utterances', 'true');  // 启用说话人分离
             params2.set('diarize', 'true');
           }
           console.log('[YouTube Prepare][Fanout] Deepgram params', {

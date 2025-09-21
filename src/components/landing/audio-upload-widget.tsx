@@ -67,7 +67,8 @@ export default function AudioUploadWidget({ locale }: Props) {
         action: isAuthenticated ? "transcribe" : "preview",
         options: {
           high_accuracy: canUseHighAccuracy && highAccuracy,
-          speaker_diarization: canUseDiarization && speakerDiarization
+          speaker_diarization: canUseDiarization && speakerDiarization,
+          enableDiarizationAfterWhisper: canUseDiarization && speakerDiarization
         }
       } as any;
 
@@ -138,7 +139,8 @@ export default function AudioUploadWidget({ locale }: Props) {
           r2Key: key, 
           originalFileName: file.name,
           high_accuracy: canUseHighAccuracy && highAccuracy,
-          speaker_diarization: canUseDiarization && speakerDiarization
+          speaker_diarization: canUseDiarization && speakerDiarization,
+          enableDiarizationAfterWhisper: canUseDiarization && speakerDiarization
         },
       };
 
@@ -206,7 +208,7 @@ export default function AudioUploadWidget({ locale }: Props) {
             />
             
             <div className="mt-2 text-xs text-slate-500">
-              Supports: MP3, M4A, WAV, OGG, FLAC, YouTube links
+              Supports: YouTube links
             </div>
             
             <div className="mt-6 flex gap-3">

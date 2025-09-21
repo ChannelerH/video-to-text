@@ -691,7 +691,8 @@ export class TranscriptionService {
         userTier: request.options?.userTier, // 传递用户等级信息
         fallbackEnabled: request.options?.fallbackEnabled,
         outputFormat: request.options?.outputFormat || 'json',
-        highAccuracyMode: request.options?.highAccuracyMode
+        highAccuracyMode: request.options?.highAccuracyMode,
+        enableDiarizationAfterWhisper: !!request.options?.enableDiarizationAfterWhisper
       }));
       console.log('[TEST][YT-002] model.used', { model: 'deepgram_or_whisper_decided_above' });
 
@@ -991,7 +992,8 @@ export class TranscriptionService {
         userTier: request.options?.userTier, // 传递用户等级信息
         fallbackEnabled: request.options?.fallbackEnabled,
         outputFormat: request.options?.outputFormat || 'json',
-        highAccuracyMode: request.options?.highAccuracyMode
+        highAccuracyMode: request.options?.highAccuracyMode,
+        enableDiarizationAfterWhisper: !!request.options?.enableDiarizationAfterWhisper
       }));
       console.log('[TEST][HA-001] transcribe.audio_url.completed', { duration: transcription.duration, language: transcription.language });
 
@@ -1505,7 +1507,8 @@ export class TranscriptionService {
         userTier: request.options?.userTier, // 传递用户等级信息
         fallbackEnabled: request.options?.fallbackEnabled,
         outputFormat: request.options?.outputFormat || 'json',
-        highAccuracyMode: request.options?.highAccuracyMode
+        highAccuracyMode: request.options?.highAccuracyMode,
+        enableDiarizationAfterWhisper: !!request.options?.enableDiarizationAfterWhisper
       }));
 
       // 档位单文件时长上限（文件上传）
@@ -1831,7 +1834,8 @@ export class TranscriptionService {
         isPreview: true,
         fallbackEnabled: request.options?.fallbackEnabled !== false, // 预览默认启用降级
         outputFormat: request.options?.outputFormat || 'json',
-        highAccuracyMode: request.options?.highAccuracyMode
+        highAccuracyMode: request.options?.highAccuracyMode,
+        enableDiarizationAfterWhisper: !!request.options?.enableDiarizationAfterWhisper
       });
 
       // 异步清理临时文件
@@ -1909,7 +1913,8 @@ export class TranscriptionService {
         isPreview: true,
         fallbackEnabled: request.options?.fallbackEnabled !== false,
         outputFormat: request.options?.outputFormat || 'json',
-        highAccuracyMode: request.options?.highAccuracyMode
+        highAccuracyMode: request.options?.highAccuracyMode,
+        enableDiarizationAfterWhisper: !!request.options?.enableDiarizationAfterWhisper
       });
 
       setTimeout(() => this.r2Service.deleteFile(clipUpload.key).catch(() => {}), 30000);

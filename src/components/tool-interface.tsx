@@ -291,7 +291,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     if (!text) return false;
     return /[\u4e00-\u9fff]/.test(text);
   };
-  type Segment = { start: number; end: number; text: string };
+  type Segment = { start: number; end: number; text: string; speaker?: string | number };
   const groupSegmentsToParagraphs = (segments: Segment[]) => {
     const groups: { start: number; end: number; text: string }[] = [];
     if (!segments || segments.length === 0) return groups;
@@ -329,6 +329,17 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     const sec = Math.floor(s % 60);
     const ms = Math.round((s - Math.floor(s)) * 1000);
     return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+  };
+
+  const formatSpeakerLabel = (value: string | number | undefined | null) => {
+    if (value === undefined || value === null) return '';
+    const str = String(value).trim();
+    if (!str) return '';
+    const num = Number(str);
+    if (!Number.isNaN(num)) {
+      return `Speaker ${num + 1}`;
+    }
+    return str;
   };
   const punctuateChineseParagraph = (raw: string) => {
     let text = (raw || '').trim();
@@ -2127,7 +2138,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                                 chapter.segments?.forEach((seg: any) => {
                                   const startTime = `${Math.floor(seg.start / 60).toString().padStart(2, '0')}:${(seg.start % 60).toFixed(3).padStart(6, '0')}`;
                                   const endTime = `${Math.floor(seg.end / 60).toString().padStart(2, '0')}:${(seg.end % 60).toFixed(3).padStart(6, '0')}`;
-                                  segmentsText += `[${startTime} - ${endTime}] ${seg.text}\n`;
+                                  const speakerLabel = enableDiarizationAfterWhisper && seg?.speaker != null && String(seg.speaker).trim() !== ''
+                                    ? `${formatSpeakerLabel(seg.speaker)}: `
+                                    : '';
+                                  segmentsText += `[${startTime} - ${endTime}] ${speakerLabel}${seg.text}\n`;
                                 });
                               });
                             } else {
@@ -2136,7 +2150,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                               segmentsText = segments.map((seg: any) => {
                                 const startTime = `${Math.floor(seg.start / 60).toString().padStart(2, '0')}:${(seg.start % 60).toFixed(3).padStart(6, '0')}`;
                                 const endTime = `${Math.floor(seg.end / 60).toString().padStart(2, '0')}:${(seg.end % 60).toFixed(3).padStart(6, '0')}`;
-                                return `[${startTime} - ${endTime}] ${seg.text}`;
+                                const speakerLabel = enableDiarizationAfterWhisper && seg?.speaker != null && String(seg.speaker).trim() !== ''
+                                  ? `${formatSpeakerLabel(seg.speaker)}: `
+                                  : '';
+                                return `[${startTime} - ${endTime}] ${speakerLabel}${seg.text}`;
                               }).join('\n');
                             }
                             
@@ -2186,38 +2203,51 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                                   
                                   {/* Chapter Segments */}
                                   <div className="space-y-2 pl-4">
-                                    {chapter.segments?.map((segment: Segment, segIdx: number) => (
-                                      <div key={segIdx} className="text-sm">
-                                        <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>
-                                          [{formatTs(segment.start)} - {formatTs(segment.end)}]
+                                    {chapter.segments?.map((segment: Segment, segIdx: number) => {
+                                      const speakerLabel = enableDiarizationAfterWhisper && segment.speaker != null && String(segment.speaker).trim() !== ''
+                                        ? formatSpeakerLabel(segment.speaker)
+                                        : '';
+                                      const speakerNode = speakerLabel ? (
+                                        <span className="mr-2 font-semibold text-teal-200">
+                                          {speakerLabel}:
                                         </span>
-                                        <span className="ml-2">
-                                          {isZh ? punctuateChineseParagraph(segment.text) : segment.text}
-                                        </span>
-                                      </div>
-                                    ))}
+                                      ) : null;
+                                      const segmentText = isZh ? punctuateChineseParagraph(segment.text) : segment.text;
+                                      return (
+                                        <div key={segIdx} className="text-sm">
+                                          <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>
+                                            [{formatTs(segment.start)} - {formatTs(segment.end)}]
+                                          </span>
+                                          <span className="ml-2">
+                                            {speakerNode}
+                                            {segmentText}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               ));
                             }
                             
                             // Fallback to flat segment display
-                            if (isZh) {
-                              return segments.map((segment: Segment, index: number) => (
+                            return segments.map((segment: Segment, index: number) => {
+                              const speakerLabel = enableDiarizationAfterWhisper && segment.speaker != null && String(segment.speaker).trim() !== ''
+                                ? formatSpeakerLabel(segment.speaker)
+                                : '';
+                              const speakerNode = speakerLabel ? (
+                                <span className="mr-2 font-semibold text-teal-200">
+                                  {speakerLabel}:
+                                </span>
+                              ) : null;
+                              const displayText = isZh ? punctuateChineseParagraph(segment.text) : segment.text;
+                              return (
                                 <div key={index} className="text-sm">
-                                  <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>
-                                    [{formatTs(segment.start)} - {formatTs(segment.end)}]
-                                  </span>
-                                  <span className="ml-2">{punctuateChineseParagraph(segment.text)}</span>
+                                  <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>[{formatTs(segment.start)} - {formatTs(segment.end)}]</span>
+                                  <span className="ml-2">{speakerNode}{displayText}</span>
                                 </div>
-                              ));
-                            }
-                            return segments.map((segment: Segment, index: number) => (
-                              <div key={index} className="text-sm">
-                                <span className="font-mono text-xs" style={{ color: "#93C5FD" }}>[{formatTs(segment.start)} - {formatTs(segment.end)}]</span>
-                                <span className="ml-2">{segment.text}</span>
-                              </div>
-                            ));
+                              );
+                            });
                           })()}
                         </div>
                       </div>
