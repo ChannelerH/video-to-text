@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
-import { FileText, Download, Copy, Check, Code, RefreshCw, AlertCircle } from "lucide-react";
+import { FileText, Download, Copy, Check, Code, RefreshCw, AlertCircle, Loader2 } from "lucide-react";
 import PyramidLoader from "@/components/ui/pyramid-loader";
 import { useRouter, Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
@@ -174,6 +174,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [highAccuracy, setHighAccuracy] = useState(false);
   const [uploadedFileInfo, setUploadedFileInfo] = useState<any>(null);
   const [copiedText, setCopiedText] = useState<boolean>(false);
+  const [downloadingFormats, setDownloadingFormats] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadXhrRef = useRef<XMLHttpRequest | null>(null);
   const isAbortingRef = useRef<boolean>(false);
@@ -1204,6 +1205,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const downloadFormat = async (format: string) => {
     if (!result?.data || result.type !== 'full') return;
 
+    // Set loading state for this format
+    setDownloadingFormats(prev => ({ ...prev, [format]: true }));
+
     try {
       const jobId = result.data.jobId as string | undefined;
       if (jobId) {
@@ -1279,6 +1283,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Download error:', error);
+    } finally {
+      // Clear loading state for this format
+      setDownloadingFormats(prev => ({ ...prev, [format]: false }));
     }
   };
 
@@ -1760,139 +1767,146 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           </div>
         </div>
 
-        {/* Pro high-accuracy toggle - Enhanced design */}
-        <div className="high-accuracy-container">
-          <div
-            className={`high-accuracy-toggle ${highAccuracy ? 'active' : ''} ${!canUseHighAccuracy ? 'locked' : ''}`}
-            onClick={(e) => {
-              const target = e.target as HTMLElement;
-              if (target.classList.contains('toggle-link') || target.closest('.toggle-link')) {
-                return;
-              }
+        {/* Advanced Options Section */}
+        <div className="advanced-options-section">
+          <h3 className="advanced-options-title">Advanced Options</h3>
+          <div className="advanced-options-grid">
+            {/* High Accuracy Toggle */}
+            <div className="high-accuracy-container">
+              <div
+                className={`high-accuracy-toggle ${highAccuracy ? 'active' : ''} ${!canUseHighAccuracy ? 'locked' : ''}`}
+                onClick={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.classList.contains('toggle-link') || target.closest('.toggle-link')) {
+                    return;
+                  }
 
-              if (!canUseHighAccuracy) {
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-              }
-
-              setHighAccuracy(!highAccuracy);
-            }}
-            role="button"
-            aria-pressed={highAccuracy}
-            aria-label={t('high_accuracy.label')}
-            style={{ cursor: canUseHighAccuracy ? 'pointer' : 'default' }}
-          >
-            <div
-              className="toggle-switch"
-              onClick={(e) => {
-                if (!canUseHighAccuracy) {
-                  e.stopPropagation();
-                }
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={highAccuracy}
-                onChange={() => {}}
-                disabled={!canUseHighAccuracy}
-                style={{ display: 'none' }}
-              />
-              <div className="toggle-slider">
-                <div className="toggle-handle" />
-              </div>
-            </div>
-            <div className="toggle-content">
-              <span className="toggle-icon">{canUseHighAccuracy ? '✨' : '🔒'}</span>
-              <div className="toggle-text">
-                <span className="toggle-label">{t('high_accuracy.label')}</span>
-                <span className="toggle-hint">
-                  {canUseHighAccuracy ? t('high_accuracy.speed_hint') : 'Pro plan required'}
-                </span>
-              </div>
-              {!canUseHighAccuracy && (
-                <a
-                  className="toggle-link upgrade-link"
-                  href="/pricing"
-                  onClick={(e) => {
+                  if (!canUseHighAccuracy) {
                     e.preventDefault();
                     e.stopPropagation();
-                    router.push('/pricing');
+                    return;
+                  }
+
+                  setHighAccuracy(!highAccuracy);
+                }}
+                role="button"
+                aria-pressed={highAccuracy}
+                aria-label={t('high_accuracy.label')}
+                style={{ cursor: canUseHighAccuracy ? 'pointer' : 'default' }}
+              >
+                <div
+                  className="toggle-switch"
+                  onClick={(e) => {
+                    if (!canUseHighAccuracy) {
+                      e.stopPropagation();
+                    }
                   }}
                 >
-                  {t('high_accuracy.pricing_link')}
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="high-accuracy-container">
-          <div
-            className={`high-accuracy-toggle ${enableDiarizationAfterWhisper ? 'active' : ''} ${!canUseDiarization ? 'locked' : ''}`}
-            onClick={(e) => {
-              const target = e.target as HTMLElement;
-              if (target.classList.contains('toggle-link') || target.closest('.toggle-link')) {
-                return;
-              }
-
-              if (!canUseDiarization) {
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-              }
-
-              setEnableDiarizationAfterWhisper(prev => !prev);
-            }}
-            role="button"
-            aria-pressed={enableDiarizationAfterWhisper}
-            aria-label="Speaker diarization"
-            style={{ cursor: canUseDiarization ? 'pointer' : 'default' }}
-          >
-            <div
-              className="toggle-switch"
-              onClick={(e) => {
-                if (!canUseDiarization) {
-                  e.stopPropagation();
-                }
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={enableDiarizationAfterWhisper}
-                onChange={() => {}}
-                disabled={!canUseDiarization}
-                style={{ display: 'none' }}
-              />
-              <div className="toggle-slider">
-                <div className="toggle-handle" />
+                  <input
+                    type="checkbox"
+                    checked={highAccuracy}
+                    onChange={() => {}}
+                    disabled={!canUseHighAccuracy}
+                    style={{ display: 'none' }}
+                  />
+                  <div className="toggle-slider">
+                    <div className="toggle-handle" />
+                  </div>
+                </div>
+                <div className="toggle-content">
+                  <span className="toggle-icon">{canUseHighAccuracy ? '✨' : '🔒'}</span>
+                  <div className="toggle-text">
+                    <span className="toggle-label">{t('high_accuracy.label')}</span>
+                    <span className="toggle-hint">
+                      {canUseHighAccuracy ? t('high_accuracy.speed_hint') : 'Pro plan required'}
+                    </span>
+                  </div>
+                  {!canUseHighAccuracy && (
+                    <a
+                      className="toggle-link upgrade-link"
+                      href="/pricing"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        router.push('/pricing');
+                      }}
+                    >
+                      {t('high_accuracy.pricing_link')}
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="toggle-content">
-              <span className="toggle-icon">{canUseDiarization ? '🗣️' : '🔒'}</span>
-              <div className="toggle-text">
-                <span className="toggle-label">Speaker diarization</span>
-                <span className="toggle-hint">
-                  {canUseDiarization
-                    ? 'Identify speakers with Deepgram diarization'
-                    : diarizationTierEligible
-                      ? 'Sign in to enable speaker identification'
-                      : 'Basic plan or higher required'}
-                </span>
-              </div>
-              {!canUseDiarization && (
-                <a
-                  className="toggle-link upgrade-link"
-                  href="/pricing"
-                  onClick={(e) => {
+
+            {/* Speaker Diarization Toggle */}
+            <div className="high-accuracy-container">
+              <div
+                className={`high-accuracy-toggle ${enableDiarizationAfterWhisper ? 'active' : ''} ${!canUseDiarization ? 'locked' : ''}`}
+                onClick={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.classList.contains('toggle-link') || target.closest('.toggle-link')) {
+                    return;
+                  }
+
+                  if (!canUseDiarization) {
                     e.preventDefault();
                     e.stopPropagation();
-                    router.push('/pricing');
+                    return;
+                  }
+
+                  setEnableDiarizationAfterWhisper(prev => !prev);
+                }}
+                role="button"
+                aria-pressed={enableDiarizationAfterWhisper}
+                aria-label="Speaker diarization"
+                style={{ cursor: canUseDiarization ? 'pointer' : 'default' }}
+              >
+                <div
+                  className="toggle-switch"
+                  onClick={(e) => {
+                    if (!canUseDiarization) {
+                      e.stopPropagation();
+                    }
                   }}
                 >
-                  {t('high_accuracy.pricing_link')}
-                </a>
-              )}
+                  <input
+                    type="checkbox"
+                    checked={enableDiarizationAfterWhisper}
+                    onChange={() => {}}
+                    disabled={!canUseDiarization}
+                    style={{ display: 'none' }}
+                  />
+                  <div className="toggle-slider">
+                    <div className="toggle-handle" />
+                  </div>
+                </div>
+                <div className="toggle-content">
+                  <span className="toggle-icon">{canUseDiarization ? '🗣️' : '🔒'}</span>
+                  <div className="toggle-text">
+                    <span className="toggle-label">Speaker diarization</span>
+                    <span className="toggle-hint">
+                      {canUseDiarization
+                        ? 'Identify speakers with Deepgram diarization'
+                        : diarizationTierEligible
+                          ? 'Sign in to enable speaker identification'
+                          : 'Basic plan or higher required'}
+                    </span>
+                  </div>
+                  {!canUseDiarization && (
+                    <a
+                      className="toggle-link upgrade-link"
+                      href="/pricing"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        router.push('/pricing');
+                      }}
+                    >
+                      {t('high_accuracy.pricing_link')}
+                    </a>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2491,6 +2505,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                             variant="outline"
                             size="lg"
                             onClick={() => downloadFormat(format)}
+                            disabled={downloadingFormats[format]}
                             className="download-format-btn group relative overflow-hidden transition-all hover:scale-105"
                             style={{
                               background: 'rgba(0,0,0,0.4)',
@@ -2500,10 +2515,19 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                             }}
                           >
                             <span className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <span className={`fmt-icon fmt-${id} relative`}>
-                              <IconComp className="fmt-icon-svg" />
-                            </span>
-                            <span className="relative font-medium">{format.toUpperCase()}</span>
+                            {downloadingFormats[format] ? (
+                              <>
+                                <Loader2 className="animate-spin mr-2" size={20} />
+                                <span className="relative font-medium">{t('common.downloading')}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className={`fmt-icon fmt-${id} relative`}>
+                                  <IconComp className="fmt-icon-svg" />
+                                </span>
+                                <span className="relative font-medium">{format.toUpperCase()}</span>
+                              </>
+                            )}
                           </Button>
                         );
                       })}

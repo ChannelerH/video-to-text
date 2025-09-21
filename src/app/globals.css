@@ -384,8 +384,14 @@ body::after {
 .dark .format-chip:hover{border-color:rgba(139,92,246,.35);box-shadow:0 5px 15px rgba(139,92,246,.18)}
 .dark .format-chip.selected{background:rgba(6,255,165,.12);border-color:rgba(6,255,165,.52);color:#fff;box-shadow:0 0 0 1px rgba(6,255,165,.38)}
 
+/* Advanced Options Section */
+.advanced-options-section{margin:1.5rem 0;padding:1.5rem;background:linear-gradient(135deg,rgba(59,130,246,0.05),rgba(139,92,246,0.05));border:1px solid rgba(139,92,246,0.15);border-radius:16px}
+.advanced-options-title{font-size:0.875rem;font-weight:600;color:#e2e8f0;margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.1em;opacity:0.8}
+.advanced-options-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem;align-items:start}
+@media(max-width:768px){.advanced-options-grid{grid-template-columns:1fr}}
+
 /* High accuracy toggle - Premium feature highlight */
-.high-accuracy-container{margin:1.5rem 0;display:flex;justify-content:center}
+.high-accuracy-container{display:flex;justify-content:flex-start}
 .high-accuracy-toggle{position:relative;display:flex;align-items:center;gap:0.75rem;padding:0.875rem 1.5rem;background:linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.1));border:1px solid rgba(139,92,246,0.3);border-radius:50px;cursor:pointer;transition:all 0.2s cubic-bezier(0.4,0,0.2,1);user-select:none;will-change:transform}
 .high-accuracy-toggle:hover{background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(236,72,153,0.15));border-color:rgba(139,92,246,0.5);transform:translateY(-2px);box-shadow:0 8px 25px rgba(139,92,246,0.25)}
 .high-accuracy-toggle:active{transform:scale(0.98);transition:transform 0.1s ease}

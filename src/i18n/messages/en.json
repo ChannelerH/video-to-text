@@ -521,6 +521,9 @@
     }
   },
   "tool_interface": {
+    "common": {
+      "downloading": "Downloading..."
+    },
     "loading": "Loading...",
     "detecting_audio_tracks": "Detecting audio tracks...",
     "upload_tip": "Drop your file here or click to browse",

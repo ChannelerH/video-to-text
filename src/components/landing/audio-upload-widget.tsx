@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "@/i18n/navigation";
 import { useSession } from "next-auth/react";
 import { ToastNotification, useToast } from "@/components/toast-notification";
@@ -21,31 +22,27 @@ export default function AudioUploadWidget({ locale }: Props) {
   const { toast, showToast, hideToast } = useToast();
   const t = useTranslations('tool_interface');
   const { userTier } = useAppContext();
-  const [hasHighAccuracyAccess, setHasHighAccuracyAccess] = useState(false);
   const [highAccuracy, setHighAccuracy] = useState(false);
   const [speakerDiarization, setSpeakerDiarization] = useState(false);
   const [showUrlDialog, setShowUrlDialog] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   
   // Check if user has high accuracy access (pro tier or high accuracy minute packs)
+  const normalizedTier = String(userTier || 'free').toLowerCase();
+  const canUseHighAccuracy = isAuthenticated && normalizedTier === 'pro';
+  const canUseDiarization = isAuthenticated && ['basic', 'pro', 'premium'].includes(normalizedTier);
+  const diarizationTierEligible = ['basic', 'pro', 'premium'].includes(normalizedTier);
   useEffect(() => {
-    const checkAccess = async () => {
-      if (!isAuthenticated) {
-        setHasHighAccuracyAccess(false);
-        return;
-      }
-      
-      try {
-        const response = await fetch('/api/user/has-high-accuracy');
-        const data = await response.json();
-        setHasHighAccuracyAccess(data.hasAccess || false);
-      } catch {
-        setHasHighAccuracyAccess(false);
-      }
-    };
-    
-    checkAccess();
-  }, [isAuthenticated]);
+    if (!canUseHighAccuracy && highAccuracy) {
+      setHighAccuracy(false);
+    }
+  }, [canUseHighAccuracy, highAccuracy]);
+
+  useEffect(() => {
+    if (!canUseDiarization && speakerDiarization) {
+      setSpeakerDiarization(false);
+    }
+  }, [canUseDiarization, speakerDiarization]);
 
   const triggerBrowse = () => {
     if (busy) return;
@@ -69,8 +66,8 @@ export default function AudioUploadWidget({ locale }: Props) {
         content: url,
         action: isAuthenticated ? "transcribe" : "preview",
         options: {
-          high_accuracy: highAccuracy,
-          speaker_diarization: speakerDiarization
+          high_accuracy: canUseHighAccuracy && highAccuracy,
+          speaker_diarization: canUseDiarization && speakerDiarization
         }
       } as any;
 
@@ -140,8 +137,8 @@ export default function AudioUploadWidget({ locale }: Props) {
         options: { 
           r2Key: key, 
           originalFileName: file.name,
-          high_accuracy: highAccuracy,
-          speaker_diarization: speakerDiarization
+          high_accuracy: canUseHighAccuracy && highAccuracy,
+          speaker_diarization: canUseDiarization && speakerDiarization
         },
       };
 
@@ -275,42 +272,72 @@ export default function AudioUploadWidget({ locale }: Props) {
 
         {/* Transcription Options */}
         <div className="mt-6 space-y-3">
-          <label className={`flex items-center justify-between px-4 py-3 rounded-xl border ${hasHighAccuracyAccess ? 'border-slate-800 bg-slate-900/60 hover:border-cyan-500/50 cursor-pointer' : 'border-slate-800/50 bg-slate-900/30 cursor-not-allowed opacity-60'} transition-colors`}>
+          <label className={`flex items-center justify-between px-4 py-3 rounded-xl border ${canUseHighAccuracy ? 'border-slate-800 bg-slate-900/60 hover:border-cyan-500/50 cursor-pointer' : 'border-slate-800/50 bg-slate-900/30 cursor-not-allowed opacity-60'} transition-colors`}>
             <div className="flex items-center gap-3">
               <span className="text-2xl">🎯</span>
               <div>
                 <div className="font-medium flex items-center gap-2">
                   High Accuracy Mode
-                  {!hasHighAccuracyAccess && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">Requires High Accuracy Minutes</span>}
+                  {!canUseHighAccuracy && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">
+                      {isAuthenticated ? 'Pro plan required' : 'Sign in to enable'}
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs text-slate-400">Best for professional use</div>
+                <div className="text-xs text-slate-400">
+                  {canUseHighAccuracy ? 'Best for professional use' : 'Unlock higher accuracy with Pro plan'}
+                </div>
+                {!canUseHighAccuracy && (
+                  <Link
+                    href="/pricing"
+                    className="text-xs text-cyan-400 underline hover:text-cyan-300"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Upgrade
+                  </Link>
+                )}
               </div>
             </div>
             <input
               type="checkbox"
-              checked={highAccuracy && hasHighAccuracyAccess}
-              onChange={(e) => hasHighAccuracyAccess && setHighAccuracy(e.target.checked)}
-              disabled={!hasHighAccuracyAccess}
+              checked={highAccuracy && canUseHighAccuracy}
+              onChange={(e) => canUseHighAccuracy && setHighAccuracy(e.target.checked)}
+              disabled={!canUseHighAccuracy}
               className="w-5 h-5 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </label>
 
-          <label className={`flex items-center justify-between px-4 py-3 rounded-xl border ${hasHighAccuracyAccess ? 'border-slate-800 bg-slate-900/60 hover:border-cyan-500/50 cursor-pointer' : 'border-slate-800/50 bg-slate-900/30 cursor-not-allowed opacity-60'} transition-colors`}>
+          <label className={`flex items-center justify-between px-4 py-3 rounded-xl border ${canUseDiarization ? 'border-slate-800 bg-slate-900/60 hover:border-cyan-500/50 cursor-pointer' : 'border-slate-800/50 bg-slate-900/30 cursor-not-allowed opacity-60'} transition-colors`}>
             <div className="flex items-center gap-3">
               <span className="text-2xl">👥</span>
               <div>
                 <div className="font-medium flex items-center gap-2">
                   Speaker Detection
-                  {!hasHighAccuracyAccess && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">Requires High Accuracy Minutes</span>}
+                  {!canUseDiarization && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">
+                      {diarizationTierEligible ? 'Sign in to enable' : 'Basic plan required'}
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs text-slate-400">Identify different speakers</div>
+                <div className="text-xs text-slate-400">
+                  {canUseDiarization ? 'Identify different speakers' : 'Upgrade to unlock speaker detection'}
+                </div>
+                {!canUseDiarization && (
+                  <Link
+                    href="/pricing"
+                    className="text-xs text-cyan-400 underline hover:text-cyan-300"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Upgrade
+                  </Link>
+                )}
               </div>
             </div>
             <input
               type="checkbox"
-              checked={speakerDiarization && hasHighAccuracyAccess}
-              onChange={(e) => hasHighAccuracyAccess && setSpeakerDiarization(e.target.checked)}
-              disabled={!hasHighAccuracyAccess}
+              checked={speakerDiarization && canUseDiarization}
+              onChange={(e) => canUseDiarization && setSpeakerDiarization(e.target.checked)}
+              disabled={!canUseDiarization}
               className="w-5 h-5 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </label>
