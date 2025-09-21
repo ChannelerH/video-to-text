@@ -1,7 +1,7 @@
 import { setRequestLocale } from "next-intl/server";
 import Link from "next/link";
 import ToolInterface from "@/components/tool-interface";
-import AudioUploadWidget from "@/components/landing/audio-upload-widget";
+import AudioUploadWidgetEnhanced from "@/components/landing/audio-upload-widget-enhanced";
 import React from "react";
 
 export const revalidate = 60;
@@ -114,9 +114,9 @@ export default async function AudioToTextPage({
             </div>
           </div>
 
-          {/* Right - Upload widget (wired) */}
+          {/* Right - Enhanced Upload widget with progress and results */}
           <div>
-            <AudioUploadWidget locale={locale} />
+            <AudioUploadWidgetEnhanced locale={locale} />
           </div>
         </div>
       </section>
