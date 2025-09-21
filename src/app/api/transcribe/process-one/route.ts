@@ -110,14 +110,25 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      await db().update(transcriptions).set({
+      const durationSec = Math.ceil(t.duration || 0);
+      const updateTranscription: any = {
         status: 'completed',
         title: result.data.title || tr.title,
-        duration_sec: Math.ceil(t.duration || 0),
-        original_duration_sec: Math.ceil(t.duration || 0),
+        duration_sec: durationSec,
         cost_minutes: Number(((t.duration || 0) / 60).toFixed(3)),
         completed_at: new Date()
-      }).where(eq(transcriptions.job_id, jobRow.job_id));
+      };
+
+      const existingOriginalSec = Number(tr.original_duration_sec || 0);
+      if (durationSec > 0) {
+        if (existingOriginalSec <= 0 || durationSec > existingOriginalSec) {
+          updateTranscription.original_duration_sec = durationSec;
+        }
+      } else if (existingOriginalSec <= 0) {
+        updateTranscription.original_duration_sec = 0;
+      }
+
+      await db().update(transcriptions).set(updateTranscription).where(eq(transcriptions.job_id, jobRow.job_id));
 
       await db().update(q_jobs).set({ done: true }).where(eq(q_jobs.id, jobRow.id));
 

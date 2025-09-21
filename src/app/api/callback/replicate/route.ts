@@ -149,9 +149,17 @@ export async function POST(req: NextRequest) {
       completed_at: new Date(),
       language: (language as any) || (undefined as any),
       duration_sec: durationSec || undefined,
-      original_duration_sec: durationSec || undefined,
       cost_minutes: roundedMinutes
     };
+
+    const existingOriginalSec = Number(currentTranscription?.original_duration_sec || 0);
+    if (durationSec > 0) {
+      if (existingOriginalSec <= 0 || durationSec > existingOriginalSec) {
+        updatePayload.original_duration_sec = durationSec;
+      }
+    } else if (existingOriginalSec <= 0) {
+      updatePayload.original_duration_sec = 0;
+    }
 
     if (currentTranscription) {
       const currentTitle = currentTranscription.title || '';

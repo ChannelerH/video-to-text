@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
     let vid: string | null = null;
     let audioUrl: string = '';
     let videoTitle: string | null = null;
+    let videoDurationSeconds: number | null = null;
     
     try {
       vid = YouTubeService.validateAndParseUrl(video) || String(video);
@@ -178,7 +179,14 @@ export async function POST(request: NextRequest) {
         try {
           const info = await ytdl.getBasicInfo(vid!);
           videoTitle = info.videoDetails?.title || null;
+          videoDurationSeconds = parseInt(info.videoDetails?.lengthSeconds || '0') || null;
+          console.log('[YouTube Prepare] Video info:', { 
+            title: videoTitle, 
+            durationSeconds: videoDurationSeconds,
+            durationMinutes: videoDurationSeconds ? (videoDurationSeconds / 60).toFixed(2) : null
+          });
         } catch (error) {
+          console.error('[YouTube Prepare] Failed to get video info:', error);
         }
         
         // Stream audio (audioonly) and collect into buffer with a time cap to respect function limits
@@ -535,6 +543,12 @@ export async function POST(request: NextRequest) {
       // Update title if we got it from YouTube
       if (videoTitle) {
         updateData.title = videoTitle;
+      }
+      
+      // Update original duration if we got it from YouTube (important for preview detection)
+      if (videoDurationSeconds && videoDurationSeconds > 0) {
+        updateData.original_duration_sec = videoDurationSeconds;
+        console.log('[YouTube Prepare] Storing original duration:', videoDurationSeconds, 'seconds');
       }
       
       // Update both processed_url and title (if available)

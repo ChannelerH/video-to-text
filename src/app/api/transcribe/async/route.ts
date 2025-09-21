@@ -165,7 +165,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. 创建占位transcription记录
+    // 5. 派发前尽量获取原始总时长，避免后续被裁剪结果覆盖
+    let initialOriginalDurationSec = 0;
+    let originalDurationCandidate = getDurationFromOptions(options);
+
+    if (!originalDurationCandidate && (type === 'audio_url' || type === 'file_upload')) {
+      try {
+        const { probeDurationSeconds } = await import('@/lib/media-probe');
+        const probed = await probeDurationSeconds(content);
+        if (probed !== null && Number.isFinite(probed) && probed > 0) {
+          originalDurationCandidate = probed;
+        }
+      } catch (probeErr) {
+        console.warn('[Async] Failed to probe original duration:', probeErr);
+      }
+    }
+
+    if (typeof originalDurationCandidate === 'number' && Number.isFinite(originalDurationCandidate) && originalDurationCandidate > 0) {
+      initialOriginalDurationSec = Math.ceil(originalDurationCandidate);
+    }
+
+    // 6. 创建占位transcription记录
     await db().insert(transcriptions).values({
       job_id: jobId,
       user_uuid: userUuid,
@@ -178,11 +198,11 @@ export async function POST(request: NextRequest) {
       created_at: new Date(),
       deleted: false,
       duration_sec: 0,
-      original_duration_sec: 0,
+      original_duration_sec: initialOriginalDurationSec,
       cost_minutes: '0'  // numeric类型需要字符串
     }).catch(() => {});
 
-    // 6. 将任务加入队列（用于非供应商异步类型的兜底处理）
+    // 7. 将任务加入队列（用于非供应商异步类型的兜底处理）
     await db().insert(q_jobs).values({
       job_id: jobId,
       tier: userUuid ? String(userTier).toLowerCase() : 'free',
@@ -191,7 +211,7 @@ export async function POST(request: NextRequest) {
       done: false
     }).catch(() => {});
 
-    // 7. 立即返回job_id（先构造响应，再异步触发一次处理）
+    // 8. 立即返回job_id（先构造响应，再异步触发一次处理）
     const resp = NextResponse.json({
       success: true,
       job_id: jobId,
@@ -370,4 +390,26 @@ async function estimateUsageMinutes(params: EstimateUsageParams) {
     userUuid,
     modelType: isHighAccuracy ? 'high_accuracy' : 'standard'
   });
+}
+
+function getDurationFromOptions(options: Record<string, any> | undefined): number | null {
+  if (!options) return null;
+  const candidates = [
+    options.originalDurationSec,
+    options.estimatedDurationSec,
+    options.probedDurationSec,
+    options.durationSec,
+    options.duration_seconds,
+    options.metadata?.duration,
+    options.videoInfo?.duration,
+    options.videoInfo?.lengthSeconds
+  ];
+
+  for (const value of candidates) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric;
+    }
+  }
+  return null;
 }

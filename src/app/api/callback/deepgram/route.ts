@@ -332,14 +332,22 @@ export async function POST(req: NextRequest) {
     const usedHighAccuracy = false; // Deepgram callbacks correspond to standard accuracy
     
     // 获取当前记录，只在标题是默认值时才更新
-    let updateData: any = {
+    const updateData: any = {
       status: 'completed',
       completed_at: new Date(),
       language: (language as any) || (undefined as any),
       duration_sec: durationSec || undefined,
-      original_duration_sec: durationSec || undefined,
       cost_minutes: roundedMinutes
     };
+
+    const existingOriginalSec = Number(currentTranscription?.original_duration_sec || 0);
+    if (durationSec > 0) {
+      if (existingOriginalSec <= 0 || durationSec > existingOriginalSec) {
+        updateData.original_duration_sec = durationSec;
+      }
+    } else if (existingOriginalSec <= 0) {
+      updateData.original_duration_sec = 0;
+    }
     
     // 只有当标题是默认值（Processing...、YouTube Video 等）时才生成新标题
     const currentTitle = currentTranscription?.title || '';
