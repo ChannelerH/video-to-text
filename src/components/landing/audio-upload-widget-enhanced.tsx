@@ -1,47 +1,47 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "@/i18n/navigation";
 import { useSession } from "next-auth/react";
 import { ToastNotification, useToast } from "@/components/toast-notification";
 import { useTranslations } from "next-intl";
 import { useAppContext } from "@/contexts/app";
-import { 
-  Download, 
-  FileText, 
-  FileSpreadsheet, 
-  FileJson, 
-  Copy, 
+import { DocumentExportService } from "@/lib/export-document";
+import type { TranscriptionSegment } from "@/lib/replicate";
+import {
+  FileText,
+  FileSpreadsheet,
+  FileType,
+  FileOutput,
+  Copy,
   CheckCircle,
   AlertCircle,
   Loader2,
   Upload,
   Link2,
   Clock,
-  User,
-  FileAudio,
-  Youtube
+  User
 } from "lucide-react";
 
 interface Props {
   locale: string;
 }
 
+interface PreviewSegment {
+  start: number;
+  end: number;
+  text: string;
+  speaker?: string;
+}
+
 interface TranscriptionResult {
-  id: string;
+  id?: string;
   title: string;
   text: string;
   duration: number;
-  speakers?: Array<{ id: string; label: string }>;
-  segments?: Array<{
-    speaker?: string;
-    text: string;
-    start: number;
-    end: number;
-  }>;
-  status: 'completed' | 'processing' | 'failed';
-  progress?: number;
+  segments: PreviewSegment[];
+  srt?: string;
+  language?: string;
   createdAt: Date;
 }
 
@@ -66,11 +66,12 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [transcriptionResult, setTranscriptionResult] = useState<TranscriptionResult | null>(null);
-  const [exportFormat, setExportFormat] = useState<'txt' | 'srt' | 'vtt' | 'json'>('txt');
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [currentFileName, setCurrentFileName] = useState<string>('');
   const [estimatedTime, setEstimatedTime] = useState<number>(0);
   const [openingEditor, setOpeningEditor] = useState(false);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   
   // Check if user has high accuracy access
   const normalizedTier = String(userTier || 'free').toLowerCase();
@@ -110,6 +111,10 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
     setCurrentFileName('');
     setEstimatedTime(0);
     setOpeningEditor(false);
+    setTranscriptionResult(null);
+    setCurrentJobId(null);
+    setPreviewError(null);
+    setCopiedToClipboard(false);
   };
 
   const triggerBrowse = () => {
@@ -128,62 +133,111 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleExport = async (format: 'txt' | 'srt' | 'vtt' | 'json') => {
+  const handleExport = async (format: 'txt' | 'srt' | 'vtt' | 'docx' | 'pdf') => {
     if (!transcriptionResult) return;
 
-    let content = '';
-    let filename = `${transcriptionResult.title || 'transcription'}.${format}`;
+    const filenameBase = (transcriptionResult.title || 'transcription').replace(/\s+/g, '_');
+    const segments = transcriptionResult.segments || [];
+    const plainText = transcriptionResult.text || segments.map(seg => seg.text).join('\n\n');
 
-    switch (format) {
-      case 'txt':
-        content = transcriptionResult.segments 
-          ? transcriptionResult.segments.map(seg => 
-              seg.speaker ? `[${seg.speaker}]: ${seg.text}` : seg.text
-            ).join('\n\n')
-          : transcriptionResult.text;
-        break;
-      
-      case 'srt':
-        if (transcriptionResult.segments) {
-          content = transcriptionResult.segments.map((seg, idx) => 
-            `${idx + 1}\n${formatTime(seg.start)} --> ${formatTime(seg.end)}\n${seg.speaker ? `[${seg.speaker}]: ` : ''}${seg.text}\n`
-          ).join('\n');
+    const downloadBlob = (blob: Blob | ArrayBuffer | Buffer, filename: string, mime = 'application/octet-stream') => {
+      const fileBlob = blob instanceof Blob ? blob : new Blob([blob as ArrayBuffer], { type: mime });
+      const url = URL.createObjectURL(fileBlob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    };
+
+    try {
+      if (format === 'docx' || format === 'pdf') {
+        const exportSegments: TranscriptionSegment[] = segments.map((segment, index) => ({
+          id: index,
+          seek: 0,
+          start: segment.start,
+          end: segment.end,
+          text: segment.text,
+          tokens: [],
+          temperature: 0,
+          avg_logprob: 0,
+          compression_ratio: 0,
+          no_speech_prob: 0
+        }));
+
+        const exportOptions = {
+          metadata: {
+            title: transcriptionResult.title || 'Transcription Preview',
+            date: new Date().toLocaleDateString(),
+            language: transcriptionResult.language || 'auto',
+            duration: transcriptionResult.duration
+          },
+          includeTimestamps: true,
+          includeChapters: false,
+          includeSummary: false
+        };
+
+        if (format === 'docx') {
+          const blob = await DocumentExportService.exportToWord(
+            {
+              text: plainText,
+              segments: exportSegments,
+              language: transcriptionResult.language,
+              duration: transcriptionResult.duration
+            },
+            [],
+            '',
+            exportOptions
+          );
+          downloadBlob(blob, `${filenameBase}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        } else {
+          const blob = await DocumentExportService.exportToPDF(
+            {
+              text: plainText,
+              segments: exportSegments,
+              language: transcriptionResult.language,
+              duration: transcriptionResult.duration
+            },
+            [],
+            '',
+            exportOptions
+          );
+          downloadBlob(blob, `${filenameBase}.pdf`, 'application/pdf');
         }
-        break;
-      
-      case 'vtt':
-        content = 'WEBVTT\n\n';
-        if (transcriptionResult.segments) {
-          content += transcriptionResult.segments.map(seg => 
-            `${formatTime(seg.start)} --> ${formatTime(seg.end)}\n${seg.speaker ? `<v ${seg.speaker}>` : ''}${seg.text}\n`
-          ).join('\n');
+      } else {
+        let content = '';
+        let mime = 'text/plain';
+        let extension = format;
+
+        if (format === 'txt') {
+          content = plainText;
+        } else if (format === 'srt') {
+          content = transcriptionResult.srt && transcriptionResult.srt.trim().length > 0
+            ? transcriptionResult.srt
+            : buildSRTFromSegments(segments);
+        } else if (format === 'vtt') {
+          content = buildVTTFromSegments(segments);
+          mime = 'text/vtt';
         }
-        break;
-      
-      case 'json':
-        content = JSON.stringify(transcriptionResult, null, 2);
-        break;
+
+        const blob = new Blob([content], { type: mime });
+        downloadBlob(blob, `${filenameBase}.${extension}`, mime);
+      }
+
+      showToast('success', 'Export Successful', `Downloaded as ${filenameBase}.${format}`);
+    } catch (error) {
+      console.error('[Export] Failed to generate file:', error);
+      showToast('error', 'Export Failed', 'Unable to generate file. Please try again.');
     }
-
-    // Create blob and download
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    showToast('success', 'Export Successful', `Downloaded as ${filename}`);
   };
 
   const handleCopyToClipboard = async () => {
     if (!transcriptionResult) return;
 
-    const text = transcriptionResult.segments 
-      ? transcriptionResult.segments.map(seg => 
-          seg.speaker ? `[${seg.speaker}]: ${seg.text}` : seg.text
-        ).join('\n\n')
+    const text = transcriptionResult.segments.length > 0
+      ? transcriptionResult.segments
+          .map(seg => `[${formatTime(seg.start)}-${formatTime(seg.end)}] ${seg.text}`)
+          .join('\n\n')
       : transcriptionResult.text;
 
     await navigator.clipboard.writeText(text);
@@ -194,14 +248,21 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
   };
 
   const handleOpenInEditor = async () => {
-    if (!transcriptionResult) return;
-    
+    if (!isAuthenticated) {
+      showToast('error', 'Sign in required', 'Please sign in to open the full editor.');
+      return;
+    }
+
+    if (!currentJobId) {
+      showToast('error', 'Job not ready', 'We are still processing the full transcription. Please try again shortly.');
+      return;
+    }
+
     setOpeningEditor(true);
-    
-    // Add a small delay to show the loading state
+
     setTimeout(() => {
-      router.push(`/${locale}/dashboard/editor/${transcriptionResult.id}`);
-    }, 500);
+      router.push(`/${locale}/dashboard/editor/${currentJobId}`);
+    }, 400);
   };
 
   const handleUrlSubmit = async () => {
@@ -211,73 +272,98 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
     
     try {
       setBusy(true);
+      setPreviewError(null);
+      setTranscriptionResult(null);
       setUploadStage('processing');
-      setProcessingProgress(10);
-      setCurrentFileName(url.split('/').pop() || 'URL Audio');
-      
+      setProcessingProgress(12);
+
       const isYouTube = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)/i.test(url);
-      
-      // Estimate time based on content type
+      const urlType: 'youtube_url' | 'audio_url' = isYouTube ? 'youtube_url' : 'audio_url';
+
+      const derivedTitle = url.split('/').pop() || (isYouTube ? 'YouTube Video' : 'Audio URL');
+      setCurrentFileName(derivedTitle);
+
       setEstimatedTime(isYouTube ? 30 : 20);
-      
-      const body = {
-        type: isYouTube ? "youtube_url" : "audio_url",
+
+      let jobId: string | undefined;
+
+      if (isAuthenticated) {
+        try {
+          const asyncBody = {
+            type: urlType,
+            content: url,
+            action: 'transcribe',
+            options: {
+              high_accuracy: canUseHighAccuracy && highAccuracy,
+              speaker_diarization: canUseDiarization && speakerDiarization
+            }
+          };
+
+          const resp = await fetch('/api/transcribe/async', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(asyncBody)
+          });
+
+          const data = await resp.json();
+          if (!resp.ok || !data?.success || !data?.job_id) {
+            throw new Error(data?.error || 'Failed to start transcription job');
+          }
+          jobId = data.job_id;
+          setCurrentJobId(jobId);
+        } catch (error) {
+          console.error('[Async] Failed to enqueue job:', error);
+          showToast('error', t('errors.general_error'), error instanceof Error ? error.message : t('errors.general_error'));
+        }
+      } else {
+        setCurrentJobId(null);
+      }
+
+      setProcessingProgress(45);
+
+      const previewBody = {
+        type: urlType,
         content: url,
-        action: isAuthenticated ? "transcribe" : "preview",
+        action: 'preview',
         options: {
-          high_accuracy: canUseHighAccuracy && highAccuracy,
-          speaker_diarization: canUseDiarization && speakerDiarization
+          highAccuracyMode: canUseHighAccuracy && highAccuracy,
+          enableDiarizationAfterWhisper: canUseDiarization && speakerDiarization
         }
       };
 
-      const resp = await fetch("/api/transcribe/async", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      const previewResp = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(previewBody)
       });
-      
-      const data = await resp.json();
-      
-      if (!resp.ok || !data?.success || !data?.job_id) {
-        throw new Error(data?.error || "Failed to start transcription");
+      const previewJson = await previewResp.json();
+
+      if (!previewResp.ok || !previewJson?.success || !previewJson?.preview) {
+        throw new Error(previewJson?.error || 'Preview generation failed');
       }
 
-      // Simulate processing completion
+      const preview = previewJson.preview as { text?: string; srt?: string; duration?: number; language?: string };
+      const segments = preview.srt ? parseSRT(preview.srt) : [];
+      const previewText = preview.text && preview.text.trim().length > 0
+        ? preview.text
+        : (segments.length > 0 ? segments.map(seg => seg.text).join(' ') : 'Preview unavailable.');
+
+      setTranscriptionResult({
+        id: jobId,
+        title: derivedTitle,
+        text: previewText,
+        duration: Math.max(preview.duration || 0, segments.length > 0 ? segments[segments.length - 1].end : 0),
+        segments,
+        srt: preview.srt,
+        language: preview.language,
+        createdAt: new Date()
+      });
+
       setProcessingProgress(100);
-      
-      // Mock result for demo
-      setTimeout(() => {
-        setTranscriptionResult({
-          id: data.job_id,
-          title: currentFileName,
-          text: "This is a sample transcription result...",
-          duration: 180,
-          speakers: speakerDiarization ? [
-            { id: '1', label: 'Speaker 1' },
-            { id: '2', label: 'Speaker 2' }
-          ] : undefined,
-          segments: [
-            { 
-              speaker: speakerDiarization ? 'Speaker 1' : undefined, 
-              text: "Welcome to our discussion today.", 
-              start: 0, 
-              end: 3 
-            },
-            { 
-              speaker: speakerDiarization ? 'Speaker 2' : undefined, 
-              text: "Thank you for having me.", 
-              start: 3, 
-              end: 5 
-            },
-          ],
-          status: 'completed',
-          createdAt: new Date()
-        });
-        setUploadStage('completed');
-      }, 2000);
-      
+      setUploadStage('completed');
     } catch (e: any) {
       console.error(e);
+      setPreviewError(e?.message || 'Preview unavailable');
       setUploadStage('failed');
       showToast('error', t('errors.general_error'), e?.message || t('errors.general_error'));
     } finally {
@@ -295,39 +381,37 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
     
     try {
       setBusy(true);
+      setPreviewError(null);
+      setTranscriptionResult(null);
       setUploadStage('uploading');
-      
-      // Get presigned upload URL
-      const presignResp = await fetch("/api/upload/presigned", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+
+      const presignResp = await fetch('/api/upload/presigned', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileName: file.name,
-          fileType: file.type || "application/octet-stream",
+          fileType: file.type || 'application/octet-stream',
           fileSize: file.size,
-          mode: "audio",
-        }),
+          mode: 'audio'
+        })
       });
-      
+
       const presign = await presignResp.json();
       if (!presignResp.ok || !presign?.success) {
-        throw new Error(presign?.error || "Failed to get upload URL");
+        throw new Error(presign?.error || 'Failed to get upload URL');
       }
-      
-      const { uploadUrl, key, publicUrl, downloadUrl } = presign.data;
 
-      // Upload file with progress tracking
+      const { uploadUrl, key, publicUrl, downloadUrl } = presign.data as { uploadUrl: string; key: string; publicUrl: string; downloadUrl?: string };
+
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        
-        xhr.upload.addEventListener("progress", (event) => {
+        xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
             const progress = (event.loaded / event.total) * 100;
             setUploadProgress(progress);
           }
         });
-        
-        xhr.addEventListener("load", () => {
+        xhr.addEventListener('load', () => {
           if (xhr.status === 200 || xhr.status === 204) {
             setUploadProgress(100);
             resolve();
@@ -335,82 +419,103 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
             reject(new Error(`Upload failed (${xhr.status})`));
           }
         });
-        
-        xhr.addEventListener("error", () => reject(new Error("Upload error")));
-        xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
-        
-        xhr.open("PUT", uploadUrl);
-        if (file.type) xhr.setRequestHeader("Content-Type", file.type);
+        xhr.addEventListener('error', () => reject(new Error('Upload error')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+        xhr.open('PUT', uploadUrl);
+        if (file.type) xhr.setRequestHeader('Content-Type', file.type);
         xhr.send(file);
       });
 
       setUploadStage('processing');
-      setProcessingProgress(20);
+      setProcessingProgress(35);
 
-      // Start async transcription
-      const body = {
-        type: "file_upload",
-        content: downloadUrl || publicUrl,
-        action: isAuthenticated ? "transcribe" : "preview",
-        options: { 
-          r2Key: key, 
-          originalFileName: file.name,
-          high_accuracy: canUseHighAccuracy && highAccuracy,
-          speaker_diarization: canUseDiarization && speakerDiarization
-        },
-      };
+      const fileUrl = downloadUrl || publicUrl;
 
-      const resp = await fetch("/api/transcribe/async", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      
-      const data = await resp.json();
-      if (!resp.ok || !data?.success || !data?.job_id) {
-        throw new Error(data?.error || "Failed to start transcription");
+      let jobId: string | undefined;
+      if (isAuthenticated) {
+        try {
+          const body = {
+            type: 'file_upload' as const,
+            content: fileUrl,
+            action: 'transcribe',
+            options: {
+              r2Key: key,
+              originalFileName: file.name,
+              high_accuracy: canUseHighAccuracy && highAccuracy,
+              speaker_diarization: canUseDiarization && speakerDiarization
+            }
+          };
+
+          const resp = await fetch('/api/transcribe/async', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          const data = await resp.json();
+          if (!resp.ok || !data?.success || !data?.job_id) {
+            throw new Error(data?.error || 'Failed to start transcription');
+          }
+          jobId = data.job_id;
+          setCurrentJobId(jobId);
+        } catch (error) {
+          console.error('[Async] Failed to enqueue job:', error);
+          showToast('error', t('errors.general_error'), error instanceof Error ? error.message : t('errors.general_error'));
+        }
+      } else {
+        setCurrentJobId(null);
       }
 
-      // Simulate processing completion
+      setProcessingProgress(65);
+
+      const previewBody = {
+        type: 'file_upload' as const,
+        content: fileUrl,
+        action: 'preview',
+        options: {
+          r2Key: key,
+          originalFileName: file.name,
+          highAccuracyMode: canUseHighAccuracy && highAccuracy,
+          enableDiarizationAfterWhisper: canUseDiarization && speakerDiarization
+        }
+      };
+
+      const previewResp = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(previewBody)
+      });
+      const previewJson = await previewResp.json();
+
+      if (!previewResp.ok || !previewJson?.success || !previewJson?.preview) {
+        throw new Error(previewJson?.error || 'Preview generation failed');
+      }
+
+      const preview = previewJson.preview as { text?: string; srt?: string; duration?: number; language?: string };
+      const segments = preview.srt ? parseSRT(preview.srt) : [];
+      const previewText = preview.text && preview.text.trim().length > 0
+        ? preview.text
+        : (segments.length > 0 ? segments.map(seg => seg.text).join(' ') : 'Preview unavailable.');
+
+      setTranscriptionResult({
+        id: jobId,
+        title: file.name,
+        text: previewText,
+        duration: Math.max(preview.duration || 0, segments.length > 0 ? segments[segments.length - 1].end : 0),
+        segments,
+        srt: preview.srt,
+        language: preview.language,
+        createdAt: new Date()
+      });
+
       setProcessingProgress(100);
-      
-      // Mock result for demo
-      setTimeout(() => {
-        setTranscriptionResult({
-          id: data.job_id,
-          title: file.name,
-          text: "This is a sample transcription of your uploaded audio file...",
-          duration: 240,
-          speakers: speakerDiarization ? [
-            { id: '1', label: 'Speaker 1' },
-            { id: '2', label: 'Speaker 2' }
-          ] : undefined,
-          segments: [
-            { 
-              speaker: speakerDiarization ? 'Speaker 1' : undefined, 
-              text: "This is the beginning of the transcription.", 
-              start: 0, 
-              end: 4 
-            },
-            { 
-              speaker: speakerDiarization ? 'Speaker 2' : undefined, 
-              text: "The audio quality is excellent.", 
-              start: 4, 
-              end: 7 
-            },
-          ],
-          status: 'completed',
-          createdAt: new Date()
-        });
-        setUploadStage('completed');
-      }, 3000);
-      
+      setUploadStage('completed');
     } catch (e: any) {
       console.error(e);
+      setPreviewError(e?.message || 'Preview unavailable');
       setUploadStage('failed');
       showToast('error', t('errors.upload_failed'), e?.message || t('errors.general_error'));
     } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setBusy(false);
     }
   };
@@ -675,19 +780,17 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
               <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                 <Clock className="w-5 h-5 text-cyan-400 mx-auto mb-1" />
                 <div className="text-sm font-medium">{formatTime(transcriptionResult.duration)}</div>
-                <div className="text-xs text-slate-500">Duration</div>
+                <div className="text-xs text-slate-500">Preview Length</div>
               </div>
-              {transcriptionResult.speakers && (
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <User className="w-5 h-5 text-cyan-400 mx-auto mb-1" />
-                  <div className="text-sm font-medium">{transcriptionResult.speakers.length}</div>
-                  <div className="text-xs text-slate-500">Speakers</div>
-                </div>
-              )}
+              <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                <User className="w-5 h-5 text-cyan-400 mx-auto mb-1" />
+                <div className="text-sm font-medium">5 min</div>
+                <div className="text-xs text-slate-500">Free Limit</div>
+              </div>
               <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                 <FileText className="w-5 h-5 text-cyan-400 mx-auto mb-1" />
                 <div className="text-sm font-medium">
-                  {transcriptionResult.segments?.length || 1}
+                  {transcriptionResult.segments.length || 1}
                 </div>
                 <div className="text-xs text-slate-500">Segments</div>
               </div>
@@ -715,33 +818,30 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
                 </button>
               </div>
               
-              <div className="bg-slate-900/60 rounded-xl border border-slate-800 p-4 max-h-64 overflow-y-auto">
-                <div className="space-y-3 font-mono text-sm">
-                  {transcriptionResult.segments?.map((segment, idx) => (
-                    <div key={idx} className="group">
-                      {segment.speaker && (
-                        <span className="text-cyan-400 font-semibold">
-                          {segment.speaker}:
-                        </span>
-                      )}
-                      <span className="text-slate-300 ml-2">
-                        {segment.text}
-                      </span>
-                      <span className="text-xs text-slate-600 ml-2">
-                        [{formatTime(segment.start)}]
-                      </span>
-                    </div>
-                  )) || (
-                    <p className="text-slate-300">{transcriptionResult.text}</p>
-                  )}
-                </div>
+              <div className="bg-slate-900/60 rounded-xl border border-slate-800 p-4 max-h-72 overflow-y-auto">
+                {transcriptionResult.segments.length > 0 ? (
+                  <div className="space-y-3 text-sm">
+                    {transcriptionResult.segments.map((segment, idx) => (
+                      <div key={idx} className="border-b border-slate-800/80 pb-2 last:border-none last:pb-0">
+                        <div className="text-xs text-slate-500 mb-1">
+                          {formatTime(segment.start)} → {formatTime(segment.end)}
+                        </div>
+                        <p className="text-slate-200 leading-relaxed whitespace-pre-wrap">
+                          {segment.text}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-300 text-sm whitespace-pre-wrap">{transcriptionResult.text}</p>
+                )}
               </div>
             </div>
 
             {/* Export Options */}
             <div>
               <h4 className="text-sm font-medium text-slate-400 mb-3">Export Options</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 <button
                   onClick={() => handleExport('txt')}
                   className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-700 hover:border-cyan-500 hover:bg-slate-800 transition-colors text-sm"
@@ -764,13 +864,23 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
                   VTT
                 </button>
                 <button
-                  onClick={() => handleExport('json')}
+                  onClick={() => handleExport('docx')}
                   className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-700 hover:border-cyan-500 hover:bg-slate-800 transition-colors text-sm"
                 >
-                  <FileJson className="w-4 h-4" />
-                  JSON
+                  <FileType className="w-4 h-4" />
+                  WORD
+                </button>
+                <button
+                  onClick={() => handleExport('pdf')}
+                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-700 hover:border-cyan-500 hover:bg-slate-800 transition-colors text-sm"
+                >
+                  <FileOutput className="w-4 h-4" />
+                  PDF
                 </button>
               </div>
+              <p className="mt-3 text-xs text-slate-500">
+                Free preview exports the first 5 minutes. Sign in for full-length transcripts and advanced features.
+              </p>
             </div>
 
             {/* Action Buttons */}
@@ -784,7 +894,7 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
               </button>
               <button
                 onClick={handleOpenInEditor}
-                disabled={openingEditor}
+                disabled={openingEditor || !currentJobId}
                 className="flex-1 px-4 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-500/70 disabled:cursor-not-allowed transition-colors text-slate-900 font-medium text-sm flex items-center justify-center gap-2"
               >
                 {openingEditor ? (
@@ -795,7 +905,7 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
                 ) : (
                   <>
                     <FileText className="w-4 h-4" />
-                    <span>Open in Editor</span>
+                    <span>{currentJobId ? 'Open in Editor' : 'Preparing Full Job...'}</span>
                   </>
                 )}
               </button>
@@ -811,7 +921,7 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
             </div>
             <h3 className="text-xl font-semibold mb-2">Transcription Failed</h3>
             <p className="text-sm text-slate-400 mb-6">
-              Something went wrong. Please try again.
+              {previewError || 'Something went wrong. Please try again.'}
             </p>
             <button
               onClick={resetState}
@@ -837,4 +947,83 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
       </div>
     </div>
   );
+}
+
+function parseSRT(srt: string): PreviewSegment[] {
+  const sanitized = srt.replace(/\r/g, '').trim();
+  if (!sanitized) return [];
+
+  const blocks = sanitized.split(/\n\n+/);
+  const segments: PreviewSegment[] = [];
+
+  for (const block of blocks) {
+    const lines = block.split('\n').filter(Boolean);
+    if (lines.length < 2) continue;
+
+    let timeLineIndex = 0;
+    if (/^\d+$/.test(lines[0].trim())) {
+      timeLineIndex = 1;
+    }
+
+    const timingLine = lines[timeLineIndex];
+    const timingMatch = timingLine.match(/(\d{2}:\d{2}:\d{2},\d{3})\s+-->\s+(\d{2}:\d{2}:\d{2},\d{3})/);
+    if (!timingMatch) continue;
+
+    const start = srtTimestampToSeconds(timingMatch[1]);
+    const end = srtTimestampToSeconds(timingMatch[2]);
+    const textLines = lines.slice(timeLineIndex + 1);
+    const text = textLines.join(' ').trim();
+    if (!text) continue;
+
+    segments.push({ start, end, text });
+  }
+
+  return segments;
+}
+
+function srtTimestampToSeconds(timestamp: string): number {
+  const match = timestamp.match(/(\d{2}):(\d{2}):(\d{2}),(\d{3})/);
+  if (!match) return 0;
+  const [, hh, mm, ss, ms] = match;
+  return parseInt(hh, 10) * 3600 + parseInt(mm, 10) * 60 + parseInt(ss, 10) + parseInt(ms, 10) / 1000;
+}
+
+function buildSRTFromSegments(segments: PreviewSegment[]): string {
+  if (!segments.length) return '';
+  return segments
+    .map((segment, idx) => {
+      const start = secondsToSrtTime(segment.start);
+      const end = secondsToSrtTime(segment.end);
+      return `${idx + 1}\n${start} --> ${end}\n${segment.text}\n`;
+    })
+    .join('\n');
+}
+
+function buildVTTFromSegments(segments: PreviewSegment[]): string {
+  if (!segments.length) return 'WEBVTT';
+  const body = segments
+    .map((segment) => `${secondsToVttTime(segment.start)} --> ${secondsToVttTime(segment.end)}\n${segment.text}\n`)
+    .join('\n');
+  return `WEBVTT\n\n${body}`.trim();
+}
+
+function secondsToSrtTime(seconds: number): string {
+  const ms = Math.floor((seconds % 1) * 1000);
+  const totalSeconds = Math.floor(seconds);
+  const s = totalSeconds % 60;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const m = totalMinutes % 60;
+  const h = Math.floor(totalMinutes / 60);
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+}
+
+function secondsToVttTime(seconds: number): string {
+  const ms = Math.floor((seconds % 1) * 1000);
+  const totalSeconds = Math.floor(seconds);
+  const s = totalSeconds % 60;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const m = totalMinutes % 60;
+  const h = Math.floor(totalMinutes / 60);
+  const base = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${base}.${ms.toString().padStart(3, '0')}`;
 }

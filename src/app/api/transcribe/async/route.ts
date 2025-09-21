@@ -336,12 +336,33 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        if (!shouldUseReplicate && !shouldUseDeepgram && process.env.PROCESS_ONE_FALLBACK === 'true') {
-          fetch(`${origin}/api/transcribe/process-one`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ job_id: jobId })
-          }).catch(() => {});
+        const dispatchedToExternal = (shouldUseReplicate || shouldUseDeepgram);
+
+        if (!dispatchedToExternal) {
+          if (process.env.PROCESS_ONE_FALLBACK === 'true') {
+            fetch(`${origin}/api/transcribe/process-one`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ job_id: jobId })
+            }).catch(() => {});
+          } else {
+            console.error('[Async] No transcription supplier configured and fallback disabled. jobId=', jobId);
+
+            await db().update(transcriptions)
+              .set({ status: 'failed' })
+              .where(eq(transcriptions.job_id, jobId));
+
+            await db().update(q_jobs)
+              .set({ done: true })
+              .where(eq(q_jobs.job_id, jobId));
+
+            return NextResponse.json({
+              success: false,
+              job_id: jobId,
+              error: 'Transcription engine not configured',
+              code: 'supplier_unavailable'
+            }, { status: 503 });
+          }
         }
       } else if (type === 'youtube_url') {
         fetch(`${origin}/api/transcribe/prepare/youtube`, {

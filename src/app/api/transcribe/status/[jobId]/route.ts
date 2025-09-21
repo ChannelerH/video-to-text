@@ -83,6 +83,11 @@ export async function GET(
       console.log('[Job Status] Staging failure detected for job:', jobId);
     }
 
+    const createdAt = transcription.created_at ? new Date(transcription.created_at) : null;
+    const shouldRetry = transcription.status === 'queued'
+      && createdAt
+      && Date.now() - createdAt.getTime() > 5 * 60 * 1000; // >2分钟仍 queued
+
     // 返回当前状态
     return NextResponse.json({
       status: transcription.status,
@@ -92,10 +97,7 @@ export async function GET(
       message: getStatusMessage(transcription.status),
       tier: effectiveTier,
       ...(warning && { warning }),
-      // Include error message if status is failed
-      ...(transcription.status === 'failed' && transcription.error_message && { 
-        error: transcription.error_message 
-      })
+      ...(shouldRetry && { should_retry: true, retry_reason: 'queue_timeout' })
     });
 
   } catch (error) {

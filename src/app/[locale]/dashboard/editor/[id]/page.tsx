@@ -249,11 +249,11 @@ export default async function EditorPage({
       </div>
 
       {/* FREE Preview Notice */}
-      {isPreview && (
+      {/* {isPreview && (
         <div className="px-4 py-2 bg-amber-500/10 text-amber-300 text-sm border-b border-amber-500/20">
           Preview mode: showing the first 5 minutes only. <a href={`/${locale}/pricing`} className="underline hover:text-amber-200">Upgrade</a> to unlock full transcript, speaker labels, and full AI features.
         </div>
-      )}
+      )} */}
 
       {/* Editor - Full height */}
       <div className="flex-1 overflow-hidden">
