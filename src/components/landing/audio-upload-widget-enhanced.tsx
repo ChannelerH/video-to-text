@@ -281,12 +281,13 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
 
     try {
       if (format === 'docx' || format === 'pdf') {
-        const exportSegments: TranscriptionSegment[] = segments.map((segment, index) => ({
+       const exportSegments: TranscriptionSegment[] = segments.map((segment, index) => ({
           id: index,
           seek: 0,
           start: segment.start,
           end: segment.end,
           text: segment.text,
+          speaker: segment.speaker,
           tokens: [],
           temperature: 0,
           avg_logprob: 0,
@@ -303,7 +304,8 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
           },
           includeTimestamps: true,
           includeChapters: false,
-          includeSummary: false
+          includeSummary: false,
+          includeSpeakers: speakerDiarization
         };
 
         if (format === 'docx') {

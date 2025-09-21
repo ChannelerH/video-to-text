@@ -127,7 +127,7 @@ export class DocumentExportService {
               heading: HeadingLevel.HEADING_1,
               spacing: { after: 400 }
             }),
-            ...(await this.generateFlatContent(transcription, options.includeTimestamps !== false))
+            ...(await this.generateFlatContent(transcription, options.includeTimestamps !== false, options.includeSpeakers !== false))
           ])
         ]
       }]
@@ -615,7 +615,7 @@ export class DocumentExportService {
   /**
    * Generate flat content for Word document
    */
-  private static async generateFlatContent(transcription: any, includeTimestamps: boolean): Promise<any[]> {
+  private static async generateFlatContent(transcription: any, includeTimestamps: boolean, includeSpeakers: boolean): Promise<any[]> {
     const { Paragraph, TextRun } = await import('docx');
     const content: any[] = [];
     const clean = (s: string) => {
@@ -627,8 +627,14 @@ export class DocumentExportService {
     
     // Handle both segments array and text
     if (transcription.segments && transcription.segments.length > 0) {
-      if (includeTimestamps) {
-        transcription.segments.forEach((segment: TranscriptionSegment) => {
+      transcription.segments.forEach((segment: TranscriptionSegment) => {
+        let speakerPrefix = '';
+        if (includeSpeakers && segment && segment.speaker !== undefined && segment.speaker !== null && String(segment.speaker).trim() !== '') {
+          const speakerValue = String(segment.speaker).trim();
+          speakerPrefix = /^\d+$/.test(speakerValue) ? `Speaker ${parseInt(speakerValue, 10) + 1}: ` : `${speakerValue}: `;
+        }
+
+        if (includeTimestamps) {
           content.push(
             new Paragraph({
               children: [
@@ -637,20 +643,26 @@ export class DocumentExportService {
                   bold: true,
                   color: '0066CC'
                 }),
+                ...(speakerPrefix
+                  ? [new TextRun({ text: speakerPrefix, bold: true })]
+                  : []),
                 new TextRun({ text: clean(segment.text) })
               ],
               spacing: { after: 150 }
             })
           );
-        });
-      } else {
-        // Without timestamps, just add segment text
-        transcription.segments.forEach((segment: TranscriptionSegment) => {
+        } else {
           content.push(
-            new Paragraph({ text: clean(segment.text), spacing: { after: 150 } })
+            new Paragraph({
+              children: [
+                ...(speakerPrefix ? [new TextRun({ text: speakerPrefix, bold: true })] : []),
+                new TextRun({ text: clean(segment.text) })
+              ],
+              spacing: { after: 150 }
+            })
           );
-        });
-      }
+        }
+      });
     } else if (transcription.text) {
       // Fall back to plain text if no segments
       transcription.text.split('\n').forEach((paragraph: string) => {

@@ -81,8 +81,11 @@ export default function Actions({ row, i18n, userTier: userTierOverride }: Actio
       // Log which URL we're using
       console.log('[Re-run] Using URL:', row.processed_url ? 'processed_url (fast)' : 'source_url (original)');
       
+      // When using processed_url (R2), treat it as audio_url regardless of original source_type
+      const effectiveType = row.processed_url ? 'audio_url' : row.source_type;
+      
       const body = {
-        type: row.source_type as 'youtube_url' | 'audio_url',
+        type: effectiveType as 'youtube_url' | 'audio_url',
         content: urlToUse,  // Use the selected URL
         options: { formats: ['txt','srt','vtt','json','md'] }
       };
