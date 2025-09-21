@@ -562,7 +562,13 @@
       "processing_file": "Processing file transcription...",
       "completed": "Transcription completed!",
       "preview_ready": "Preview generated (5 minutes). Sign in to get full result.",
-      "audio_transformed": "Your audio has been transformed into text."
+      "audio_transformed": "Your audio has been transformed into text.",
+      "detecting": "Detecting",
+      "detecting_tracks": "Detecting available audio tracks...",
+      "detecting_title": "Analyzing Content",
+      "detecting_subtitle": "Checking for available audio tracks",
+      "processing_title": "Processing Audio",
+      "processing_subtitle": "Transcribing your audio with AI"
     },
     "results": {
       "transcription_complete": "Transcription Complete",

@@ -223,8 +223,10 @@ export default async function EditorPage({
     rawSegmentMax || 0
   ];
   const totalDuration = Math.max(...candidateDurations);
-  // 容差 1 秒，防止浮点近似导致误判
-  const isPreview = (userTier === UserTier.FREE) && (visibleSegmentMax + 1 < totalDuration);
+  const toleranceSeconds = 1;
+  const exceedsPreviewWindow = totalDuration > (previewWindow + toleranceSeconds);
+  const hasLockedPortion = visibleSegmentMax + toleranceSeconds < totalDuration;
+  const isPreview = (userTier === UserTier.FREE) && exceedsPreviewWindow && hasLockedPortion;
   
   // Preview mode derived using tolerant duration check
 

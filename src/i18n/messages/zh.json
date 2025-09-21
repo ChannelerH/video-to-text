@@ -417,7 +417,13 @@
       "processing_file": "正在处理文件转录...",
       "completed": "转录完成！",
       "preview_ready": "已生成 5 分钟预览。登录可获得完整结果并保存记录。",
-      "audio_transformed": "您的音频已转换为文本。"
+      "audio_transformed": "您的音频已转换为文本。",
+      "detecting": "检测中",
+      "detecting_tracks": "正在检测可用音轨...",
+      "detecting_title": "分析内容",
+      "detecting_subtitle": "正在检查可用的音频轨道",
+      "processing_title": "处理音频",
+      "processing_subtitle": "使用 AI 转录您的音频"
     },
     "results": {
       "transcription_complete": "转录完成",

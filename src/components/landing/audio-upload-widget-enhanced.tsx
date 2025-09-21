@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useSession } from "next-auth/react";
 import { ToastNotification, useToast } from "@/components/toast-notification";
 import { useTranslations } from "next-intl";
 import { useAppContext } from "@/contexts/app";
 import { DocumentExportService } from "@/lib/export-document";
+import { transcribeAsync } from "@/lib/async-transcribe";
+import AudioTrackSelector from "@/components/audio-track-selector";
+import type { AudioTrack } from "@/components/audio-track-selector";
 import type { TranscriptionSegment } from "@/lib/replicate";
 import {
   FileText,
@@ -45,7 +48,77 @@ interface TranscriptionResult {
   createdAt: Date;
 }
 
-type UploadStage = 'idle' | 'uploading' | 'processing' | 'completed' | 'failed';
+type UploadStage = 'idle' | 'uploading' | 'detecting' | 'processing' | 'completed' | 'failed';
+
+const DEFAULT_FORMATS = ['txt', 'srt', 'vtt', 'md', 'json'];
+
+function isMediaFileType(mime: string): boolean {
+  return typeof mime === 'string' && (mime.startsWith('audio') || mime.startsWith('video'));
+}
+
+async function measureFileDuration(file: File): Promise<number | null> {
+  if (typeof document === 'undefined') return null;
+  if (!isMediaFileType(file.type)) return null;
+
+  return new Promise((resolve) => {
+    let media: HTMLMediaElement | null = null;
+    let objectUrl = '';
+    let settled = false;
+
+    const cleanup = () => {
+      if (media) {
+        media.removeEventListener('loadedmetadata', onLoaded);
+        media.removeEventListener('error', onError);
+        if (media.parentNode) {
+          media.parentNode.removeChild(media);
+        }
+      }
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+
+    const finish = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(value);
+    };
+
+    const onLoaded = () => {
+      if (!media) return finish(null);
+      const duration = Number(media.duration);
+      finish(Number.isFinite(duration) && duration > 0 ? duration : null);
+    };
+
+    const onError = () => finish(null);
+
+    try {
+      objectUrl = URL.createObjectURL(file);
+      const tagName = file.type.startsWith('video') ? 'video' : 'audio';
+      media = document.createElement(tagName);
+      media.preload = 'metadata';
+      media.muted = true;
+      media.playsInline = true;
+      media.src = objectUrl;
+      media.style.position = 'absolute';
+      media.style.opacity = '0';
+      media.style.pointerEvents = 'none';
+      media.style.width = '1px';
+      media.style.height = '1px';
+
+      media.addEventListener('loadedmetadata', onLoaded, { once: true });
+      media.addEventListener('error', onError, { once: true });
+      document.body.appendChild(media);
+      media.load();
+
+      setTimeout(() => finish(null), 7000);
+    } catch (error) {
+      console.warn('[AudioUploadWidget] Unable to probe media duration:', error);
+      finish(null);
+    }
+  });
+}
 
 export default function AudioUploadWidgetEnhanced({ locale }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -65,6 +138,7 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
   const [uploadStage, setUploadStage] = useState<UploadStage>('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingMessage, setProcessingMessage] = useState<string>('');
   const [transcriptionResult, setTranscriptionResult] = useState<TranscriptionResult | null>(null);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [currentFileName, setCurrentFileName] = useState<string>('');
@@ -72,6 +146,15 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
   const [openingEditor, setOpeningEditor] = useState(false);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [showTrackSelector, setShowTrackSelector] = useState(false);
+  const [availableTracks, setAvailableTracks] = useState<AudioTrack[]>([]);
+  const [trackVideoTitle, setTrackVideoTitle] = useState('');
+  const pendingYouTubeRequest = useRef<{
+    type: 'youtube_url' | 'audio_url';
+    content: string;
+    title: string;
+    options: Record<string, any>;
+  } | null>(null);
   
   // Check if user has high accuracy access
   const normalizedTier = String(userTier || 'free').toLowerCase();
@@ -91,23 +174,11 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
     }
   }, [canUseDiarization, speakerDiarization]);
 
-  // Simulate processing progress
-  useEffect(() => {
-    if (uploadStage === 'processing') {
-      const interval = setInterval(() => {
-        setProcessingProgress(prev => {
-          if (prev >= 95) return prev;
-          return prev + Math.random() * 5;
-        });
-      }, 500);
-      return () => clearInterval(interval);
-    }
-  }, [uploadStage]);
-
   const resetState = () => {
     setUploadStage('idle');
     setUploadProgress(0);
     setProcessingProgress(0);
+    setProcessingMessage('');
     setCurrentFileName('');
     setEstimatedTime(0);
     setOpeningEditor(false);
@@ -115,6 +186,10 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
     setCurrentJobId(null);
     setPreviewError(null);
     setCopiedToClipboard(false);
+    setShowTrackSelector(false);
+    setAvailableTracks([]);
+    setTrackVideoTitle('');
+    pendingYouTubeRequest.current = null;
   };
 
   const triggerBrowse = () => {
@@ -306,6 +381,145 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
     setTimeout(() => setCopiedToClipboard(false), 3000);
   };
 
+  const runTranscription = useCallback(async (
+    params: {
+      type: 'file_upload' | 'audio_url' | 'youtube_url';
+      content: string;
+      title?: string;
+      options?: Record<string, any>;
+      preferredLanguage?: string;
+    }
+  ) => {
+    const { type, content, title, options = {}, preferredLanguage } = params;
+
+    setPreviewError(null);
+    setCurrentJobId(null);
+    setProcessingMessage(t('progress.starting') || 'Starting transcription...');
+    setProcessingProgress(10);
+    setUploadStage('processing');
+
+    const requestOptions: Record<string, any> = {
+      ...options,
+      formats: options.formats || DEFAULT_FORMATS,
+    };
+
+    if (requestOptions.highAccuracyMode && !canUseHighAccuracy) {
+      delete requestOptions.highAccuracyMode;
+    }
+    if (requestOptions.enableDiarizationAfterWhisper && !canUseDiarization) {
+      delete requestOptions.enableDiarizationAfterWhisper;
+    }
+
+    requestOptions.userTier = String(normalizedTier || 'free');
+
+    if (isAuthenticated) {
+      requestOptions.streamProgress = true;
+    }
+
+    if (preferredLanguage && typeof preferredLanguage === 'string') {
+      requestOptions.preferred_language = preferredLanguage;
+    }
+
+    try {
+      const requestData = {
+        type,
+        content,
+        action: isAuthenticated ? 'transcribe' : 'preview',
+        options: requestOptions,
+      } as const;
+
+      const result = await transcribeAsync(
+        requestData,
+        (stage, percentage, message) => {
+          setUploadStage('processing');
+          setProcessingProgress(Math.max(0, Math.min(100, percentage || 0)));
+          if (message) {
+            setProcessingMessage(message);
+          }
+        }
+      );
+
+      if (result?.success && result.data) {
+        const transcription = result.data.transcription || {};
+        const rawSegments = Array.isArray(transcription.segments) ? transcription.segments : [];
+        const normalizedSegments: PreviewSegment[] = rawSegments.map((segment: any) => {
+          const start = typeof segment.start === 'number' ? segment.start : Number(segment.start) || 0;
+          const end = typeof segment.end === 'number' ? segment.end : Number(segment.end) || start;
+          const speaker = segment.speaker ?? segment.speaker_label ?? segment.speakerId;
+          return {
+            start,
+            end,
+            text: typeof segment.text === 'string' ? segment.text : '',
+            speaker,
+          };
+        });
+
+        setTranscriptionResult({
+          id: result.data.jobId,
+          title: title || result.data.title || currentFileName || 'Transcription',
+          text: transcription.text || '',
+          duration: transcription.duration || (normalizedSegments.at(-1)?.end ?? 0),
+          segments: normalizedSegments,
+          language: transcription.language,
+          createdAt: new Date(),
+        });
+        setCurrentJobId(result.data.jobId || null);
+        setProcessingProgress(100);
+        setProcessingMessage(t('progress.completed') || 'Transcription complete!');
+        setUploadStage('completed');
+        return;
+      }
+
+      if (result?.success && result.preview) {
+        const preview = result.preview as {
+          text?: string;
+          srt?: string;
+          duration?: number;
+          language?: string;
+          job_id?: string;
+        };
+        const segments = preview.srt ? parseSRT(preview.srt) : [];
+        const derivedDuration = preview.duration || (segments.length > 0 ? segments[segments.length - 1].end : 0);
+
+        setTranscriptionResult({
+          id: preview.job_id,
+          title: title || currentFileName || 'Preview',
+          text: preview.text || '',
+          duration: derivedDuration,
+          segments,
+          srt: preview.srt,
+          language: preview.language,
+          createdAt: new Date(),
+        });
+        setCurrentJobId(preview.job_id || null);
+        setProcessingProgress(100);
+        setProcessingMessage(t('progress.preview_ready') || 'Preview ready.');
+        setUploadStage('completed');
+        return;
+      }
+
+      const errorMessage = result?.error || t('errors.general_error');
+      throw new Error(typeof errorMessage === 'string' ? errorMessage : 'Transcription failed');
+    } catch (error: any) {
+      const message = error?.message || t('errors.general_error');
+      console.error('[AudioUploadWidget] Transcription error:', error);
+      setPreviewError(message);
+      setProcessingMessage('');
+      setUploadStage('failed');
+      showToast('error', t('errors.transcription_failed_title') || 'Transcription Failed', message);
+    }
+  }, [
+    canUseDiarization,
+    canUseHighAccuracy,
+    currentFileName,
+    highAccuracy,
+    isAuthenticated,
+    normalizedTier,
+    showToast,
+    speakerDiarization,
+    t
+  ]);
+
   const handleOpenInEditor = async () => {
     if (!isAuthenticated) {
       showToast('error', 'Sign in required', 'Please sign in to open the full editor.');
@@ -324,6 +538,38 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
     }, 400);
   };
 
+  const handleTrackSelected = async (languageCode: string) => {
+    const pending = pendingYouTubeRequest.current;
+    setShowTrackSelector(false);
+    if (!pending) {
+      return;
+    }
+
+    try {
+      setBusy(true);
+      await runTranscription({
+        type: pending.type,
+        content: pending.content,
+        title: pending.title,
+        options: pending.options,
+        preferredLanguage: languageCode,
+      });
+    } finally {
+      pendingYouTubeRequest.current = null;
+      setBusy(false);
+      setAvailableTracks([]);
+      setTrackVideoTitle('');
+    }
+  };
+
+  const handleTrackSelectorClose = () => {
+    setShowTrackSelector(false);
+    setAvailableTracks([]);
+    setTrackVideoTitle('');
+    pendingYouTubeRequest.current = null;
+    setBusy(false);
+  };
+
   const handleUrlSubmit = async () => {
     const url = urlInput.trim();
     if (!url) return;
@@ -333,8 +579,8 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
       setBusy(true);
       setPreviewError(null);
       setTranscriptionResult(null);
-      setUploadStage('processing');
-      setProcessingProgress(12);
+      setProcessingProgress(0);
+      setProcessingMessage('');
 
       const isYouTube = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)/i.test(url);
       const urlType: 'youtube_url' | 'audio_url' = isYouTube ? 'youtube_url' : 'audio_url';
@@ -343,88 +589,61 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
       setCurrentFileName(derivedTitle);
 
       setEstimatedTime(isYouTube ? 30 : 20);
+      pendingYouTubeRequest.current = null;
+      const baseOptions = {
+        highAccuracyMode: canUseHighAccuracy && highAccuracy,
+        enableDiarizationAfterWhisper: canUseDiarization && speakerDiarization,
+      } as Record<string, any>;
 
-      let jobId: string | undefined;
-
-      if (isAuthenticated) {
+      if (isYouTube) {
+        // Show detecting state
+        setUploadStage('detecting');
+        setProcessingProgress(50);
+        setProcessingMessage(t('progress.detecting_tracks') || 'Detecting available audio tracks...');
+        
         try {
-          const asyncBody = {
-            type: urlType,
-            content: url,
-            action: 'transcribe',
-            options: {
-              high_accuracy: canUseHighAccuracy && highAccuracy,
-              speaker_diarization: canUseDiarization && speakerDiarization
-            }
-          };
-
-          const resp = await fetch('/api/transcribe/async', {
+          const detectResponse = await fetch('/api/youtube/detect-tracks', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(asyncBody)
+            body: JSON.stringify({ url })
           });
 
-          const data = await resp.json();
-          if (!resp.ok || !data?.success || !data?.job_id) {
-            throw new Error(data?.error || 'Failed to start transcription job');
+          if (detectResponse.ok) {
+            const data = await detectResponse.json();
+            const { tracks = [], videoTitle = '', hasMultipleTracks } = data || {};
+
+            if (Array.isArray(tracks) && hasMultipleTracks && tracks.length > 1) {
+              pendingYouTubeRequest.current = {
+                type: urlType,
+                content: url,
+                title: derivedTitle,
+                options: baseOptions,
+              };
+              setAvailableTracks(tracks);
+              setTrackVideoTitle(videoTitle || derivedTitle);
+              setShowTrackSelector(true);
+              setBusy(false);
+              return;
+            }
           }
-          jobId = data.job_id;
-          setCurrentJobId(jobId);
         } catch (error) {
-          console.error('[Async] Failed to enqueue job:', error);
-          showToast('error', t('errors.general_error'), error instanceof Error ? error.message : t('errors.general_error'));
+          console.warn('[AudioUploadWidget] Track detection failed, continuing with default:', error);
         }
-      } else {
-        setCurrentJobId(null);
       }
 
-      setProcessingProgress(45);
-
-      const previewBody = {
+      await runTranscription({
         type: urlType,
         content: url,
-        action: 'preview',
-        options: {
-          highAccuracyMode: canUseHighAccuracy && highAccuracy,
-          enableDiarizationAfterWhisper: canUseDiarization && speakerDiarization
-        }
-      };
-
-      const previewResp = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(previewBody)
-      });
-      const previewJson = await previewResp.json();
-
-      if (!previewResp.ok || !previewJson?.success || !previewJson?.preview) {
-        throw new Error(previewJson?.error || 'Preview generation failed');
-      }
-
-      const preview = previewJson.preview as { text?: string; srt?: string; duration?: number; language?: string };
-      const segments = preview.srt ? parseSRT(preview.srt) : [];
-      const previewText = preview.text && preview.text.trim().length > 0
-        ? preview.text
-        : (segments.length > 0 ? segments.map(seg => seg.text).join(' ') : 'Preview unavailable.');
-
-      setTranscriptionResult({
-        id: jobId,
         title: derivedTitle,
-        text: previewText,
-        duration: Math.max(preview.duration || 0, segments.length > 0 ? segments[segments.length - 1].end : 0),
-        segments,
-        srt: preview.srt,
-        language: preview.language,
-        createdAt: new Date()
+        options: baseOptions
       });
-
-      setProcessingProgress(100);
-      setUploadStage('completed');
     } catch (e: any) {
       console.error(e);
-      setPreviewError(e?.message || 'Preview unavailable');
-      setUploadStage('failed');
-      showToast('error', t('errors.general_error'), e?.message || t('errors.general_error'));
+      if (uploadStage !== 'failed') {
+        setPreviewError(e?.message || 'Preview unavailable');
+        setUploadStage('failed');
+        showToast('error', t('errors.general_error'), e?.message || t('errors.general_error'));
+      }
     } finally {
       setBusy(false);
       setUrlInput('');
@@ -443,6 +662,13 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
       setPreviewError(null);
       setTranscriptionResult(null);
       setUploadStage('uploading');
+
+      let detectedDuration: number | null = null;
+      try {
+        detectedDuration = await measureFileDuration(file);
+      } catch (probeError) {
+        console.warn('[AudioUploadWidget] Failed to detect duration:', probeError);
+      }
 
       const presignResp = await fetch('/api/upload/presigned', {
         method: 'POST',
@@ -485,89 +711,20 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
         xhr.send(file);
       });
 
-      setUploadStage('processing');
-      setProcessingProgress(35);
-
       const fileUrl = downloadUrl || publicUrl;
 
-      let jobId: string | undefined;
-      if (isAuthenticated) {
-        try {
-          const body = {
-            type: 'file_upload' as const,
-            content: fileUrl,
-            action: 'transcribe',
-            options: {
-              r2Key: key,
-              originalFileName: file.name,
-              high_accuracy: canUseHighAccuracy && highAccuracy,
-              speaker_diarization: canUseDiarization && speakerDiarization
-            }
-          };
-
-          const resp = await fetch('/api/transcribe/async', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          });
-          const data = await resp.json();
-          if (!resp.ok || !data?.success || !data?.job_id) {
-            throw new Error(data?.error || 'Failed to start transcription');
-          }
-          jobId = data.job_id;
-          setCurrentJobId(jobId);
-        } catch (error) {
-          console.error('[Async] Failed to enqueue job:', error);
-          showToast('error', t('errors.general_error'), error instanceof Error ? error.message : t('errors.general_error'));
-        }
-      } else {
-        setCurrentJobId(null);
-      }
-
-      setProcessingProgress(65);
-
-      const previewBody = {
-        type: 'file_upload' as const,
+      await runTranscription({
+        type: 'file_upload',
         content: fileUrl,
-        action: 'preview',
+        title: file.name.replace(/\.[^/.]+$/, '') || file.name,
         options: {
           r2Key: key,
           originalFileName: file.name,
+          estimatedDurationSec: detectedDuration ?? undefined,
           highAccuracyMode: canUseHighAccuracy && highAccuracy,
-          enableDiarizationAfterWhisper: canUseDiarization && speakerDiarization
+          enableDiarizationAfterWhisper: canUseDiarization && speakerDiarization,
         }
-      };
-
-      const previewResp = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(previewBody)
       });
-      const previewJson = await previewResp.json();
-
-      if (!previewResp.ok || !previewJson?.success || !previewJson?.preview) {
-        throw new Error(previewJson?.error || 'Preview generation failed');
-      }
-
-      const preview = previewJson.preview as { text?: string; srt?: string; duration?: number; language?: string };
-      const segments = preview.srt ? parseSRT(preview.srt) : [];
-      const previewText = preview.text && preview.text.trim().length > 0
-        ? preview.text
-        : (segments.length > 0 ? segments.map(seg => seg.text).join(' ') : 'Preview unavailable.');
-
-      setTranscriptionResult({
-        id: jobId,
-        title: file.name,
-        text: previewText,
-        duration: Math.max(preview.duration || 0, segments.length > 0 ? segments[segments.length - 1].end : 0),
-        segments,
-        srt: preview.srt,
-        language: preview.language,
-        createdAt: new Date()
-      });
-
-      setProcessingProgress(100);
-      setUploadStage('completed');
     } catch (e: any) {
       console.error(e);
       setPreviewError(e?.message || 'Preview unavailable');
@@ -782,6 +939,35 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
           </div>
         )}
 
+        {/* Track Detection Stage */}
+        {uploadStage === 'detecting' && (
+          <div className="py-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-purple-500/20 mb-4">
+                <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">{t('progress.detecting_title') || 'Analyzing Content'}</h3>
+              <p className="text-sm text-slate-400">{t('progress.detecting_subtitle') || 'Checking for available audio tracks'}</p>
+              {processingMessage && (
+                <p className="text-xs text-slate-500 mt-2">{processingMessage}</p>
+              )}
+            </div>
+
+            <div className="max-w-md mx-auto">
+              <div className="flex justify-between text-sm text-slate-400 mb-2">
+                <span>{t('progress.detecting') || 'Detecting'}</span>
+                <span>{Math.round(processingProgress)}%</span>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-purple-500 to-purple-400 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${processingProgress}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Processing Stage */}
         {uploadStage === 'processing' && (
           <div className="py-8">
@@ -789,8 +975,11 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-cyan-500/20 mb-4">
                 <Loader2 className="w-10 h-10 text-cyan-400 animate-spin" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Processing Audio</h3>
-              <p className="text-sm text-slate-400">Transcribing your audio with AI</p>
+              <h3 className="text-xl font-semibold mb-2">{t('progress.processing_title') || 'Processing Audio'}</h3>
+              <p className="text-sm text-slate-400">{t('progress.processing_subtitle') || 'Transcribing your audio with AI'}</p>
+              {processingMessage && (
+                <p className="text-xs text-slate-500 mt-2">{processingMessage}</p>
+              )}
             </div>
 
             <div className="max-w-md mx-auto">
@@ -1018,6 +1207,14 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
           </div>
         )}
       </div>
+
+      <AudioTrackSelector
+        isOpen={showTrackSelector}
+        onClose={handleTrackSelectorClose}
+        onSelect={handleTrackSelected}
+        tracks={availableTracks}
+        videoTitle={trackVideoTitle}
+      />
     </div>
   );
 }
