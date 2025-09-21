@@ -11,7 +11,9 @@ import {
   MessageSquare,
   User,
   Users,
-  Loader2
+  Loader2,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app';
 
@@ -25,6 +27,7 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
   const { user, setShowFeedback } = useAppContext();
   const [isLoading, setIsLoading] = useState(true);
   const [loadingRoute, setLoadingRoute] = useState<string | null>(null);
+  const [isUserMenuExpanded, setIsUserMenuExpanded] = useState(false);
 
   useEffect(() => {
     // Set loading to false once we've checked for user
@@ -153,23 +156,27 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
       {/* User Section */}
       <div className="border-t border-gray-800">
         <div className="px-6 py-4">
-          <div className="flex items-center gap-3 mb-4">
+          {/* User Info - Always Visible, Clickable to Toggle Menu */}
+          <button
+            onClick={() => setIsUserMenuExpanded(!isUserMenuExpanded)}
+            className="w-full flex items-center gap-3 mb-2 hover:bg-gray-800/30 rounded-lg p-2 -ml-2 transition-colors"
+          >
             {isLoading ? (
               <>
                 <div className="w-8 h-8 bg-gray-700 rounded-full animate-pulse" />
-                <div className="flex-1">
+                <div className="flex-1 text-left">
                   <div className="h-3 w-20 bg-gray-700 rounded animate-pulse mb-1" />
                   <div className="h-2 w-32 bg-gray-700 rounded animate-pulse" />
                 </div>
               </>
             ) : user ? (
               <>
-                <div className="w-8 h-8 bg-purple-600/20 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-purple-600/20 rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-xs text-purple-400 font-medium">
                     {userNickname[0]?.toUpperCase() || '?'}
                   </span>
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 text-left">
                   <p className="text-sm text-white truncate">{userNickname}</p>
                   <p className="text-xs text-gray-500 truncate">{userEmail}</p>
                 </div>
@@ -177,40 +184,51 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
             ) : (
               <>
                 <div className="w-8 h-8 bg-gray-700/50 rounded-full" />
-                <div className="flex-1">
+                <div className="flex-1 text-left">
                   <p className="text-sm text-gray-500">Not logged in</p>
                 </div>
               </>
             )}
-          </div>
+            {/* Expand/Collapse Icon */}
+            <div className="ml-auto">
+              {isUserMenuExpanded ? (
+                <ChevronUp className="w-4 h-4 text-gray-500" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              )}
+            </div>
+          </button>
           
-          <div className="space-y-1">
-            <button
-              onClick={handleFeedback}
-              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg transition-colors"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>{t('feedback.title')}</span>
-            </button>
-            
-            <a
-              href="https://discord.gg/v2tx"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg transition-colors"
-            >
-              <Users className="w-4 h-4" />
-              <span>Discord</span>
-            </a>
-            
-            <button
-              onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>{t('user.sign_out')}</span>
-            </button>
-          </div>
+          {/* Collapsible Menu Items */}
+          {isUserMenuExpanded && (
+            <div className="space-y-1 mt-2 animate-in slide-in-from-top-1 duration-200">
+              <button
+                onClick={handleFeedback}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg transition-colors"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>{t('feedback.title')}</span>
+              </button>
+              
+              <a
+                href="https://discord.gg/v2tx"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg transition-colors"
+              >
+                <Users className="w-4 h-4" />
+                <span>Discord</span>
+              </a>
+              
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>{t('user.sign_out')}</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </aside>

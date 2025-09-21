@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "@/i18n/navigation";
 import { useSession } from "next-auth/react";
 import { ToastNotification, useToast } from "@/components/toast-notification";
@@ -1182,9 +1183,33 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
               <AlertCircle className="w-10 h-10 text-red-400" />
             </div>
             <h3 className="text-xl font-semibold mb-2">Transcription Failed</h3>
-            <p className="text-sm text-slate-400 mb-6">
-              {previewError || 'Something went wrong. Please try again.'}
-            </p>
+            <div className="text-sm text-slate-400 mb-6">
+              {(() => {
+                const error = previewError || 'Something went wrong. Please try again.';
+                // Check if error contains "Upgrade at /pricing"
+                const upgradeMatch = error.match(/(.*?)[\s—-]*(Upgrade at \/pricing)(.*?)/);
+                
+                if (upgradeMatch) {
+                  const beforeText = upgradeMatch[1].trim();
+                  const afterText = upgradeMatch[3]?.trim() || '';
+                  
+                  return (
+                    <>
+                      {beforeText && <span>{beforeText} — </span>}
+                      <Link 
+                        href={`/${locale}/pricing`}
+                        className="text-cyan-400 hover:text-cyan-300 underline transition-colors"
+                      >
+                        Upgrade
+                      </Link>
+                      {afterText && <span> {afterText}</span>}
+                    </>
+                  );
+                }
+                
+                return <span>{error}</span>;
+              })()}
+            </div>
             <button
               onClick={resetState}
               className="px-6 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 transition-colors text-slate-900 font-medium"
