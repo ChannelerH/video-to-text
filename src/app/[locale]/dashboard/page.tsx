@@ -113,9 +113,10 @@ export default async function DashboardPage({
             <UsageSummaryCard dataPromise={dashboardDataPromise} />
           </Suspense>
 
-          <Suspense fallback={<UpgradeCardSkeleton />}>
+          {/* Removed upgrade panel per user request - keeping only top notification and left sidebar button */}
+          {/* <Suspense fallback={<UpgradeCardSkeleton />}>
             <UpgradePrompt dataPromise={dashboardDataPromise} locale={locale} />
-          </Suspense>
+          </Suspense> */}
         </div>
       </div>
     </div>
@@ -260,14 +261,12 @@ async function DashboardHeader({
             {userTier === UserTier.FREE
               ? "📅 Showing transcriptions from the last 7 days. Older files are automatically archived."
               : "📅 Showing transcriptions from the last 90 days."}
-            {userTier === UserTier.FREE && (
-              <Link
-                href={`/${locale}/pricing`}
-                className="ml-2 text-blue-400 hover:text-blue-300 underline"
-              >
-                Upgrade for longer retention
-              </Link>
-            )}
+            <Link
+              href={`/${locale}/pricing`}
+              className="ml-2 text-blue-400 hover:text-blue-300 underline"
+            >
+              Upgrade for longer retention
+            </Link>
           </p>
         </div>
       )}
@@ -475,64 +474,65 @@ async function UsageSummaryCard({
   );
 }
 
-async function UpgradePrompt({
-  dataPromise,
-  locale,
-}: {
-  dataPromise: Promise<DashboardData>;
-  locale: string;
-}) {
-  const { userTier } = await dataPromise;
+// Commented out as the upgrade panel was removed per user request
+// async function UpgradePrompt({
+//   dataPromise,
+//   locale,
+// }: {
+//   dataPromise: Promise<DashboardData>;
+//   locale: string;
+// }) {
+//   const { userTier } = await dataPromise;
 
-  if (userTier !== UserTier.FREE && userTier !== UserTier.BASIC) {
-    return null;
-  }
+//   if (userTier !== UserTier.FREE && userTier !== UserTier.BASIC) {
+//     return null;
+//   }
 
-  return (
-    <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-lg p-5 border border-purple-500/30">
-      <h3 className="text-white font-medium mb-2">
-        {userTier === UserTier.FREE
-          ? "Unlock Full Features"
-          : "Upgrade to Pro"}
-      </h3>
+//   return (
+//     <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-lg p-5 border border-purple-500/30">
+//       <h3 className="text-white font-medium mb-2">
+//         {userTier === UserTier.FREE
+//           ? "Unlock Full Features"
+//           : "Upgrade to Pro"}
+//       </h3>
 
-      {userTier === UserTier.FREE ? (
-        <>
-          <p className="text-gray-300 text-sm mb-4">
-            Free users can only view the first 5 minutes sample and basic features.
-            Upgrade to BASIC/PRO to unlock full content, complete speaker labels/AI
-            features, and all export formats.
-          </p>
-          <ul className="text-xs text-gray-300 space-y-1 mb-4">
-            <li>✓ Full transcription content</li>
-            <li>✓ Complete AI chapters & summaries</li>
-            <li>✓ All export formats</li>
-            <li>✓ Speaker diarization</li>
-          </ul>
-        </>
-      ) : (
-        <>
-          <p className="text-gray-300 text-sm mb-4">
-            Get more transcription minutes and premium features
-          </p>
-          <ul className="text-xs text-gray-300 space-y-1 mb-4">
-            <li>✓ 2,200 minutes monthly (2000 standard + 200 high-accuracy)</li>
-            <li>✓ Priority processing queue</li>
-            <li>✓ Batch processing & export</li>
-            <li>✓ Extended file retention (365 days)</li>
-          </ul>
-        </>
-      )}
+//       {userTier === UserTier.FREE ? (
+//         <>
+//           <p className="text-gray-300 text-sm mb-4">
+//             Free users can only view the first 5 minutes sample and basic features.
+//             Upgrade to BASIC/PRO to unlock full content, complete speaker labels/AI
+//             features, and all export formats.
+//           </p>
+//           <ul className="text-xs text-gray-300 space-y-1 mb-4">
+//             <li>✓ Full transcription content</li>
+//             <li>✓ Complete AI chapters & summaries</li>
+//             <li>✓ All export formats</li>
+//             <li>✓ Speaker diarization</li>
+//           </ul>
+//         </>
+//       ) : (
+//         <>
+//           <p className="text-gray-300 text-sm mb-4">
+//             Get more transcription minutes and premium features
+//           </p>
+//           <ul className="text-xs text-gray-300 space-y-1 mb-4">
+//             <li>✓ 2,200 minutes monthly (2000 standard + 200 high-accuracy)</li>
+//             <li>✓ Priority processing queue</li>
+//             <li>✓ Batch processing & export</li>
+//             <li>✓ Extended file retention (365 days)</li>
+//           </ul>
+//         </>
+//       )}
 
-      <Link
-        href={`/${locale}/pricing`}
-        className="block w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg text-sm transition-colors text-center"
-      >
-        Upgrade Now
-      </Link>
-    </div>
-  );
-}
+//       <Link
+//         href={`/${locale}/pricing`}
+//         className="block w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg text-sm transition-colors text-center"
+//       >
+//         Upgrade Now
+//       </Link>
+//     </div>
+//   );
+// }
 
 function HeaderSkeleton() {
   return (
@@ -574,12 +574,13 @@ function UsageSummarySkeleton() {
   );
 }
 
-function UpgradeCardSkeleton() {
-  return (
-    <div className="bg-gray-900/30 border border-gray-800 rounded-lg p-5 animate-pulse space-y-3">
-      <div className="h-5 w-36 bg-gray-800 rounded" />
-      <div className="h-4 w-full bg-gray-800 rounded" />
-      <div className="h-8 w-full bg-gray-800 rounded" />
-    </div>
-  );
-}
+// Commented out as the upgrade panel was removed per user request
+// function UpgradeCardSkeleton() {
+//   return (
+//     <div className="bg-gray-900/30 border border-gray-800 rounded-lg p-5 animate-pulse space-y-3">
+//       <div className="h-5 w-36 bg-gray-800 rounded" />
+//       <div className="h-4 w-full bg-gray-800 rounded" />
+//       <div className="h-8 w-full bg-gray-800 rounded" />
+//     </div>
+//   );
+// }
