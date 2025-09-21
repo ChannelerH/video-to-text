@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
+import Link from 'next/link';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -69,7 +70,30 @@ export function ToastNotification({
           <div className="flex-1">
             <h3 className={`font-semibold ${style.titleColor}`}>{title}</h3>
             {message && (
-              <p className="mt-1 text-sm text-gray-400">{message}</p>
+              <p className="mt-1 text-sm text-gray-400">
+                {(() => {
+                  // Check if message contains "Upgrade at /pricing"
+                  const upgradeMatch = message.match(/^(.*?)(\s*—\s*Upgrade at \/pricing)(.*?)$/i);
+                  if (upgradeMatch) {
+                    const [, prefix, , suffix] = upgradeMatch;
+                    return (
+                      <>
+                        {prefix && prefix.trim()}
+                        {prefix && ' — '}
+                        <Link 
+                          href="/pricing" 
+                          className="text-cyan-300 hover:text-cyan-200 underline font-medium"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Upgrade
+                        </Link>
+                        {suffix && suffix.trim()}
+                      </>
+                    );
+                  }
+                  return message;
+                })()}
+              </p>
             )}
           </div>
           <button

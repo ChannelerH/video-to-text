@@ -127,11 +127,47 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
     setShowUrlDialog(true);
   };
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const formatDuration = (seconds: number): string => {
+    const total = Math.max(0, Math.floor(seconds));
+    const mins = Math.floor(total / 60);
+    const secs = total % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
+
+  const formatTimestamp = (seconds: number): string => {
+    const sign = seconds < 0 ? '-' : '';
+    const value = Math.abs(seconds);
+    const mins = Math.floor(value / 60);
+    const secs = Math.floor(value % 60);
+    const millis = Math.round((value - Math.floor(value)) * 1000);
+    return `${sign}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+  };
+
+  const isChineseText = (language?: string, text?: string) => {
+    if (language && language.toLowerCase().includes('zh')) return true;
+    if (!text) return false;
+    return /[\u4e00-\u9fff]/.test(text);
+  };
+
+  const enhanceChineseText = (raw: string) => {
+    let text = (raw || '').trim();
+    if (!text) return '';
+    text = text.replace(/[\t\r\f]+/g, ' ').replace(/\u00A0/g, ' ').replace(/\s{2,}/g, ' ');
+    text = text.replace(/([\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])/g, '$1');
+    text = text
+      .replace(/([\u4e00-\u9fff])([A-Za-z0-9])/g, '$1 $2')
+      .replace(/([A-Za-z0-9])([\u4e00-\u9fff])/g, '$1 $2');
+    text = text
+      .replace(/([\u4e00-\u9fff])\s*,\s*/g, '$1，')
+      .replace(/([\u4e00-\u9fff])\s*\.\s*/g, '$1。')
+      .replace(/([\u4e00-\u9fff])\s*!\s*/g, '$1！')
+      .replace(/([\u4e00-\u9fff])\s*\?\s*/g, '$1？')
+      .replace(/([\u4e00-\u9fff])\s*:\s*/g, '$1：')
+      .replace(/([\u4e00-\u9fff])\s*;\s*/g, '$1；');
+    return text;
+  };
+
+  const previewIsChinese = transcriptionResult ? isChineseText(transcriptionResult.language, transcriptionResult.text) : false;
 
   const handleExport = async (format: 'txt' | 'srt' | 'vtt' | 'docx' | 'pdf') => {
     if (!transcriptionResult) return;
@@ -236,9 +272,12 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
 
     const text = transcriptionResult.segments.length > 0
       ? transcriptionResult.segments
-          .map(seg => `[${formatTime(seg.start)}-${formatTime(seg.end)}] ${seg.text}`)
+          .map(seg => {
+            const payload = previewIsChinese ? enhanceChineseText(seg.text) : seg.text;
+            return `[${formatTimestamp(seg.start)} - ${formatTimestamp(seg.end)}] ${payload}`;
+          })
           .join('\n\n')
-      : transcriptionResult.text;
+      : (previewIsChinese ? enhanceChineseText(transcriptionResult.text || '') : transcriptionResult.text || '');
 
     await navigator.clipboard.writeText(text);
     setCopiedToClipboard(true);
@@ -779,7 +818,7 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
             <div className="grid grid-cols-3 gap-3 mb-6">
               <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                 <Clock className="w-5 h-5 text-cyan-400 mx-auto mb-1" />
-                <div className="text-sm font-medium">{formatTime(transcriptionResult.duration)}</div>
+                <div className="text-sm font-medium">{formatDuration(transcriptionResult.duration)}</div>
                 <div className="text-xs text-slate-500">Preview Length</div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-3 text-center">
@@ -796,10 +835,10 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
               </div>
             </div>
 
-            {/* Transcription Preview */}
+            {/* Timestamped Segments Preview */}
             <div className="mb-6">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-medium text-slate-400">Transcription Preview</h4>
+                <h4 className="text-sm font-medium text-slate-400">Timestamped Segments</h4>
                 <button
                   onClick={handleCopyToClipboard}
                   className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
@@ -823,12 +862,14 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
                   <div className="space-y-3 text-sm">
                     {transcriptionResult.segments.map((segment, idx) => (
                       <div key={idx} className="border-b border-slate-800/80 pb-2 last:border-none last:pb-0">
-                        <div className="text-xs text-slate-500 mb-1">
-                          {formatTime(segment.start)} → {formatTime(segment.end)}
+                        <div className="text-sm">
+                          <span className="font-mono text-xs text-slate-400">
+                            [{formatTimestamp(segment.start)} - {formatTimestamp(segment.end)}]
+                          </span>
+                          <span className="ml-2 text-slate-200 leading-relaxed whitespace-pre-wrap">
+                            {previewIsChinese ? enhanceChineseText(segment.text) : segment.text}
+                          </span>
                         </div>
-                        <p className="text-slate-200 leading-relaxed whitespace-pre-wrap">
-                          {segment.text}
-                        </p>
                       </div>
                     ))}
                   </div>
