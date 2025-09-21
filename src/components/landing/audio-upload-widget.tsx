@@ -315,7 +315,7 @@ export default function AudioUploadWidget({ locale }: Props) {
                   Speaker Detection
                   {!canUseDiarization && (
                     <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">
-                      {diarizationTierEligible ? 'Sign in to enable' : 'Basic plan required'}
+                      {diarizationTierEligible ? 'Sign in to enable' : 'Basic plan or higher required'}
                     </span>
                   )}
                 </div>
