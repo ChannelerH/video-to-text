@@ -124,8 +124,10 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const isFreeTier = (userTier || 'free') === 'free';
   const isAuthenticated = !!(session?.user || user);
   const tier = (userTier || (user as any)?.userTier || 'free') as string;
-  const canUseHighAccuracy = isAuthenticated && (tier === 'pro');
-  const canUseDiarization = isAuthenticated && ['basic', 'pro', 'premium'].includes(tier);
+  const normalizedTier = String(tier || 'free').toLowerCase();
+  const canUseHighAccuracy = isAuthenticated && (normalizedTier === 'pro');
+  const canUseDiarization = isAuthenticated && ['basic', 'pro', 'premium'].includes(normalizedTier);
+  const diarizationTierEligible = ['basic', 'pro', 'premium'].includes(normalizedTier);
   
   // Debug logging
   const [enableDiarizationAfterWhisper, setEnableDiarizationAfterWhisper] = useState(false);
@@ -893,6 +895,8 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           action: action,
           options: { formats: selectedFormats }
         };
+        // 向后端传递用户等级，以便控制诸如说话人分离等特性
+        requestData.options.userTier = tier;
         if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
           requestData.options.highAccuracyMode = true;
         }
@@ -919,6 +923,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             originalFileName: uploadedFileInfo.originalName  // 改为 originalFileName 以匹配后端
           }
         };
+        requestData.options.userTier = tier;
         if (uploadedFileInfo.durationSec) {
           requestData.options.estimatedDurationSec = uploadedFileInfo.durationSec;
         }
@@ -1757,34 +1762,32 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
 
         {/* Pro high-accuracy toggle - Enhanced design */}
         <div className="high-accuracy-container">
-          <div 
+          <div
             className={`high-accuracy-toggle ${highAccuracy ? 'active' : ''} ${!canUseHighAccuracy ? 'locked' : ''}`}
             onClick={(e) => {
-              // Check if click is on the upgrade link
               const target = e.target as HTMLElement;
               if (target.classList.contains('toggle-link') || target.closest('.toggle-link')) {
-                return; // Let the link handle its own click
+                return;
               }
-              
-              e.preventDefault();
-              e.stopPropagation();
-              
-              if (canUseHighAccuracy) {
-                // Pro/Premium users can toggle
-                setHighAccuracy(!highAccuracy);
+
+              if (!canUseHighAccuracy) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
               }
-              // Non-Pro users: do nothing when clicking the main button
-              // They must click the "Upgrade" link specifically
+
+              setHighAccuracy(!highAccuracy);
             }}
             role="button"
             aria-pressed={highAccuracy}
             aria-label={t('high_accuracy.label')}
             style={{ cursor: canUseHighAccuracy ? 'pointer' : 'default' }}
           >
-            <div className="toggle-switch" 
+            <div
+              className="toggle-switch"
               onClick={(e) => {
                 if (!canUseHighAccuracy) {
-                  e.stopPropagation(); // Prevent toggle for non-Pro users
+                  e.stopPropagation();
                 }
               }}
             >
@@ -1802,71 +1805,97 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
             <div className="toggle-content">
               <span className="toggle-icon">{canUseHighAccuracy ? '✨' : '🔒'}</span>
               <div className="toggle-text">
-                {canUseHighAccuracy ? (
-                  <>
-                    <span className="toggle-label">{t('high_accuracy.enabled_label')}</span>
-                    <span className="toggle-hint">{t('high_accuracy.speed_hint')}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="toggle-label">
-                      {isAuthenticated 
-                        ? t('high_accuracy.upgrade_hint') 
-                        : t('high_accuracy.login_hint')}
-                    </span>
-                    <a 
-                      className="toggle-link upgrade-link"
-                      href="/pricing"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        router.push('/pricing');
-                      }}
-                      style={{ 
-                        cursor: 'pointer', 
-                        textDecoration: 'underline',
-                        marginLeft: '4px'
-                      }}
-                    >
-                      {t('high_accuracy.pricing_link')}
-                    </a>
-                  </>
-                )}
+                <span className="toggle-label">{t('high_accuracy.label')}</span>
+                <span className="toggle-hint">
+                  {canUseHighAccuracy ? t('high_accuracy.speed_hint') : 'Pro plan required'}
+                </span>
               </div>
+              {!canUseHighAccuracy && (
+                <a
+                  className="toggle-link upgrade-link"
+                  href="/pricing"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push('/pricing');
+                  }}
+                >
+                  {t('high_accuracy.pricing_link')}
+                </a>
+              )}
             </div>
           </div>
         </div>
 
-        {canUseDiarization && (
-          <div className="high-accuracy-container">
+        <div className="high-accuracy-container">
+          <div
+            className={`high-accuracy-toggle ${enableDiarizationAfterWhisper ? 'active' : ''} ${!canUseDiarization ? 'locked' : ''}`}
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              if (target.classList.contains('toggle-link') || target.closest('.toggle-link')) {
+                return;
+              }
+
+              if (!canUseDiarization) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+              }
+
+              setEnableDiarizationAfterWhisper(prev => !prev);
+            }}
+            role="button"
+            aria-pressed={enableDiarizationAfterWhisper}
+            aria-label="Speaker diarization"
+            style={{ cursor: canUseDiarization ? 'pointer' : 'default' }}
+          >
             <div
-              className={`high-accuracy-toggle ${enableDiarizationAfterWhisper ? 'active' : ''}`}
-              onClick={() => setEnableDiarizationAfterWhisper(prev => !prev)}
-              role="button"
-              aria-pressed={enableDiarizationAfterWhisper}
-              aria-label="Speaker diarization"
+              className="toggle-switch"
+              onClick={(e) => {
+                if (!canUseDiarization) {
+                  e.stopPropagation();
+                }
+              }}
             >
-              <div className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={enableDiarizationAfterWhisper}
-                  onChange={() => {}}
-                  style={{ display: 'none' }}
-                />
-                <div className="toggle-slider">
-                  <div className="toggle-handle" />
-                </div>
-              </div>
-              <div className="toggle-content">
-                <span className="toggle-icon">🗣️</span>
-                <div className="toggle-text">
-                  <span className="toggle-label">Speaker diarization</span>
-                  <span className="toggle-hint">Identify speakers with Deepgram diarization</span>
-                </div>
+              <input
+                type="checkbox"
+                checked={enableDiarizationAfterWhisper}
+                onChange={() => {}}
+                disabled={!canUseDiarization}
+                style={{ display: 'none' }}
+              />
+              <div className="toggle-slider">
+                <div className="toggle-handle" />
               </div>
             </div>
+            <div className="toggle-content">
+              <span className="toggle-icon">{canUseDiarization ? '🗣️' : '🔒'}</span>
+              <div className="toggle-text">
+                <span className="toggle-label">Speaker diarization</span>
+                <span className="toggle-hint">
+                  {canUseDiarization
+                    ? 'Identify speakers with Deepgram diarization'
+                    : diarizationTierEligible
+                      ? 'Sign in to enable speaker identification'
+                      : 'Basic plan or higher required'}
+                </span>
+              </div>
+              {!canUseDiarization && (
+                <a
+                  className="toggle-link upgrade-link"
+                  href="/pricing"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push('/pricing');
+                  }}
+                >
+                  {t('high_accuracy.pricing_link')}
+                </a>
+              )}
+            </div>
           </div>
-        )}
+        </div>
 
         {/* Action Button */}
         <div className="balloon-button-container">

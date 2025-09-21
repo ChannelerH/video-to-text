@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = raw ? JSON.parse(raw) : ({} as any);
-    
+
     // Debug: Log the structure to understand what Deepgram returns
     console.log('[Deepgram Callback] Response structure keys:', Object.keys(payload));
     if (payload.results?.channels?.[0]?.alternatives?.[0]) {
@@ -137,6 +137,27 @@ export async function POST(req: NextRequest) {
         console.log('[Deepgram Callback] Words count:', alt.words.length);
       }
     }
+
+    const normalizeSpeaker = (speaker: any): string | undefined => {
+      if (speaker === null || speaker === undefined) return undefined;
+      if (typeof speaker === 'number') return String(speaker);
+      const str = String(speaker).trim();
+      return str.length > 0 ? str : undefined;
+    };
+
+    const pickSpeakerFromCounts = (counts: Record<string, { count: number; confidence: number }>): { speaker?: string; speaker_confidence?: number } => {
+      const entries = Object.entries(counts);
+      if (entries.length === 0) return {};
+      entries.sort((a, b) => {
+        if (b[1].count !== a[1].count) return b[1].count - a[1].count;
+        return (b[1].confidence / Math.max(1, b[1].count)) - (a[1].confidence / Math.max(1, a[1].count));
+      });
+      const [winner, data] = entries[0];
+      return {
+        speaker: winner,
+        speaker_confidence: data.count > 0 ? data.confidence / data.count : undefined
+      };
+    };
 
     // Try to extract transcript and segments
     let text = '';
@@ -159,7 +180,9 @@ export async function POST(req: NextRequest) {
                 id: segments.length, 
                 start: s.start || 0, 
                 end: s.end || 0, 
-                text: s.text || '' 
+                text: s.text || '',
+                speaker: normalizeSpeaker(s.speaker ?? para.speaker),
+                speaker_confidence: s.speaker_confidence ?? para.speaker_confidence
               });
             });
           }
@@ -172,6 +195,7 @@ export async function POST(req: NextRequest) {
         if (Array.isArray(words) && words.length > 0) {
           // Group words into segments (simple approach: every 10-15 words or punctuation)
           let currentSegment: any = { text: '', start: 0, end: 0 };
+          let speakerCounts: Record<string, { count: number; confidence: number }> = {};
           let wordCount = 0;
           
           words.forEach((word: any, idx: number) => {
@@ -181,17 +205,30 @@ export async function POST(req: NextRequest) {
             currentSegment.text += (currentSegment.text ? ' ' : '') + (word.punctuated_word || word.word || '');
             currentSegment.end = word.end || 0;
             wordCount++;
+
+            const sp = normalizeSpeaker(word.speaker);
+            if (sp) {
+              if (!speakerCounts[sp]) {
+                speakerCounts[sp] = { count: 0, confidence: 0 };
+              }
+              speakerCounts[sp].count += 1;
+              speakerCounts[sp].confidence += Number(word.speaker_confidence || 0);
+            }
             
             // Create segment at sentence end or every 15 words
             const isEndOfSentence = /[.!?]$/.test(word.punctuated_word || word.word || '');
             if (isEndOfSentence || wordCount >= 15 || idx === words.length - 1) {
+              const speakerInfo = pickSpeakerFromCounts(speakerCounts);
               segments.push({
                 id: segments.length,
                 start: currentSegment.start,
                 end: currentSegment.end,
-                text: currentSegment.text.trim()
+                text: currentSegment.text.trim(),
+                speaker: speakerInfo.speaker,
+                speaker_confidence: speakerInfo.speaker_confidence
               });
               currentSegment = { text: '', start: 0, end: 0 };
+              speakerCounts = {};
               wordCount = 0;
             }
           });

@@ -182,6 +182,13 @@ export class DeepgramService {
         console.log(`Language mode: ${options.language || 'auto-detect'}`);
         console.log(`User tier: ${options.userTier || 'free'}`);
       }
+      console.log('[Deepgram Service] request', {
+        params: params.toString(),
+        languageOption: options.language || 'auto',
+        userTier: options.userTier || 'free',
+        enableDiarization: params.get('diarize') === 'true',
+        urlPreview: typeof audioUrl === 'string' ? audioUrl.slice(0, 120) : 'buffer',
+      });
 
       // Add timeout control - 4 minutes for transcription
       const controller = new AbortController();
@@ -209,6 +216,7 @@ export class DeepgramService {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('[Deepgram Service] response error', response.status, errorText);
         console.error('Deepgram API error:', response.status, errorText);
         throw new Error(`Deepgram API failed: ${response.status}`);
       }
@@ -234,13 +242,14 @@ export class DeepgramService {
             utterances_count: utterances.length,
             utterances_sample: utterances.slice(0, 3).map((u: any) => ({ start: u.start, end: u.end, sp: u.speaker, text: (u.transcript || '').slice(0, 80) }))
           });
-          await this.writeDebugFile('snapshot', {
-            detected_language: ch?.detected_language,
-            alt_languages: alt?.languages,
-            transcript_len: (alt?.transcript || '').length,
-            utterances_count: utterances.length
-          });
-          await this.writeDebugFile('raw', result);
+          if (this.DEBUG_TO_FILE) {
+            await this.writeDebugFile('snapshot', {
+              detected_language: ch?.detected_language,
+              alt_languages: alt?.languages,
+              transcript_len: (alt?.transcript || '').length,
+              utterances_count: utterances.length
+            });
+          }
         } catch (e) {
           console.warn('[DG RAW] Snapshot logging failed:', e);
         }
@@ -381,7 +390,9 @@ export class DeepgramService {
             segments: transcriptionResult.segments.length,
             segSample: transcriptionResult.segments.slice(0, 3).map((s: any) => ({ start: s.start, end: s.end, sp: s.speaker, text: (s.text || '').slice(0, 80) }))
           });
-          await this.writeDebugFile('parsed', transcriptionResult);
+          if (this.DEBUG_TO_FILE) {
+            await this.writeDebugFile('parsed', transcriptionResult);
+          }
         } catch {}
       }
       

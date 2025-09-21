@@ -59,7 +59,37 @@ export async function POST(req: NextRequest) {
       if (typeof out?.detected_language === 'string') language = out.detected_language;
     } catch {}
 
-    const txt = transcriptionText || (segments.length ? segments.map((s: any) => s.text).join('\n') : '');
+    let txt = transcriptionText || (segments.length ? segments.map((s: any) => s.text).join('\n') : '');
+
+    const [currentTranscription] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
+
+    const wantsDiarization = req.nextUrl.searchParams.get('dw') === '1';
+    const hasDeepgramKey = !!process.env.DEEPGRAM_API_KEY;
+    if (wantsDiarization && hasDeepgramKey && Array.isArray(segments) && segments.length > 0) {
+      const audioSource = (currentTranscription as any)?.processed_url || (currentTranscription as any)?.source_url || null;
+      if (audioSource) {
+        try {
+          const { UnifiedTranscriptionService } = await import('@/lib/unified-transcription');
+          const svc = new UnifiedTranscriptionService(process.env.REPLICATE_API_TOKEN || '', process.env.DEEPGRAM_API_KEY);
+          const rawDurationEstimate = segments.length ? Number(segments[segments.length - 1]?.end || 0) : 0;
+          const transcriptionStruct: any = {
+            text: txt,
+            segments,
+            language: language || 'unknown',
+            duration: rawDurationEstimate
+          };
+          const ok = await svc.addDiarizationFromUrl(audioSource, transcriptionStruct);
+          if (ok) {
+            segments = transcriptionStruct.segments || segments;
+            txt = transcriptionStruct.text || txt;
+            language = transcriptionStruct.language || language;
+          }
+        } catch (err) {
+          console.warn('[Replicate Callback] Failed to overlay diarization:', err);
+        }
+      }
+    }
+
     const json = JSON.stringify(segments || []);
 
     // Try to generate SRT/VTT/MD when we have segments
@@ -78,8 +108,6 @@ export async function POST(req: NextRequest) {
         markdownSource = { svc, tr };
       }
     } catch {}
-
-    const [currentTranscription] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
 
     if (!md && markdownSource) {
       try {

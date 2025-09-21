@@ -95,7 +95,9 @@ function getTierRank(tier: UserTier): number {
 async function checkHasActiveMinutePacks(userUuid: string): Promise<boolean> {
   try {
     const packSummary = await getMinuteSummary(userUuid);
-    return packSummary.std > 0;
+    const remaining = Number(packSummary.std || 0);
+    const total = Number((packSummary as any).stdTotal || 0);
+    return remaining > 0 || total > 0;
   } catch (error) {
     console.error('Error checking minute packs:', error);
     return false;
@@ -286,7 +288,8 @@ export async function getUserActiveSubscriptions(userUuid: string) {
       type: order.order_type as string,
       expiresAt: order.expired_at,
       createdAt: order.created_at,
-      productName: order.product_name
+      productName: order.product_name,
+      credits: order.credits
     }));
   } catch (error) {
     console.error('Error getting user subscriptions:', error);
@@ -297,15 +300,3 @@ export async function getUserActiveSubscriptions(userUuid: string) {
 /**
  * 获取订阅类型对应的月度分钟数
  */
-export function getSubscriptionMinutes(orderType: string): number {
-  const minutesMap: Record<string, number> = {
-    'basic_monthly': 500,
-    'basic_yearly': 500,  // 年度订阅也是每月500分钟
-    'pro_monthly': 2000,
-    'pro_yearly': 2000,   // 年度订阅也是每月2000分钟
-    'premium_monthly': -1, // 无限
-    'premium_yearly': -1   // 无限
-  };
-  
-  return minutesMap[orderType] || 0;
-}

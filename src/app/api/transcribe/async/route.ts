@@ -228,12 +228,23 @@ export async function POST(request: NextRequest) {
         const callbackBase = process.env.CALLBACK_BASE_URL || origin;
         const shouldUseReplicate = (isHighAccuracyRequest && hasReplicate) || ((supplier.includes('replicate') || supplier === 'both') && hasReplicate);
         const shouldUseDeepgram = !isHighAccuracyRequest && hasDeepgram && (supplier.includes('deepgram') || supplier === 'both' || supplier === '');
+        const enableDiarization = !!options?.enableDiarizationAfterWhisper && ['basic', 'pro', 'premium'].includes(String(userTier).toLowerCase());
+        console.log('[Async] supplier decision', {
+          supplier,
+          hasDeepgram,
+          hasReplicate,
+          isHighAccuracyRequest,
+          shouldUseDeepgram,
+          shouldUseReplicate,
+          enableDiarization,
+        });
 
         if (shouldUseReplicate) {
           try {
             const cbUrl = new URL(`${callbackBase}/api/callback/replicate`);
             cbUrl.searchParams.set('job_id', jobId);
             if (isHighAccuracyRequest) cbUrl.searchParams.set('ha', '1');
+            if (enableDiarization) cbUrl.searchParams.set('dw', '1');
 
             await fetch('https://api.replicate.com/v1/predictions', {
               method: 'POST',
@@ -271,6 +282,15 @@ export async function POST(request: NextRequest) {
             params.set('utterances', 'true');
             params.set('model', 'nova-2');
             params.set('detect_language', 'true');
+            if (enableDiarization) {
+              params.set('diarize', 'true');
+            }
+
+            console.log('[Async] Deepgram request', {
+              params: params.toString(),
+              enableDiarization,
+              callback: cb,
+            });
 
             await fetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
               method: 'POST',
@@ -279,6 +299,15 @@ export async function POST(request: NextRequest) {
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({ url: audioUrlForSupplier })
+            }).then(async (resp) => {
+              if (!resp.ok) {
+                const text = await resp.text().catch(() => '');
+                console.error('[Async] Deepgram enqueue failed', resp.status, text);
+              } else {
+                console.log('[Async] Deepgram enqueue success');
+              }
+            }).catch((err) => {
+              console.error('[Async] Deepgram enqueue error', err);
             });
 
             await db().update(transcriptions).set({ status: 'transcribing' }).where(eq(transcriptions.job_id, jobId));
@@ -302,7 +331,8 @@ export async function POST(request: NextRequest) {
             job_id: jobId,
             video: content,
             user_tier: userTier,
-            preferred_language: options?.preferred_language
+            preferred_language: options?.preferred_language,
+            enable_diarization_after_whisper: options?.enableDiarizationAfterWhisper === true
           })
         }).catch(() => {});
       }

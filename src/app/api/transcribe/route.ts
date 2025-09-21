@@ -379,7 +379,7 @@ async function applyFreeTierConstraints(params: FreeTierConstraintParams) {
       try {
         const { getMinuteBalances } = await import('@/services/minutes');
         const balances = await getMinuteBalances(userUuid);
-        const packAllowance = Math.max(0, Number(balances.std || 0)) * 60;
+        const packAllowance = Math.max(0, Number(balances.stdTotal || balances.std || 0)) * 60;
         if (packAllowance > 0) maxSeconds += packAllowance;
       } catch {}
 
@@ -409,7 +409,7 @@ async function applyFreeTierConstraints(params: FreeTierConstraintParams) {
     try {
       const { getMinuteBalances } = await import('@/services/minutes');
       const balances = await getMinuteBalances(userUuid);
-      const packAllowance = Math.max(0, Number(balances.std || 0)) * 60;
+      const packAllowance = Math.max(0, Number(balances.stdTotal || balances.std || 0)) * 60;
       if (packAllowance > 0) maxSeconds += packAllowance;
     } catch {}
     options.trimToSeconds = maxSeconds;
@@ -428,7 +428,7 @@ async function applyFreeTierConstraints(params: FreeTierConstraintParams) {
     try {
       const { getMinuteBalances } = await import('@/services/minutes');
       const balances = await getMinuteBalances(userUuid);
-      const packAllowance = Math.max(0, Number(balances.std || 0)) * 60;
+      const packAllowance = Math.max(0, Number(balances.stdTotal || balances.std || 0)) * 60;
       if (packAllowance > 0) maxSeconds += packAllowance;
     } catch {}
     options.trimToSeconds = maxSeconds;
@@ -447,7 +447,7 @@ async function applyFreeTierConstraints(params: FreeTierConstraintParams) {
     try {
       const { getMinuteBalances } = await import('@/services/minutes');
       const balances = await getMinuteBalances(userUuid);
-      const packAllowance = Math.max(0, Number(balances.std || 0)) * 60;
+      const packAllowance = Math.max(0, Number(balances.stdTotal || balances.std || 0)) * 60;
       if (packAllowance > 0) maxSeconds += packAllowance;
     } catch {}
     options.trimToSeconds = maxSeconds;

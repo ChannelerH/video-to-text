@@ -189,34 +189,42 @@ export default async function EditorPage({
   // 先提取音频 URL，供后续话者叠加使用
   audioUrl = transcription.source_url || null;
 
-  // FREE 用户：仅预览前 5 分钟（服务端导出已截断，这里仅影响编辑器显示）
-  try {
-    const tier = await getUserTier(userUuid);
-    if (tier === UserTier.FREE && Array.isArray(segments) && segments.length > 0) {
-      const maxSec = POLICY.preview.freePreviewSeconds || 300;
-      segments = trimSegmentsToSeconds(segments as any, maxSec) as any[];
-      // 不在编辑页做叠加；叠加仅在转写阶段、且显式勾选“说话人分离”时执行
+  const previewWindow = POLICY.preview.freePreviewSeconds || 300;
+  const computeMaxEnd = (segs: any[]): number => {
+    if (!Array.isArray(segs) || segs.length === 0) return 0;
+    return segs.reduce((max, seg) => {
+      const end = Number(seg?.end) || 0;
+      return end > max ? end : max;
+    }, 0);
+  };
+
+  const originalDurationSec = Number((transcription as any).original_duration_sec) || Number(transcription.duration_sec) || 0;
+  const rawSegmentMax = computeMaxEnd(segments);
+
+  // FREE 用户且任务本身就是“预览”时才截断 5 分钟
+  if (userTier === UserTier.FREE && Array.isArray(segments) && segments.length > 0) {
+    const totalCandidateDuration = Math.max(originalDurationSec, rawSegmentMax);
+    const looksLikePreviewJob = totalCandidateDuration > (previewWindow + 1) && rawSegmentMax <= (previewWindow + 1);
+    if (looksLikePreviewJob) {
+      segments = trimSegmentsToSeconds(segments as any, previewWindow) as any[];
     }
-  } catch {}
+  }
+
+  const visibleSegmentMax = computeMaxEnd(segments);
 
   // Page load complete
   
   // Derive preview mode flag
   // 规则：Free 用户且时长接近预览窗口（299-300秒都算，考虑浮点数舍入）
-  const previewWindow = POLICY.preview.freePreviewSeconds || 300;
-  // 计算更稳健的“总时长”来源：DB 写入时长 / 解析结果时长 / 片段最后结束时间
-  const lastEnd = Array.isArray(segments) && segments.length > 0 
-    ? Math.max(...segments.map((s: any) => Number(s?.end) || 0)) 
-    : 0;
   const candidateDurations = [
     Number(transcription.duration_sec) || 0,
-    Number((transcription as any).original_duration_sec) || 0,
+    originalDurationSec,
     Number((transcriptionData as any)?.duration) || 0,
-    lastEnd || 0
+    rawSegmentMax || 0
   ];
   const totalDuration = Math.max(...candidateDurations);
-  // 容差1秒：部分流程会写入 299.x 或四舍五入成 299
-  const isPreview = (userTier === UserTier.FREE) && (totalDuration >= (previewWindow - 1));
+  // 容差 1 秒，防止浮点近似导致误判
+  const isPreview = (userTier === UserTier.FREE) && (visibleSegmentMax + 1 < totalDuration);
   
   // Preview mode derived using tolerant duration check
 
@@ -257,7 +265,12 @@ export default async function EditorPage({
           transcription={transcriptionData}
           backHref={`/${locale}/dashboard/transcriptions`}
           isPreviewMode={isPreview}
-          originalDurationSec={(transcription as any).original_duration_sec || Math.max(transcription.duration_sec || 0, lastEnd || 0)}
+          originalDurationSec={Math.max(
+            originalDurationSec,
+            Number(transcription.duration_sec) || 0,
+            rawSegmentMax || 0,
+            visibleSegmentMax || 0
+          )}
         />
       </div>
     </div>

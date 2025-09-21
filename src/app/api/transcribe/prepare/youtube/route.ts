@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db } from '@/db';
@@ -9,9 +10,18 @@ export const runtime = 'nodejs';
 export const maxDuration = 10; // keep it short
 
 export async function POST(request: NextRequest) {
+  let job_id: string | undefined;
   try {
     const body = await request.json();
-    const { job_id, video, user_tier, preferred_language } = body;
+    ({ job_id } = body);
+    const { video, user_tier, preferred_language, enable_diarization_after_whisper } = body;
+    console.log('[YouTube Prepare] incoming request', {
+      job_id,
+      hasVideo: typeof video === 'string' && video.length > 0,
+      user_tier,
+      preferred_language,
+      enable_diarization_after_whisper,
+    });
     if (!job_id || !video) {
       return NextResponse.json({ error: 'missing job_id or video' }, { status: 400 });
     }
@@ -38,10 +48,12 @@ export async function POST(request: NextRequest) {
       }
       
       // Store the URL and proceed to Deepgram
-      try {
-        await db().update(transcriptions).set({ processed_url: supplierAudioUrl }).where(eq(transcriptions.job_id, job_id));
-      } catch (e) {
-        console.error('[YouTube Prepare] DB update failed:', e);
+      if (job_id) {
+        try {
+          await db().update(transcriptions).set({ processed_url: supplierAudioUrl }).where(eq(transcriptions.job_id, job_id));
+        } catch (e) {
+          console.error('[YouTube Prepare] DB update failed:', e);
+        }
       }
       
       // Send to Deepgram
@@ -49,6 +61,14 @@ export async function POST(request: NextRequest) {
       const origin = new URL(request.url).origin;
       const cbBase = process.env.CALLBACK_BASE_URL || origin;
       
+      const enableDiarization = !!enable_diarization_after_whisper && ['basic', 'pro', 'premium'].includes(String(user_tier).toLowerCase());
+      console.log('[YouTube Prepare] processed-url branch', {
+        enableDiarization,
+        supplier,
+        hasDeepgramKey: !!process.env.DEEPGRAM_API_KEY,
+        supplierAudioUrl,
+      });
+
       if ((supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
         let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(job_id)}`;
         if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
@@ -63,7 +83,15 @@ export async function POST(request: NextRequest) {
         params.set('utterances', 'true');
         params.set('model', 'nova-2');
         params.set('detect_language', 'true');
-        
+        if (enableDiarization) {
+          params.set('diarize', 'true');
+        }
+        console.log('[YouTube Prepare][Processed] Deepgram params', {
+          params: params.toString(),
+          enableDiarization,
+          callback: cb,
+        });
+
         fetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
           method: 'POST',
           headers: {
@@ -74,9 +102,12 @@ export async function POST(request: NextRequest) {
           signal: AbortSignal.timeout(30000) // 30秒超时
         }).then(resp => {
           if (!resp.ok) {
+            resp.text().then((text) => console.error('[YouTube Prepare][Processed] Deepgram enqueue failed', resp.status, text)).catch(() => {});
           } else {
+            console.log('[YouTube Prepare][Processed] Deepgram enqueue success');
           }
         }).catch((e) => { 
+          console.error('[YouTube Prepare][Processed] Deepgram enqueue error', e);
         });
       }
       
@@ -507,6 +538,9 @@ export async function POST(request: NextRequest) {
       }
       
       // Update both processed_url and title (if available)
+      if (!job_id) {
+        throw new Error('job_id is required for database update');
+      }
       await db().update(transcriptions).set(updateData).where(eq(transcriptions.job_id, job_id));
     } catch (e) {
       console.error('[YouTube Prepare] DB update failed:', e);
@@ -525,6 +559,16 @@ export async function POST(request: NextRequest) {
     const tasks: Promise<any>[] = [];
 
     // Only send to Deepgram if we have a public R2 URL (proxy URL is not accessible from outside)
+    const enableDiarization = !!enable_diarization_after_whisper && ['basic', 'pro', 'premium'].includes(String(user_tier).toLowerCase());
+
+    console.log('[YouTube Prepare] fanout', {
+      supplier,
+      hasDeepgramKey: !!process.env.DEEPGRAM_API_KEY,
+      hasReplicateKey: !!process.env.REPLICATE_API_TOKEN,
+      supplierAudioUrl,
+      enableDiarization,
+    });
+
     if (supplierAudioUrl && (supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
       let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(job_id)}`;
       if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
@@ -544,6 +588,14 @@ export async function POST(request: NextRequest) {
           params2.set('utterances', 'true');  // 启用说话人分离
           params2.set('model', 'nova-2');     // 使用 Nova-2 模型
           params2.set('detect_language', 'true'); // 启用语言检测
+          if (enableDiarization) {
+            params2.set('diarize', 'true');
+          }
+          console.log('[YouTube Prepare][Fanout] Deepgram params', {
+            params: params2.toString(),
+            enableDiarization,
+            callback: cb,
+          });
           
           try {
             const resp = await fetch(`https://api.deepgram.com/v1/listen?${params2.toString()}`, {
@@ -562,9 +614,10 @@ export async function POST(request: NextRequest) {
               const t = await resp.text();
               console.error('[Deepgram][prepare/youtube] enqueue non-200:', resp.status, t);
             } else {
+              console.log('[Deepgram][prepare/youtube] enqueue success');
             }
           } catch (e) {
-            // 更详细的错误处理
+            console.error('[Deepgram][prepare/youtube] enqueue error', e);
           }
         })()
       );
@@ -572,7 +625,10 @@ export async function POST(request: NextRequest) {
 
     // Only send to Replicate if we have a public R2 URL
     if (supplierAudioUrl && (supplier.includes('replicate') || supplier === 'both') && process.env.REPLICATE_API_TOKEN) {
-      const cb = `${cbBase}/api/callback/replicate?job_id=${encodeURIComponent(job_id)}`;
+      const cbUrl = new URL(`${cbBase}/api/callback/replicate`);
+      cbUrl.searchParams.set('job_id', job_id);
+      if (enableDiarization) cbUrl.searchParams.set('dw', '1');
+      const cb = cbUrl.toString();
       tasks.push(
         fetch('https://api.replicate.com/v1/predictions', {
           method: 'POST',
@@ -706,13 +762,14 @@ export async function POST(request: NextRequest) {
     if (tasks.length === 0 && !supplierAudioUrl) {
       // No supplier can be called, mark as failed
       console.error('[YouTube Prepare] No supplier available, marking job as failed');
-      await db().update(transcriptions)
-        .set({ 
-          status: 'failed',
-          error_message: 'Failed to prepare audio for transcription. Please try again.',
-          completed_at: new Date()
-        })
-        .where(eq(transcriptions.job_id, job_id));
+      if (job_id) {
+        await db().update(transcriptions)
+          .set({ 
+            status: 'failed',
+            completed_at: new Date()
+          })
+          .where(eq(transcriptions.job_id, job_id));
+      }
       
       return NextResponse.json({ ok: true, warning: 'prepare_failed' });
     }
@@ -724,14 +781,15 @@ export async function POST(request: NextRequest) {
       if (allFailed && rs.length > 0) {
         console.error('[YouTube Prepare] All supplier tasks failed');
         // Update status to failed if all suppliers failed
-        db().update(transcriptions)
-          .set({ 
-            status: 'failed',
-            error_message: 'All transcription services failed. Please try again.',
-            completed_at: new Date()
-          })
-          .where(eq(transcriptions.job_id, job_id))
-          .catch(err => console.error('[YouTube Prepare] Failed to update status:', err));
+        if (job_id) {
+          db().update(transcriptions)
+            .set({ 
+              status: 'failed',
+              completed_at: new Date()
+            })
+            .where(eq(transcriptions.job_id, job_id))
+            .catch(err => console.error('[YouTube Prepare] Failed to update status:', err));
+        }
       }
     }).catch((e) => console.warn('[YouTube Prepare] Fan-out settle failed:', e));
 
@@ -740,16 +798,17 @@ export async function POST(request: NextRequest) {
     console.error('[YouTube Prepare] Uncaught error:', e);
     
     // Update database status to failed
-    try {
-      await db().update(transcriptions)
-        .set({ 
-          status: 'failed',
-          error_message: e?.message || 'Preparation failed',
-          completed_at: new Date()
-        })
-        .where(eq(transcriptions.job_id, job_id));
-    } catch (dbError) {
-      console.error('[YouTube Prepare] Failed to update error status:', dbError);
+    if (job_id) {
+      try {
+        await db().update(transcriptions)
+          .set({ 
+            status: 'failed',
+            completed_at: new Date()
+          })
+          .where(eq(transcriptions.job_id, job_id));
+      } catch (dbError) {
+        console.error('[YouTube Prepare] Failed to update error status:', dbError);
+      }
     }
     
     return NextResponse.json({ error: e?.message || 'prepare failed' }, { status: 500 });

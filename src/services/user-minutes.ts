@@ -1,19 +1,13 @@
 import { db } from '@/db';
-import { orders, usage_records } from '@/db/schema';
+import { usage_records } from '@/db/schema';
 import { eq, and, gte, sql, or, isNull } from 'drizzle-orm';
 import { getMinuteSummary } from './minutes';
-import { getUserActiveSubscriptions, getSubscriptionMinutes } from './user-tier';
+import { getUserActiveSubscriptions } from './user-tier';
 
-/**
- * 获取用户总分钟数（订阅 + 分钟包）
- */
 export async function getUserTotalMinutes(userUuid: string): Promise<{
-  subscriptions: Array<{
-    type: string;
-    minutes: number;
-    expiresAt: Date | null;
-  }>;
-  packs: number;
+  subscriptions: Array<{ type: string; minutes: number; expiresAt: Date | null }>;
+  packs: number; // remaining pack minutes
+  packAllowance: number; // total pack minutes purchased (active)
   total: number;
   isUnlimited: boolean;
 }> {
@@ -21,7 +15,8 @@ export async function getUserTotalMinutes(userUuid: string): Promise<{
     return {
       subscriptions: [],
       packs: 0,
-      total: 30, // FREE用户默认30分钟
+      packAllowance: 0,
+      total: 30,
       isUnlimited: false
     };
   }
@@ -31,37 +26,45 @@ export async function getUserTotalMinutes(userUuid: string): Promise<{
     const activeSubscriptions = await getUserActiveSubscriptions(userUuid);
     
     // 2. 计算每个订阅的分钟数
-    const subscriptionDetails = activeSubscriptions.map(sub => ({
-      type: sub.type,
-      minutes: getSubscriptionMinutes(sub.type),
-      expiresAt: sub.expiresAt
-    }));
-    
-    // 3. 累加订阅分钟数（如果有多个订阅）
-    let subscriptionTotal = 0;
+    const subscriptionDetails = activeSubscriptions.map(sub => {
+      const minutesFromOrder = typeof sub.credits === 'number' ? sub.credits : null;
+      const minutes =
+        minutesFromOrder !== null && minutesFromOrder !== undefined && minutesFromOrder !== 0
+          ? minutesFromOrder
+          : 0;
+      return {
+        type: sub.type,
+        minutes,
+        expiresAt: sub.expiresAt
+      };
+    });
+
+    let subscriptionAllowance = 0;
     let isUnlimited = false;
-    
     for (const sub of subscriptionDetails) {
       if (sub.minutes === -1) {
         isUnlimited = true;
-        subscriptionTotal = -1;
+        subscriptionAllowance = -1;
         break;
       }
-      subscriptionTotal += sub.minutes;
+      subscriptionAllowance += sub.minutes;
     }
-    
-    // 4. 获取分钟包余额
+
     const packSummary = await getMinuteSummary(userUuid);
-    const packMinutes = packSummary.std || 0;
-    
-    // 5. 计算总数
-    const total = isUnlimited ? -1 : 
-                  subscriptionTotal === 0 ? 30 + packMinutes : // FREE用户：30分钟 + 分钟包
-                  subscriptionTotal + packMinutes; // 付费用户：订阅 + 分钟包
-    
+    const packMinutesRemaining = Number(packSummary.std || 0);
+    const packAllowance = Number((packSummary as any).stdTotal || packMinutesRemaining);
+
+    let baseAllowance = 0;
+    if (!isUnlimited && subscriptionAllowance === 0) {
+      baseAllowance = 30;
+    }
+
+    const total = isUnlimited ? -1 : baseAllowance + subscriptionAllowance + packAllowance;
+
     return {
       subscriptions: subscriptionDetails,
-      packs: packMinutes,
+      packs: packMinutesRemaining,
+      packAllowance,
       total,
       isUnlimited
     };
@@ -70,6 +73,7 @@ export async function getUserTotalMinutes(userUuid: string): Promise<{
     return {
       subscriptions: [],
       packs: 0,
+      packAllowance: 0,
       total: 30,
       isUnlimited: false
     };
@@ -91,7 +95,7 @@ export async function getUserMinutesUsed(userUuid: string): Promise<number> {
     // 优先从 usage_records 表获取
     const [usageResult] = await db()
       .select({ 
-        total: sql<number>`COALESCE(SUM(CASE WHEN ${usage_records.model_type} NOT LIKE 'pack_%' THEN ${usage_records.minutes}::double precision ELSE 0 END), 0)` 
+        total: sql<number>`COALESCE(SUM(${usage_records.minutes}::double precision), 0)` 
       })
       .from(usage_records)
       .where(
@@ -129,7 +133,8 @@ export async function getUserUsageSummary(userUuid: string) {
     
     // 分钟包部分
     packMinutes: totalMinutes.packs,
-    
+    packAllowance: totalMinutes.packAllowance,
+
     // 使用情况
     totalAvailable: totalMinutes.total,
     totalUsed: usedMinutes,

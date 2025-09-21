@@ -100,20 +100,33 @@ export async function getEstimatedPackCoverage(userId: string, minutes: number, 
 export async function getMinuteSummary(userId: string): Promise<{
   std: number;
   ha: number;
+  stdTotal?: number;
+  haTotal?: number;
   stdEarliestExpire?: string | null;
   haEarliestExpire?: string | null;
   stdPacks: number;
   haPacks: number;
 }> {
-  const [totalSum, firstExp, packCount] = await Promise.all([
+  const [leftSum, totalSum, firstExp, packCount] = await Promise.all([
     db().execute(sql`SELECT COALESCE(SUM(minutes_left),0) AS sum FROM v2tx_minute_packs WHERE user_id=${userId} AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`),
+    db().execute(sql`SELECT COALESCE(SUM(minutes_total),0) AS sum FROM v2tx_minute_packs WHERE user_id=${userId} AND (expires_at IS NULL OR expires_at > NOW())`),
     db().execute(sql`SELECT MIN(expires_at) AS exp FROM v2tx_minute_packs WHERE user_id=${userId} AND (expires_at IS NOT NULL AND expires_at > NOW())`),
     db().execute(sql`SELECT COUNT(*) AS cnt FROM v2tx_minute_packs WHERE user_id=${userId} AND minutes_left > 0 AND (expires_at IS NULL OR expires_at > NOW())`),
   ]);
+  const left = Number((leftSum as any)[0]?.sum || 0);
   const total = Number((totalSum as any)[0]?.sum || 0);
   const exp = (firstExp as any)[0]?.exp || null;
   const cnt = Number((packCount as any)[0]?.cnt || 0);
-  return { std: total, ha: 0, stdEarliestExpire: exp, haEarliestExpire: null, stdPacks: cnt, haPacks: 0 };
+  return {
+    std: left,
+    ha: 0,
+    stdTotal: total,
+    haTotal: 0,
+    stdEarliestExpire: exp,
+    haEarliestExpire: null,
+    stdPacks: cnt,
+    haPacks: 0
+  };
 }
 
 // Sum monthly used minutes from transcriptions table

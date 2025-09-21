@@ -696,7 +696,7 @@ export class TranscriptionService {
       console.log('[TEST][YT-002] model.used', { model: 'deepgram_or_whisper_decided_above' });
 
       // Optional: overlay diarization for PRO users when enabled
-      const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && (request.options?.userTier === 'pro' || request.options?.userTier === 'basic');
+      const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && ['pro', 'basic', 'premium'].includes(String(request.options?.userTier || '').toLowerCase());
       if (enableOverlay) {
         try {
           const ok = await this.transcriptionService.addDiarizationFromUrl(audioUrlForTranscription, transcription);
@@ -996,7 +996,7 @@ export class TranscriptionService {
       console.log('[TEST][HA-001] transcribe.audio_url.completed', { duration: transcription.duration, language: transcription.language });
 
       // 可选：为 PRO 用户叠加话者分离（Deepgram）
-      const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && (request.options?.userTier === 'pro' || request.options?.userTier === 'basic');
+      const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && ['pro', 'basic', 'premium'].includes(String(request.options?.userTier || '').toLowerCase());
       if (enableOverlay) {
         try { await this.transcriptionService.addDiarizationFromUrl(audioUrlForTranscription, transcription); } catch {}
       }
