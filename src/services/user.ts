@@ -127,8 +127,20 @@ export async function getUserInfoWithTier() {
   }
 
   const user = await findUserByUuid(user_uuid);
-  const { getUserTier } = await import('@/services/user-tier');
-  const userTier = await getUserTier(user_uuid);
+  let subscriptionStatus = '';
 
-  return { user, userTier };
+  if (user && (user as any).subscription_status) {
+    subscriptionStatus = String((user as any).subscription_status).toLowerCase();
+  }
+
+  if (!subscriptionStatus) {
+    const { getUserTier } = await import('@/services/user-tier');
+    subscriptionStatus = (await getUserTier(user_uuid)).toLowerCase();
+  }
+
+  if (!subscriptionStatus) {
+    subscriptionStatus = 'free';
+  }
+
+  return { user, userTier: subscriptionStatus };
 }

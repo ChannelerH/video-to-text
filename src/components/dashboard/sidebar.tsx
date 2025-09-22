@@ -24,7 +24,7 @@ interface DashboardSidebarProps {
 export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
   const t = useTranslations();
   const pathname = usePathname();
-  const { user, setShowFeedback } = useAppContext();
+  const { user, userTier: contextTier, setShowFeedback } = useAppContext();
   const [isLoading, setIsLoading] = useState(true);
   const [loadingRoute, setLoadingRoute] = useState<string | null>(null);
   const [isUserMenuExpanded, setIsUserMenuExpanded] = useState(false);
@@ -77,7 +77,7 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
     await signOut({ callbackUrl: `/${locale}` });
   };
 
-  const userTier = user?.tier || 'free';
+  const userTier = (contextTier || user?.tier || 'free')?.toLowerCase();
   const userNickname = user?.nickname || user?.email?.split('@')[0] || '';
   const userEmail = user?.email || '';
 

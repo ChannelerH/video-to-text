@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, AlertTriangle, Download, Clock, TrendingDown, Gift } from 'lucide-react';
+import { X, AlertTriangle, Download, Clock, TrendingDown, Gift, AlertCircle } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 
 interface CancelSubscriptionModalProps {
@@ -18,6 +18,8 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
   const [isProcessing, setIsProcessing] = useState(false);
   const [requestRefund, setRequestRefund] = useState(false);
   const [refundEligible, setRefundEligible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showError, setShowError] = useState(false);
   const router = useRouter();
 
   const reasons = [
@@ -57,6 +59,8 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
   const handleFinalCancel = async () => {
     setIsProcessing(true);
     setStep('processing');
+    setShowError(false);
+    setErrorMessage('');
     
     try {
       // Call actual cancellation API
@@ -79,14 +83,24 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
         // Show success message or redirect
         router.push(`/${locale}/dashboard/account?cancelled=true`);
       } else {
-        alert(data.error || 'Failed to cancel subscription');
+        // Show error in modal instead of alert
+        setErrorMessage(data.error || 'Failed to cancel subscription. Please try again or contact support.');
+        setShowError(true);
+        setStep('confirm');
+        setIsProcessing(false);
+        return;
       }
     } catch (error) {
       console.error('Cancellation error:', error);
-      alert('An error occurred. Please try again.');
-    } finally {
-      onClose();
+      // Show error in modal instead of alert
+      setErrorMessage('An error occurred while processing your request. Please try again or contact support.');
+      setShowError(true);
+      setStep('confirm');
+      setIsProcessing(false);
+      return;
     }
+    
+    onClose();
   };
 
   return (
@@ -258,6 +272,21 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
         {/* Step 3: Final Confirmation */}
         {step === 'confirm' && (
           <div className="p-8">
+            {/* Error Message Display */}
+            {showError && (
+              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-red-400">
+                      {errorMessage.includes('No active subscription') ? 'No Subscription Found' : 'Cancellation Failed'}
+                    </p>
+                    <p className="text-sm text-gray-300 mt-1">{errorMessage}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-center mb-6">
               <div className="p-4 rounded-full bg-red-500/10">
                 <AlertTriangle className="w-12 h-12 text-red-400" />

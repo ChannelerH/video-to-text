@@ -1,6 +1,10 @@
 import Stripe from "stripe";
 import { updateOrder, updateSubOrder } from "./order";
 import { syncUserSubscriptionTier } from "./user-subscription";
+import { db } from '@/db';
+import { users } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { findOrderByOrderNo } from '@/models/order';
 
 // handle checkout session completed
 export async function handleCheckoutSession(
@@ -53,6 +57,15 @@ export async function handleCheckoutSession(
 
       const item = subscription.items.data[0];
 
+      const customerId = typeof subscription.customer === 'string' ? subscription.customer : '';
+      let userUuid = metadata.user_uuid || '';
+      if (!userUuid) {
+        try {
+          const existingOrder = await findOrderByOrderNo(metadata.order_no);
+          userUuid = (existingOrder?.user_uuid as string) || '';
+        } catch {}
+      }
+
       metadata["sub_id"] = subId;
       metadata["sub_times"] = "1";
       metadata["sub_interval"] = item.plan.interval;
@@ -76,8 +89,30 @@ export async function handleCheckoutSession(
         paid_detail: JSON.stringify(session),
       });
 
+      if (userUuid && customerId) {
+        try {
+          await db()
+            .update(users)
+            .set({
+              stripe_customer_id: customerId,
+              stripe_subscription_id: subId,
+              stripe_price_id: item.price?.id as any,
+              subscription_state: 'active',
+              updated_at: new Date(),
+            } as any)
+            .where(eq(users.uuid, userUuid));
+        } catch (error) {
+          console.error('[Subscription] Failed to store Stripe identifiers', {
+            userUuid,
+            customerId,
+            error,
+          });
+        }
+      }
+
       await syncUserSubscriptionTier({
-        stripeCustomerId: typeof subscription.customer === 'string' ? subscription.customer : undefined,
+        userUuid: userUuid || undefined,
+        stripeCustomerId: customerId || undefined,
         stripe,
       });
 
@@ -177,6 +212,7 @@ export async function handleInvoice(stripe: Stripe, invoice: Stripe.Invoice) {
     });
 
     await syncUserSubscriptionTier({
+      userUuid: metadata.user_uuid || undefined,
       stripeCustomerId: typeof subscription.customer === 'string' ? subscription.customer : undefined,
       stripe,
     });
