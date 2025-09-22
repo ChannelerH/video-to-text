@@ -71,7 +71,11 @@ export async function GET(
         results: resultMap,
         created_at: transcription.created_at,
         completed_at: transcription.completed_at,
-        tier: effectiveTier
+        tier: effectiveTier,
+        source_type: transcription.source_type,
+        source_url: transcription.source_url,
+        processed_url: transcription.processed_url,
+        original_duration_sec: transcription.original_duration_sec,
       });
     }
 
@@ -96,6 +100,10 @@ export async function GET(
       created_at: transcription.created_at,
       message: getStatusMessage(transcription.status),
       tier: effectiveTier,
+      source_type: transcription.source_type,
+      source_url: transcription.source_url,
+      processed_url: transcription.processed_url,
+      original_duration_sec: transcription.original_duration_sec,
       ...(warning && { warning }),
       ...(shouldRetry && { should_retry: true, retry_reason: 'queue_timeout' })
     });

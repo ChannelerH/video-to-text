@@ -492,9 +492,14 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
           };
         });
 
+        const transcriptionTitle = typeof transcription.title === 'string' ? transcription.title.trim() : '';
+        const responseTitle = typeof result.data.title === 'string' ? result.data.title.trim() : '';
+        const resolvedTitle = transcriptionTitle || responseTitle;
+        const fallbackTitle = title || currentFileName || 'Transcription';
+
         setTranscriptionResult({
           id: result.data.jobId,
-          title: title || result.data.title || currentFileName || 'Transcription',
+          title: resolvedTitle || fallbackTitle,
           text: transcription.text || '',
           duration: transcription.duration || (normalizedSegments.at(-1)?.end ?? 0),
           segments: normalizedSegments,
@@ -624,7 +629,19 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
       const isYouTube = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)/i.test(url);
       const urlType: 'youtube_url' | 'audio_url' = isYouTube ? 'youtube_url' : 'audio_url';
 
-      const derivedTitle = url.split('/').pop() || (isYouTube ? 'YouTube Video' : 'Audio URL');
+      // 改进的 title 提取逻辑
+      let derivedTitle = 'Transcription';
+      if (isYouTube) {
+        // 提取 YouTube 视频 ID
+        const videoIdMatch = url.match(/(?:v=|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        derivedTitle = videoIdMatch ? `YouTube_${videoIdMatch[1]}` : 'YouTube Video';
+      } else {
+        // 对于普通 URL，提取文件名（不包含查询参数）
+        const urlPath = url.split('?')[0];
+        const filename = urlPath.split('/').pop() || 'Audio';
+        // 移除文件扩展名作为 title
+        derivedTitle = filename.replace(/\.[^/.]+$/, '') || filename;
+      }
       setCurrentFileName(derivedTitle);
 
       setEstimatedTime(isYouTube ? 30 : 20);

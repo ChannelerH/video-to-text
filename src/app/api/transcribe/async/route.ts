@@ -18,7 +18,14 @@ export async function POST(request: NextRequest) {
 
     // 2. 解析请求
     const body = await request.json();
-    const { type, content, options = {}, action } = body;
+    const { type, content, options: rawOptions = {}, action } = body;
+    const options: Record<string, any> = { ...rawOptions };
+    if (options.highAccuracyMode === undefined) {
+      const alias = options.high_accuracy ?? options.highAccuracy;
+      if (alias !== undefined) {
+        options.highAccuracyMode = !!alias;
+      }
+    }
 
     // 3. 验证输入
     if (!type || !content) {
@@ -133,7 +140,7 @@ export async function POST(request: NextRequest) {
     const sourceHash = crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
 
     // 确定初始标题
-    let initialTitle = options.title || 'Processing...';
+    let initialTitle = 'Processing...';
     
     // 如果是文件上传，使用原始文件名（去掉扩展名）
     if (type === 'file_upload' && options.originalFileName) {
@@ -142,27 +149,38 @@ export async function POST(request: NextRequest) {
       const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
       initialTitle = nameWithoutExt;
     }
-    // 如果是 YouTube URL，可以稍后从视频信息中获取标题
+    // 如果是 YouTube URL，不使用前端传来的 title，因为后端会获取真实视频标题
     else if (type === 'youtube_url') {
       // YouTube 标题会在 prepare/youtube 路由中获取并更新
+      // 不使用 options.title，避免覆盖真实标题
       initialTitle = 'YouTube Video';
     }
     // 如果是音频 URL，尝试从 URL 中提取文件名
-    else if (type === 'audio_url' && content) {
-      try {
-        const url = new URL(content);
-        const pathname = url.pathname;
-        const fileName = pathname.split('/').pop() || '';
-        if (fileName && fileName !== '') {
-          // 去掉文件扩展名
-          const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
-          if (nameWithoutExt) {
-            initialTitle = decodeURIComponent(nameWithoutExt);
+    else if (type === 'audio_url') {
+      // 优先使用 URL 中的文件名，而不是前端传来的 title
+      if (content) {
+        try {
+          const url = new URL(content);
+          const pathname = url.pathname;
+          const fileName = pathname.split('/').pop() || '';
+          if (fileName && fileName !== '') {
+            // 去掉文件扩展名
+            const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
+            if (nameWithoutExt) {
+              initialTitle = decodeURIComponent(nameWithoutExt);
+            }
+          }
+        } catch {
+          // URL 解析失败，使用前端传来的 title 作为后备
+          if (options.title) {
+            initialTitle = options.title;
           }
         }
-      } catch {
-        // URL 解析失败，保持默认标题
       }
+    }
+    // 其他类型使用前端传来的 title
+    else if (options.title) {
+      initialTitle = options.title;
     }
 
     // 5. 派发前尽量获取原始总时长，避免后续被裁剪结果覆盖
@@ -225,6 +243,8 @@ export async function POST(request: NextRequest) {
       const supplier = (process.env.SUPPLIER_ASYNC || '').toLowerCase();
       const hasReplicate = !!process.env.REPLICATE_API_TOKEN;
       const hasDeepgram = !!process.env.DEEPGRAM_API_KEY;
+      const replicateAllowed = hasReplicate && (supplier === '' || supplier === 'both' || supplier.includes('replicate'));
+      const deepgramAllowed = hasDeepgram && (supplier === '' || supplier === 'both' || supplier.includes('deepgram'));
 
       if (type === 'audio_url' || type === 'file_upload') {
         let audioUrlForSupplier = content;
@@ -246,40 +266,63 @@ export async function POST(request: NextRequest) {
         }
 
         const callbackBase = process.env.CALLBACK_BASE_URL || origin;
-        const shouldUseReplicate = (isHighAccuracyRequest && hasReplicate) || ((supplier.includes('replicate') || supplier === 'both') && hasReplicate);
-        const shouldUseDeepgram = !isHighAccuracyRequest && hasDeepgram && (supplier.includes('deepgram') || supplier === 'both' || supplier === '');
+        const shouldUseReplicate = isHighAccuracyActive && replicateAllowed;
+        const shouldUseDeepgram = !isHighAccuracyActive && deepgramAllowed;
+        const fallbackToReplicate = !shouldUseDeepgram && !deepgramAllowed && replicateAllowed && !isHighAccuracyActive;
         const enableDiarization = !!options?.enableDiarizationAfterWhisper && ['basic', 'pro', 'premium'].includes(String(userTier).toLowerCase());
         console.log('[Async] supplier decision', {
           supplier,
           hasDeepgram,
           hasReplicate,
           isHighAccuracyRequest,
+          canUseHighAccuracy,
+          isHighAccuracyActive,
+          deepgramAllowed,
+          replicateAllowed,
           shouldUseDeepgram,
           shouldUseReplicate,
+          fallbackToReplicate,
           enableDiarization,
         });
 
-        if (shouldUseReplicate) {
+        if (shouldUseReplicate || fallbackToReplicate) {
           try {
             const cbUrl = new URL(`${callbackBase}/api/callback/replicate`);
             cbUrl.searchParams.set('job_id', jobId);
-            if (isHighAccuracyRequest) cbUrl.searchParams.set('ha', '1');
+            if (isHighAccuracyActive) {
+              cbUrl.searchParams.set('ha', '1');
+            } else if (fallbackToReplicate) {
+              cbUrl.searchParams.set('dg_missing', '1');
+            }
             if (enableDiarization) cbUrl.searchParams.set('dw', '1');
 
-            await fetch('https://api.replicate.com/v1/predictions', {
+            const replicateVersion = process.env.REPLICATE_WHISPER_VERSION || 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e';
+            const payload: Record<string, any> = {
+              version: replicateVersion,
+              input: {
+                audio: audioUrlForSupplier,
+                audio_file: audioUrlForSupplier,
+                model: 'large-v3',
+                diarize: false,
+                translate: false
+              },
+              webhook: cbUrl.toString(),
+              webhook_events_filter: ['completed']
+            };
+
+            const resp = await fetch('https://api.replicate.com/v1/predictions', {
               method: 'POST',
               headers: {
                 'Authorization': `Token ${process.env.REPLICATE_API_TOKEN}`,
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({
-                model: 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
-                input: { audio_file: audioUrlForSupplier, model: 'large-v3' },
-                webhook: cbUrl.toString(),
-                webhook_events_filter: ['completed', 'failed'],
-                ...(process.env.REPLICATE_WEBHOOK_SECRET ? { webhook_secret: process.env.REPLICATE_WEBHOOK_SECRET } : {})
-              })
+              body: JSON.stringify(payload)
             });
+
+            if (!resp.ok) {
+              const text = await resp.text().catch(() => '');
+              console.error('[Async] Replicate enqueue failed', resp.status, text);
+            }
 
             await db().update(transcriptions).set({ status: 'transcribing' }).where(eq(transcriptions.job_id, jobId));
           } catch (err) {
@@ -336,7 +379,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const dispatchedToExternal = (shouldUseReplicate || shouldUseDeepgram);
+        const dispatchedToExternal = (shouldUseReplicate || shouldUseDeepgram || fallbackToReplicate);
 
         if (!dispatchedToExternal) {
           if (process.env.PROCESS_ONE_FALLBACK === 'true') {
@@ -373,7 +416,8 @@ export async function POST(request: NextRequest) {
             video: content,
             user_tier: userTier,
             preferred_language: options?.preferred_language,
-            enable_diarization_after_whisper: options?.enableDiarizationAfterWhisper === true
+            enable_diarization_after_whisper: options?.enableDiarizationAfterWhisper === true,
+            high_accuracy: isHighAccuracyRequest
           })
         }).catch(() => {});
       }

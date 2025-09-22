@@ -60,6 +60,13 @@ export async function POST(request: NextRequest) {
       
       // Send to Deepgram
       const supplier = (process.env.SUPPLIER_ASYNC || '').toLowerCase();
+      const hasReplicate = !!process.env.REPLICATE_API_TOKEN;
+      const hasDeepgram = !!process.env.DEEPGRAM_API_KEY;
+      const replicateAllowed = hasReplicate && (supplier === '' || supplier === 'both' || supplier.includes('replicate'));
+      const deepgramAllowed = hasDeepgram && (supplier === '' || supplier === 'both' || supplier.includes('deepgram'));
+      const shouldUseDeepgram = !forceHighAccuracy && deepgramAllowed;
+      const shouldUseReplicate = forceHighAccuracy && replicateAllowed;
+      const fallbackToReplicate = !shouldUseDeepgram && !deepgramAllowed && replicateAllowed && !forceHighAccuracy;
       const origin = new URL(request.url).origin;
       const cbBase = process.env.CALLBACK_BASE_URL || origin;
       
@@ -67,12 +74,17 @@ export async function POST(request: NextRequest) {
       console.log('[YouTube Prepare] processed-url branch', {
         enableDiarization,
         supplier,
-        hasDeepgramKey: !!process.env.DEEPGRAM_API_KEY,
+        hasDeepgramKey: hasDeepgram,
         supplierAudioUrl,
         high_accuracy: forceHighAccuracy,
+        deepgramAllowed,
+        replicateAllowed,
+        shouldUseDeepgram,
+        shouldUseReplicate,
+        fallbackToReplicate,
       });
 
-      if (!forceHighAccuracy && (supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
+      if (shouldUseDeepgram && supplierAudioUrl) {
         let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(job_id)}`;
         if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
           const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(job_id).digest('hex');
@@ -114,11 +126,15 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      if ((forceHighAccuracy || supplier.includes('replicate') || supplier === 'both') && process.env.REPLICATE_API_TOKEN && supplierAudioUrl) {
+      if (supplierAudioUrl && (shouldUseReplicate || fallbackToReplicate)) {
         try {
           const cbUrl = new URL(`${cbBase}/api/callback/replicate`);
           cbUrl.searchParams.set('job_id', job_id);
-          cbUrl.searchParams.set('ha', '1');
+          if (forceHighAccuracy) {
+            cbUrl.searchParams.set('ha', '1');
+          } else if (fallbackToReplicate) {
+            cbUrl.searchParams.set('dg_missing', '1');
+          }
           if (enableDiarization) cbUrl.searchParams.set('dw', '1');
 
           const replicateVersion = process.env.REPLICATE_WHISPER_VERSION || 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e';
@@ -604,6 +620,10 @@ export async function POST(request: NextRequest) {
 
     // Fan out to suppliers according to env
     const supplier = (process.env.SUPPLIER_ASYNC || '').toLowerCase();
+    const hasReplicate = !!process.env.REPLICATE_API_TOKEN;
+    const hasDeepgram = !!process.env.DEEPGRAM_API_KEY;
+    const replicateAllowed = hasReplicate && (supplier === '' || supplier === 'both' || supplier.includes('replicate'));
+    const deepgramAllowed = hasDeepgram && (supplier === '' || supplier === 'both' || supplier.includes('deepgram'));
     const origin = new URL(request.url).origin;
     const cbBase = process.env.CALLBACK_BASE_URL || origin;
     // Provide suppliers with preferred R2 URL; fallback to our proxy URL if R2 not available
@@ -616,16 +636,25 @@ export async function POST(request: NextRequest) {
     // Only send to Deepgram if we have a public R2 URL (proxy URL is not accessible from outside)
     const enableDiarization = !!enable_diarization_after_whisper && ['basic', 'pro', 'premium'].includes(String(user_tier).toLowerCase());
 
+    const shouldUseDeepgram = !forceHighAccuracy && deepgramAllowed && !!supplierAudioUrl;
+    const shouldUseReplicate = forceHighAccuracy && replicateAllowed && !!supplierAudioUrl;
+    const fallbackToReplicate = !shouldUseDeepgram && !deepgramAllowed && replicateAllowed && !forceHighAccuracy && !!supplierAudioUrl;
+
     console.log('[YouTube Prepare] fanout', {
       supplier,
-      hasDeepgramKey: !!process.env.DEEPGRAM_API_KEY,
-      hasReplicateKey: !!process.env.REPLICATE_API_TOKEN,
+      hasDeepgramKey: hasDeepgram,
+      hasReplicateKey: hasReplicate,
       supplierAudioUrl,
       enableDiarization,
       forceHighAccuracy,
+      deepgramAllowed,
+      replicateAllowed,
+      shouldUseDeepgram,
+      shouldUseReplicate,
+      fallbackToReplicate,
     });
 
-    if (!forceHighAccuracy && supplierAudioUrl && (supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
+    if (shouldUseDeepgram) {
       let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(job_id)}`;
       if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
         const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(job_id).digest('hex');
@@ -680,11 +709,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Only send to Replicate if we have a public R2 URL
-    if (supplierAudioUrl && ((supplier.includes('replicate') || supplier === 'both') || forceHighAccuracy) && process.env.REPLICATE_API_TOKEN) {
+    if (shouldUseReplicate || fallbackToReplicate) {
       const cbUrl = new URL(`${cbBase}/api/callback/replicate`);
       cbUrl.searchParams.set('job_id', job_id);
       if (enableDiarization) cbUrl.searchParams.set('dw', '1');
-      if (forceHighAccuracy) cbUrl.searchParams.set('ha', '1');
+      if (forceHighAccuracy) {
+        cbUrl.searchParams.set('ha', '1');
+      } else if (fallbackToReplicate) {
+        cbUrl.searchParams.set('dg_missing', '1');
+      }
       const cb = cbUrl.toString();
       tasks.push(
         (async () => {

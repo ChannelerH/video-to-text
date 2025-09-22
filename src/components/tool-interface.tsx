@@ -1233,20 +1233,20 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     const transcription = result?.data?.transcription || {};
     const detectedSourceType = transcription.source_type || result?.data?.sourceType;
     const sourceType = detectedSourceType || (uploadedFileInfo ? 'file_upload' : '');
-
-    if (sourceType === 'file_upload') {
-      const uploadName = uploadedFileInfo?.originalName || '';
-      const urlName = extractFileNameFromUrl(transcription.source_url || audioUrl || '');
-      const titleName = transcription.title || '';
-
-      const preferred = uploadName || urlName || titleName;
-      const base = stripExtension(preferred) || titleName || urlName;
-      return sanitizeFileBase(base || 'transcription') || 'transcription';
-    }
-
     const videoTitle = result?.data?.videoInfo?.title || '';
     const transcriptionTitle = transcription.title || '';
     const urlDerived = extractFileNameFromUrl(transcription.source_url || audioUrl || '');
+    const uploadName = uploadedFileInfo?.originalName || '';
+
+    if (sourceType === 'file_upload') {
+      const urlName = urlDerived;
+      const titleName = transcriptionTitle;
+
+      const preferred = uploadName || urlName || titleName;
+      const base = stripExtension(preferred) || titleName || urlName;
+      const sanitized = sanitizeFileBase(base || 'transcription') || 'transcription';
+      return sanitized;
+    }
 
     const baseCandidate = videoTitle || transcriptionTitle || stripExtension(urlDerived) || urlDerived;
     const sanitized = sanitizeFileBase(baseCandidate || 'transcription');

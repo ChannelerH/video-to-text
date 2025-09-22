@@ -67,7 +67,7 @@ export async function pollJobStatus(
     // Check the final status
     if (result.status === 'completed') {
       const tier = (result as any).tier || 'free';
-      
+
       const baseFormats: Record<string, string | undefined> = {
         srt: result.results.srt,
         vtt: result.results.vtt,
@@ -84,18 +84,47 @@ export async function pollJobStatus(
         }
       }
 
+      let parsedJson: any = null;
+      if (result.results.json) {
+        try {
+          parsedJson = JSON.parse(result.results.json);
+        } catch (error) {
+          console.warn('[pollJobStatus] Failed to parse JSON format:', error);
+        }
+      }
+
+      const segments = Array.isArray(parsedJson?.segments)
+        ? parsedJson.segments
+        : Array.isArray(parsedJson)
+          ? parsedJson
+          : [];
+
+      const textFromJson = typeof parsedJson?.text === 'string' ? parsedJson.text : '';
+      const languageFromJson = typeof parsedJson?.language === 'string' ? parsedJson.language : undefined;
+      const durationFromJson = typeof parsedJson?.duration === 'number' ? parsedJson.duration : undefined;
+      const titleFromJson = typeof parsedJson?.title === 'string' ? parsedJson.title : undefined;
+      const sourceTypeFromJson = parsedJson?.source_type;
+      const sourceUrlFromJson = parsedJson?.source_url;
+
       return {
         success: true,
         data: {
           transcription: {
-            segments: JSON.parse(result.results.json || '[]'),
-            text: result.results.txt || '',
-            language: result.language,
-            duration: result.duration
+            segments,
+            text: textFromJson || result.results.txt || '',
+            language: languageFromJson || result.language,
+            duration: durationFromJson ?? result.duration,
+            title: titleFromJson || result.title,
+            source_type: sourceTypeFromJson || result.source_type,
+            source_url: sourceUrlFromJson || result.source_url,
           },
-          title: result.title,
+          title: titleFromJson || result.title,
           formats: baseFormats,
           tier,
+          sourceType: result.source_type,
+          sourceUrl: result.source_url,
+          processedUrl: result.processed_url,
+          originalDurationSec: result.original_duration_sec,
           // 将 jobId 回传给前端用于"Edit Transcription"跳转
           jobId
         }
