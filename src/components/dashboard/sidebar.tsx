@@ -24,7 +24,7 @@ interface DashboardSidebarProps {
 export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
   const t = useTranslations();
   const pathname = usePathname();
-  const { user, userTier: contextTier, setShowFeedback } = useAppContext();
+  const { user, userTier: contextTier, subscriptionPlan, setShowFeedback } = useAppContext();
   const [isLoading, setIsLoading] = useState(true);
   const [loadingRoute, setLoadingRoute] = useState<string | null>(null);
   const [isUserMenuExpanded, setIsUserMenuExpanded] = useState(false);
@@ -78,6 +78,18 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
   };
 
   const userTier = (contextTier || user?.tier || 'free')?.toLowerCase();
+  const normalizedPlan = (subscriptionPlan || '').toString().toUpperCase();
+  const planLabel = normalizedPlan
+    ? normalizedPlan === 'FREE'
+      ? 'Free Plan'
+      : `${normalizedPlan.charAt(0)}${normalizedPlan.slice(1).toLowerCase()} Plan`
+    : userTier
+      ? userTier === 'free'
+        ? 'Free Plan'
+        : `${userTier.charAt(0).toUpperCase()}${userTier.slice(1)} Plan`
+      : '';
+  const showMinutePackUpgrade = normalizedPlan === 'FREE' && userTier === 'basic';
+  const isPlanLoading = isLoading || !planLabel;
   const userNickname = user?.nickname || user?.email?.split('@')[0] || '';
   const userEmail = user?.email || '';
 
@@ -95,14 +107,19 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
       <div className="px-6 py-4 border-b border-gray-800">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs text-gray-500">Current Plan</span>
-          {isLoading ? (
+          {isPlanLoading ? (
             <div className="h-4 w-12 bg-gray-700 rounded animate-pulse" />
           ) : (
             <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">
-              {userTier === 'free' ? 'Free' : userTier}
+              {planLabel}
             </span>
           )}
         </div>
+        {!isPlanLoading && showMinutePackUpgrade && (
+          <p className="text-[11px] text-green-400 mb-3">
+            Basic features active via minute pack
+          </p>
+        )}
         <Link
           href={`/${locale}/pricing`}
           className="block w-full py-2 bg-purple-600 hover:bg-purple-700 

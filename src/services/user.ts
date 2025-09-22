@@ -123,10 +123,18 @@ export async function getUserInfoWithTier() {
   const user_uuid = await getUserUuid();
 
   if (!user_uuid) {
-    return { user: null, userTier: 'free' };
+    return { user: null, userTier: 'free', subscriptionPlan: 'FREE' };
   }
 
   const user = await findUserByUuid(user_uuid);
+  let subscriptionPlan = 'FREE';
+
+  try {
+    const { getUserSubscriptionPlan } = await import('@/services/user-subscription');
+    subscriptionPlan = await getUserSubscriptionPlan(user_uuid);
+  } catch (e) {
+    console.error('getUserInfoWithTier: failed to load subscription plan', e);
+  }
   let subscriptionStatus = '';
 
   if (user && (user as any).subscription_status) {
@@ -142,5 +150,5 @@ export async function getUserInfoWithTier() {
     subscriptionStatus = 'free';
   }
 
-  return { user, userTier: subscriptionStatus };
+  return { user, userTier: subscriptionStatus, subscriptionPlan };
 }

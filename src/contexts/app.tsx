@@ -35,6 +35,7 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
   // empty string indicates "unknown/not loaded"; avoids blocking initial fetch by truthy default
   const [userTier, setUserTier] = useState<string>('');
+  const [subscriptionPlan, setSubscriptionPlan] = useState<string>('');
   const loadedRef = useRef(false);
 
   // simple in-memory cache (module-scoped via static on window) with 60s TTL
@@ -49,6 +50,7 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
         if (cached && cached.ts && (now() - cached.ts) < 60_000 && cached.data) {
           setUser(cached.data.user || cached.data);
           setUserTier(cached.data.userTier || 'free');
+          setSubscriptionPlan(cached.data.subscriptionPlan || 'FREE');
           updateInvite(cached.data.user || cached.data);
           loadedRef.current = true;
           return;
@@ -71,6 +73,7 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
       // API returns { user, userTier }
       if (data?.user) setUser(data.user); else setUser(data);
       if (data?.userTier) setUserTier(data.userTier);
+      if (data?.subscriptionPlan) setSubscriptionPlan(data.subscriptionPlan);
 
       // write cache
       try { (globalThis as any)[cacheKey] = { ts: now(), data }; } catch {}
@@ -158,6 +161,7 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
         setShowSignModal,
         user,
         userTier,
+        subscriptionPlan,
         setUser,
         showFeedback,
         setShowFeedback,
