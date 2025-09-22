@@ -1201,6 +1201,64 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     }
   };
 
+  const extractFileNameFromUrl = (value?: string | null): string => {
+    if (!value) return '';
+    try {
+      const url = new URL(value);
+      const parts = url.pathname.split('/');
+      return decodeURIComponent(parts.filter(Boolean).pop() || '');
+    } catch {
+      return '';
+    }
+  };
+
+  const stripExtension = (name: string): string => {
+    if (!name) return '';
+    const lastDot = name.lastIndexOf('.');
+    if (lastDot <= 0) return name;
+    return name.substring(0, lastDot);
+  };
+
+  const sanitizeFileBase = (name: string): string => {
+    if (!name) return '';
+    return name
+      .replace(/[\\/:*?"<>|]+/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .trim();
+  };
+
+  const resolveDownloadBaseName = (): string => {
+    const transcription = result?.data?.transcription || {};
+    const detectedSourceType = transcription.source_type || result?.data?.sourceType;
+    const sourceType = detectedSourceType || (uploadedFileInfo ? 'file_upload' : '');
+
+    if (sourceType === 'file_upload') {
+      const uploadName = uploadedFileInfo?.originalName || '';
+      const urlName = extractFileNameFromUrl(transcription.source_url || audioUrl || '');
+      const titleName = transcription.title || '';
+
+      const preferred = uploadName || urlName || titleName;
+      const base = stripExtension(preferred) || titleName || urlName;
+      return sanitizeFileBase(base || 'transcription') || 'transcription';
+    }
+
+    const videoTitle = result?.data?.videoInfo?.title || '';
+    const transcriptionTitle = transcription.title || '';
+    const urlDerived = extractFileNameFromUrl(transcription.source_url || audioUrl || '');
+
+    const baseCandidate = videoTitle || transcriptionTitle || stripExtension(urlDerived) || urlDerived;
+    const sanitized = sanitizeFileBase(baseCandidate || 'transcription');
+    return sanitized || 'transcription';
+  };
+
+  const buildDownloadFileName = (format: string): string => {
+    const cleanFormat = (format || '').replace(/^\./, '').toLowerCase();
+    const base = resolveDownloadBaseName();
+    return `${base}.${cleanFormat || 'txt'}`;
+  };
+
   const fetchAndDownload = async (url: string, fallbackName: string) => {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`download_failed_${res.status}`);
@@ -1223,7 +1281,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       const jobId = result.data.jobId as string | undefined;
       if (jobId) {
         // 统一走后端导出（Free 自动裁到 5 分钟并去 speaker）
-        await fetchAndDownload(`/api/transcriptions/${jobId}/file?format=${format}`, `${(result.data.videoInfo?.title || 'transcription').replace(/\s+/g,'_')}.${format}`);
+        await fetchAndDownload(`/api/transcriptions/${jobId}/file?format=${format}`, buildDownloadFileName(format));
         return;
       }
       // 无 jobId（极少），前端兜底
@@ -1285,9 +1343,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           content = txt;
         }
       }
-      const title = result.data.videoInfo?.title || 'transcription';
-      const safeTitle = title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-      const fileName = `${safeTitle}.${format}`;
+      const fileName = buildDownloadFileName(format);
       const blob = new Blob([content], { type: getContentType(format) });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1605,13 +1661,15 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   };
 
   // Only expose formats supported by backend to keep functionality unchanged
-  const formats = [
-    { id: "txt", label: t("formats.txt"), icon: FileText },
-    { id: "srt", label: t("formats.srt"), icon: Download },
-    { id: "vtt", label: t("formats.vtt"), icon: Download },
-    { id: "md", label: t("formats.md"), icon: FileText },
-    { id: "json", label: t("formats.json"), icon: Code },
-  ];
+  const formats = useMemo(() => (
+    [
+      { id: "txt", label: t("formats.txt"), icon: FileText },
+      { id: "srt", label: t("formats.srt"), icon: Download },
+      { id: "vtt", label: t("formats.vtt"), icon: Download },
+      { id: "md", label: t("formats.md"), icon: FileText },
+      { id: "json", label: t("formats.json"), icon: Code },
+    ]
+  ), [t]);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -2592,7 +2650,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                             try {
                               const jobId = result.data.jobId as string | undefined;
                               if (jobId) {
-                                await fetchAndDownload(`/api/transcriptions/${jobId}/export?format=docx`, `transcription_${new Date().toISOString().split('T')[0]}.docx`);
+                                await fetchAndDownload(`/api/transcriptions/${jobId}/export?format=docx`, buildDownloadFileName('docx'));
                               } else {
                                 // fallback: client-side export (rare) — enforce Free preview trim
                                 const maxSec = 300;
@@ -2627,7 +2685,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                                 );
                                 const url = URL.createObjectURL(blob as any);
                                 const link = document.createElement('a');
-                                link.href = url; link.download = `transcription_${new Date().toISOString().split('T')[0]}.docx`; link.click(); URL.revokeObjectURL(url);
+                                link.href = url; link.download = buildDownloadFileName('docx'); link.click(); URL.revokeObjectURL(url);
                               }
                               showToast('success', t("results.export_success"), t("results.word_exported"));
                             } catch (error) {
@@ -2677,7 +2735,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                             try {
                               const jobId = result.data.jobId as string | undefined;
                               if (jobId) {
-                                await fetchAndDownload(`/api/transcriptions/${jobId}/export?format=pdf`, `transcription_${new Date().toISOString().split('T')[0]}.pdf`);
+                                await fetchAndDownload(`/api/transcriptions/${jobId}/export?format=pdf`, buildDownloadFileName('pdf'));
                               } else {
                                 // fallback: client-side export (rare) — enforce Free preview trim
                                 const maxSec = 300;
@@ -2712,7 +2770,7 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
                                 );
                                 const url = URL.createObjectURL(blob as any);
                                 const link = document.createElement('a');
-                                link.href = url; link.download = `transcription_${new Date().toISOString().split('T')[0]}.pdf`; link.click(); URL.revokeObjectURL(url);
+                                link.href = url; link.download = buildDownloadFileName('pdf'); link.click(); URL.revokeObjectURL(url);
                               }
                               showToast('success', t("results.export_success"), t("results.pdf_exported"));
                             } catch (error) {
