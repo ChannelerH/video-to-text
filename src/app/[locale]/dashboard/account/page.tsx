@@ -46,6 +46,7 @@ export default async function AccountPage({
       email: users.email,
       created_at: users.created_at,
       subscription_status: users.subscription_status,
+      subscription_state: users.subscription_state,
       stripe_price_id: users.stripe_price_id
     })
     .from(users)

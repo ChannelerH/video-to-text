@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserUuid } from '@/services/user';
 import { db } from '@/db';
 import { users, transcriptions, refunds } from '@/db/schema';
+import { syncUserSubscriptionTier } from '@/services/user-subscription';
 import { eq, and, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
 
@@ -151,7 +152,7 @@ export async function POST(request: NextRequest) {
       await db()
         .update(users)
         .set({
-          subscription_status: 'cancelled',
+          subscription_state: 'cancelled',
           subscription_cancelled_at: new Date(),
           subscription_cancel_at_period_end: false,
           subscription_cancel_reason: reason,
@@ -160,17 +161,29 @@ export async function POST(request: NextRequest) {
           updated_at: new Date()
         } as any)
         .where(eq(users.uuid, userUuid));
+
+      await syncUserSubscriptionTier({
+        userUuid,
+        stripeCustomerId: stripeCustomerId || undefined,
+        stripe,
+      });
     } else {
       await db()
         .update(users)
         .set({
-          subscription_status: 'cancelling',
+          subscription_state: 'cancelling',
           subscription_cancel_at_period_end: true,
           subscription_cancel_reason: reason,
           subscription_cancel_feedback: feedback,
           updated_at: new Date()
         } as any)
         .where(eq(users.uuid, userUuid));
+
+      await syncUserSubscriptionTier({
+        userUuid,
+        stripeCustomerId: stripeCustomerId || undefined,
+        stripe,
+      });
     }
 
     // 9. 记录取消事件
@@ -236,12 +249,18 @@ export async function DELETE(request: NextRequest) {
     await db()
       .update(users)
       .set({
-        subscription_status: 'active',
+        subscription_state: 'active',
         subscription_cancelled_at: null,
         subscription_cancel_reason: null,
         updated_at: new Date()
       } as any)
       .where(eq(users.uuid, userUuid));
+
+    await syncUserSubscriptionTier({
+      userUuid,
+      stripeCustomerId: (user as any)?.stripe_customer_id || undefined,
+      stripe,
+    });
 
     return NextResponse.json({
       success: true,

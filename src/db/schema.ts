@@ -35,6 +35,7 @@ export const users = pgTable(
     stripe_subscription_id: varchar({ length: 255 }),
     stripe_price_id: varchar({ length: 255 }),
     subscription_status: varchar({ length: 50 }).default("free"),
+    subscription_state: varchar({ length: 50 }).default("inactive"),
     subscription_current_period_start: timestamp({ withTimezone: true }),
     subscription_current_period_end: timestamp({ withTimezone: true }),
     subscription_paused_at: timestamp({ withTimezone: true }),

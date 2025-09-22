@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import Stripe from 'stripe';
+import { syncUserSubscriptionTier } from '@/services/user-subscription';
 
 export const runtime = 'nodejs';
 
@@ -67,12 +68,18 @@ export async function POST(request: NextRequest) {
     await db()
       .update(users)
       .set({
-        subscription_status: 'paused',
+        subscription_state: 'paused',
         subscription_paused_at: new Date(),
         subscription_resumes_at: resumeDate,
         updated_at: new Date()
       } as any)
       .where(eq(users.uuid, userUuid));
+
+    await syncUserSubscriptionTier({
+      userUuid,
+      stripeCustomerId: stripeCustomerId || undefined,
+      stripe,
+    });
 
     // 6. 记录事件
     console.log(`[Subscription] Paused for user ${userUuid} until ${resumeDate}`);

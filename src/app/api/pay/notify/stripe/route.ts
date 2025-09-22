@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { respOk } from "@/lib/resp";
 import { handleCheckoutSession, handleInvoice } from "@/services/stripe";
+import { syncUserSubscriptionTier } from "@/services/user-subscription";
 import { db } from "@/db";
 import { users, orders, refunds } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -56,10 +57,7 @@ export async function POST(req: Request) {
         // 同步用户订阅状态为 active（与 users 表对齐）
         const customerId = invoice.customer as string;
         if (customerId) {
-          await db()
-            .update(users)
-            .set({ subscription_status: "active", updated_at: new Date() } as any)
-            .where(eq(users.stripe_customer_id as any, customerId));
+          await syncUserSubscriptionTier({ stripeCustomerId: customerId, stripe });
         }
         break;
       }
@@ -68,10 +66,7 @@ export async function POST(req: Request) {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
         if (customerId) {
-          await db()
-            .update(users)
-            .set({ subscription_status: "past_due", updated_at: new Date() } as any)
-            .where(eq(users.stripe_customer_id as any, customerId));
+          await syncUserSubscriptionTier({ stripeCustomerId: customerId, stripe });
         }
         break;
       }
@@ -150,17 +145,6 @@ export async function POST(req: Request) {
         // 同步 users 订阅状态等详细字段
         try {
           const customerId = sub.customer as string;
-          const statusMap: Record<string, string> = {
-            active: "active",
-            past_due: "past_due",
-            unpaid: "unpaid",
-            canceled: "cancelled",
-            incomplete: "incomplete",
-            incomplete_expired: "expired",
-            trialing: "trial",
-            paused: "paused",
-          };
-          const status = (statusMap[sub.status] || sub.status) as any;
           const priceId = sub.items.data[0]?.price.id;
 
           await db()
@@ -168,7 +152,6 @@ export async function POST(req: Request) {
             .set({
               stripe_subscription_id: sub.id,
               stripe_price_id: priceId as any,
-              subscription_status: status,
               subscription_current_period_start: sub.current_period_start
                 ? new Date(sub.current_period_start * 1000)
                 : null,
@@ -182,6 +165,8 @@ export async function POST(req: Request) {
               updated_at: new Date(),
             } as any)
             .where(eq(users.stripe_customer_id as any, customerId));
+
+          await syncUserSubscriptionTier({ stripeCustomerId: customerId, stripe });
         } catch {}
 
         break;
@@ -203,7 +188,6 @@ export async function POST(req: Request) {
         await db()
           .update(users)
           .set({
-            subscription_status: "cancelled",
             subscription_cancelled_at: new Date(),
             subscription_cancel_at_period_end: false,
             stripe_subscription_id: null,
@@ -211,6 +195,8 @@ export async function POST(req: Request) {
             updated_at: new Date(),
           } as any)
           .where(eq(users.stripe_customer_id as any, customerId));
+
+        await syncUserSubscriptionTier({ stripeCustomerId: customerId, stripe });
         break;
       }
 
@@ -222,7 +208,6 @@ export async function POST(req: Request) {
         await db()
           .update(users)
           .set({
-            subscription_status: "paused",
             subscription_paused_at: new Date(),
             subscription_resumes_at: pauseCollection?.resumes_at
               ? new Date(pauseCollection.resumes_at * 1000)
@@ -230,6 +215,8 @@ export async function POST(req: Request) {
             updated_at: new Date(),
           } as any)
           .where(eq(users.stripe_customer_id as any, customerId));
+
+        await syncUserSubscriptionTier({ stripeCustomerId: customerId, stripe });
         break;
       }
 
@@ -240,12 +227,13 @@ export async function POST(req: Request) {
         await db()
           .update(users)
           .set({
-            subscription_status: "active",
             subscription_paused_at: null,
             subscription_resumes_at: null,
             updated_at: new Date(),
           } as any)
           .where(eq(users.stripe_customer_id as any, customerId));
+
+        await syncUserSubscriptionTier({ stripeCustomerId: customerId, stripe });
         break;
       }
 

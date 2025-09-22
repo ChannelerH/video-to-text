@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { updateOrder, updateSubOrder } from "./order";
+import { syncUserSubscriptionTier } from "./user-subscription";
 
 // handle checkout session completed
 export async function handleCheckoutSession(
@@ -73,6 +74,11 @@ export async function handleCheckoutSession(
         sub_period_start: Number(metadata.sub_period_start),
         sub_times: Number(metadata.sub_times),
         paid_detail: JSON.stringify(session),
+      });
+
+      await syncUserSubscriptionTier({
+        stripeCustomerId: typeof subscription.customer === 'string' ? subscription.customer : undefined,
+        stripe,
       });
 
       return;
@@ -168,6 +174,11 @@ export async function handleInvoice(stripe: Stripe, invoice: Stripe.Invoice) {
       sub_period_start: Number(metadata.sub_period_start),
       sub_times: Number(metadata.sub_times),
       paid_detail: JSON.stringify(invoice),
+    });
+
+    await syncUserSubscriptionTier({
+      stripeCustomerId: typeof subscription.customer === 'string' ? subscription.customer : undefined,
+      stripe,
     });
   } catch (e) {
     console.log("handle payment succeeded failed: ", e);
