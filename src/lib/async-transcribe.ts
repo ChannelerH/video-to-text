@@ -67,15 +67,21 @@ export async function pollJobStatus(
     // Check the final status
     if (result.status === 'completed') {
       const tier = (result as any).tier || 'free';
+      
       const baseFormats: Record<string, string | undefined> = {
         srt: result.results.srt,
         vtt: result.results.vtt,
         txt: result.results.txt,
       };
 
+      // Only include json and md for non-free users
       if (tier !== 'free') {
-        if (result.results.json) baseFormats.json = result.results.json;
-        if (result.results.md) baseFormats.md = result.results.md;
+        if (result.results.json) {
+          baseFormats.json = result.results.json;
+        }
+        if (result.results.md) {
+          baseFormats.md = result.results.md;
+        }
       }
 
       return {

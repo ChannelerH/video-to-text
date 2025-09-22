@@ -47,6 +47,7 @@ interface TranscriptionResult {
   srt?: string;
   language?: string;
   createdAt: Date;
+  formats?: Record<string, string>; // 添加formats字段
 }
 
 type UploadStage = 'idle' | 'uploading' | 'detecting' | 'processing' | 'completed' | 'failed';
@@ -256,7 +257,7 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
 
   const previewIsChinese = transcriptionResult ? isChineseText(transcriptionResult.language, transcriptionResult.text) : false;
 
-  const handleExport = async (format: 'txt' | 'srt' | 'vtt' | 'docx' | 'pdf') => {
+  const handleExport = async (format: string) => {
     if (!transcriptionResult) return;
 
     const filenameBase = (transcriptionResult.title || 'transcription').replace(/\s+/g, '_');
@@ -280,6 +281,7 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
     };
 
     try {
+      // 对于 WORD 和 PDF，使用本地生成
       if (format === 'docx' || format === 'pdf') {
        const exportSegments: TranscriptionSegment[] = segments.map((segment, index) => ({
           id: index,
@@ -340,15 +342,48 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
         let mime = 'text/plain';
         let extension = format;
 
-        if (format === 'txt') {
-          content = plainText;
-        } else if (format === 'srt') {
-          content = transcriptionResult.srt && transcriptionResult.srt.trim().length > 0
-            ? transcriptionResult.srt
-            : buildSRTFromSegments(segments);
-        } else if (format === 'vtt') {
-          content = buildVTTFromSegments(segments);
-          mime = 'text/vtt';
+        // 优先使用后端返回的格式数据
+        if (transcriptionResult.formats && transcriptionResult.formats[format]) {
+          content = transcriptionResult.formats[format];
+          
+          // 设置正确的 MIME 类型
+          if (format === 'json') {
+            mime = 'application/json';
+          } else if (format === 'md') {
+            mime = 'text/markdown';
+          } else if (format === 'vtt') {
+            mime = 'text/vtt';
+          } else if (format === 'srt') {
+            mime = 'application/x-subrip';
+          }
+        } else {
+          // 后备方案：本地生成（主要用于兼容旧数据）
+          if (format === 'txt') {
+            content = plainText;
+          } else if (format === 'srt') {
+            content = transcriptionResult.srt && transcriptionResult.srt.trim().length > 0
+              ? transcriptionResult.srt
+              : buildSRTFromSegments(segments);
+          } else if (format === 'vtt') {
+            content = buildVTTFromSegments(segments);
+            mime = 'text/vtt';
+          } else if (format === 'json') {
+            const jsonData = {
+              title: transcriptionResult.title,
+              duration: transcriptionResult.duration,
+              language: transcriptionResult.language,
+              segments: transcriptionResult.segments,
+              text: transcriptionResult.text
+            };
+            content = JSON.stringify(jsonData, null, 2);
+            mime = 'application/json';
+          } else if (format === 'md') {
+            content = `# ${transcriptionResult.title}\n\n` +
+              `**Duration:** ${formatDuration(transcriptionResult.duration)}\n` +
+              `**Language:** ${transcriptionResult.language || 'Auto-detected'}\n\n` +
+              `## Transcription\n\n${plainText}`;
+            mime = 'text/markdown';
+          }
         }
 
         const blob = new Blob([content], { type: mime });
@@ -465,6 +500,7 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
           segments: normalizedSegments,
           language: transcription.language,
           createdAt: new Date(),
+          formats: result.data.formats, // 保存formats数据
         });
         setCurrentJobId(result.data.jobId || null);
         setProcessingProgress(100);
@@ -1031,12 +1067,18 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
               <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                 <Clock className="w-5 h-5 text-cyan-400 mx-auto mb-1" />
                 <div className="text-sm font-medium">{formatDuration(transcriptionResult.duration)}</div>
-                <div className="text-xs text-slate-500">Preview Length</div>
+                <div className="text-xs text-slate-500">
+                  {isAuthenticated ? 'Duration' : 'Preview Length'}
+                </div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                 <User className="w-5 h-5 text-cyan-400 mx-auto mb-1" />
-                <div className="text-sm font-medium">5 min</div>
-                <div className="text-xs text-slate-500">Free Limit</div>
+                <div className="text-sm font-medium">
+                  {isAuthenticated ? normalizedTier.toUpperCase() : '5 min'}
+                </div>
+                <div className="text-xs text-slate-500">
+                  {isAuthenticated ? 'Account' : 'Free Limit'}
+                </div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                 <FileText className="w-5 h-5 text-cyan-400 mx-auto mb-1" />
@@ -1107,27 +1149,29 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
             <div>
               <h4 className="text-sm font-medium text-slate-400 mb-3">Export Options</h4>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                <button
-                  onClick={() => handleExport('txt')}
-                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-700 hover:border-cyan-500 hover:bg-slate-800 transition-colors text-sm"
-                >
-                  <FileText className="w-4 h-4" />
-                  TXT
-                </button>
-                <button
-                  onClick={() => handleExport('srt')}
-                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-700 hover:border-cyan-500 hover:bg-slate-800 transition-colors text-sm"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  SRT
-                </button>
-                <button
-                  onClick={() => handleExport('vtt')}
-                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-700 hover:border-cyan-500 hover:bg-slate-800 transition-colors text-sm"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  VTT
-                </button>
+                {/* 动态渲染基础格式按钮（来自后端） */}
+                {transcriptionResult.formats && Object.keys(transcriptionResult.formats).map((format) => {
+                  const formatUpper = format.toUpperCase();
+                  let Icon = FileText;
+                  if (format === 'srt' || format === 'vtt') {
+                    Icon = FileSpreadsheet;
+                  } else if (format === 'json') {
+                    Icon = FileOutput;
+                  }
+                  
+                  return (
+                    <button
+                      key={format}
+                      onClick={() => handleExport(format as any)}
+                      className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-700 hover:border-cyan-500 hover:bg-slate-800 transition-colors text-sm"
+                    >
+                      <Icon className="w-4 h-4" />
+                      {formatUpper}
+                    </button>
+                  );
+                })}
+                
+                {/* 始终显示 WORD 和 PDF 按钮（本地生成） */}
                 <button
                   onClick={() => handleExport('docx')}
                   className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-700 hover:border-cyan-500 hover:bg-slate-800 transition-colors text-sm"
@@ -1144,7 +1188,10 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
                 </button>
               </div>
               <p className="mt-3 text-xs text-slate-500">
-                Free preview exports the first 5 minutes. Sign in for full-length transcripts and advanced features.
+                {isAuthenticated 
+                  ? `Export your transcription in multiple formats. ${normalizedTier === 'free' ? 'Upgrade for JSON and Markdown formats.' : ''}`
+                  : 'Free preview exports the first 5 minutes. Sign in for full-length transcripts and advanced features.'
+                }
               </p>
             </div>
 
