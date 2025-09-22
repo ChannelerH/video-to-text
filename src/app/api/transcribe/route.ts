@@ -272,12 +272,17 @@ type AuthenticatedRequestParams = {
 async function handleAuthenticatedRequest(params: AuthenticatedRequestParams) {
   const { type, content, options, userUuid } = params;
 
+  const normalizedOptions: Record<string, any> = { ...options };
+  if (normalizedOptions.highAccuracyMode === undefined) {
+    const alias = normalizedOptions.high_accuracy ?? normalizedOptions.highAccuracy;
+    if (alias !== undefined) {
+      normalizedOptions.highAccuracyMode = !!alias;
+    }
+  }
   const userTier = await getUserTier(userUuid);
   const subscriptionPlan = await getUserSubscriptionPlan(userUuid);
   const { hasHighAccuracyAccess } = await import('@/services/user-tier');
   const canUseHighAccuracy = await hasHighAccuracyAccess(userUuid);
-
-  const normalizedOptions = { ...options };
   await applyFreeTierConstraints({
     type,
     content,

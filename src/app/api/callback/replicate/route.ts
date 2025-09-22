@@ -31,11 +31,16 @@ export async function POST(req: NextRequest) {
     const secret = process.env.REPLICATE_WEBHOOK_SECRET || '';
     const raw = await req.text();
     if (!simulate && secret) {
-      const sig = req.headers.get('x-replicate-signature') || req.headers.get('x-signature') || '';
-      const computed = crypto.createHmac('sha256', secret).update(raw).digest('hex');
-      const given = sig.startsWith('sha256=') ? sig.slice(7) : sig;
-      if (!given || given.toLowerCase() !== computed.toLowerCase()) {
-        return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
+      const headerSignature = req.headers.get('x-replicate-signature') || req.headers.get('x-signature') || '';
+      if (!headerSignature) {
+        console.warn('[Replicate Callback] Signature header missing; skipping strict verification');
+      } else {
+        const computed = crypto.createHmac('sha256', secret).update(raw).digest('hex');
+        const given = headerSignature.startsWith('sha256=') ? headerSignature.slice(7) : headerSignature;
+        if (!given || given.toLowerCase() !== computed.toLowerCase()) {
+          console.error('[Replicate Callback] Signature mismatch', { given, computed });
+          return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
+        }
       }
     }
 

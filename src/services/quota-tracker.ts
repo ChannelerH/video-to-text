@@ -1,6 +1,7 @@
 import { db } from '@/db';
 import { and, eq, gte, sql } from 'drizzle-orm';
 import { usage_records } from '@/db/schema';
+import { getUserUsageSummary } from './user-minutes';
 
 interface UsageRecord {
   userId: string;
@@ -37,6 +38,26 @@ export class QuotaTracker {
   ): Promise<QuotaStatus> {
     const quotaLimits = this.getQuotaLimits(userTier);
     const usage = await this.getUserUsage(userId);
+    const usageSummary = await getUserUsageSummary(userId).catch(() => null);
+
+    const dynamicMonthlyLimit = usageSummary
+      ? usageSummary.isUnlimited
+        ? Infinity
+        : Math.max(quotaLimits.monthlyMinutes, Number(usageSummary.totalAvailable || 0))
+      : quotaLimits.monthlyMinutes;
+
+    const dynamicMonthlyUsed = usageSummary
+      ? Number(usageSummary.totalUsed || usage.monthlyMinutes)
+      : usage.monthlyMinutes;
+
+    const normalizedUsage = {
+      ...usage,
+      monthlyMinutes: dynamicMonthlyUsed
+    };
+
+    const baseHaLimitRaw = quotaLimits.monthlyHighAccuracyMinutes;
+    const highAccuracyLimit = baseHaLimitRaw === undefined ? 0 : baseHaLimitRaw;
+    const currentHighAccuracyUsed = usage.monthlyHighAccuracyMinutes || 0;
 
     // 仅当“请求+分钟”都无限时才视为完全无限制
     if (quotaLimits.dailyRequests === Infinity && quotaLimits.monthlyMinutes === Infinity) {
@@ -62,39 +83,47 @@ export class QuotaTracker {
         reason: 'Daily request limit exceeded',
         remaining: {
           dailyRequests: 0,
-          monthlyMinutes: Math.max(0, quotaLimits.monthlyMinutes - usage.monthlyMinutes),
-          monthlyHighAccuracyMinutes: Math.max(0, (quotaLimits.monthlyHighAccuracyMinutes || 0) - (usage.monthlyHighAccuracyMinutes || 0))
+          monthlyMinutes: dynamicMonthlyLimit === Infinity
+            ? Infinity
+            : Math.max(0, dynamicMonthlyLimit - dynamicMonthlyUsed),
+          monthlyHighAccuracyMinutes: baseHaLimitRaw === Infinity
+            ? Infinity
+            : Math.max(0, highAccuracyLimit - currentHighAccuracyUsed)
         },
-        usage
+        usage: normalizedUsage
       };
     }
 
     // 检查月度时长限制（标准分钟）
-    if (usage.monthlyMinutes + requestDurationMinutes > quotaLimits.monthlyMinutes) {
+    if (dynamicMonthlyLimit !== Infinity && (dynamicMonthlyUsed + requestDurationMinutes > dynamicMonthlyLimit)) {
       return {
         isAllowed: false,
         reason: 'Monthly minutes quota exceeded',
         remaining: {
           dailyRequests: quotaLimits.dailyRequests - usage.dailyRequests,
           monthlyMinutes: 0,
-          monthlyHighAccuracyMinutes: Math.max(0, (quotaLimits.monthlyHighAccuracyMinutes || 0) - (usage.monthlyHighAccuracyMinutes || 0))
+          monthlyHighAccuracyMinutes: baseHaLimitRaw === Infinity
+            ? Infinity
+            : Math.max(0, highAccuracyLimit - currentHighAccuracyUsed)
         },
-        usage
+        usage: normalizedUsage
       };
     }
 
     // 检查高精度分钟池（仅 PRO 且 high_accuracy 模式）
-    if (modelType === 'high_accuracy' && (quotaLimits.monthlyHighAccuracyMinutes || 0) > 0) {
-      if ((usage.monthlyHighAccuracyMinutes || 0) + requestDurationMinutes > (quotaLimits.monthlyHighAccuracyMinutes || 0)) {
+    if (modelType === 'high_accuracy' && baseHaLimitRaw) {
+      if (baseHaLimitRaw !== Infinity && (currentHighAccuracyUsed + requestDurationMinutes > highAccuracyLimit)) {
         return {
           isAllowed: false,
           reason: 'High-accuracy minutes quota exceeded',
           remaining: {
             dailyRequests: quotaLimits.dailyRequests - usage.dailyRequests,
-            monthlyMinutes: quotaLimits.monthlyMinutes - usage.monthlyMinutes,
+            monthlyMinutes: dynamicMonthlyLimit === Infinity
+              ? Infinity
+              : Math.max(0, dynamicMonthlyLimit - dynamicMonthlyUsed),
             monthlyHighAccuracyMinutes: 0
           },
-          usage
+          usage: normalizedUsage
         };
       }
     }
@@ -103,10 +132,14 @@ export class QuotaTracker {
       isAllowed: true,
       remaining: {
         dailyRequests: quotaLimits.dailyRequests - usage.dailyRequests,
-        monthlyMinutes: quotaLimits.monthlyMinutes - usage.monthlyMinutes - requestDurationMinutes,
-        monthlyHighAccuracyMinutes: (quotaLimits.monthlyHighAccuracyMinutes || 0) - (usage.monthlyHighAccuracyMinutes || 0) - (modelType === 'high_accuracy' ? requestDurationMinutes : 0)
+        monthlyMinutes: dynamicMonthlyLimit === Infinity
+          ? Infinity
+          : Math.max(0, dynamicMonthlyLimit - dynamicMonthlyUsed - requestDurationMinutes),
+        monthlyHighAccuracyMinutes: baseHaLimitRaw === Infinity
+          ? Infinity
+          : Math.max(0, highAccuracyLimit - currentHighAccuracyUsed - (modelType === 'high_accuracy' ? requestDurationMinutes : 0))
       },
-      usage
+      usage: normalizedUsage
     };
   }
 

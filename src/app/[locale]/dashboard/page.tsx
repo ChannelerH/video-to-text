@@ -441,16 +441,16 @@ async function UsageSummaryCard({
           <span className="text-sm font-medium text-purple-400">
             {usage.minutesLimit === -1
               ? "Unlimited"
-              : Math.max(0, usage.totalAllowance - usage.minutesUsed)}
+              : Math.max(0, usage.totalAllowance - usage.minutesUsed).toFixed(2)}
             {usage.minutesLimit === -1 ? "" : " minutes remaining"}
           </span>
         </div>
 
         <div className="space-y-2">
           <div className="flex justify-between text-xs text-gray-500">
-            <span>Used: {usage.minutesUsed || 0}</span>
+            <span>Used: {(usage.minutesUsed || 0).toFixed(2)}</span>
             <span>
-              Total: {usage.minutesLimit === -1 ? "Unlimited" : usage.totalAllowance}
+              Total: {usage.minutesLimit === -1 ? "Unlimited" : usage.totalAllowance.toFixed(2)}
             </span>
           </div>
 
@@ -465,7 +465,7 @@ async function UsageSummaryCard({
 
           {usage.minutesLimit !== -1 && usage.packBalance > 0 && (
             <div className="text-[11px] text-gray-500">
-              Includes {usage.packBalance} min from minute packs
+              Includes {usage.packBalance.toFixed(2)} min from minute packs
             </div>
           )}
         </div>

@@ -66,6 +66,7 @@ export default function AudioUploadWidget({ locale }: Props) {
         content: url,
         action: isAuthenticated ? "transcribe" : "preview",
         options: {
+          highAccuracyMode: canUseHighAccuracy && highAccuracy,
           high_accuracy: canUseHighAccuracy && highAccuracy,
           speaker_diarization: canUseDiarization && speakerDiarization,
           enableDiarizationAfterWhisper: canUseDiarization && speakerDiarization
@@ -138,6 +139,7 @@ export default function AudioUploadWidget({ locale }: Props) {
         options: { 
           r2Key: key, 
           originalFileName: file.name,
+          highAccuracyMode: canUseHighAccuracy && highAccuracy,
           high_accuracy: canUseHighAccuracy && highAccuracy,
           speaker_diarization: canUseDiarization && speakerDiarization,
           enableDiarizationAfterWhisper: canUseDiarization && speakerDiarization

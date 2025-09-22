@@ -14,13 +14,15 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     ({ job_id } = body);
-    const { video, user_tier, preferred_language, enable_diarization_after_whisper } = body;
+    const { video, user_tier, preferred_language, enable_diarization_after_whisper, high_accuracy } = body;
+    const forceHighAccuracy = high_accuracy === true;
     console.log('[YouTube Prepare] incoming request', {
       job_id,
       hasVideo: typeof video === 'string' && video.length > 0,
       user_tier,
       preferred_language,
       enable_diarization_after_whisper,
+      high_accuracy: forceHighAccuracy,
     });
     if (!job_id || !video) {
       return NextResponse.json({ error: 'missing job_id or video' }, { status: 400 });
@@ -67,9 +69,10 @@ export async function POST(request: NextRequest) {
         supplier,
         hasDeepgramKey: !!process.env.DEEPGRAM_API_KEY,
         supplierAudioUrl,
+        high_accuracy: forceHighAccuracy,
       });
 
-      if ((supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
+      if (!forceHighAccuracy && (supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
         let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(job_id)}`;
         if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
           const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(job_id).digest('hex');
@@ -110,7 +113,45 @@ export async function POST(request: NextRequest) {
           console.error('[YouTube Prepare][Processed] Deepgram enqueue error', e);
         });
       }
-      
+
+      if ((forceHighAccuracy || supplier.includes('replicate') || supplier === 'both') && process.env.REPLICATE_API_TOKEN && supplierAudioUrl) {
+        try {
+          const cbUrl = new URL(`${cbBase}/api/callback/replicate`);
+          cbUrl.searchParams.set('job_id', job_id);
+          cbUrl.searchParams.set('ha', '1');
+          if (enableDiarization) cbUrl.searchParams.set('dw', '1');
+
+          const replicateVersion = process.env.REPLICATE_WHISPER_VERSION || 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e';
+          const payload: Record<string, any> = {
+            version: replicateVersion,
+            input: {
+              audio: supplierAudioUrl,
+              audio_file: supplierAudioUrl,
+              model: 'large-v3',
+              diarize: false,
+              translate: false
+            },
+            webhook: cbUrl.toString(),
+            webhook_events_filter: ['completed']
+          };
+
+          const resp = await fetch('https://api.replicate.com/v1/predictions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Token ${process.env.REPLICATE_API_TOKEN}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+          if (!resp.ok) {
+            const text = await resp.text().catch(() => '');
+            console.error('[YouTube Prepare][Processed] Replicate enqueue failed', resp.status, text);
+          }
+        } catch (repErr) {
+          console.error('[YouTube Prepare][Processed] Replicate enqueue error', repErr);
+        }
+      }
+
       return NextResponse.json({ ok: true, rerun: true });
     }
     
@@ -361,8 +402,8 @@ export async function POST(request: NextRequest) {
           const chunks: Buffer[] = [];
           const buf: Buffer = await new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
-              reject(new Error('Download timeout after 30 seconds'));
-            }, 30000);
+              reject(new Error('Download timeout after 120 seconds'));
+            }, 120000);
             
             stream.on('data', (c: Buffer) => chunks.push(Buffer.from(c)));
             stream.on('end', () => { 
@@ -507,8 +548,8 @@ export async function POST(request: NextRequest) {
             const chunks: Buffer[] = [];
             const buf: Buffer = await new Promise((resolve, reject) => {
               const timeout = setTimeout(() => {
-                reject(new Error('Download timeout after 30 seconds'));
-              }, 30000);
+                reject(new Error('Download timeout after 120 seconds'));
+              }, 120000);
               
               fallbackStream.on('data', (c: Buffer) => chunks.push(Buffer.from(c)));
               fallbackStream.on('end', () => { 
@@ -581,9 +622,10 @@ export async function POST(request: NextRequest) {
       hasReplicateKey: !!process.env.REPLICATE_API_TOKEN,
       supplierAudioUrl,
       enableDiarization,
+      forceHighAccuracy,
     });
 
-    if (supplierAudioUrl && (supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
+    if (!forceHighAccuracy && supplierAudioUrl && (supplier.includes('deepgram') || supplier === 'both') && process.env.DEEPGRAM_API_KEY) {
       let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(job_id)}`;
       if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
         const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(job_id).digest('hex');
@@ -638,26 +680,46 @@ export async function POST(request: NextRequest) {
     }
 
     // Only send to Replicate if we have a public R2 URL
-    if (supplierAudioUrl && (supplier.includes('replicate') || supplier === 'both') && process.env.REPLICATE_API_TOKEN) {
+    if (supplierAudioUrl && ((supplier.includes('replicate') || supplier === 'both') || forceHighAccuracy) && process.env.REPLICATE_API_TOKEN) {
       const cbUrl = new URL(`${cbBase}/api/callback/replicate`);
       cbUrl.searchParams.set('job_id', job_id);
       if (enableDiarization) cbUrl.searchParams.set('dw', '1');
+      if (forceHighAccuracy) cbUrl.searchParams.set('ha', '1');
       const cb = cbUrl.toString();
       tasks.push(
-        fetch('https://api.replicate.com/v1/predictions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Token ${process.env.REPLICATE_API_TOKEN}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
-            // Use R2 URL that Replicate can access
-            input: { audio_file: supplierAudioUrl, model: 'large-v3' },
-            webhook: cb,
-            webhook_events_filter: ['completed', 'failed']
-          })
-        }).catch(() => {})
+        (async () => {
+          try {
+            const replicateVersion = process.env.REPLICATE_WHISPER_VERSION || 'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e';
+            const payload: Record<string, any> = {
+              version: replicateVersion,
+              input: {
+                audio: supplierAudioUrl,
+                audio_file: supplierAudioUrl,
+                model: 'large-v3',
+                diarize: false,
+                translate: false
+              },
+              webhook: cb,
+              webhook_events_filter: ['completed']
+            };
+
+            const resp = await fetch('https://api.replicate.com/v1/predictions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Token ${process.env.REPLICATE_API_TOKEN}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(payload)
+            });
+
+            if (!resp.ok) {
+              const text = await resp.text().catch(() => '');
+              console.error('[YouTube Prepare][Fanout] Replicate enqueue failed', resp.status, text);
+            }
+          } catch (repErr) {
+            console.error('[YouTube Prepare][Fanout] Replicate enqueue error', repErr);
+          }
+        })()
       );
     }
 
