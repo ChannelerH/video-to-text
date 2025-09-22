@@ -96,8 +96,7 @@ async function checkHasActiveMinutePacks(userUuid: string): Promise<boolean> {
   try {
     const packSummary = await getMinuteSummary(userUuid);
     const remaining = Number(packSummary.std || 0);
-    const total = Number((packSummary as any).stdTotal || 0);
-    return remaining > 0 || total > 0;
+    return remaining > 0;
   } catch (error) {
     console.error('Error checking minute packs:', error);
     return false;

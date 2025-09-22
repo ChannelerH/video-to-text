@@ -99,15 +99,18 @@ export async function handleInvoice(stripe: Stripe, invoice: Stripe.Invoice) {
       throw new Error("not handle unpaid invoice");
     }
 
-    const subId = invoice.subscription as string;
-    // not handle none-subscription payment
-    if (!subId) {
-      throw new Error("not handle none-subscription payment");
-    }
-
     // not handle first subscription, because it's be handled in session completed event
     if (invoice.billing_reason === "subscription_create") {
       return;
+    }
+
+    const subId =
+      (invoice.subscription as string | null | undefined) ??
+      invoice.lines?.data?.[0]?.subscription ??
+      "";
+    // not handle none-subscription payment
+    if (!subId) {
+      throw new Error("not handle none-subscription payment");
     }
 
     // get subscription
