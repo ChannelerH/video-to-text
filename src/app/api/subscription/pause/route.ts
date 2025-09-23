@@ -4,7 +4,7 @@ import { db } from '@/db';
 import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import Stripe from 'stripe';
-import { syncUserSubscriptionTier } from '@/services/user-subscription';
+import { getCurrentSubscriptionOrder, syncUserSubscriptionTier } from '@/services/user-subscription';
 
 export const runtime = 'nodejs';
 
@@ -40,7 +40,8 @@ export async function POST(request: NextRequest) {
     }
 
     const stripeCustomerId = (user as any).stripe_customer_id;
-    const subscriptionId = (user as any).stripe_subscription_id;
+    const activeOrder = await getCurrentSubscriptionOrder(userUuid);
+    const subscriptionId = activeOrder?.sub_id ? String(activeOrder.sub_id) : null;
 
     if (!stripeCustomerId || !subscriptionId) {
       return NextResponse.json(

@@ -3,15 +3,19 @@
 import { useState } from 'react';
 import { X, AlertTriangle, Download, Clock, TrendingDown, Gift, AlertCircle } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
+import { useAppContext } from '@/contexts/app';
+import type { DowngradeTarget } from '@/services/subscription-plan';
 
 interface CancelSubscriptionModalProps {
   onClose: () => void;
   locale: string;
+  currentPlan: string;
 }
 
-type CancelStep = 'reason' | 'retention' | 'confirm' | 'processing';
+type CancelStep = 'reason' | 'retention' | 'downgrade' | 'confirm' | 'processing';
 
-const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalProps) => {
+const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscriptionModalProps) => {
+  const { refreshUserInfo } = useAppContext();
   const [step, setStep] = useState<CancelStep>('reason');
   const [reason, setReason] = useState('');
   const [feedback, setFeedback] = useState('');
@@ -20,6 +24,9 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
   const [refundEligible, setRefundEligible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showError, setShowError] = useState(false);
+  const [isDowngrading, setIsDowngrading] = useState(false);
+  const [downgradeError, setDowngradeError] = useState('');
+  const [isCheckingRefund, setIsCheckingRefund] = useState(false);
   const router = useRouter();
 
   const reasons = [
@@ -30,8 +37,69 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
     { id: 'other', label: 'Other reason', icon: X }
   ];
 
+  const baseDowngradeOptions: Array<{
+    id: DowngradeTarget;
+    title: string;
+    description: string;
+    badge?: string;
+    highlight?: boolean;
+    losses?: string[];
+  }> = [
+    {
+      id: 'basic_monthly',
+      title: 'Basic Monthly',
+      description: 'Keep the essentials for $9/mo — 5 hours, AI chapters & summary, standard exports.',
+      highlight: true,
+      losses: [
+        'No API access or batch processing',
+        'High-accuracy minutes removed',
+        'Storage retention drops to 90 days',
+      ],
+    },
+    {
+      id: 'basic_yearly',
+      title: 'Basic Yearly',
+      description: 'Save 20% with the annual plan. Same Basic features billed once per year.',
+      losses: [
+        'No API access or batch processing',
+        'High-accuracy minutes removed',
+        'Storage retention drops to 90 days',
+      ],
+    },
+    {
+      id: 'free',
+      title: 'Switch to Free',
+      description: 'Preview-only mode. 5-minute clips, limited exports, data kept for 7 days.',
+      badge: 'Preview only',
+      losses: [
+        'Only 5-minute previews, no full transcripts',
+        'No AI summary/chapters beyond preview',
+        'Storage retention only 7 days',
+      ],
+    },
+  ];
+
+  const normalizedPlan = (currentPlan || '').toUpperCase();
+  const allowedTargets: DowngradeTarget[] = (() => {
+    if (normalizedPlan === 'PRO' || normalizedPlan === 'PREMIUM') {
+      return ['basic_monthly', 'basic_yearly', 'free'];
+    }
+    if (normalizedPlan === 'BASIC') {
+      return ['free'];
+    }
+    return [];
+  })();
+
+  const downgradeOptions = baseDowngradeOptions.filter((option) => allowedTargets.includes(option.id));
+
   const handleReasonSubmit = async () => {
-    if (reason) {
+    if (reason && !isCheckingRefund) {
+      // Set loading state immediately for instant feedback
+      setIsCheckingRefund(true);
+      
+      // Small delay to ensure loading state is visible
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Check refund eligibility
       try {
         const response = await fetch('/api/subscription/check-refund-eligibility');
@@ -39,7 +107,13 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
         setRefundEligible(data.eligible || false);
       } catch (error) {
         console.error('Failed to check refund eligibility');
+        // Still proceed even if refund check fails
       }
+      
+      // Ensure minimum loading time for better UX
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      setIsCheckingRefund(false);
       setStep('retention');
     }
   };
@@ -49,10 +123,61 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
       router.push(`/${locale}/dashboard/account/pause`);
       onClose();
     } else if (offer === 'downgrade') {
-      router.push(`/${locale}/pricing`);
-      onClose();
+      setStep('downgrade');
     } else {
       setStep('confirm');
+    }
+  };
+
+  const handleDowngrade = async (target: DowngradeTarget) => {
+    setIsDowngrading(true);
+    setDowngradeError('');
+    try {
+      const response = await fetch('/api/subscription/downgrade', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ target, locale, reason, feedback }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        // Handle specific error cases with user-friendly messages
+        if (data.error === 'Downgrade already scheduled') {
+          setDowngradeError('You already have a pending plan change scheduled. Please cancel the existing scheduled change from your account page before selecting a new plan.');
+        } else if (data.error === 'Already on the requested plan') {
+          setDowngradeError('You are already on this plan. Please choose a different plan or close this dialog.');
+        } else if (data.error === 'Target plan is not lower than current plan') {
+          setDowngradeError('Please select a plan that is lower than your current subscription tier.');
+        } else if (data.error === 'No active subscription found') {
+          setDowngradeError('No active subscription found. You may already be on the free plan.');
+        } else {
+          setDowngradeError(data.error || 'Failed to downgrade subscription. Please try again or contact support.');
+        }
+        return;
+      }
+
+      if (data.scheduled) {
+        refreshUserInfo?.();
+        const effectiveAt = data.effectiveAt || '';
+        router.push(`/${locale}/dashboard/account?downgradeScheduled=${encodeURIComponent(effectiveAt)}&downgradePlan=${encodeURIComponent(target)}`);
+        onClose();
+        return;
+      }
+
+      refreshUserInfo?.();
+      const plan = typeof data.plan === 'string' ? data.plan.toLowerCase() : '';
+      const queryKey = plan === 'free' ? 'cancelled' : 'downgraded';
+      const queryValue = plan === 'free' ? 'true' : target;
+      router.push(`/${locale}/dashboard/account?${queryKey}=${encodeURIComponent(queryValue)}`);
+      onClose();
+    } catch (error) {
+      console.error('Downgrade error:', error);
+      setDowngradeError('An error occurred while processing your downgrade. Please try again or contact support.');
+    } finally {
+      setIsDowngrading(false);
     }
   };
 
@@ -157,17 +282,26 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition-colors"
+                disabled={isCheckingRefund}
+                className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 
+                  disabled:cursor-not-allowed text-white rounded-xl transition-colors"
               >
                 Keep Subscription
               </button>
               <button
                 onClick={handleReasonSubmit}
-                disabled={!reason}
+                disabled={!reason || isCheckingRefund}
                 className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 
-                  disabled:text-gray-500 text-white rounded-xl transition-colors"
+                  disabled:text-gray-500 text-white rounded-xl transition-all relative overflow-hidden"
               >
-                Continue
+                {isCheckingRefund ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Processing...</span>
+                  </span>
+                ) : (
+                  'Continue'
+                )}
               </button>
             </div>
           </div>
@@ -269,7 +403,174 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
           </div>
         )}
 
-        {/* Step 3: Final Confirmation */}
+        {/* Step 3: Downgrade Options */}
+        {step === 'downgrade' && (
+          <div className="p-8 max-h-[90vh] overflow-y-auto">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-white mb-3">Keep what matters most</h2>
+              <p className="text-gray-400 text-lg">
+                Choose a plan that fits your budget
+              </p>
+            </div>
+
+            {downgradeError && (
+              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-red-300">{downgradeError}</p>
+                    {downgradeError.includes('pending plan change') && (
+                      <button
+                        onClick={() => {
+                          router.push(`/${locale}/dashboard/account`);
+                          onClose();
+                        }}
+                        className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline"
+                      >
+                        Go to Account Settings →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {downgradeOptions.length === 0 && (
+                <div className="p-6 border border-gray-800 rounded-xl bg-gray-900/40 text-center">
+                  <AlertTriangle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-400">No downgrade options available for your current plan</p>
+                </div>
+              )}
+              
+              {downgradeOptions.map((option) => {
+                const isBasicMonthly = option.id === 'basic_monthly';
+                const isBasicYearly = option.id === 'basic_yearly';
+                const isFree = option.id === 'free';
+                
+                return (
+                  <div
+                    key={option.id}
+                    className={`
+                      relative rounded-2xl p-6 transition-all duration-200
+                      ${isBasicMonthly 
+                        ? 'bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent border-2 border-purple-500/30 shadow-lg shadow-purple-500/10' 
+                        : isFree
+                        ? 'bg-gray-900/60 border border-gray-700/50'
+                        : 'bg-gray-900/40 border border-gray-700/30 hover:border-gray-600/50'
+                      }
+                    `}
+                  >
+                    {isBasicMonthly && (
+                      <div className="absolute -top-3 left-6">
+                        <span className="px-3 py-1 bg-purple-500 text-white text-xs font-medium rounded-full">
+                          RECOMMENDED
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-3">
+                          <h3 className={`text-xl font-bold ${isBasicMonthly ? 'text-white' : 'text-gray-200'}`}>
+                            {option.title}
+                          </h3>
+                          {isFree && (
+                            <span className="px-2 py-0.5 bg-gray-700 text-gray-300 text-xs rounded-md">
+                              Limited Access
+                            </span>
+                          )}
+                          {isBasicYearly && (
+                            <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-md">
+                              SAVE 20%
+                            </span>
+                          )}
+                        </div>
+                        
+                        <p className={`mb-4 ${isBasicMonthly ? 'text-gray-300' : 'text-gray-400'}`}>
+                          {option.description}
+                        </p>
+                        
+                        {option.losses && (
+                          <div className="space-y-2 mb-4">
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">You'll lose:</p>
+                            <ul className="space-y-1.5">
+                              {option.losses.map((loss) => (
+                                <li key={loss} className="flex items-start gap-2">
+                                  <X className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />
+                                  <span className="text-sm text-gray-400">{loss}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>Changes take effect at next billing cycle</span>
+                        </div>
+                      </div>
+                      
+                      <div className="lg:ml-6">
+                        <button
+                          onClick={() => handleDowngrade(option.id)}
+                          disabled={isDowngrading}
+                          className={`
+                            px-6 py-3 rounded-xl font-medium transition-all duration-200 transform
+                            ${isBasicMonthly 
+                              ? 'bg-purple-600 hover:bg-purple-700 text-white hover:scale-105 shadow-lg shadow-purple-500/25' 
+                              : isFree
+                              ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                              : 'bg-gray-800 hover:bg-gray-700 text-gray-200'
+                            }
+                            ${isDowngrading ? 'opacity-70 cursor-not-allowed' : 'hover:shadow-xl'}
+                          `}
+                        >
+                          {isDowngrading ? (
+                            <span className="flex items-center gap-2">
+                              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              Scheduling...
+                            </span>
+                          ) : (
+                            <span>
+                              {isFree ? 'Switch to Free' : 'Select Plan'}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-8 p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
+              <div className="flex gap-3">
+                <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-blue-300 mb-2">How scheduled downgrades work</p>
+                  <ul className="space-y-1 text-sm text-gray-400">
+                    <li>• You keep your current plan until the billing period ends</li>
+                    <li>• Your plan automatically switches on the renewal date</li>
+                    <li>• No partial refunds or pro-rated charges</li>
+                    <li>• Cancel the scheduled change anytime before it takes effect</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-gray-800">
+              <button
+                onClick={() => setStep('confirm')}
+                className="w-full text-center text-sm text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                I still want to cancel completely →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Final Confirmation */}
         {step === 'confirm' && (
           <div className="p-8">
             {/* Error Message Display */}
@@ -371,7 +672,7 @@ const CancelSubscriptionModal = ({ onClose, locale }: CancelSubscriptionModalPro
           </div>
         )}
 
-        {/* Step 4: Processing */}
+        {/* Step 5: Processing */}
         {step === 'processing' && (
           <div className="p-8">
             <div className="flex flex-col items-center justify-center py-12">

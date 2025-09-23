@@ -47,7 +47,9 @@ export default async function AccountPage({
       created_at: users.created_at,
       subscription_status: users.subscription_status,
       subscription_state: users.subscription_state,
-      stripe_price_id: users.stripe_price_id
+      stripe_price_id: users.stripe_price_id,
+      subscription_pending_plan: users.subscription_pending_plan,
+      subscription_pending_effective_at: users.subscription_pending_effective_at,
     })
     .from(users)
     .where(eq(users.uuid, userUuid))
@@ -379,7 +381,12 @@ export default async function AccountPage({
                 </div>
               </div>
               
-              <AccountActions locale={locale} />
+          <AccountActions
+            locale={locale}
+            currentPlan={subscriptionPlan}
+            pendingPlan={user?.subscription_pending_plan as string | null | undefined}
+            pendingEffectiveAt={user?.subscription_pending_effective_at ? new Date(user.subscription_pending_effective_at).toISOString() : null}
+          />
             </div>
           </div>
         </div>

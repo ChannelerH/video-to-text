@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { users, transcriptions, orders } from '@/db/schema';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import Stripe from 'stripe';
+import { getCurrentSubscriptionOrder } from '@/services/user-subscription';
 
 export const runtime = 'nodejs';
 
@@ -38,8 +39,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const subscriptionId = (user as any).stripe_subscription_id;
     const subscriptionStatus = (user as any).subscription_status;
+
+    const activeOrder = await getCurrentSubscriptionOrder(userUuid);
+    const subscriptionId = activeOrder?.sub_id ? String(activeOrder.sub_id) : null;
 
     if (!subscriptionId || subscriptionStatus === 'free') {
       return NextResponse.json({
@@ -59,6 +62,7 @@ export async function GET(request: NextRequest) {
 
     // 5. 获取使用统计
     const startOfPeriod = new Date(subscription.current_period_start * 1000);
+    const startOfPeriodIso = startOfPeriod.toISOString();
     const usageStats = await db()
       .select({
         totalTranscriptions: sql<number>`COUNT(*)`,
@@ -68,7 +72,7 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(transcriptions.user_uuid, userUuid),
-          sql`${transcriptions.created_at} >= ${startOfPeriod}`
+          sql`${transcriptions.created_at} >= ${startOfPeriodIso}`
         )
       );
 

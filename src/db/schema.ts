@@ -45,6 +45,11 @@ export const users = pgTable(
     subscription_cancel_reason: varchar({ length: 255 }),
     subscription_cancel_feedback: text(),
     subscription_trial_end: timestamp({ withTimezone: true }),
+    subscription_pending_plan: varchar({ length: 50 }),
+    subscription_pending_schedule_id: varchar({ length: 255 }),
+    subscription_pending_effective_at: timestamp({ withTimezone: true }),
+    subscription_pending_reason: varchar({ length: 255 }),
+    subscription_pending_feedback: text(),
   },
   (table) => [
     uniqueIndex("email_provider_unique_idx").on(

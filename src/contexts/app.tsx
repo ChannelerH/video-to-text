@@ -38,25 +38,8 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
   const [subscriptionPlan, setSubscriptionPlan] = useState<string>('');
   const loadedRef = useRef(false);
 
-  // simple in-memory cache (module-scoped via static on window) with 60s TTL
-  const cacheKey = 'userInfoWithTierCache';
-  const now = () => Date.now();
-
   const fetchUserInfo = async function () {
     try {
-      // if cache exists and fresh, reuse
-      try {
-        const cached: any = (globalThis as any)[cacheKey];
-        if (cached && cached.ts && (now() - cached.ts) < 60_000 && cached.data) {
-          setUser(cached.data.user || cached.data);
-          setUserTier(cached.data.userTier || 'free');
-          setSubscriptionPlan(cached.data.subscriptionPlan || 'FREE');
-          updateInvite(cached.data.user || cached.data);
-          loadedRef.current = true;
-          return;
-        }
-      } catch {}
-
       const resp = await fetch("/api/get-user-info", {
         method: "POST",
       });
@@ -74,9 +57,6 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
       if (data?.user) setUser(data.user); else setUser(data);
       if (data?.userTier) setUserTier(data.userTier);
       if (data?.subscriptionPlan) setSubscriptionPlan(data.subscriptionPlan);
-
-      // write cache
-      try { (globalThis as any)[cacheKey] = { ts: now(), data }; } catch {}
 
       updateInvite(data.user || data);
       loadedRef.current = true;
@@ -165,6 +145,7 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
         setUser,
         showFeedback,
         setShowFeedback,
+        refreshUserInfo: fetchUserInfo,
       }}
     >
       {children}

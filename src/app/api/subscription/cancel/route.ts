@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserUuid } from '@/services/user';
 import { db } from '@/db';
 import { users, transcriptions, refunds } from '@/db/schema';
-import { syncUserSubscriptionTier } from '@/services/user-subscription';
+import { getCurrentSubscriptionOrder, syncUserSubscriptionTier } from '@/services/user-subscription';
 import { eq, and, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
 
@@ -40,11 +40,19 @@ export async function POST(request: NextRequest) {
     }
 
     const stripeCustomerId = (user as any).stripe_customer_id;
-    const subscriptionId = (user as any).stripe_subscription_id;
+    const activeOrder = await getCurrentSubscriptionOrder(userUuid);
+    const subscriptionId = activeOrder?.sub_id ? String(activeOrder.sub_id) : null;
 
     if (!subscriptionId) {
       return NextResponse.json(
         { error: 'No active subscription found' },
+        { status: 400 }
+      );
+    }
+
+    if (!stripeCustomerId) {
+      return NextResponse.json(
+        { error: 'Stripe customer not found' },
         { status: 400 }
       );
     }
@@ -231,7 +239,8 @@ export async function DELETE(request: NextRequest) {
       .where(eq(users.uuid, userUuid))
       .limit(1);
 
-    const subscriptionId = (user as any)?.stripe_subscription_id;
+    const activeOrder = await getCurrentSubscriptionOrder(userUuid);
+    const subscriptionId = activeOrder?.sub_id ? String(activeOrder.sub_id) : null;
     if (!subscriptionId) {
       return NextResponse.json(
         { error: 'No subscription found' },

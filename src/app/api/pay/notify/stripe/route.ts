@@ -87,23 +87,38 @@ export async function POST(req: Request) {
             : null;
           const cancelAtPeriodEnd = sub.cancel_at_period_end;
 
-          // 查询现有订单，保留已有的 order_type
           const [existingOrder] = await db()
-            .select({ order_type: orders.order_type })
+            .select({ order_type: orders.order_type, order_no: orders.order_no, product_name: orders.product_name })
             .from(orders)
             .where(eq(orders.sub_id as any, subId))
             .limit(1);
-          
-          // 只有在订单没有 order_type 时才计算
-          const orderType = existingOrder?.order_type || 
-                           getOrderType(product as string, nickname as string, interval as string);
+
+          const priceOrderType = (item?.price?.metadata?.order_type as string | undefined) || undefined;
+          const orderType = getOrderType(
+            product as string,
+            nickname as string,
+            interval as string,
+            priceOrderType || (existingOrder?.order_type as string | undefined)
+          );
+
+          const effectiveProductName = nickname || (item?.price?.nickname || '') || (existingOrder?.product_name as string || '').toString();
+
+          console.info('[Stripe][Webhook][subscription.updated] determine order_type', {
+            subId,
+            product,
+            nickname,
+            interval,
+            existingOrderType: existingOrder?.order_type,
+            computedOrderType: orderType,
+            cancelAtPeriodEnd,
+          });
 
           if (sub.status === "canceled") {
             await db()
               .update(orders)
               .set({
-                product_name: nickname as any,
-                product_id: product as any,
+                product_name: (effectiveProductName || existingOrder?.product_name) as any, 
+                product_id: product as any, 
                 order_type: orderType as any,
                 expired_at: new Date(),
               } as any)
@@ -113,7 +128,7 @@ export async function POST(req: Request) {
             await db()
               .update(orders)
               .set({ 
-                product_name: nickname as any, 
+                product_name: (effectiveProductName || existingOrder?.product_name) as any, 
                 product_id: product as any, 
                 order_type: orderType as any,
                 expired_at: exp 
@@ -124,7 +139,7 @@ export async function POST(req: Request) {
             await db()
               .update(orders)
               .set({ 
-                product_name: nickname as any, 
+                product_name: (effectiveProductName || existingOrder?.product_name) as any, 
                 product_id: product as any, 
                 order_type: orderType as any,
                 expired_at: exp 
@@ -134,7 +149,7 @@ export async function POST(req: Request) {
             await db()
               .update(orders)
               .set({ 
-                product_name: nickname as any, 
+                product_name: (effectiveProductName || existingOrder?.product_name) as any, 
                 product_id: product as any,
                 order_type: orderType as any 
               } as any)
@@ -146,24 +161,36 @@ export async function POST(req: Request) {
         try {
           const customerId = sub.customer as string;
           const priceId = sub.items.data[0]?.price.id;
+          const scheduleId = (sub.schedule as string | null | undefined) || null;
+
+          const updatePayload: Record<string, any> = {
+            stripe_subscription_id: sub.id,
+            stripe_price_id: priceId as any,
+            subscription_current_period_start: sub.current_period_start
+              ? new Date(sub.current_period_start * 1000)
+              : null,
+            subscription_current_period_end: sub.current_period_end
+              ? new Date(sub.current_period_end * 1000)
+              : null,
+            subscription_cancel_at_period_end: sub.cancel_at_period_end,
+            subscription_trial_end: sub.trial_end
+              ? new Date(sub.trial_end * 1000)
+              : null,
+            updated_at: new Date(),
+          };
+
+          if (!scheduleId) {
+            updatePayload.subscription_pending_plan = null;
+            updatePayload.subscription_pending_schedule_id = null;
+            updatePayload.subscription_pending_effective_at = null;
+            updatePayload.subscription_state = 'active';
+          } else {
+            updatePayload.subscription_pending_schedule_id = scheduleId;
+          }
 
           await db()
             .update(users)
-            .set({
-              stripe_subscription_id: sub.id,
-              stripe_price_id: priceId as any,
-              subscription_current_period_start: sub.current_period_start
-                ? new Date(sub.current_period_start * 1000)
-                : null,
-              subscription_current_period_end: sub.current_period_end
-                ? new Date(sub.current_period_end * 1000)
-                : null,
-              subscription_cancel_at_period_end: sub.cancel_at_period_end,
-              subscription_trial_end: sub.trial_end
-                ? new Date(sub.trial_end * 1000)
-                : null,
-              updated_at: new Date(),
-            } as any)
+            .set(updatePayload as any)
             .where(eq(users.stripe_customer_id as any, customerId));
 
           await syncUserSubscriptionTier({ stripeCustomerId: customerId, stripe });

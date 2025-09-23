@@ -76,6 +76,33 @@ export async function getUserActiveSubscriptions(userUuid: string) {
   return activeSubscriptions;
 }
 
+export async function getCurrentSubscriptionOrder(userUuid: string) {
+  const activeSubscriptions = await getUserActiveSubscriptions(userUuid);
+  if (!activeSubscriptions || activeSubscriptions.length === 0) {
+    return null;
+  }
+
+  const toTimestamp = (value: any): number => {
+    if (!value) return 0;
+    if (value instanceof Date) return value.getTime();
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+  };
+
+  const sorted = [...activeSubscriptions].sort((a, b) => {
+    const endA = Number(a.sub_period_end || 0);
+    const endB = Number(b.sub_period_end || 0);
+    if (endA === endB) {
+      const createdA = toTimestamp(a.created_at);
+      const createdB = toTimestamp(b.created_at);
+      return createdA - createdB;
+    }
+    return endA - endB;
+  });
+
+  return sorted[sorted.length - 1];
+}
+
 interface SyncSubscriptionTierParams {
   userUuid?: string;
   stripeCustomerId?: string;

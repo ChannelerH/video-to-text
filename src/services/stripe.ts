@@ -149,9 +149,10 @@ export async function handleInvoice(stripe: Stripe, invoice: Stripe.Invoice) {
       (invoice.subscription as string | null | undefined) ??
       invoice.lines?.data?.[0]?.subscription ??
       "";
-    // not handle none-subscription payment
+    // 如果不是订阅账单，例如一次性计费/分钟包补扣，直接跳过
     if (!subId) {
-      throw new Error("not handle none-subscription payment");
+      console.log('[Stripe] invoice payment (non-subscription) received, skipping');
+      return;
     }
 
     // get subscription

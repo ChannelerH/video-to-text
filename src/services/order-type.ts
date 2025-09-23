@@ -2,16 +2,23 @@
  * 根据产品信息判断订单类型
  * 优先使用显式的 orderType，如果没有则根据产品信息推断
  */
-export function getOrderType(productId: string, productName: string, interval?: string, explicitOrderType?: string): string {
-  // 如果有显式的 order_type，直接使用
+export function getOrderType(
+  productId: string,
+  productName: string,
+  interval?: string,
+  explicitOrderType?: string
+): string {
+  // 如果有显式的 order_type（来自元数据/已有记录），直接使用
   if (explicitOrderType) {
     return explicitOrderType;
   }
-  
-  // 否则使用推断逻辑（保留向后兼容）
+
   const pid = (productId || '').toLowerCase();
   const pname = (productName || '').toLowerCase();
-  const combined = `${pid} ${pname}`;
+
+  // Stripe 的产品 id 都是 prod_ 开头，避免把 prod_ 当成 pro
+  const pidForMatch = pid.startsWith('prod_') ? '' : pid;
+  const combined = `${pidForMatch} ${pname}`.trim();
   
   // 分钟包判断
   if (pid.startsWith('std-') || pid.startsWith('ha-') || 
