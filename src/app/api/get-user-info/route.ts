@@ -5,14 +5,16 @@ import { auth } from '@/auth';
 // simple 60s in-memory cache keyed by user_uuid
 const cache = new Map<string, { ts: number; data: any }>();
 
-export async function POST(_req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
+    const forceRefresh = req.headers.get('x-refresh') === '1';
+
     const data = await getUserInfoWithTier();
     // derive key
     const key = data?.user?.uuid || 'anon';
     const now = Date.now();
     const cached = cache.get(key);
-    if (cached && (now - cached.ts) < 60_000) {
+    if (!forceRefresh && cached && (now - cached.ts) < 60_000) {
       return NextResponse.json({ code: 0, message: 'ok', data: cached.data });
     }
     cache.set(key, { ts: now, data });

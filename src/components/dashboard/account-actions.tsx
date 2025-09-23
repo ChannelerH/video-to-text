@@ -42,6 +42,12 @@ export default function AccountActions({ locale, currentPlan, pendingPlan, pendi
   const canManageSubscription = normalizedCurrentPlan !== 'FREE';
 
   useEffect(() => {
+    if (currentPlan) {
+      refreshUserInfo?.(true);
+    }
+  }, [currentPlan, refreshUserInfo]);
+
+  useEffect(() => {
     if (pendingPlan && pendingEffectiveAt) {
       setScheduledInfo({ plan: pendingPlan, effectiveAt: pendingEffectiveAt });
     } else if (!pendingPlan) {
@@ -87,7 +93,7 @@ export default function AccountActions({ locale, currentPlan, pendingPlan, pendi
         setScheduleError(data.error || 'Failed to cancel scheduled downgrade.');
         return;
       }
-      refreshUserInfo?.();
+      refreshUserInfo?.(true);
       setScheduledInfo(null);
     } catch (error) {
       console.error('Cancel scheduled downgrade error:', error);

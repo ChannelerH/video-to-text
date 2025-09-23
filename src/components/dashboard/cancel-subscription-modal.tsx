@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, AlertTriangle, Download, Clock, TrendingDown, Gift, AlertCircle } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { useAppContext } from '@/contexts/app';
@@ -27,7 +27,11 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
   const [isDowngrading, setIsDowngrading] = useState(false);
   const [downgradeError, setDowngradeError] = useState('');
   const [isCheckingRefund, setIsCheckingRefund] = useState(false);
+  const [cancelTiming, setCancelTiming] = useState<'period_end' | 'immediate'>('period_end');
   const router = useRouter();
+
+  const isImmediateCancellation = cancelTiming === 'immediate';
+  const canRequestRefund = refundEligible && isImmediateCancellation;
 
   const reasons = [
     { id: 'too_expensive', label: 'Too expensive', icon: TrendingDown },
@@ -118,12 +122,54 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
     }
   };
 
-  const handleRetentionOffer = (offer: string) => {
+  const handleRetentionOffer = async (offer: string) => {
+    console.log('[handleRetentionOffer] Called with offer:', offer);
+    
     if (offer === 'pause') {
       router.push(`/${locale}/dashboard/account/pause`);
       onClose();
     } else if (offer === 'downgrade') {
       setStep('downgrade');
+    } else if (offer === 'discount') {
+      console.log('[handleRetentionOffer] Processing discount offer...');
+      // Claim the 30% off retention offer
+      setIsProcessing(true);
+      setShowError(false); // Clear any previous errors
+      
+      try {
+        console.log('[handleRetentionOffer] Calling retention-offer API...');
+        const response = await fetch('/api/subscription/retention-offer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        console.log('[handleRetentionOffer] Response status:', response.status);
+        const data = await response.json();
+        console.log('[handleRetentionOffer] Response data:', data);
+        
+        if (data.success) {
+          // Refresh user info to update subscription status
+          refreshUserInfo?.(true);
+          
+          // Redirect to account page with success message
+          router.push(`/${locale}/dashboard/account?retention_applied=true`);
+          onClose();
+        } else {
+          // Show error message
+          const errorMsg = data.message || data.error || 'Failed to apply discount. Please try again.';
+          console.error('[handleRetentionOffer] Error:', errorMsg);
+          setErrorMessage(errorMsg);
+          setShowError(true);
+        }
+      } catch (error) {
+        console.error('[handleRetentionOffer] Exception:', error);
+        setErrorMessage('An error occurred while applying the discount. Please try again.');
+        setShowError(true);
+      } finally {
+        setIsProcessing(false);
+      }
     } else {
       setStep('confirm');
     }
@@ -160,14 +206,14 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
       }
 
       if (data.scheduled) {
-        refreshUserInfo?.();
+        refreshUserInfo?.(true);
         const effectiveAt = data.effectiveAt || '';
         router.push(`/${locale}/dashboard/account?downgradeScheduled=${encodeURIComponent(effectiveAt)}&downgradePlan=${encodeURIComponent(target)}`);
         onClose();
         return;
       }
 
-      refreshUserInfo?.();
+      refreshUserInfo?.(true);
       const plan = typeof data.plan === 'string' ? data.plan.toLowerCase() : '';
       const queryKey = plan === 'free' ? 'cancelled' : 'downgraded';
       const queryValue = plan === 'free' ? 'true' : target;
@@ -197,8 +243,8 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
         body: JSON.stringify({
           reason,
           feedback,
-          immediate: false, // Cancel at period end
-          requestRefund: requestRefund
+          immediate: cancelTiming === 'immediate',
+          requestRefund: cancelTiming === 'immediate' ? requestRefund : false,
         }),
       });
 
@@ -227,6 +273,12 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
     
     onClose();
   };
+
+  useEffect(() => {
+    if (!isImmediateCancellation && requestRefund) {
+      setRequestRefund(false);
+    }
+  }, [isImmediateCancellation, requestRefund]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -317,6 +369,18 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
               Before you cancel, consider these options:
             </p>
             
+            {/* Error message display */}
+            {showError && errorMessage && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <div className="flex gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-red-300">{errorMessage}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {/* Refund eligibility notice */}
             {refundEligible && (
               <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
@@ -383,11 +447,13 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
                       Special offer just for you. Limited time only.
                     </p>
                     <button
-                      onClick={onClose}
-                      className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 
-                        text-green-400 rounded-lg transition-colors text-sm font-medium"
+                      onClick={() => handleRetentionOffer('discount')}
+                      disabled={isProcessing}
+                      className={`px-4 py-2 bg-green-500/20 hover:bg-green-500/30 
+                        text-green-400 rounded-lg transition-colors text-sm font-medium
+                        ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      Claim Offer
+                      {isProcessing ? 'Applying...' : 'Claim Offer'}
                     </button>
                   </div>
                 </div>
@@ -598,9 +664,35 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
               Are you absolutely sure?
             </h2>
             <p className="text-gray-400 text-center mb-6">
-              If you cancel immediately, this action cannot be undone and you will lose:
-              If you cancel at period end, access continues until your current billing period ends.
+              {isImmediateCancellation
+                ? 'You will lose access to your workspace right away and billing stops immediately.'
+                : 'You keep access until the end of the current billing period. Billing stops after that date.'}
             </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+              <button
+                type="button"
+                onClick={() => setCancelTiming('period_end')}
+                className={`rounded-xl border px-4 py-3 text-sm transition-all ${
+                  !isImmediateCancellation
+                    ? 'border-purple-500 bg-purple-500/10 text-white'
+                    : 'border-gray-700 bg-gray-800 hover:border-gray-600 text-gray-300'
+                }`}
+              >
+                Cancel at period end
+              </button>
+              <button
+                type="button"
+                onClick={() => setCancelTiming('immediate')}
+                className={`rounded-xl border px-4 py-3 text-sm transition-all ${
+                  isImmediateCancellation
+                    ? 'border-red-500 bg-red-500/10 text-white'
+                    : 'border-gray-700 bg-gray-800 hover:border-gray-600 text-gray-300'
+                }`}
+              >
+                Cancel immediately (lose access now)
+              </button>
+            </div>
 
             <div className="bg-gray-800 rounded-xl p-4 mb-6">
               <ul className="space-y-2">
@@ -619,8 +711,8 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
               </ul>
             </div>
 
-            {/* Refund option if eligible */}
-            {refundEligible && (
+            {/* Refund option if eligible and cancelling immediately */}
+            {canRequestRefund && (
               <div className="mb-4 p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
@@ -638,6 +730,11 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
                     </p>
                   </div>
                 </label>
+              </div>
+            )}
+            {refundEligible && !canRequestRefund && (
+              <div className="mb-4 p-4 bg-green-500/5 border border-green-500/20 rounded-xl text-sm text-gray-400">
+                Refunds are only available for immediate cancellations. Switch to "Cancel immediately" if you want to request one.
               </div>
             )}
 

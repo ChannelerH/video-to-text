@@ -94,11 +94,13 @@ export async function POST(req: Request) {
             .limit(1);
 
           const priceOrderType = (item?.price?.metadata?.order_type as string | undefined) || undefined;
+          const priceAmount = item?.price?.unit_amount || undefined;
           const orderType = getOrderType(
             product as string,
             nickname as string,
             interval as string,
-            priceOrderType || (existingOrder?.order_type as string | undefined)
+            priceOrderType || (existingOrder?.order_type as string | undefined),
+            priceAmount
           );
 
           const effectiveProductName = nickname || (item?.price?.nickname || '') || (existingOrder?.product_name as string || '').toString();

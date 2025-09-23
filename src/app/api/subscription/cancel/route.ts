@@ -3,7 +3,7 @@ import { getUserUuid } from '@/services/user';
 import { db } from '@/db';
 import { users, transcriptions, refunds } from '@/db/schema';
 import { getCurrentSubscriptionOrder, syncUserSubscriptionTier } from '@/services/user-subscription';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, gte } from 'drizzle-orm';
 import Stripe from 'stripe';
 
 export const runtime = 'nodejs';
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
         totalMinutes: sql<number>`COALESCE(SUM(${transcriptions.cost_minutes}), 0)`
       })
       .from(transcriptions)
-      .where(and(eq(transcriptions.user_uuid, userUuid), sql`${transcriptions.created_at} >= ${periodStart}`));
+      .where(and(eq(transcriptions.user_uuid, userUuid), gte(transcriptions.created_at, periodStart)));
 
     const usage = usageStats[0];
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     // 7. 处理退款（如果请求且符合条件）
     let refundResult = null;
-    if (requestRefund && (updatedSub as any).latest_invoice) {
+    if (immediate && requestRefund && (updatedSub as any).latest_invoice) {
       // 检查是否符合退款条件
       const daysSinceCharge = Math.floor(
         (Date.now() - subscription.current_period_start * 1000) / (1000 * 60 * 60 * 24)

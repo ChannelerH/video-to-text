@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
   useRef,
+  useCallback,
 } from "react";
 import { cacheGet, cacheRemove } from "@/lib/simple-cache";
 
@@ -38,10 +39,21 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
   const [subscriptionPlan, setSubscriptionPlan] = useState<string>('');
   const loadedRef = useRef(false);
 
-  const fetchUserInfo = async function () {
+  const fetchUserInfo = useCallback(async (forceRefresh = false) => {
     try {
+      const headers: Record<string, string> = {};
+      if (forceRefresh) {
+        headers['x-refresh'] = '1';
+      }
+
       const resp = await fetch("/api/get-user-info", {
         method: "POST",
+        headers:
+          Object.keys(headers).length > 0
+            ? {
+                ...headers,
+              }
+            : undefined,
       });
 
       if (!resp.ok) {
@@ -63,7 +75,7 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) {
       console.log("fetch user info failed");
     }
-  };
+  }, []);
 
   const updateInvite = async (user: User) => {
     try {

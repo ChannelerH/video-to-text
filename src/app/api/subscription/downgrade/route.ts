@@ -215,6 +215,7 @@ export async function POST(request: NextRequest) {
               interval: planPricing.interval,
             }
           : undefined,
+        nickname: planPricing.productName, // Add nickname to help identify
         product_data: {
           name: planPricing.productName,
           metadata: {
@@ -319,6 +320,7 @@ export async function POST(request: NextRequest) {
             interval: planPricing.interval,
           }
         : undefined,
+      nickname: planPricing.productName, // Add nickname to help identify
       product_data: {
         name: planPricing.productName,
         metadata: {
