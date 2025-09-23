@@ -52,6 +52,11 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const uploadAbortControllerRef = useRef<AbortController | null>(null);
+  const transcriptionAbortControllerRef = useRef<AbortController | null>(null);
+  const jobIdRef = useRef<string | null>(null);
+  const isCancellingRef = useRef(false);
+  const wasCancelledRef = useRef(false);
   const router = useRouter();
   const locale = useLocale();
   const { toast, showToast, hideToast } = useToast();
@@ -103,6 +108,10 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
     setShowGlobalLoading(false);
     setEnableDiarization(false);
     setHighAccuracy(false);
+    jobIdRef.current = null;
+    uploadAbortControllerRef.current = null;
+    transcriptionAbortControllerRef.current = null;
+    isCancellingRef.current = false;
     
     // Reset file input value
     if (fileInputRef.current) {
@@ -122,8 +131,58 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
       }
+      if (uploadAbortControllerRef.current) {
+        uploadAbortControllerRef.current.abort();
+      }
+      if (transcriptionAbortControllerRef.current) {
+        transcriptionAbortControllerRef.current.abort();
+      }
     };
   }, []);
+
+  useEffect(() => {
+    jobIdRef.current = jobId;
+  }, [jobId]);
+
+  const cancelInFlight = useCallback(async () => {
+    if (isCancellingRef.current) {
+      return;
+    }
+
+    isCancellingRef.current = true;
+    wasCancelledRef.current = true;
+    hideToast();
+
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    if (uploadAbortControllerRef.current) {
+      uploadAbortControllerRef.current.abort();
+      uploadAbortControllerRef.current = null;
+    }
+
+    if (transcriptionAbortControllerRef.current) {
+      transcriptionAbortControllerRef.current.abort();
+      transcriptionAbortControllerRef.current = null;
+    }
+
+    const currentJobId = jobIdRef.current;
+    if (currentJobId) {
+      try {
+        await TranscriptionService.cancelJob(currentJobId);
+      } catch (error) {
+        const expectedErrors = new Set(['not_cancellable', 'not_found', 'forbidden', 'unauthorized']);
+        if (!(error instanceof Error) || !expectedErrors.has(error.message)) {
+          console.error('Failed to cancel transcription job:', error);
+        }
+      }
+      jobIdRef.current = null;
+    }
+
+    isCancellingRef.current = false;
+  }, [hideToast]);
 
   const handleSubmit = async () => {
     if (mode === 'youtube' && !url) {
@@ -136,6 +195,8 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
     }
 
     try {
+      isCancellingRef.current = false;
+      wasCancelledRef.current = false;
       setStage('uploading');
       setProgress(0);
       
@@ -143,40 +204,76 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
       
       if (mode === 'youtube') {
         setStatusMessage('Starting YouTube transcription...');
-        transcriptionJobId = await TranscriptionService.startYouTubeTranscription(url, {
-          highAccuracy,
-          enableDiarization
-        });
+        const controller = new AbortController();
+        transcriptionAbortControllerRef.current = controller;
+        try {
+          transcriptionJobId = await TranscriptionService.startYouTubeTranscription(url, {
+            highAccuracy,
+            enableDiarization
+          }, { signal: controller.signal });
+        } finally {
+          transcriptionAbortControllerRef.current = null;
+        }
       } else {
         // Upload file first
         setStatusMessage(`Uploading ${file!.name}...`);
-        const { key, url: fileUrl } = await TranscriptionService.uploadFile(
-          file!,
-          file!.type.startsWith('audio/') ? 'audio' : 'video',
-          (uploadProgress) => {
-            const validProgress = typeof uploadProgress === 'number' && !isNaN(uploadProgress) 
-              ? Math.round(uploadProgress) 
-              : 0;
-            setProgress(validProgress);
-            setStatusMessage(`Uploading... ${validProgress}%`);
-          }
-        );
+        const uploadController = new AbortController();
+        uploadAbortControllerRef.current = uploadController;
+        let uploadResult: { key: string; url: string } | null = null;
+        try {
+          uploadResult = await TranscriptionService.uploadFile(
+            file!,
+            file!.type.startsWith('audio/') ? 'audio' : 'video',
+            (uploadProgress) => {
+              const validProgress = typeof uploadProgress === 'number' && !isNaN(uploadProgress) 
+                ? Math.round(uploadProgress) 
+                : 0;
+              setProgress(validProgress);
+              setStatusMessage(`Uploading... ${validProgress}%`);
+            },
+            { signal: uploadController.signal }
+          );
+        } finally {
+          uploadAbortControllerRef.current = null;
+        }
+
+        if (isCancellingRef.current) {
+          return;
+        }
+
+        if (!uploadResult) {
+          throw new Error('Upload did not complete');
+        }
+
+        const { key, url: fileUrl } = uploadResult;
         
         // Start transcription
         setStage('processing');
         setStatusMessage('Starting transcription...');
-        transcriptionJobId = await TranscriptionService.startFileTranscription(
-          fileUrl,
-          key,
-          file!.name,
-          {
-            highAccuracy,
-            enableDiarization
-          }
-        );
+        const transcriptionController = new AbortController();
+        transcriptionAbortControllerRef.current = transcriptionController;
+        try {
+          transcriptionJobId = await TranscriptionService.startFileTranscription(
+            fileUrl,
+            key,
+            file!.name,
+            {
+              highAccuracy,
+              enableDiarization
+            },
+            { signal: transcriptionController.signal }
+          );
+        } finally {
+          transcriptionAbortControllerRef.current = null;
+        }
       }
       
+      if (isCancellingRef.current) {
+        return;
+      }
+
       setJobId(transcriptionJobId);
+      jobIdRef.current = transcriptionJobId;
       setStage('transcribing');
       setStatusMessage('Transcribing... Please wait...');
       
@@ -189,9 +286,15 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
       
       pollIntervalRef.current = setInterval(async () => {
         pollAttempts++;
+        if (isCancellingRef.current) {
+          return;
+        }
         
         // Check if we should stop polling due to timeout BEFORE making the request
         if (pollAttempts > maxAttempts) {
+          if (isCancellingRef.current || !jobIdRef.current) {
+            return;
+          }
           if (pollIntervalRef.current) {
             clearInterval(pollIntervalRef.current);
             pollIntervalRef.current = null;
@@ -201,6 +304,9 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
           const transcriptionsUrl = `/${locale}/dashboard/transcriptions?highlight=${encodeURIComponent(transcriptionJobId)}`;
           
           setTimeout(() => {
+            if (isCancellingRef.current || !jobIdRef.current) {
+              return;
+            }
             router.push(transcriptionsUrl);
             onClose();
             resetState();
@@ -222,7 +328,10 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
           }
           
           const statusData = await statusResponse.json();
-          
+          if (isCancellingRef.current || !jobIdRef.current) {
+            return;
+          }
+
           if (statusData.status === 'completed') {
             // Success! IMMEDIATELY clear interval to stop polling
             // Stop polling immediately
@@ -237,6 +346,9 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
             
             // Small delay to ensure loading overlay is visible
             setTimeout(() => {
+              if (!jobIdRef.current) {
+                return;
+              }
               router.push(`/${locale}/dashboard/editor/${transcriptionJobId}`);
             }, 100);
           } else if (statusData.status === 'failed' || statusData.status === 'error') {
@@ -248,6 +360,13 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
             setStage('error');
             setStatusMessage('Transcription failed. Please try again.');
             showToast('error', 'Transcription failed', statusData.error || 'Unknown error occurred');
+          } else if (statusData.status === 'cancelled') {
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            setStage('idle');
+            setStatusMessage('Transcription cancelled');
           } else {
             // Still processing - show actual status
             const progressPercent = pollAttempts / maxAttempts * 100;
@@ -292,6 +411,9 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
       }, 2000); // Poll every 2 seconds
       
     } catch (error) {
+      if (isCancellingRef.current || wasCancelledRef.current) {
+        return;
+      }
       console.error('Transcription error:', error);
       setStage('error');
       setStatusMessage(error instanceof Error ? error.message : 'An error occurred');
@@ -326,17 +448,22 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
 
   // Handle dialog close - make sure to stop any ongoing processes
   const handleDialogClose = () => {
-    // Stop any ongoing polling
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-    
-    // Reset all state
-    resetState();
-    
-    // Call the parent's onClose handler
-    onClose();
+    const closeModal = async () => {
+      const hasActiveProcess =
+        stage !== 'idle' ||
+        jobIdRef.current !== null ||
+        uploadAbortControllerRef.current !== null ||
+        transcriptionAbortControllerRef.current !== null;
+
+      if (hasActiveProcess) {
+        await cancelInFlight();
+      }
+
+      resetState();
+      onClose();
+    };
+
+    void closeModal();
   };
 
   return (

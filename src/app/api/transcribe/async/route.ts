@@ -6,13 +6,21 @@ import { db } from '@/db';
 import { q_jobs, transcriptions, usage_records } from '@/db/schema';
 import { getUniSeq } from '@/lib/hash';
 import crypto from 'crypto';
-import { and, gte, eq, count } from 'drizzle-orm';
+import { and, gte, eq, count, ne } from 'drizzle-orm';
 import { computeEstimatedMinutes } from '@/lib/estimate-usage';
 
 export const maxDuration = 10; // Vercel hobby limit
 
 export async function POST(request: NextRequest) {
   try {
+    const abortSignal = request.signal;
+    let clientAborted = abortSignal?.aborted ?? false;
+    if (abortSignal) {
+      abortSignal.addEventListener('abort', () => {
+        clientAborted = true;
+      });
+    }
+
     // 1. 验证用户（允许匿名预览）
     const maybeUserUuid = await getUserUuid();
 
@@ -139,6 +147,21 @@ export async function POST(request: NextRequest) {
     const jobId = getUniSeq('job_');
     const sourceHash = crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
 
+    const markJobCancelled = async () => {
+      try {
+        await db().update(transcriptions)
+          .set({ status: 'cancelled', completed_at: new Date(), deleted: true })
+          .where(eq(transcriptions.job_id, jobId));
+      } catch (err) {
+        console.warn('[Async] Failed to mark transcription as cancelled', err);
+      }
+      try {
+        await db().update(q_jobs)
+          .set({ done: true })
+          .where(eq(q_jobs.job_id, jobId));
+      } catch {}
+    };
+
     // 确定初始标题
     let initialTitle = 'Processing...';
     
@@ -242,6 +265,11 @@ export async function POST(request: NextRequest) {
       done: false
     }).catch(() => {});
 
+    if (clientAborted) {
+      await markJobCancelled();
+      return NextResponse.json({ success: false, error: 'client_aborted' }, { status: 499 });
+    }
+
     // 8. 立即返回job_id（先构造响应，再异步触发一次处理）
     const resp = NextResponse.json({
       success: true,
@@ -258,6 +286,11 @@ export async function POST(request: NextRequest) {
       const hasDeepgram = !!process.env.DEEPGRAM_API_KEY;
       const replicateAllowed = hasReplicate && (supplier === '' || supplier === 'both' || supplier.includes('replicate'));
       const deepgramAllowed = hasDeepgram && (supplier === '' || supplier === 'both' || supplier.includes('deepgram'));
+
+      if (clientAborted) {
+        await markJobCancelled();
+        return resp;
+      }
 
       if (type === 'audio_url' || type === 'file_upload') {
         let audioUrlForSupplier = content;
@@ -323,7 +356,9 @@ export async function POST(request: NextRequest) {
               console.error('[Async] Replicate enqueue failed', resp.status, text);
             }
 
-            await db().update(transcriptions).set({ status: 'transcribing' }).where(eq(transcriptions.job_id, jobId));
+            await db().update(transcriptions)
+              .set({ status: 'transcribing' })
+              .where(and(eq(transcriptions.job_id, jobId), ne(transcriptions.status, 'cancelled')));
           } catch (err) {
             console.error('[Async] Failed to dispatch Replicate job:', err);
           }

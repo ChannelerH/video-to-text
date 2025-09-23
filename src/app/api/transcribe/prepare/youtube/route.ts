@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db } from '@/db';
 import { transcriptions } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { CloudflareR2Service } from '@/lib/r2-upload';
 
 export const runtime = 'nodejs';
@@ -28,6 +28,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'missing job_id or video' }, { status: 400 });
     }
 
+    const [currentTranscription] = await db()
+      .select({ status: transcriptions.status })
+      .from(transcriptions)
+      .where(eq(transcriptions.job_id, job_id))
+      .limit(1);
+
+    if (!currentTranscription) {
+      return NextResponse.json({ error: 'transcription_not_found' }, { status: 404 });
+    }
+
+    if (currentTranscription.status === 'cancelled') {
+      console.log('[YouTube Prepare] Job already cancelled, skipping prepare:', job_id);
+      return NextResponse.json({ cancelled: true, success: false });
+    }
 
     // Check if this is already an R2/processed URL (from Re-run)
     const isProcessedUrl = video.includes('.r2.dev/') || video.includes('pub-') || video.includes('/api/media/proxy');
@@ -52,7 +66,9 @@ export async function POST(request: NextRequest) {
       // Store the URL and proceed to Deepgram
       if (job_id) {
         try {
-          await db().update(transcriptions).set({ processed_url: supplierAudioUrl }).where(eq(transcriptions.job_id, job_id));
+          await db().update(transcriptions)
+            .set({ processed_url: supplierAudioUrl })
+            .where(and(eq(transcriptions.job_id, job_id), ne(transcriptions.status, 'cancelled')));
         } catch (e) {
           console.error('[YouTube Prepare] DB update failed:', e);
         }
@@ -85,6 +101,15 @@ export async function POST(request: NextRequest) {
       });
 
       if (shouldUseDeepgram && supplierAudioUrl) {
+        const [statusCheck] = await db()
+          .select({ status: transcriptions.status })
+          .from(transcriptions)
+          .where(eq(transcriptions.job_id, job_id))
+          .limit(1);
+        if (statusCheck?.status === 'cancelled') {
+          console.log('[YouTube Prepare][Processed] Cancelled before Deepgram dispatch, skip:', job_id);
+          return NextResponse.json({ cancelled: true, success: false });
+        }
         let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(job_id)}`;
         if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
           const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(job_id).digest('hex');
@@ -627,7 +652,9 @@ export async function POST(request: NextRequest) {
       if (!job_id) {
         throw new Error('job_id is required for database update');
       }
-      await db().update(transcriptions).set(updateData).where(eq(transcriptions.job_id, job_id));
+      await db().update(transcriptions)
+        .set(updateData)
+        .where(and(eq(transcriptions.job_id, job_id), ne(transcriptions.status, 'cancelled')));
     } catch (e) {
       console.error('[YouTube Prepare] DB update failed:', e);
       return NextResponse.json({ error: 'db_update_failed' }, { status: 500 });
@@ -670,6 +697,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (shouldUseDeepgram) {
+      const [statusCheckBeforeDispatch] = await db()
+        .select({ status: transcriptions.status })
+        .from(transcriptions)
+        .where(eq(transcriptions.job_id, job_id))
+        .limit(1);
+      if (statusCheckBeforeDispatch?.status === 'cancelled') {
+        console.log('[YouTube Prepare] Cancelled before Deepgram dispatch (main branch), skip:', job_id);
+        return NextResponse.json({ cancelled: true, success: false });
+      }
+
       let cb = `${cbBase}/api/callback/deepgram?job_id=${encodeURIComponent(job_id)}`;
       if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
         const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(job_id).digest('hex');
@@ -725,6 +762,16 @@ export async function POST(request: NextRequest) {
 
     // Only send to Replicate if we have a public R2 URL
     if (shouldUseReplicate || fallbackToReplicate) {
+      const [statusCheckReplicate] = await db()
+        .select({ status: transcriptions.status })
+        .from(transcriptions)
+        .where(eq(transcriptions.job_id, job_id))
+        .limit(1);
+      if (statusCheckReplicate?.status === 'cancelled') {
+        console.log('[YouTube Prepare] Cancelled before Replicate dispatch, skip:', job_id);
+        return NextResponse.json({ cancelled: true, success: false });
+      }
+
       const cbUrl = new URL(`${cbBase}/api/callback/replicate`);
       cbUrl.searchParams.set('job_id', job_id);
       if (enableDiarization) cbUrl.searchParams.set('dw', '1');
@@ -892,7 +939,7 @@ export async function POST(request: NextRequest) {
             status: 'failed',
             completed_at: new Date()
           })
-          .where(eq(transcriptions.job_id, job_id));
+          .where(and(eq(transcriptions.job_id, job_id), ne(transcriptions.status, 'cancelled')));
       }
       
       return NextResponse.json({ ok: true, warning: 'prepare_failed' });
@@ -911,7 +958,7 @@ export async function POST(request: NextRequest) {
               status: 'failed',
               completed_at: new Date()
             })
-            .where(eq(transcriptions.job_id, job_id))
+            .where(and(eq(transcriptions.job_id, job_id), ne(transcriptions.status, 'cancelled')))
             .catch(err => console.error('[YouTube Prepare] Failed to update status:', err));
         }
       }
@@ -929,7 +976,7 @@ export async function POST(request: NextRequest) {
             status: 'failed',
             completed_at: new Date()
           })
-          .where(eq(transcriptions.job_id, job_id));
+          .where(and(eq(transcriptions.job_id, job_id), ne(transcriptions.status, 'cancelled')));
       } catch (dbError) {
         console.error('[YouTube Prepare] Failed to update error status:', dbError);
       }

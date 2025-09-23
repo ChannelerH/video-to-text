@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     // Idempotency: check if already processing or completed
     try {
       const [tr] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
-      if (tr && ((tr as any).status === 'completed' || (tr as any).status === 'processing')) {
+      if (tr && ['completed', 'processing', 'cancelled', 'failed'].includes(String((tr as any).status))) {
         return NextResponse.json({ ok: true, skipped: `already_${(tr as any).status}` });
       }
       

@@ -125,7 +125,8 @@ function getStatusMessage(status: string): string {
     'failed': 'Transcription failed',
     'downloading': 'Downloading media...',
     'transcribing': 'Processing audio...',
-    'refining': 'Refining transcript...'
+    'refining': 'Refining transcript...',
+    'cancelled': 'Transcription cancelled'
   };
   return messages[status] || 'Processing...';
 }

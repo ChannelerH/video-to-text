@@ -14,7 +14,7 @@ export interface TranscriptionOptions {
 
 export interface TranscriptionResult {
   jobId: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
   data?: any;
   error?: string;
 }
@@ -26,20 +26,20 @@ export class TranscriptionService {
   static async uploadFile(
     file: File,
     mode: 'audio' | 'video' = 'video',
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    requestOptions?: { signal?: AbortSignal }
   ): Promise<{ key: string; url: string }> {
     const modeHint = file.type.startsWith('audio/') ? 'audio' : mode;
     let r2Key = '';
     let fileUrl = '';
+    const signal = requestOptions?.signal;
 
     if (MultipartUploader.shouldUseMultipart(file.size)) {
       // Multipart upload for large files
       const uploader = new MultipartUploader();
-      const abort = new AbortController();
-      
       const result = await uploader.upload({
         file: file,
-        abortSignal: abort.signal,
+        abortSignal: signal,
         onProgress: (progressPercentage, uploadedBytes, totalBytes) => {
           // Ensure we have a valid percentage value
           const percentage = typeof progressPercentage === 'number' 
@@ -69,9 +69,10 @@ export class TranscriptionService {
           fileType: file.type || 'application/octet-stream',
           fileSize: file.size,
           mode: modeHint
-        })
+        }),
+        signal
       });
-      
+
       const presign = await presignResp.json();
       if (!presignResp.ok || !presign?.success) {
         throw new Error(presign?.error || 'Failed to get upload URL');
@@ -87,6 +88,22 @@ export class TranscriptionService {
           xhr.open('PUT', uploadUrl);
           if (file.type) xhr.setRequestHeader('Content-Type', file.type);
           
+          let abortHandler: (() => void) | null = null;
+          if (signal) {
+            abortHandler = () => {
+              try {
+                xhr.abort();
+              } catch {}
+            };
+            signal.addEventListener('abort', abortHandler);
+          }
+
+          const cleanup = () => {
+            if (abortHandler && signal) {
+              signal.removeEventListener('abort', abortHandler);
+            }
+          };
+
           xhr.upload.addEventListener('progress', (event) => {
             if (event.lengthComputable) {
               const progress = Math.round((event.loaded / event.total) * 100);
@@ -95,6 +112,7 @@ export class TranscriptionService {
           });
           
           xhr.onload = () => {
+            cleanup();
             if (xhr.status === 200 || xhr.status === 204) {
               resolve();
             } else {
@@ -102,8 +120,14 @@ export class TranscriptionService {
             }
           };
           
-          xhr.onerror = () => reject(new Error('Upload error'));
-          xhr.onabort = () => reject(new Error('Upload aborted'));
+          xhr.onerror = () => {
+            cleanup();
+            reject(new Error('Upload error'));
+          };
+          xhr.onabort = () => {
+            cleanup();
+            reject(new Error('Upload aborted'));
+          };
           xhr.send(file);
         });
         
@@ -116,9 +140,10 @@ export class TranscriptionService {
         
         const uploadResp = await fetch('/api/upload', {
           method: 'POST',
-          body: form
+          body: form,
+          signal
         });
-        
+
         const uploadResult = await uploadResp.json();
         if (!uploadResp.ok || !uploadResult?.success) {
           throw new Error(uploadResult?.error || 'Upload failed');
@@ -139,7 +164,8 @@ export class TranscriptionService {
     fileUrl: string,
     r2Key: string,
     originalFileName: string,
-    options: TranscriptionOptions = {}
+    options: TranscriptionOptions = {},
+    requestOptions?: { signal?: AbortSignal }
   ): Promise<string> {
     // Map enableDiarization to enableDiarizationAfterWhisper for API compatibility
     const apiOptions = {
@@ -161,7 +187,8 @@ export class TranscriptionService {
     const response = await fetch('/api/transcribe/async', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      signal: requestOptions?.signal
     });
 
     const data = await response.json();
@@ -183,7 +210,8 @@ export class TranscriptionService {
    */
   static async startYouTubeTranscription(
     url: string,
-    options: TranscriptionOptions = {}
+    options: TranscriptionOptions = {},
+    requestOptions?: { signal?: AbortSignal }
   ): Promise<string> {
     // Map enableDiarization to enableDiarizationAfterWhisper for API compatibility
     const apiOptions = {
@@ -201,7 +229,8 @@ export class TranscriptionService {
         content: url,
         action: 'transcribe',
         options: apiOptions
-      })
+      }),
+      signal: requestOptions?.signal
     });
 
     const data = await response.json();
@@ -210,6 +239,28 @@ export class TranscriptionService {
     }
 
     return data.job_id;
+  }
+
+  /**
+   * Cancel an in-flight transcription job
+   */
+  static async cancelJob(jobId: string): Promise<{ success: boolean; status?: string; error?: string }> {
+    const response = await fetch(`/api/transcriptions/${encodeURIComponent(jobId)}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {}
+
+    if (!response.ok) {
+      const errorMessage = data?.error || 'Failed to cancel transcription job';
+      throw new Error(errorMessage);
+    }
+
+    return data || { success: true, status: 'cancelled' };
   }
 
   /**
@@ -243,11 +294,11 @@ export class TranscriptionService {
         };
       }
 
-      if (status === 'failed') {
+      if (status === 'failed' || status === 'cancelled') {
         return {
           jobId,
-          status: 'failed',
-          error: data.error || 'Transcription failed'
+          status,
+          error: data.error || (status === 'cancelled' ? 'Transcription cancelled' : 'Transcription failed')
         };
       }
 
