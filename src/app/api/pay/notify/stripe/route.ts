@@ -79,9 +79,26 @@ export async function POST(req: Request) {
         // 更新 orders 表里该订阅对应订单的过期时间/商品信息
         try {
           const item = sub.items.data[0];
-          const nickname = (item?.plan?.nickname || '').toString();
-          const product = (item?.plan?.product as string) || '';
-          const interval = item?.plan?.interval || 'month'; // month or year
+          // 兼容新旧版 Stripe API：优先从 plan 获取，其次从 price 获取
+          const planNickname = (item?.plan?.nickname || '').toString();
+          const priceNickname = (item?.price?.nickname || '').toString();
+          let nickname = planNickname || priceNickname;
+          
+          // product ID 也需要兼容处理
+          const productId = (item?.plan?.product as string) || (item?.price?.product as string) || '';
+          
+          // 如果 nickname 为空且有 productId，从 Stripe 获取产品信息
+          if (!nickname && productId && productId.startsWith('prod_')) {
+            try {
+              const product = await stripe.products.retrieve(productId);
+              nickname = product.name || '';
+            } catch (e) {
+              console.log('[Stripe][Webhook] Failed to fetch product:', productId, e);
+            }
+          }
+          
+          const product = productId;
+          const interval = item?.plan?.interval || item?.price?.recurring?.interval || 'month'; // month or year
           const end = sub.current_period_end
             ? new Date(sub.current_period_end * 1000)
             : null;
@@ -94,16 +111,15 @@ export async function POST(req: Request) {
             .limit(1);
 
           const priceOrderType = (item?.price?.metadata?.order_type as string | undefined) || undefined;
-          const priceAmount = item?.price?.unit_amount || undefined;
           const orderType = getOrderType(
             product as string,
             nickname as string,
             interval as string,
-            priceOrderType || (existingOrder?.order_type as string | undefined),
-            priceAmount
+            priceOrderType || (existingOrder?.order_type as string | undefined)
           );
 
-          const effectiveProductName = nickname || (item?.price?.nickname || '') || (existingOrder?.product_name as string || '').toString();
+          // nickname 已经包含了 plan 和 price 的 fallback，这里只需要再 fallback 到已存在的订单名称
+          const effectiveProductName = nickname || (existingOrder?.product_name as string || '').toString();
 
           console.info('[Stripe][Webhook][subscription.updated] determine order_type', {
             subId,
