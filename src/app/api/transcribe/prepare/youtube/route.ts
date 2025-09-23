@@ -483,6 +483,11 @@ export async function POST(request: NextRequest) {
 
             const contentLength = await contentLengthPromise;
 
+            const hasValidContentLength = typeof contentLength === 'number' && Number.isFinite(contentLength) && contentLength > 0;
+            if (!hasValidContentLength) {
+              throw new Error('MISSING_CONTENT_LENGTH');
+            }
+
             const putParams: any = {
               Bucket: bucket,
               Key: key,
@@ -493,9 +498,7 @@ export async function POST(request: NextRequest) {
                 'source': 'youtube-prepare'
               }
             };
-            if (contentLength && Number.isFinite(contentLength)) {
-              putParams.ContentLength = contentLength;
-            }
+            putParams.ContentLength = contentLength;
 
             await s3.send(new PutObjectCommand(putParams));
             
@@ -505,7 +508,19 @@ export async function POST(request: NextRequest) {
             
             supplierAudioUrl = publicUrl;
           } catch (streamError) {
-            console.error('[YouTube Prepare] Stream upload failed, falling back to buffer upload:', streamError);
+            if (streamError instanceof Error && streamError.message === 'MISSING_CONTENT_LENGTH') {
+              console.warn('[YouTube Prepare] Missing content length metadata, switching to buffered upload');
+            } else {
+              console.error('[YouTube Prepare] Stream upload failed, falling back to buffer upload:', streamError);
+            }
+
+            try {
+              if (typeof (stream as any)?.destroy === 'function') {
+                (stream as any).destroy();
+              }
+            } catch (destroyErr) {
+              console.warn('[YouTube Prepare] Failed to destroy primary stream before fallback:', destroyErr);
+            }
             
             // Fallback: create new stream and buffer it (保留语言选择)
             let fallbackStream;

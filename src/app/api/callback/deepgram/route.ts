@@ -11,16 +11,15 @@ import { deductFromPacks } from '@/services/minutes';
 export const runtime = 'nodejs';
 export const maxDuration = 10; // Vercel limit
 
+// Test GET handler for debugging
+export async function GET(req: NextRequest) {
+  return NextResponse.json({ message: 'Deepgram callback endpoint is working', method: 'GET' });
+}
+
 // Accept Deepgram callback. We map job_id via query string (?job_id=...)
 // In prod, consider validating signature using DEEPGRAM_WEBHOOK_SECRET.
 export async function POST(req: NextRequest) {
   try {
-    console.log('Deepgram callback received');
-    
-    // 打印所有headers用于调试
-    const headers = Object.fromEntries(req.headers.entries());
-    console.log('[Deepgram Callback] All headers:', headers);
-    
     const jobId = req.nextUrl.searchParams.get('job_id') || '';
     if (!jobId) return NextResponse.json({ error: 'missing job_id' }, { status: 400 });
 
@@ -30,7 +29,6 @@ export async function POST(req: NextRequest) {
     try {
       const [tr] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
       if (tr && ((tr as any).status === 'completed' || (tr as any).status === 'processing')) {
-        console.log(`[Deepgram Callback] Job ${jobId} already ${(tr as any).status}, skipping`);
         return NextResponse.json({ ok: true, skipped: `already_${(tr as any).status}` });
       }
       
@@ -51,13 +49,6 @@ export async function POST(req: NextRequest) {
     // Deepgram支持两种验证方式：
     // 1. 使用callback_secret参数（推荐）
     // 2. 使用API key作为HMAC密钥
-    console.log('[Deepgram Callback] Starting signature validation...');
-    console.log('[Deepgram Callback] DEEPGRAM_WEBHOOK_SECRET configured:', !!process.env.DEEPGRAM_WEBHOOK_SECRET);
-    console.log('[Deepgram Callback] DEEPGRAM_REQUIRE_SIGNATURE:', process.env.DEEPGRAM_REQUIRE_SIGNATURE);
-    console.log('[Deepgram Callback] URL params:', {
-      job_id: jobId,
-      cb_sig: req.nextUrl.searchParams.get('cb_sig')
-    });
     
     if (!simulate && process.env.DEEPGRAM_WEBHOOK_SECRET) {
       // 优先检查 Deepgram 官方签名头（不同命名变体）
@@ -73,45 +64,28 @@ export async function POST(req: NextRequest) {
         const given = sigHeader.startsWith('sha256=') ? sigHeader.slice(7) : sigHeader;
         if (given.toLowerCase() === computed.toLowerCase()) {
           verified = true;
-          console.log('[Deepgram Callback] Signature verified successfully');
         } else {
           console.error('[Deepgram Callback] Signature verification failed');
-          console.log('Expected:', computed);
-          console.log('Received:', given);
         }
       }
 
       // 若无官方签名或不匹配，允许使用我们埋在回调URL里的 HMAC 进行二次校验
       if (!verified) {
-        console.log('[Deepgram Callback] Official signature not verified, checking URL signature...');
         const urlSig = req.nextUrl.searchParams.get('cb_sig') || '';
-        console.log('[Deepgram Callback] URL signature present:', !!urlSig);
-        
         if (urlSig) {
           const computedUrlSig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(jobId).digest('hex');
-          console.log('[Deepgram Callback] URL sig comparison:');
-          console.log('  - Expected (computed):', computedUrlSig);
-          console.log('  - Received (from URL):', urlSig);
-          console.log('  - Match:', computedUrlSig === urlSig);
-          
           if (computedUrlSig === urlSig) {
             verified = true;
-            console.log('[Deepgram Callback] URL token verified successfully');
           } else {
-            console.log('[Deepgram Callback] URL token verification failed');
+            console.warn('[Deepgram Callback] URL token verification failed');
           }
         } else {
-          console.log('[Deepgram Callback] No URL signature found in callback');
+          console.warn('[Deepgram Callback] No URL signature found in callback');
         }
       }
 
       if (!verified && process.env.DEEPGRAM_REQUIRE_SIGNATURE === 'true') {
         console.error('[Deepgram Callback] Signature verification failed, returning 401');
-        console.log('[Deepgram Callback] Final verification status:', {
-          verified,
-          hadOfficialSignature: !!sigHeader,
-          hadUrlSignature: !!req.nextUrl.searchParams.get('cb_sig')
-        });
         return NextResponse.json({ error: 'signature required' }, { status: 401 });
       }
       
@@ -124,19 +98,6 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = raw ? JSON.parse(raw) : ({} as any);
-
-    // Debug: Log the structure to understand what Deepgram returns
-    console.log('[Deepgram Callback] Response structure keys:', Object.keys(payload));
-    if (payload.results?.channels?.[0]?.alternatives?.[0]) {
-      const alt = payload.results.channels[0].alternatives[0];
-      console.log('[Deepgram Callback] Alternative keys:', Object.keys(alt));
-      if (alt.paragraphs) {
-        console.log('[Deepgram Callback] Paragraphs structure:', JSON.stringify(alt.paragraphs).slice(0, 200));
-      }
-      if (alt.words) {
-        console.log('[Deepgram Callback] Words count:', alt.words.length);
-      }
-    }
 
     const normalizeSpeaker = (speaker: any): string | undefined => {
       if (speaker === null || speaker === undefined) return undefined;
@@ -253,21 +214,14 @@ export async function POST(req: NextRequest) {
       try {
         // For Deepgram callback, trust the detected language since text may have spaces
         const isZh = language && language.toLowerCase().includes('zh');
-        
-        console.log('[Deepgram Callback] Chinese detection:', { language, isZh, textSample: text.substring(0, 50) });
-        
+
         if (isZh) {
-          console.log('[Deepgram Callback] Chinese detected, applying refinement');
-          console.log('[Deepgram Callback] Original text with spaces:', text.substring(0, 100));
-          
           // Use shared refinement logic
           const { applyChineseRefinement } = await import('@/lib/chinese-refinement');
           const refined = await applyChineseRefinement(text, segments, language);
           
           text = refined.text;
           segments = refined.segments;
-          
-          console.log('[Deepgram Callback] Chinese refinement completed, final text:', text.substring(0, 100));
         }
       } catch (e) {
         console.error('[Deepgram Callback] Error applying Chinese refinement:', e);

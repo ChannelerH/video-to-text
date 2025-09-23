@@ -61,6 +61,7 @@ export class CloudflareR2Service {
         Key: key,
         Body: file,
         ContentType: contentType,
+        ContentLength: file.length,
         Metadata: {
           'upload-time': new Date().toISOString(),
           'expires-at': expiryDate.toISOString(),

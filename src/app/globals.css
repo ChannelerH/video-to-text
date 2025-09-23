@@ -14,6 +14,21 @@
     color: #ffffff;
   }
   
+  /* Success checkmark animation for Quick Actions */
+  @keyframes checkmark-pop {
+    0% {
+      transform: scale(0) rotate(-180deg);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.2) rotate(10deg);
+    }
+    100% {
+      transform: scale(1) rotate(0deg);
+      opacity: 1;
+    }
+  }
+  
   /* Enhanced text readability for cosmic theme */
   h1, h2, h3, h4, h5, h6 {
     color: #ffffff !important;

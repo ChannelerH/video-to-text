@@ -5,8 +5,17 @@ import { Readable } from 'stream';
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
-  const src = req.nextUrl.searchParams.get('url');
+  let src = req.nextUrl.searchParams.get('url');
   if (!src) return new Response('missing url', { status: 400 });
+
+  // Fix double https:// issue
+  if (src.startsWith('https://https://')) {
+    console.warn('[Media Proxy] Fixing double https:// in URL:', src);
+    src = src.replace('https://https://', 'https://');
+  } else if (src.startsWith('http://http://')) {
+    console.warn('[Media Proxy] Fixing double http:// in URL:', src);
+    src = src.replace('http://http://', 'http://');
+  }
 
   try {
     const url = new URL(src);

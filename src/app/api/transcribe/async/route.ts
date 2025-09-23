@@ -204,12 +204,25 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. 创建占位transcription记录
+    let sourceUrlToSave = (type === 'youtube_url' || type === 'audio_url' || type === 'file_upload') ? content : null;
+    
+    // Fix potential double protocol issue
+    if (sourceUrlToSave) {
+      if (sourceUrlToSave.startsWith('https://https://')) {
+        console.warn('[Async] Fixing double https:// in source_url:', sourceUrlToSave);
+        sourceUrlToSave = sourceUrlToSave.replace('https://https://', 'https://');
+      } else if (sourceUrlToSave.startsWith('http://http://')) {
+        console.warn('[Async] Fixing double http:// in source_url:', sourceUrlToSave);
+        sourceUrlToSave = sourceUrlToSave.replace('http://http://', 'http://');
+      }
+    }
+    
     await db().insert(transcriptions).values({
       job_id: jobId,
       user_uuid: userUuid,
       source_type: type,
       source_hash: sourceHash,
-      source_url: (type === 'youtube_url' || type === 'audio_url' || type === 'file_upload') ? content : null,
+      source_url: sourceUrlToSave,
       title: initialTitle,
       language: options.language || 'auto',
       status: 'queued',
@@ -270,20 +283,6 @@ export async function POST(request: NextRequest) {
         const shouldUseDeepgram = !isHighAccuracyActive && deepgramAllowed;
         const fallbackToReplicate = !shouldUseDeepgram && !deepgramAllowed && replicateAllowed && !isHighAccuracyActive;
         const enableDiarization = !!options?.enableDiarizationAfterWhisper && ['basic', 'pro', 'premium'].includes(String(userTier).toLowerCase());
-        console.log('[Async] supplier decision', {
-          supplier,
-          hasDeepgram,
-          hasReplicate,
-          isHighAccuracyRequest,
-          canUseHighAccuracy,
-          isHighAccuracyActive,
-          deepgramAllowed,
-          replicateAllowed,
-          shouldUseDeepgram,
-          shouldUseReplicate,
-          fallbackToReplicate,
-          enableDiarization,
-        });
 
         if (shouldUseReplicate || fallbackToReplicate) {
           try {
@@ -337,7 +336,6 @@ export async function POST(request: NextRequest) {
               const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(jobId).digest('hex');
               cb = `${cb}&cb_sig=${sig}`;
             }
-
             const params = new URLSearchParams();
             params.set('callback', cb);
             params.set('paragraphs', 'true');
@@ -348,30 +346,20 @@ export async function POST(request: NextRequest) {
               params.set('utterances', 'true');
               params.set('diarize', 'true');
             }
-
-            console.log('[Async] Deepgram request', {
-              params: params.toString(),
-              enableDiarization,
-              callback: cb,
-            });
-
-            await fetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
+            const deepgramResponse = await fetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
               method: 'POST',
               headers: {
                 'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({ url: audioUrlForSupplier })
-            }).then(async (resp) => {
-              if (!resp.ok) {
-                const text = await resp.text().catch(() => '');
-                console.error('[Async] Deepgram enqueue failed', resp.status, text);
-              } else {
-                console.log('[Async] Deepgram enqueue success');
-              }
-            }).catch((err) => {
-              console.error('[Async] Deepgram enqueue error', err);
             });
+            
+            const responseText = await deepgramResponse.text();
+            
+            if (!deepgramResponse.ok) {
+              console.error('[Async] Deepgram enqueue failed', deepgramResponse.status, responseText);
+            }
 
             await db().update(transcriptions).set({ status: 'transcribing' }).where(eq(transcriptions.job_id, jobId));
           } catch (err) {

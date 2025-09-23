@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Upload, Youtube } from 'lucide-react';
-import UploadModal from './upload-modal';
+import UploadModal from './upload-modal-new';
 
 interface QuickActionsProps {
   locale: string;
