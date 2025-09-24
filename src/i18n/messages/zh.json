@@ -360,15 +360,29 @@
     "sign_out": "退出登录"
   },
   "dashboard": {
-    "title": "工作台",
+    "welcome_back": "欢迎回来",
+    "dashboard_subtitle": "管理你的转录与账户",
     "nav": {
+      "home": "首页",
+      "transcriptions": "全部转录",
       "account": "账户"
     },
-    "upgrade_now": "立即升级",
+    "quick_actions": "快捷操作",
+    "actions": {
+      "upload_file": "上传文件",
+      "upload_description": "上传音频或视频进行转录",
+      "youtube_link": "YouTube 链接",
+      "youtube_description": "通过链接转录 YouTube 视频"
+    },
     "usage": {
       "monthly_usage": "本月使用量",
-      "minutes": "分钟"
+      "minutes": "分钟",
+      "near_limit": "接近限制",
+      "limit_reached": "已达上限",
+      "upgrade_for_more": "升级以获得更多使用额度"
     },
+    "upgrade": "升级",
+    "upgrade_now": "立即升级",
     "plan": {
       "free": "免费计划",
       "basic": "基础计划",

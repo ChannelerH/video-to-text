@@ -127,6 +127,14 @@ export async function getUserInfoWithTier() {
   }
 
   const user = await findUserByUuid(user_uuid);
+  
+  // Check if user is admin
+  let userWithAdmin = user ? { ...user } : null;
+  if (userWithAdmin && userWithAdmin.email) {
+    const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim()) || [];
+    (userWithAdmin as any).is_admin = adminEmails.includes(userWithAdmin.email);
+  }
+  
   let subscriptionPlan = 'FREE';
 
   try {
@@ -150,5 +158,5 @@ export async function getUserInfoWithTier() {
     subscriptionStatus = 'free';
   }
 
-  return { user, userTier: subscriptionStatus, subscriptionPlan };
+  return { user: userWithAdmin, userTier: subscriptionStatus, subscriptionPlan };
 }

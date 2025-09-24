@@ -12,7 +12,8 @@ interface UsageData {
 }
 
 export default function DashboardHeader() {
-  const t = useTranslations();
+  const tDashboard = useTranslations('dashboard');
+  const tUsage = useTranslations('dashboard.usage');
   const [usage, setUsage] = useState<UsageData>({
     minutesUsed: 8,
     minutesLimit: 10,
@@ -52,13 +53,13 @@ export default function DashboardHeader() {
                 <Clock className="w-5 h-5 text-purple-400" />
               </div>
               <div>
-                <p className="text-xs text-gray-500">{t('usage.monthly_usage')}</p>
+                <p className="text-xs text-gray-500">{tUsage('monthly_usage')}</p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-lg font-semibold text-white">
                     {usage.minutesUsed}
                   </span>
                   <span className="text-sm text-gray-400">
-                    / {usage.minutesLimit} {t('usage.minutes')}
+                    / {usage.minutesLimit} {tUsage('minutes')}
                   </span>
                 </div>
               </div>
@@ -83,7 +84,7 @@ export default function DashboardHeader() {
               {isNearLimit && (
                 <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" />
-                  {isAtLimit ? t('usage.limit_reached') : t('usage.near_limit')}
+                  {isAtLimit ? tUsage('limit_reached') : tUsage('near_limit')}
                 </p>
               )}
             </div>
@@ -100,13 +101,13 @@ export default function DashboardHeader() {
             >
               <TrendingUp className="w-4 h-4 text-purple-400" />
               <span className="text-sm text-gray-300">
-                {t('usage.upgrade_for_more')}
+                {tUsage('upgrade_for_more')}
               </span>
               <button className="px-3 py-1 text-xs font-medium
                 bg-gradient-to-r from-purple-500 to-pink-500 text-white
                 rounded hover:opacity-90 transition-opacity"
               >
-                {t('upgrade')}
+                {tDashboard('upgrade')}
               </button>
             </motion.div>
           )}
@@ -117,7 +118,7 @@ export default function DashboardHeader() {
           <div className="sm:hidden mt-3 p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
             <p className="text-xs text-yellow-400 flex items-center gap-1">
               <AlertCircle className="w-3 h-3" />
-              {isAtLimit ? t('usage.limit_reached') : t('usage.near_limit')}
+              {isAtLimit ? tUsage('limit_reached') : tUsage('near_limit')}
             </p>
           </div>
         )}

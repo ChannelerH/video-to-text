@@ -505,15 +505,29 @@
     "sign_out": "Sign out"
   },
   "dashboard": {
-    "title": "Dashboard",
+    "welcome_back": "Welcome Back",
+    "dashboard_subtitle": "Manage your transcriptions and account",
     "nav": {
+      "home": "Home",
+      "transcriptions": "All Transcriptions",
       "account": "Account"
     },
-    "upgrade_now": "Upgrade Now",
+    "quick_actions": "Quick Actions",
+    "actions": {
+      "upload_file": "Upload File",
+      "upload_description": "Upload audio or video files for transcription",
+      "youtube_link": "YouTube Link",
+      "youtube_description": "Transcribe YouTube videos by URL"
+    },
     "usage": {
       "monthly_usage": "Monthly Usage",
-      "minutes": "minutes"
+      "minutes": "minutes",
+      "near_limit": "Approaching limit",
+      "limit_reached": "Limit reached",
+      "upgrade_for_more": "Upgrade for more features"
     },
+    "upgrade": "Upgrade",
+    "upgrade_now": "Upgrade Now",
     "plan": {
       "free": "Free Plan",
       "basic": "Basic Plan",

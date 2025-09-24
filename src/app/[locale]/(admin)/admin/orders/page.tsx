@@ -11,6 +11,7 @@ export default async function () {
     { name: "order_no", title: "Order No" },
     { name: "paid_email", title: "Paid Email" },
     { name: "product_name", title: "Product Name" },
+    { name: "order_type", title: "Order Type" },
     { name: "amount", title: "Amount" },
     {
       name: "created_at",

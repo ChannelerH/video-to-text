@@ -2,6 +2,7 @@ import { db } from '@/db';
 import { orders, users } from '@/db/schema';
 import { and, eq, gte, or, isNull, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
+import { logger } from '@/lib/logger';
 
 export type SubscriptionPlan = 'FREE' | 'BASIC' | 'PRO' | 'PREMIUM';
 
@@ -167,9 +168,9 @@ export async function syncUserSubscriptionTier({
 
           aggregatedState = aggregateSubscriptionState(subscriptions.data);
         } catch (stripeError) {
-          console.error('[Subscription] Failed to fetch Stripe subscriptions', {
-            customerId,
-            error: stripeError,
+          logger.error(stripeError, {
+            context: '[Subscription] Failed to fetch Stripe subscriptions',
+            payload: { customerId },
           });
         }
       }
@@ -189,10 +190,9 @@ export async function syncUserSubscriptionTier({
       .set(updatePayload as any)
       .where(eq(users.uuid as any, targetUuid));
   } catch (error) {
-    console.error('[Subscription] Failed to sync subscription tier', {
-      userUuid,
-      stripeCustomerId,
-      error,
+    logger.error(error, {
+      context: '[Subscription] Failed to sync subscription tier',
+      payload: { userUuid, stripeCustomerId },
     });
   }
 }
