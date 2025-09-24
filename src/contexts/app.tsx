@@ -10,6 +10,7 @@ import {
   useCallback,
 } from "react";
 import { cacheGet, cacheRemove } from "@/lib/simple-cache";
+import { identifyMixpanelUser, registerMixpanelSuperProperties } from '@/lib/mixpanel-browser';
 
 import { CacheKey } from "@/services/constant";
 import { ContextValue } from "@/types/context";
@@ -66,9 +67,30 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // API returns { user, userTier }
-      if (data?.user) setUser(data.user); else setUser(data);
-      if (data?.userTier) setUserTier(data.userTier);
-      if (data?.subscriptionPlan) setSubscriptionPlan(data.subscriptionPlan);
+      const resolvedUser = (data?.user || data) as User | undefined;
+      if (resolvedUser) {
+        setUser(resolvedUser);
+        if (typeof window !== 'undefined') {
+          identifyMixpanelUser(resolvedUser.uuid || resolvedUser.id || '');
+        }
+      } else {
+        setUser(null);
+      }
+
+      if (data?.userTier) {
+        setUserTier(data.userTier);
+      }
+      if (data?.subscriptionPlan) {
+        setSubscriptionPlan(data.subscriptionPlan);
+      }
+
+      if (typeof window !== 'undefined') {
+        registerMixpanelSuperProperties({
+          plan: data?.subscriptionPlan || '',
+          tier: data?.userTier || '',
+          locale: resolvedUser?.locale || '',
+        });
+      }
 
       updateInvite(data.user || data);
       loadedRef.current = true;

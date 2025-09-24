@@ -682,6 +682,10 @@
         }
       }
     },
+    "turnstile": {
+      "title": "Verify You're Human",
+      "description": "Please complete the verification to continue"
+    },
     "dashboard": {
       "welcome_back": "Welcome Back",
       "dashboard_subtitle": "Manage your transcriptions and account",

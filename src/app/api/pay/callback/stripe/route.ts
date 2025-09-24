@@ -1,6 +1,7 @@
 import { redirect } from "@/i18n/navigation";
 import { newStripeClient } from "@/integrations/stripe";
 import { handleCheckoutSession } from "@/services/stripe";
+import { trackMixpanelServerEvent } from '@/lib/mixpanel-server';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -22,6 +23,15 @@ export async function GET(req: Request) {
       .checkout.sessions.retrieve(session_id);
 
     await handleCheckoutSession(client.stripe(), session);
+
+    await trackMixpanelServerEvent('subscription.purchase_success', {
+      distinct_id: session.metadata?.user_uuid || session.customer_details?.email || session.customer_email || '',
+      plan: session.metadata?.order_type || session.metadata?.product_name || '',
+      order_no: session.metadata?.order_no || order_no,
+      locale,
+      amount: session.amount_total,
+      currency: session.currency,
+    });
 
     console.log("stripe callback session: ", session);
 

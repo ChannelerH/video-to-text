@@ -21,6 +21,7 @@ import AudioTrackSelector from '@/components/audio-track-selector';
 import type { AudioTrack } from '@/components/audio-track-selector';
 import { callApiWithRetry, pollStatus, getErrorType } from "@/lib/api-utils";
 import { ErrorDialog } from '@/components/error-dialog';
+import TurnstileModal from '@/components/turnstile-modal';
 
 function isMediaFileType(mime: string): boolean {
   return typeof mime === 'string' && (mime.startsWith('audio') || mime.startsWith('video'));
@@ -192,6 +193,9 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingTranscriptionRef = useRef<{ preferredLanguage?: string } | null>(null);
+  const sessionTokenRef = useRef<string | null>(null);
+  const sessionExpiryRef = useRef<number>(0);
   
   // Audio track selection state
   const [showTrackSelector, setShowTrackSelector] = useState(false);
@@ -216,6 +220,12 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
   const [generatedChapters, setGeneratedChapters] = useState<any[]>([]);
   const [generatedSummary, setGeneratedSummary] = useState<string>("");
   const [copiedChapters, setCopiedChapters] = useState<boolean>(false);
+  
+  // Turnstile state
+  const [showTurnstile, setShowTurnstile] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [sessionExpiry, setSessionExpiry] = useState<number>(0);
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
   const [copiedSegments, setCopiedSegments] = useState<boolean>(false);
   const [generatingChapters, setGeneratingChapters] = useState<boolean>(false);
@@ -807,7 +817,25 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       }
       return;
     }
-    
+
+    if (!isAuthenticated) {
+      const now = Date.now();
+      const token = sessionTokenRef.current;
+      const expiry = sessionExpiryRef.current;
+      const hasValidSession = token && (!expiry || now < expiry);
+
+      if (!hasValidSession) {
+        sessionTokenRef.current = null;
+        sessionExpiryRef.current = 0;
+        if (sessionToken) setSessionToken(null);
+        if (sessionExpiry) setSessionExpiry(0);
+        console.log('[ToolInterface] Anonymous user without valid session, prompting Turnstile');
+        pendingTranscriptionRef.current = { preferredLanguage: undefined };
+        setShowTurnstile(true);
+        return;
+      }
+    }
+
     // 如果是 YouTube URL，先检测音轨
     if (url && (url.includes('youtube.com') || url.includes('youtu.be'))) {
       try {
@@ -861,8 +889,78 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
     await performTranscription(languageCode);
   };
   
+  // Handle Turnstile verification success
+  const handleTurnstileSuccess = async (token: string) => {
+    console.log('[ToolInterface] Turnstile verification success, verifying token with backend');
+
+    try {
+      const response = await fetch('/api/turnstile/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.sessionToken) {
+        setTurnstileToken(token);
+        setSessionToken(data.sessionToken);
+        setSessionExpiry(data.sessionExpiry || 0);
+        sessionTokenRef.current = data.sessionToken;
+        sessionExpiryRef.current = data.sessionExpiry || 0;
+        setShowTurnstile(false);
+
+        const pending = pendingTranscriptionRef.current;
+        pendingTranscriptionRef.current = null;
+
+        setTimeout(async () => {
+          if (pending) {
+            console.log('[ToolInterface] Resuming pending transcription after verification', pending);
+            await performTranscription(pending.preferredLanguage);
+            return;
+          }
+
+          if (url || uploadedFileInfo) {
+            console.log('[ToolInterface] Continuing transcription after verification');
+            await performTranscription();
+          }
+        }, 100);
+      } else {
+        console.warn('[ToolInterface] Verification failed:', data.error);
+        showToast('error', 'Verification Failed', data.error || 'Please try again.');
+        setShowTurnstile(false);
+      }
+    } catch (error) {
+      console.error('[ToolInterface] Verification error:', error);
+      showToast('error', 'Verification Error', 'Please try again.');
+      setShowTurnstile(false);
+    }
+  };
+
   // 抽取实际的转录逻辑
   const performTranscription = async (preferredLanguage?: string) => {
+    if (!isAuthenticated) {
+      const now = Date.now();
+      const token = sessionTokenRef.current;
+      const expiry = sessionExpiryRef.current;
+      const hasValidSession = token && (!expiry || now < expiry);
+
+      if (!hasValidSession) {
+        sessionTokenRef.current = null;
+        sessionExpiryRef.current = 0;
+        if (sessionToken) setSessionToken(null);
+        if (sessionExpiry) setSessionExpiry(0);
+        console.log('[ToolInterface] Missing or expired Turnstile session, requesting verification');
+        pendingTranscriptionRef.current = { preferredLanguage };
+        setShowTurnstile(true);
+        return;
+      }
+    }
+
+    if (pendingTranscriptionRef.current) {
+      pendingTranscriptionRef.current = null;
+    }
+
     setIsProcessing(true);  // 开启加载动画
     setProgress(t("progress.starting"));
     setResult(null);
@@ -955,6 +1053,27 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
       // Add streamProgress flag for authenticated users
       if (isAuthenticated && requestData) {
         requestData.options = { ...requestData.options, streamProgress: true };
+      }
+
+      if (!isAuthenticated && requestData) {
+        const anonSessionToken = sessionTokenRef.current;
+        const anonExpiry = sessionExpiryRef.current;
+        const sessionPayload: { sessionToken?: string } =
+          anonSessionToken && (!anonExpiry || Date.now() < anonExpiry)
+            ? { sessionToken: anonSessionToken }
+            : {};
+
+        requestData = {
+          ...requestData,
+          ...sessionPayload,
+          ...(turnstileToken ? { turnstileToken } : {}),
+        };
+
+        console.log('[performTranscription] Using anonymous verification tokens', {
+          hasSession: !!sessionPayload.sessionToken,
+          hasTurnstile: !!turnstileToken,
+          sessionPrefix: sessionPayload.sessionToken?.slice(0, 8) || null,
+        });
       }
 
       // Add preferred language if provided
@@ -2937,6 +3056,15 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
         error={errorState}
         onClose={() => setErrorState({ type: null, message: '', canRetry: false })}
         onRetry={errorState.retryAction}
+      />
+      
+      {/* Turnstile Verification Modal */}
+      <TurnstileModal
+        open={showTurnstile}
+        onClose={() => setShowTurnstile(false)}
+        onSuccess={handleTurnstileSuccess}
+        title={t("turnstile.title") || "Verify You're Human"}
+        description={t("turnstile.description") || "Please complete the verification to continue"}
       />
     </div>
   );

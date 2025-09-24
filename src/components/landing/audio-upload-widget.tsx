@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { ToastNotification, useToast } from "@/components/toast-notification";
 import { useTranslations } from "next-intl";
 import { useAppContext } from "@/contexts/app";
+import { trackMixpanelEvent } from '@/lib/mixpanel-browser';
 
 interface Props {
   locale: string;
@@ -46,11 +47,23 @@ export default function AudioUploadWidget({ locale }: Props) {
 
   const triggerBrowse = () => {
     if (busy) return;
+    trackMixpanelEvent('landing.cta_click', {
+      source: 'audio_widget',
+      action: 'open_file_picker',
+      auth: isAuthenticated ? 'logged_in' : 'guest',
+      plan: normalizedTier,
+    });
     fileInputRef.current?.click();
   };
 
   const handlePasteUrl = () => {
     if (busy) return;
+    trackMixpanelEvent('landing.cta_click', {
+      source: 'audio_widget',
+      action: 'paste_url',
+      auth: isAuthenticated ? 'logged_in' : 'guest',
+      plan: normalizedTier,
+    });
     setShowUrlDialog(true);
   };
 
@@ -58,9 +71,9 @@ export default function AudioUploadWidget({ locale }: Props) {
     const url = urlInput.trim();
     if (!url) return;
     setShowUrlDialog(false);
+    const isYouTube = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)/i.test(url);
     try {
       setBusy(true);
-      const isYouTube = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)/i.test(url);
       const body = {
         type: isYouTube ? "youtube_url" : "audio_url",
         content: url,
@@ -82,6 +95,11 @@ export default function AudioUploadWidget({ locale }: Props) {
       if (!resp.ok || !data?.success || !data?.job_id) {
         throw new Error(data?.error || "Failed to start transcription");
       }
+      trackMixpanelEvent('transcription.job_started', {
+        method: isYouTube ? 'youtube_url' : 'audio_url',
+        auth: isAuthenticated ? 'logged_in' : 'guest',
+        plan: normalizedTier,
+      });
       // Navigate to history with highlight
       const dest = locale && locale !== "en"
         ? `/${locale}/dashboard/transcriptions?highlight=${encodeURIComponent(data.job_id)}`
@@ -89,6 +107,12 @@ export default function AudioUploadWidget({ locale }: Props) {
       router.push(dest);
     } catch (e: any) {
       console.error(e);
+      trackMixpanelEvent('transcription.job_failed', {
+        method: isYouTube ? 'youtube_url' : 'audio_url',
+        auth: isAuthenticated ? 'logged_in' : 'guest',
+        plan: normalizedTier,
+        error: e?.message,
+      });
       showToast('error', t('errors.general_error'), e?.message || t('errors.general_error'));
     } finally {
       setBusy(false);
@@ -101,6 +125,13 @@ export default function AudioUploadWidget({ locale }: Props) {
     if (!file) return;
     try {
       setBusy(true);
+      trackMixpanelEvent('transcription.upload_start', {
+        method: 'file',
+        file_name: file.name,
+        file_size: file.size,
+        auth: isAuthenticated ? 'logged_in' : 'guest',
+        plan: normalizedTier,
+      });
       // 1) get presigned upload URL
       const presignResp = await fetch("/api/upload/presigned", {
         method: "POST",
@@ -155,6 +186,13 @@ export default function AudioUploadWidget({ locale }: Props) {
       if (!resp.ok || !data?.success || !data?.job_id) {
         throw new Error(data?.error || "Failed to start transcription");
       }
+      trackMixpanelEvent('transcription.job_started', {
+        method: 'file',
+        file_name: file.name,
+        file_size: file.size,
+        auth: isAuthenticated ? 'logged_in' : 'guest',
+        plan: normalizedTier,
+      });
       // 4) navigate to dashboard/transcriptions with highlight
       const dest = locale && locale !== "en"
         ? `/${locale}/dashboard/transcriptions?highlight=${encodeURIComponent(data.job_id)}`
@@ -162,6 +200,13 @@ export default function AudioUploadWidget({ locale }: Props) {
       router.push(dest);
     } catch (e: any) {
       console.error(e);
+      trackMixpanelEvent('transcription.job_failed', {
+        method: 'file',
+        file_name: file?.name,
+        auth: isAuthenticated ? 'logged_in' : 'guest',
+        plan: normalizedTier,
+        error: e?.message,
+      });
       showToast('error', t('errors.upload_failed'), e?.message || t('errors.general_error'));
     } finally {
       // reset input to allow selecting the same file again

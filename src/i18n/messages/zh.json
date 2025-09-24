@@ -537,6 +537,10 @@
         }
       }
     },
+    "turnstile": {
+      "title": "人机验证",
+      "description": "请完成验证以继续"
+    },
     "dashboard": {
       "welcome_back": "欢迎回来",
       "dashboard_subtitle": "管理您的转录记录和账户",

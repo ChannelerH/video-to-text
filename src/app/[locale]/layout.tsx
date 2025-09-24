@@ -9,6 +9,7 @@ import { NextAuthSessionProvider } from "@/auth/session";
 import IntlProvider from "@/components/i18n/intl-provider";
 import { ThemeProvider } from "@/providers/theme";
 import { locales } from "@/i18n/locale";
+import MixpanelProvider from '@/providers/mixpanel-provider';
 
 export async function generateMetadata({
   params,
@@ -51,7 +52,9 @@ export default async function LocaleLayout({
     <IntlProvider messages={messages} locale={locale} timeZone={timeZone}>
       <NextAuthSessionProvider>
         <AppContextProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <MixpanelProvider>
+            <ThemeProvider>{children}</ThemeProvider>
+          </MixpanelProvider>
         </AppContextProvider>
       </NextAuthSessionProvider>
     </IntlProvider>

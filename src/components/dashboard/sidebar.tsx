@@ -16,6 +16,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app';
+import { trackMixpanelEvent } from '@/lib/mixpanel-browser';
 
 interface DashboardSidebarProps {
   locale: string;
@@ -122,6 +123,13 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
         )}
         <Link
           href={`/${locale}/pricing`}
+          onClick={() =>
+            trackMixpanelEvent('subscription.upgrade_click', {
+              source: 'sidebar',
+              current_plan: normalizedPlan,
+              tier: userTier,
+            })
+          }
           className="block w-full py-2 bg-purple-600 hover:bg-purple-700 
             text-white text-sm font-medium rounded-lg text-center transition-colors"
         >

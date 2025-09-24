@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { X, AlertTriangle, Download, Clock, TrendingDown, Gift, AlertCircle } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { useAppContext } from '@/contexts/app';
+import { trackMixpanelEvent } from '@/lib/mixpanel-browser';
 import type { DowngradeTarget } from '@/services/subscription-plan';
 
 interface CancelSubscriptionModalProps {
@@ -178,6 +179,11 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
   const handleDowngrade = async (target: DowngradeTarget) => {
     setIsDowngrading(true);
     setDowngradeError('');
+    trackMixpanelEvent('subscription.downgrade_attempt', {
+      target_plan: target,
+      current_plan: currentPlan,
+      locale,
+    });
     try {
       const response = await fetch('/api/subscription/downgrade', {
         method: 'POST',
@@ -206,6 +212,12 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
       }
 
       if (data.scheduled) {
+        trackMixpanelEvent('subscription.downgrade_scheduled', {
+          target_plan: target,
+          current_plan: currentPlan,
+          locale,
+          effective_at: data.effectiveAt,
+        });
         refreshUserInfo?.(true);
         const effectiveAt = data.effectiveAt || '';
         router.push(`/${locale}/dashboard/account?downgradeScheduled=${encodeURIComponent(effectiveAt)}&downgradePlan=${encodeURIComponent(target)}`);
@@ -213,6 +225,11 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
         return;
       }
 
+      trackMixpanelEvent('subscription.downgrade_immediate', {
+        target_plan: target,
+        current_plan: currentPlan,
+        locale,
+      });
       refreshUserInfo?.(true);
       const plan = typeof data.plan === 'string' ? data.plan.toLowerCase() : '';
       const queryKey = plan === 'free' ? 'cancelled' : 'downgraded';
@@ -232,6 +249,13 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
     setStep('processing');
     setShowError(false);
     setErrorMessage('');
+    trackMixpanelEvent('subscription.cancel_request', {
+      current_plan: currentPlan,
+      immediate: cancelTiming === 'immediate',
+      refund_requested: cancelTiming === 'immediate' ? requestRefund : false,
+      reason,
+      locale,
+    });
     
     try {
       // Call actual cancellation API
@@ -251,6 +275,12 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
       const data = await response.json();
 
       if (data.success) {
+        trackMixpanelEvent('subscription.cancel_success', {
+          current_plan: currentPlan,
+          immediate: cancelTiming === 'immediate',
+          refund_requested: cancelTiming === 'immediate' ? requestRefund : false,
+          locale,
+        });
         // Show success message or redirect
         router.push(`/${locale}/dashboard/account?cancelled=true`);
       } else {
@@ -266,6 +296,12 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
       // Show error in modal instead of alert
       setErrorMessage('An error occurred while processing your request. Please try again or contact support.');
       setShowError(true);
+      trackMixpanelEvent('subscription.cancel_failed', {
+        current_plan: currentPlan,
+        immediate: cancelTiming === 'immediate',
+        refund_requested: cancelTiming === 'immediate' ? requestRefund : false,
+        locale,
+      });
       setStep('confirm');
       setIsProcessing(false);
       return;

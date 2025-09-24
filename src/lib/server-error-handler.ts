@@ -56,7 +56,9 @@ export function handleServerError(
     consoleErrorOriginal('[Error]', message, stack || '', contextInfo, payloadInfo);
   }
 
-  if (!isServer || isDev) {
+  const allowDev = process.env.ERROR_ALERT_ALLOW_DEV === 'true';
+
+  if (!isServer || (isDev && !allowDev)) {
     return;
   }
 
@@ -79,4 +81,3 @@ const consoleErrorOriginal = console.error.bind(console);
 export function getOriginalConsoleError() {
   return consoleErrorOriginal;
 }
-

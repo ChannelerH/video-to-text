@@ -28,6 +28,7 @@ export class CloudflareR2Service {
         accessKeyId: process.env.STORAGE_ACCESS_KEY || '',
         secretAccessKey: process.env.STORAGE_SECRET_KEY || '',
       },
+      forcePathStyle: true, // Important for R2 - 必须使用路径样式而不是虚拟主机样式
     });
   }
 

@@ -12,6 +12,7 @@ import { transcribeAsync } from "@/lib/async-transcribe";
 import AudioTrackSelector from "@/components/audio-track-selector";
 import type { AudioTrack } from "@/components/audio-track-selector";
 import type { TranscriptionSegment } from "@/lib/replicate";
+import TurnstileModal from '@/components/turnstile-modal';
 import {
   FileText,
   FileSpreadsheet,
@@ -151,6 +152,14 @@ export default function AudioUploadWidgetEnhanced({ locale }: Props) {
   const [showTrackSelector, setShowTrackSelector] = useState(false);
   const [availableTracks, setAvailableTracks] = useState<AudioTrack[]>([]);
   const [trackVideoTitle, setTrackVideoTitle] = useState('');
+  
+  // Turnstile state
+  const [showTurnstile, setShowTurnstile] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [sessionExpiry, setSessionExpiry] = useState<number>(0);
+  const pendingTranscriptionParams = useRef<any>(null);
+  
   const pendingYouTubeRequest = useRef<{
     type: 'youtube_url' | 'audio_url';
     content: string;
@@ -426,9 +435,35 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
       title?: string;
       options?: Record<string, any>;
       preferredLanguage?: string;
+      turnstileToken?: string;
+      sessionToken?: string;
     }
   ) => {
-    const { type, content, title, options = {}, preferredLanguage } = params;
+    const { type, content, title, options = {}, preferredLanguage, turnstileToken: passedToken, sessionToken: passedSession } = params;
+    const effectiveToken = passedToken || turnstileToken;
+    const effectiveSession = passedSession || sessionToken;
+    
+    console.log('[runTranscription] Parameters:', {
+      hasPassedSession: !!passedSession,
+      hasStoredSession: !!sessionToken,
+      effectiveSession: effectiveSession?.substring(0, 20),
+      isAuthenticated
+    });
+
+    // 如果用户未登录，检查session的有效性
+    if (!isAuthenticated) {
+      const now = Date.now();
+      
+      // 没有session或者session过期了，显示验证
+      if (!effectiveSession || (sessionExpiry && now > sessionExpiry)) {
+        console.log('[AudioUploadWidget] No auth and no valid session, showing Turnstile');
+        pendingTranscriptionParams.current = params;
+        setShowTurnstile(true);
+        return;
+      }
+    }
+
+    console.log('[AudioUploadWidget] Starting transcription with auth:', isAuthenticated, 'token:', !!effectiveToken);
 
     setPreviewError(null);
     setCurrentJobId(null);
@@ -464,7 +499,19 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
         content,
         action: isAuthenticated ? 'transcribe' : 'preview',
         options: requestOptions,
+        // 如果未登录，传递session token
+        ...(effectiveSession && !isAuthenticated ? { sessionToken: effectiveSession } : {}),
+        // 后向兼容：也传递turnstileToken
+        ...(effectiveToken && !isAuthenticated ? { turnstileToken: effectiveToken } : {}),
       } as const;
+
+      console.log('[AudioUploadWidget] Sending request with:', {
+        action: requestData.action,
+        hasSession: !!(requestData as any).sessionToken,
+        hasToken: !!(requestData as any).turnstileToken,
+        sessionToken: (requestData as any).sessionToken?.substring(0, 20),
+        fullData: requestData
+      });
 
       const result = await transcribeAsync(
         requestData,
@@ -561,8 +608,58 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
     normalizedTier,
     showToast,
     speakerDiarization,
-    t
+    t,
+    turnstileToken
   ]);
+
+  // Handle Turnstile verification success
+  const handleTurnstileSuccess = useCallback(async (token: string) => {
+    console.log('[AudioUploadWidget] Turnstile verification success, verifying with backend...');
+    
+    try {
+      // 验证token并获取session
+      const response = await fetch('/api/turnstile/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.sessionToken) {
+        console.log('[AudioUploadWidget] Session token received:', data.sessionToken.substring(0, 20) + '...');
+        setTurnstileToken(token);
+        setSessionToken(data.sessionToken);
+        setSessionExpiry(data.sessionExpiry);
+        setShowTurnstile(false);
+        
+        // Continue with the pending transcription
+        if (pendingTranscriptionParams.current) {
+          console.log('[AudioUploadWidget] Continuing with transcription after verification');
+          const params = pendingTranscriptionParams.current;
+          pendingTranscriptionParams.current = null;
+          
+          // 直接传递session token，不依赖state更新
+          const updatedParams = { 
+            ...params, 
+            sessionToken: data.sessionToken,
+            turnstileToken: token // 也传递原始token作为备份
+          };
+          
+          // 稍微延迟确保UI更新
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await runTranscription(updatedParams);
+        }
+      } else {
+        showToast('error', 'Verification Failed', data.error || 'Please try again');
+        setShowTurnstile(false);
+      }
+    } catch (error) {
+      console.error('[AudioUploadWidget] Turnstile verification error:', error);
+      showToast('error', 'Verification Error', 'Please try again');
+      setShowTurnstile(false);
+    }
+  }, [runTranscription]);
 
   const handleOpenInEditor = async () => {
     if (!isAuthenticated) {
@@ -1305,6 +1402,15 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
         onSelect={handleTrackSelected}
         tracks={availableTracks}
         videoTitle={trackVideoTitle}
+      />
+      
+      {/* Turnstile Verification Modal */}
+      <TurnstileModal
+        open={showTurnstile}
+        onClose={() => setShowTurnstile(false)}
+        onSuccess={handleTurnstileSuccess}
+        title={t("turnstile.title") || "Verify You're Human"}
+        description={t("turnstile.description") || "Please complete the verification to continue"}
       />
     </div>
   );

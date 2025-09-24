@@ -116,14 +116,24 @@ async function flushQueue() {
   flushing = true;
 
   while (emailQueue.length) {
-    const payload = emailQueue.shift();
-    if (!payload) continue;
+    const batch = emailQueue.splice(0, emailQueue.length);
+    if (!batch.length) break;
+
+    const mergedSubject =
+      batch.length === 1
+        ? batch[0].subject
+        : `[${process.env.NEXT_PUBLIC_PROJECT_NAME || 'V2TX'}] Error Digest (${batch.length})`;
+
+    const mergedBody = batch
+      .map((payload, idx) => `[#${idx + 1}] ${payload.subject}\n${payload.text}`)
+      .join('\n\n---\n\n');
 
     try {
-      await sendEmailViaSmtp(payload);
+      await sendEmailViaSmtp({ subject: mergedSubject, text: mergedBody });
     } catch (error) {
       console.error('[ErrorReporter] Failed to send alert email:', error);
-      emailQueue.unshift(payload);
+      // put the batch back to the front so it can retry later
+      emailQueue.unshift(...batch);
       break;
     }
   }
