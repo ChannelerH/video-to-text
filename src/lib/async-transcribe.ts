@@ -1,7 +1,7 @@
 // Helper functions for async transcription with polling
 import { callApiWithRetry, pollStatus } from '@/lib/api-utils';
 
-export async function submitTranscriptionJob(requestData: any): Promise<{ success: boolean; job_id?: string; error?: string }> {
+export async function submitTranscriptionJob(requestData: any): Promise<{ success: boolean; job_id?: string; error?: string; code?: string }> {
   try {
     const response = await callApiWithRetry('/api/transcribe/async', {
       method: 'POST',
@@ -14,7 +14,11 @@ export async function submitTranscriptionJob(requestData: any): Promise<{ succes
     const result = await response.json();
     
     if (!response.ok) {
-      throw new Error(result.error || 'Failed to submit job');
+      return {
+        success: false,
+        error: result.error || 'Failed to submit job',
+        code: result.code
+      };
     }
 
     return result;
@@ -172,7 +176,11 @@ export async function transcribeAsync(
   const submitResult = await submitTranscriptionJob(requestData);
   
   if (!submitResult.success || !submitResult.job_id) {
-    throw new Error(submitResult.error || 'Failed to start transcription');
+    const error = new Error(submitResult.error || 'Failed to start transcription');
+    if (submitResult.code) {
+      (error as any).errorCode = submitResult.code;
+    }
+    throw error;
   }
 
   // Store jobId for potential retry

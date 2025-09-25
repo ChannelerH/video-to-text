@@ -39,6 +39,17 @@
     "pro_minutes": "2000 min/month",
     "pro_badge": "High Accuracy"
   },
+  "discount_coupon": {
+    "title": "Exclusive Offer!",
+    "subtitle": "Thanks for your interest! Here's a special discount for you.",
+    "discount": "15% OFF",
+    "code": "BROWSE5",
+    "description": "Use this code at checkout to get 15% OFF on any purchase.",
+    "valid_for": "Valid for new customers only.",
+    "copy_button": "Copy & Continue",
+    "dismiss_button": "Maybe Later",
+    "copied": "Copied!"
+  },
   "transcription_demo": {
     "title": "🎬 Real Transcription Results",
     "description": "See how our AI accurately handles various types of video content<br />From technical lectures to business meetings, from code tutorials to group discussions",
@@ -733,6 +744,8 @@
       "timeout": "The operation is taking longer than expected. Please try again.",
       "server_error": "Server error occurred. Please try again in a moment.",
       "network": "Network connection failed. Please check your connection and try again.",
+      "youtube_limit_reached_title": "Monthly Limit Reached",
+      "youtube_limit_reached_message": "You've hit the monthly YouTube URL quota for the Free plan. Upgrade your plan or download the video and upload the file to continue.",
       "youtube_manual_upload_required_title": "Manual Upload Needed",
       "youtube_manual_upload_required_message": "We couldn't download this YouTube video automatically. Please download the video manually and upload the file to continue the transcription."
     },

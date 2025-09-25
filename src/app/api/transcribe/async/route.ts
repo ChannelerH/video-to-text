@@ -24,6 +24,10 @@ export async function POST(request: NextRequest) {
     // 1. 验证用户（允许匿名预览）
     const maybeUserUuid = await getUserUuid();
 
+    const ipHeader = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '';
+    const anonIp = ipHeader.split(',')[0].trim() || '0.0.0.0';
+    const anonUsageKey = !maybeUserUuid ? `anon:${anonIp}` : null;
+
     // 2. 解析请求
     const body = await request.json();
     const { type, content, options: rawOptions = {}, action, turnstileToken, sessionToken } = body;
@@ -221,24 +225,98 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 3.2 Anonymous & Free YouTube monthly usage limit
+    let shouldRecordAnonYoutubeUsage = false;
+    if (type === 'youtube_url') {
+      const monthlyLimit = Number(process.env.YOUTUBE_FREE_MONTHLY_LIMIT || process.env.NEXT_PUBLIC_YOUTUBE_FREE_MONTHLY_LIMIT || 3);
+      const now = new Date();
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+      if (!maybeUserUuid) {
+        if (anonUsageKey) {
+          try {
+            const [row] = await db()
+              .select({ c: count() })
+              .from(usage_records)
+              .where(
+                and(
+                  eq(usage_records.user_id, anonUsageKey),
+                  eq(usage_records.model_type, 'anon_youtube'),
+                  gte(usage_records.created_at as any, monthStart)
+                )
+              );
+            const used = Number((row as any)?.c || 0);
+            if (used >= monthlyLimit) {
+              return NextResponse.json(
+                {
+                  error: `You have reached the ${monthlyLimit}/month YouTube limit. Upgrade your plan or upload the media file instead.`,
+                  code: 'youtube_limit_reached'
+                },
+                { status: 429 }
+              );
+            }
+            shouldRecordAnonYoutubeUsage = true;
+          } catch (err) {
+            console.warn('[Async] Failed to check anonymous YouTube quota:', err);
+          }
+        }
+      } else if (userTier === UserTier.FREE) {
+        try {
+          const [row] = await db()
+            .select({ c: count() })
+            .from(transcriptions)
+            .where(
+              and(
+                eq(transcriptions.user_uuid, userUuid),
+                eq(transcriptions.source_type, 'youtube_url'),
+                gte(transcriptions.created_at as any, monthStart)
+              )
+            );
+          const used = Number((row as any)?.c || 0);
+          if (used >= monthlyLimit) {
+            return NextResponse.json(
+              {
+                error: `You have reached the ${monthlyLimit}/month YouTube limit on the Free plan. Upgrade your plan or upload the media file instead.`,
+                code: 'youtube_limit_reached'
+              },
+              { status: 429 }
+            );
+          }
+        } catch (err) {
+          console.warn('[Async] Failed to check free-tier YouTube quota:', err);
+        }
+      }
+    }
+
     // 3.1 匿名预览限流（按 IP 每日次数）
     if (!maybeUserUuid && isPreview) {
-      const ipHeader = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '';
-      const ip = ipHeader.split(',')[0].trim() || '0.0.0.0';
-      const anonId = `anon:${ip}`;
       const now = new Date();
       const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
       try {
         const [row] = await db().select({ c: count() }).from(usage_records)
-          .where(and(eq(usage_records.user_id, anonId), gte(usage_records.created_at as any, dayStart), eq(usage_records.model_type, 'anon_preview')));
+          .where(and(eq(usage_records.user_id, anonUsageKey!), gte(usage_records.created_at as any, dayStart), eq(usage_records.model_type, 'anon_preview')));
         const used = Number((row as any)?.c || 0);
         // 单变量方案：优先读取 NEXT_PUBLIC_ANON_PREVIEW_DAILY_LIMIT（也可在服务端使用），否则回退 ANON_PREVIEW_DAILY_LIMIT，再回退 10
         const limit = Number(process.env.NEXT_PUBLIC_ANON_PREVIEW_DAILY_LIMIT || process.env.ANON_PREVIEW_DAILY_LIMIT || 10);
         if (used >= limit) {
           return NextResponse.json({ error: `Anonymous preview limit reached (${limit}/day). Please sign in.` }, { status: 429 });
         }
-        await db().insert(usage_records).values({ user_id: anonId, date: new Date().toISOString().slice(0,10), minutes: '0' as any, model_type: 'anon_preview', created_at: new Date() });
+        await db().insert(usage_records).values({ user_id: anonUsageKey!, date: new Date().toISOString().slice(0,10), minutes: '0' as any, model_type: 'anon_preview', created_at: new Date() });
       } catch {}
+    }
+
+    if (shouldRecordAnonYoutubeUsage && anonUsageKey) {
+      try {
+        await db().insert(usage_records).values({
+          user_id: anonUsageKey,
+          date: new Date().toISOString().slice(0, 10),
+          minutes: '0' as any,
+          model_type: 'anon_youtube',
+          created_at: new Date()
+        });
+      } catch (err) {
+        console.warn('[Async] Failed to record anonymous YouTube usage:', err);
+      }
     }
 
     // 4. 生成任务ID（使用内置序列工具，避免新增依赖）

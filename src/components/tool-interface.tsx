@@ -1141,7 +1141,13 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           let displayMessage = rawMessage;
           let canRetry = errorType !== 'cancelled';
 
-          if (errorCode === 'youtube_manual_upload_required') {
+          if (errorCode === 'youtube_limit_reached') {
+            displayTitle = t("errors.youtube_limit_reached_title") || "Monthly Limit Reached";
+            displayMessage = t("errors.youtube_limit_reached_message")
+              || rawMessage
+              || "You have reached the monthly YouTube URL quota. Please upgrade your plan or upload the media file.";
+            canRetry = false;
+          } else if (errorCode === 'youtube_manual_upload_required') {
             displayTitle = t("errors.youtube_manual_upload_required_title") || "Manual Upload Needed";
             displayMessage = t("errors.youtube_manual_upload_required_message") 
               || "We couldn't download this YouTube video automatically. Please download it manually and upload the file for transcription.";
@@ -1224,7 +1230,13 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           let displayMessage = rawMessage;
           let canRetry = errorType !== 'cancelled';
 
-          if (errorCode === 'youtube_manual_upload_required') {
+          if (errorCode === 'youtube_limit_reached') {
+            displayTitle = t("errors.youtube_limit_reached_title") || "Monthly Limit Reached";
+            displayMessage = t("errors.youtube_limit_reached_message")
+              || rawMessage
+              || "You have reached the monthly YouTube URL quota. Please upgrade your plan or upload the media file.";
+            canRetry = false;
+          } else if (errorCode === 'youtube_manual_upload_required') {
             displayTitle = t("errors.youtube_manual_upload_required_title") || "Manual Upload Needed";
             displayMessage = t("errors.youtube_manual_upload_required_message") 
               || "We couldn't download this YouTube video automatically. Please download it manually and upload the file for transcription.";

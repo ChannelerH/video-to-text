@@ -3,6 +3,7 @@ import Header from "@/components/blocks/header";
 import { ReactNode } from "react";
 import { getLandingPage } from "@/services/page";
 import Feedback from "@/components/feedback";
+import { DiscountCouponProvider } from "@/components/discount-coupon-provider";
 
 export default async function DefaultLayout({
   children,
@@ -20,6 +21,7 @@ export default async function DefaultLayout({
       <main className="overflow-x-hidden">{children}</main>
       {page.footer && <Footer footer={page.footer} />}
       {/* <Feedback socialLinks={page.footer?.social?.items} /> */}
+      <DiscountCouponProvider />
     </>
   );
 }
