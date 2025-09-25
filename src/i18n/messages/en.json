@@ -571,6 +571,7 @@
     "processing": "Processing...",
     "upload_required": "Please upload a file or enter a URL.",
     "or": "OR",
+    "signing_in": "Redirecting...",
     "formats": {
       "txt": "TXT",
       "srt": "SRT",
@@ -615,6 +616,8 @@
       "summary_generated": "Summary generated successfully!",
       "upgrade_required_basic": "🔒 This feature requires Basic subscription",
       "upgrade_required_pro": "👑 This premium feature requires Pro subscription",
+      "upgrade_to_access_title": "Upgrade Required",
+      "upgrade_to_access_message": "Downloads and AI features unlock after you sign in and upgrade. Paid plans also let you keep transcribing via file uploads without limits.",
       "smart_features_desc": "AI-powered features to enhance your transcription experience",
       "upgrade_prompt": "Would you like to view our pricing plans?",
       "generation_failed": "Unable to generate at this moment. Please try again later.",

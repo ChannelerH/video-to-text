@@ -228,6 +228,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionExpiry, setSessionExpiry] = useState<number>(0);
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
+  const [signingIn, setSigningIn] = useState(false);
   const [copiedSegments, setCopiedSegments] = useState<boolean>(false);
   const [generatingChapters, setGeneratingChapters] = useState<boolean>(false);
   const [isNavigatingToEditor, setIsNavigatingToEditor] = useState<boolean>(false);
@@ -1429,7 +1430,18 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
     a.href = obj; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(obj);
   };
 
+  const requireAuthenticatedUpgrade = () => {
+    if (isAuthenticated) return true;
+    showToast(
+      'warning',
+      t('results.upgrade_to_access_title'),
+      t('results.upgrade_to_access_message')
+    );
+    return false;
+  };
+
   const downloadFormat = async (format: string) => {
+    if (!requireAuthenticatedUpgrade()) return;
     if (!result?.data || result.type !== 'full') return;
 
     // Set loading state for this format
@@ -2254,14 +2266,28 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                   <div className="text-center py-8 px-6 bg-gray-800/20 rounded-xl border border-gray-700/50">
                     <p className="text-gray-400 mb-4">{t('sign_in_to_access_features')}</p>
                     <button
-                      onClick={() => router.push('/auth/signin')}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:opacity-90 transition-all hover:scale-105 font-medium"
+                      onClick={() => {
+                        if (signingIn) return;
+                        setSigningIn(true);
+                        router.push('/auth/signin');
+                      }}
+                      disabled={signingIn}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:opacity-90 transition-all hover:scale-105 font-medium disabled:opacity-70 disabled:hover:scale-100"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                          d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                      </svg>
-                      {t('sign_in_to_save')}
+                      {signingIn ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          {t('signing_in')}
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                              d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                          </svg>
+                          {t('sign_in_to_save')}
+                        </>
+                      )}
                     </button>
                   </div>
                 )}
@@ -2498,6 +2524,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                       {/* Generate Chapters Button */}
                       <button
                         onClick={async () => {
+                          if (!requireAuthenticatedUpgrade()) return;
                           if (!result.data?.transcription?.segments || generatingChapters) return;
                           
                           setGeneratingChapters(true);
@@ -2568,6 +2595,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                       {/* Generate Summary Button */}
                       <button
                         onClick={async () => {
+                          if (!requireAuthenticatedUpgrade()) return;
                           if (!result.data?.transcription?.segments || generatingSummary) return;
                           
                           setGeneratingSummary(true);
@@ -2810,6 +2838,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                           variant="outline"
                           size="lg"
                           onClick={async () => {
+                            if (!requireAuthenticatedUpgrade()) return;
                             setExportingWord(true);
                             try {
                               const jobId = result.data.jobId as string | undefined;
@@ -2895,6 +2924,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                           variant="outline"
                           size="lg"
                           onClick={async () => {
+                            if (!requireAuthenticatedUpgrade()) return;
                             setExportingPDF(true);
                             try {
                               const jobId = result.data.jobId as string | undefined;
