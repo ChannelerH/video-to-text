@@ -8,7 +8,12 @@ import { Link } from "@/i18n/navigation";
 import ToolInterface from "@/components/tool-interface";
 import BlurText from "./BlurText";
 
-export default function Hero({ hero }: { hero: HeroType }) {
+interface HeroProps {
+  hero: HeroType;
+  notice?: string;
+}
+
+export default function Hero({ hero, notice }: HeroProps) {
   if (hero.disabled) {
     return null;
   }
@@ -67,6 +72,7 @@ export default function Hero({ hero }: { hero: HeroType }) {
               <div className="mt-8">
                 <ToolInterface 
                   mode={hero.tool_mode || "video"} 
+                  notice={notice}
                 />
               </div>
             )}

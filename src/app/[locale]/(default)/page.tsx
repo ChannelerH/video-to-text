@@ -58,8 +58,8 @@ export default async function VideoToTextPage({
   return (
     <>
       {/* 1. Hero区（转换工具） */}
-      {page.hero && <Hero hero={page.hero} />}
-      
+      {page.hero && <Hero hero={page.hero} notice={t("notices.chinese_processing")} />}
+
       {/* 2. 信任指标（关键数据） */}
       {page.stats && <Stats section={page.stats} locale={locale} />}
 

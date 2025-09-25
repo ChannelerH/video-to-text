@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { setRequestLocale, getTranslations } from "next-intl/server";
 import Link from "next/link";
 import ToolInterface from "@/components/tool-interface";
 import AudioUploadWidgetEnhanced from "@/components/landing/audio-upload-widget-enhanced";
@@ -62,6 +62,7 @@ export default async function AudioToTextPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations();
   // 尽量沿用已有多语言文案（如可用），但严格按新的 UI 结构渲染
   const page = await getAudioPage(locale).catch(() => undefined as any);
 
@@ -116,7 +117,7 @@ export default async function AudioToTextPage({
 
           {/* Right - Enhanced Upload widget with progress and results */}
           <div>
-            <AudioUploadWidgetEnhanced locale={locale} />
+            <AudioUploadWidgetEnhanced locale={locale} notice={t("notices.chinese_processing")} />
           </div>
         </div>
       </section>

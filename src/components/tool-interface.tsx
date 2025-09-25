@@ -114,9 +114,10 @@ const ThreeColumnEditor = dynamic(() => import('@/components/editor-view/three-c
 
 interface ToolInterfaceProps {
   mode?: "video" | "audio";
+  notice?: string;
 }
 
-export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
+export default function ToolInterface({ mode = "video", notice }: ToolInterfaceProps) {
   const t = useTranslations("tool_interface");
   
   // Authentication state
@@ -1936,8 +1937,14 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           </div>
           <div className="url-help-text">
             <span className="text-xs text-gray-400">{t(mode === "video" ? "url_help_text_video" : "url_help_text_audio")}</span>
-            <span className="text-xs text-gray-500 ml-2">•</span>
-            <span className="text-xs text-gray-500 ml-2">{t("url_not_supported")}</span>
+            {/* <span className="text-xs text-gray-500 ml-2">•</span> */}
+            {/* <span className="text-xs text-gray-500 ml-2">{t("url_not_supported")}</span> */}
+            {notice && (
+              <>
+                <span className="text-xs text-gray-500 ml-2">•</span>
+                <span className="text-xs text-gray-400 ml-2">{notice}</span>
+              </>
+            )}
           </div>
         </div>
 

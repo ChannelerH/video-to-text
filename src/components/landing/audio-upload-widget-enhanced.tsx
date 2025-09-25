@@ -30,6 +30,7 @@ import {
 
 interface Props {
   locale: string;
+  notice?: string;
 }
 
 interface PreviewSegment {
@@ -123,7 +124,7 @@ async function measureFileDuration(file: File): Promise<number | null> {
   });
 }
 
-export default function AudioUploadWidgetEnhanced({ locale }: Props) {
+export default function AudioUploadWidgetEnhanced({ locale, notice }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { data: session } = useSession();
   const isAuthenticated = !!session?.user;
@@ -1001,6 +1002,14 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
 
             <p className="mt-4 text-center text-slate-400 text-sm">
               Supports: MP3, WAV, M4A, AAC, OGG, FLAC, MP4, and more
+              {notice && (
+                <>
+                  <br />
+                  <span className="text-xs text-slate-400/70 mt-1 inline-block">
+                    {notice}
+                  </span>
+                </>
+              )}
             </p>
 
             {/* Transcription Options */}

@@ -71,6 +71,14 @@ interface Mp36VideoData {
 
 const DEFAULT_RAPIDAPI_HOST = 'youtube-mp36.p.rapidapi.com';
 
+type PrefetchedDownload = {
+  videoId: string;
+  link?: string;
+  title?: string;
+  filesize?: number | string;
+  duration?: number | string;
+};
+
 function parseDurationFromString(value: string): number | null {
   if (!value) return null;
   const trimmed = value.trim();
@@ -121,6 +129,7 @@ function parseSizeString(value: string | undefined): number | undefined {
 
 export class YouTubeService {
   private static rapidApiCache = new Map<string, Mp36VideoData>();
+  private static prefetchedCache = new Map<string, Mp36VideoData>();
 
   /**
    * 验证并解析 YouTube URL
@@ -296,6 +305,22 @@ export class YouTubeService {
     const bytesPerSecond = fileSizeBytes / durationSeconds;
     const kbps = (bytesPerSecond * 8) / 1024;
     return Math.max(64, Math.round(kbps));
+  }
+
+  private static normalizePrefetchedData(videoId: string, data: PrefetchedDownload | Mp36VideoData | undefined | null): Mp36VideoData | null {
+    if (!data) return null;
+    if ('link' in data || 'title' in data || 'filesize' in data || 'duration' in data) {
+      const { link, title, filesize, duration } = data as PrefetchedDownload;
+      return {
+        status: 'ok',
+        msg: 'prefetched',
+        link,
+        title,
+        filesize,
+        duration,
+      };
+    }
+    return data as Mp36VideoData;
   }
 
   /**
@@ -592,9 +617,12 @@ export class YouTubeService {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
   }
 
-  private static async fetchVideoData(videoId: string, forceRefresh = false): Promise<Mp36VideoData> {
-    if (!forceRefresh && this.rapidApiCache.has(videoId)) {
-      return this.rapidApiCache.get(videoId)!;
+  private static async fetchVideoData(videoId: string, forceRefresh = false, attempt = 0): Promise<Mp36VideoData> {
+    if (!forceRefresh) {
+      const cached = this.rapidApiCache.get(videoId) || this.prefetchedCache.get(videoId);
+      if (cached) {
+        return cached;
+      }
     }
 
     const { host, key } = this.getRapidApiCredentials();
@@ -635,6 +663,15 @@ export class YouTubeService {
     }
 
     const status = data.status?.toLowerCase();
+    if (status === 'in process' || status === 'processing') {
+      if (attempt >= 4) {
+        throw new Error(data.msg ? String(data.msg) : 'RapidAPI still processing download');
+      }
+      const delay = Math.min(2000 * Math.pow(2, Math.max(0, attempt - 0)), 16000);
+      await sleep(delay);
+      return this.fetchVideoData(videoId, true, attempt + 1);
+    }
+
     if (!data.link || (status && status !== 'ok' && status !== 'success')) {
       throw new Error(data.msg ? String(data.msg) : 'RapidAPI returned invalid download data');
     }
@@ -684,6 +721,18 @@ export class YouTubeService {
       `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
       `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     ];
+  }
+
+  static primeVideoData(videoId: string, data: PrefetchedDownload | Mp36VideoData) {
+    const normalized = this.normalizePrefetchedData(videoId, data);
+    if (normalized) {
+      this.rapidApiCache.set(videoId, normalized);
+      this.prefetchedCache.set(videoId, normalized);
+    }
+  }
+
+  static getPrimedVideoData(videoId: string): Mp36VideoData | undefined {
+    return this.rapidApiCache.get(videoId) || this.prefetchedCache.get(videoId);
   }
 
   private static applyCdnProxy(url: string, cdnProxy: string): string {
@@ -958,4 +1007,8 @@ export class YouTubeService {
 
     return { host, key };
   }
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }

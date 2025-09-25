@@ -21,6 +21,9 @@
     "view_full_comparison": "查看完整对比",
     "cny_payment": "人民币支付"
   },
+  "notices": {
+    "chinese_processing": "中文转写可能稍慢，我们会自动优化标点与可读性。"
+  },
   "pricing_cta": {
     "title": "简单透明的定价",
     "subtitle": "免费开始，每月30分钟",
@@ -403,7 +406,6 @@
     "audio_url_placeholder": "粘贴 YouTube 链接 (youtube.com, youtu.be)...",
     "url_help_text_video": "支持：YouTube视频",
     "url_help_text_audio": "支持：YouTube视频",
-    "url_not_supported": "不支持：Vimeo、Spotify、音频直链、Google Drive",
     "upload_disabled_url": "文件上传已禁用（已输入URL）",
     "url_disabled_file": "URL输入已禁用（已选择文件）",
     "clear_file": "清除",
