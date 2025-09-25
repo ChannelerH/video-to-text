@@ -130,7 +130,12 @@ export async function pollJobStatus(
         }
       };
     } else if (result.status === 'failed') {
-      throw new Error(result.error || 'Transcription failed');
+      const errorCode = result.error_code || result.error;
+      const error = new Error(errorCode || 'Transcription failed');
+      if (errorCode) {
+        (error as any).errorCode = errorCode;
+      }
+      throw error;
     }
 
     throw new Error('Unexpected status: ' + result.status);

@@ -53,10 +53,17 @@ export async function computeEstimatedMinutes(params: EstimateParams): Promise<n
   if (estimatedSeconds === null) {
     if (type === 'youtube_url') {
       try {
-        const info = await YouTubeService.getVideoInfo(content);
-        if (info?.duration && Number.isFinite(info.duration) && info.duration > 0) {
-          options.estimatedDurationSec = info.duration;
-          estimatedSeconds = info.duration;
+        const parsedId = YouTubeService.validateAndParseUrl(content);
+
+        if (!parsedId) {
+          console.warn('[EstimateUsage] Failed to parse YouTube URL for duration estimate', { content });
+        } else {
+          const info = await YouTubeService.getVideoInfo(parsedId);
+          if (info?.duration && Number.isFinite(info.duration) && info.duration > 0) {
+            options.youtubeVideoId = parsedId;
+            options.estimatedDurationSec = info.duration;
+            estimatedSeconds = info.duration;
+          }
         }
       } catch (error) {
         console.warn('[EstimateUsage] YouTube duration fetch failed', error);

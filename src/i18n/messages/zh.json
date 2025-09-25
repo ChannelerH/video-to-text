@@ -585,7 +585,9 @@
       "retry_suggestion": "点击重试按钮重新尝试。",
       "timeout": "操作超时，请重试。",
       "server_error": "服务器错误，请稍后重试。",
-      "network": "网络连接失败，请检查网络后重试。"
+      "network": "网络连接失败，请检查网络后重试。",
+      "youtube_manual_upload_required_title": "需要手动上传",
+      "youtube_manual_upload_required_message": "我们无法自动下载此 YouTube 视频，请先手动下载视频，然后通过文件上传方式继续转录。"
     },
     "warnings": {
       "staging_failed_title": "处理提示",

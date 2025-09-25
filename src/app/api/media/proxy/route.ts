@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
-import ytdl from '@distube/ytdl-core';
-import { Readable } from 'stream';
+import { YouTubeService } from '@/lib/youtube';
 
 export const runtime = 'nodejs';
 
@@ -21,42 +20,58 @@ export async function GET(req: NextRequest) {
     const url = new URL(src);
     const isYouTube = /(^|\.)youtube\.com$/.test(url.hostname) || /(^|\.)youtu\.be$/.test(url.hostname);
 
-    // Special handling for YouTube: stream audio via ytdl-core
+    // Special handling for YouTube: resolve audio via YouTubeService
     if (isYouTube) {
       try {
-        const stream = ytdl(src, {
-          quality: 'highestaudio',
-          filter: 'audioonly',
-          highWaterMark: 1 << 25, // 32MB buffer for smoother streaming
-          requestOptions: {
-            headers: {
-              'User-Agent': 'Mozilla/5.0',
-              'Accept-Language': 'en-US,en;q=0.9'
-            }
-          }
-        }) as unknown as Readable;
+        const videoId = YouTubeService.validateAndParseUrl(src);
+        if (!videoId) {
+          return new Response('invalid youtube url', { status: 400 });
+        }
 
-        // Convert Node stream to Web ReadableStream
-        const webStream = new ReadableStream({
-          start(controller) {
-            stream.on('data', (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
-            stream.on('end', () => controller.close());
-            stream.on('error', (err: any) => controller.error(err));
+        const audioUrl = await YouTubeService.getAudioStreamUrl(videoId);
+
+        console.log('[Media Proxy] Audio URL:', audioUrl);
+        
+        const range = req.headers.get('range') || undefined;
+
+        const upstream = await fetch(audioUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0',
+            ...(range ? { Range: range } : {}),
           },
-          cancel() { try { stream.destroy(); } catch { /* noop */ } }
         });
 
-        return new Response(webStream, {
-          status: 200,
-          headers: {
-            // Most YouTube audioonly streams are webm/opus; use a safe default
-            'Content-Type': 'audio/webm',
-            'Cache-Control': 'no-store',
-            'Access-Control-Allow-Origin': '*'
-          }
+        if (!upstream.ok && upstream.status !== 206) {
+          const message = await upstream.text().catch(() => '');
+          return new Response(`upstream-error: ${upstream.status} ${message}`, { status: 502 });
+        }
+
+        if (!upstream.body) {
+          return new Response('upstream returned empty body', { status: 502 });
+        }
+
+        const headers = new Headers();
+        const contentType = upstream.headers.get('content-type') || 'audio/webm';
+        headers.set('Content-Type', contentType);
+
+        const contentLength = upstream.headers.get('content-length');
+        if (contentLength) headers.set('Content-Length', contentLength);
+
+        const contentRange = upstream.headers.get('content-range');
+        if (contentRange) headers.set('Content-Range', contentRange);
+
+        const acceptRanges = upstream.headers.get('accept-ranges');
+        if (acceptRanges) headers.set('Accept-Ranges', acceptRanges);
+
+        headers.set('Cache-Control', 'no-store');
+        headers.set('Access-Control-Allow-Origin', '*');
+
+        return new Response(upstream.body, {
+          status: upstream.status,
+          headers,
         });
       } catch (e: any) {
-        return new Response(`ytdl-error: ${e?.message || 'failed to stream'}`, { status: 502 });
+        return new Response(`youtube-proxy-error: ${e?.message || 'failed to stream'}`, { status: 502 });
       }
     }
 

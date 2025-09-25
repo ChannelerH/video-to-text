@@ -730,7 +730,9 @@
       "retry_suggestion": "Click Retry to try again.",
       "timeout": "The operation is taking longer than expected. Please try again.",
       "server_error": "Server error occurred. Please try again in a moment.",
-      "network": "Network connection failed. Please check your connection and try again."
+      "network": "Network connection failed. Please check your connection and try again.",
+      "youtube_manual_upload_required_title": "Manual Upload Needed",
+      "youtube_manual_upload_required_message": "We couldn't download this YouTube video automatically. Please download the video manually and upload the file to continue the transcription."
     },
     "warnings": {
       "staging_failed_title": "Processing Notice",

@@ -1129,27 +1129,40 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           );
         } catch (error) {
           console.error('[Async Transcribe] Error:', error);
-          const errorMessage = error instanceof Error ? error.message : 'Transcription failed';
+          const rawMessage = error instanceof Error ? error.message : 'Transcription failed';
           const errorType = getErrorType(error as Error);
-          
-          // Set error state with retry capability
+          const errorCode = (error as any)?.errorCode || rawMessage;
+
+          const defaultTitle = t("errors.transcription_failed_title") || "Transcription Failed";
+          const retrySuggestion = t("errors.retry_suggestion") || "Click Retry to try again.";
+
+          let displayTitle = defaultTitle;
+          let displayMessage = rawMessage;
+          let canRetry = errorType !== 'cancelled';
+
+          if (errorCode === 'youtube_manual_upload_required') {
+            displayTitle = t("errors.youtube_manual_upload_required_title") || "Manual Upload Needed";
+            displayMessage = t("errors.youtube_manual_upload_required_message") 
+              || "We couldn't download this YouTube video automatically. Please download it manually and upload the file for transcription.";
+            canRetry = false;
+          } else if (canRetry) {
+            displayMessage = `${rawMessage}. ${retrySuggestion}`;
+          }
+
+          const dialogType = errorType === 'timeout' ? 'timeout'
+            : errorType === 'server' ? 'server'
+            : errorType === 'network' ? 'network'
+            : 'api_error';
+
           setErrorState({
-            type: errorType === 'timeout' ? 'timeout' : 
-                  errorType === 'server' ? 'server' : 
-                  errorType === 'network' ? 'network' : 'api_error',
-            message: errorMessage,
-            canRetry: errorType !== 'cancelled',
-            retryAction: () => performTranscription(preferredLanguage)
+            type: dialogType,
+            message: displayMessage,
+            canRetry,
+            retryAction: canRetry ? () => performTranscription(preferredLanguage) : undefined
           });
-          
-          // Show error toast with retry option
-          showToast(
-            'error', 
-            t("errors.transcription_failed_title") || "Transcription Failed",
-            `${errorMessage}. ${errorType !== 'cancelled' ? t("errors.retry_suggestion") || "Click Retry to try again." : ""}`
-          );
-          
-          // Reset UI state
+
+          showToast('error', displayTitle, displayMessage);
+
           setProgress("");
           setIsProcessing(false);
           setProgressInfo({ stage: null, percentage: 0, message: '' });
@@ -1199,27 +1212,40 @@ export default function ToolInterface({ mode = "video" }: ToolInterfaceProps) {
           );
         } catch (error) {
           console.error('[Async Transcribe Anon] Error:', error);
-          const errorMessage = error instanceof Error ? error.message : 'Transcription failed';
+          const rawMessage = error instanceof Error ? error.message : 'Transcription failed';
           const errorType = getErrorType(error as Error);
-          
-          // Set error state with retry capability
+          const errorCode = (error as any)?.errorCode || rawMessage;
+
+          const defaultTitle = t("errors.transcription_failed_title") || "Transcription Failed";
+          const retrySuggestion = t("errors.retry_suggestion") || "Click Retry to try again.";
+
+          let displayTitle = defaultTitle;
+          let displayMessage = rawMessage;
+          let canRetry = errorType !== 'cancelled';
+
+          if (errorCode === 'youtube_manual_upload_required') {
+            displayTitle = t("errors.youtube_manual_upload_required_title") || "Manual Upload Needed";
+            displayMessage = t("errors.youtube_manual_upload_required_message") 
+              || "We couldn't download this YouTube video automatically. Please download it manually and upload the file for transcription.";
+            canRetry = false;
+          } else if (canRetry) {
+            displayMessage = `${rawMessage}. ${retrySuggestion}`;
+          }
+
+          const dialogType = errorType === 'timeout' ? 'timeout'
+            : errorType === 'server' ? 'server'
+            : errorType === 'network' ? 'network'
+            : 'api_error';
+
           setErrorState({
-            type: errorType === 'timeout' ? 'timeout' : 
-                  errorType === 'server' ? 'server' : 
-                  errorType === 'network' ? 'network' : 'api_error',
-            message: errorMessage,
-            canRetry: errorType !== 'cancelled',
-            retryAction: () => performTranscription(preferredLanguage)
+            type: dialogType,
+            message: displayMessage,
+            canRetry,
+            retryAction: canRetry ? () => performTranscription(preferredLanguage) : undefined
           });
-          
-          // Show error toast with retry suggestion
-          showToast(
-            'error',
-            t("errors.transcription_failed_title") || "Transcription Failed", 
-            `${errorMessage}. ${errorType !== 'cancelled' ? t("errors.retry_suggestion") || "Click Retry to try again." : ""}`
-          );
-          
-          // Reset UI state
+
+          showToast('error', displayTitle, displayMessage);
+
           setProgress("");
           setIsProcessing(false);
           setProgressInfo({ stage: null, percentage: 0, message: '' });

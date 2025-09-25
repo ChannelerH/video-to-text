@@ -92,6 +92,19 @@ export async function GET(
       && createdAt
       && Date.now() - createdAt.getTime() > 5 * 60 * 1000; // >2分钟仍 queued
 
+    let errorCode: string | null = null;
+    if (transcription.status === 'failed') {
+      const processedUrl = transcription.processed_url || '';
+      if (typeof processedUrl === 'string' && processedUrl.startsWith('download_failed:manual_upload_required')) {
+        errorCode = 'youtube_manual_upload_required';
+      }
+    }
+
+    const processedUrl
+      = typeof transcription.processed_url === 'string' && transcription.processed_url.startsWith('download_failed:')
+        ? null
+        : transcription.processed_url;
+
     // 返回当前状态
     return NextResponse.json({
       status: transcription.status,
@@ -102,10 +115,11 @@ export async function GET(
       tier: effectiveTier,
       source_type: transcription.source_type,
       source_url: transcription.source_url,
-      processed_url: transcription.processed_url,
+      processed_url: processedUrl,
       original_duration_sec: transcription.original_duration_sec,
       ...(warning && { warning }),
-      ...(shouldRetry && { should_retry: true, retry_reason: 'queue_timeout' })
+      ...(shouldRetry && { should_retry: true, retry_reason: 'queue_timeout' }),
+      ...(errorCode && { error: errorCode, error_code: errorCode })
     });
 
   } catch (error) {

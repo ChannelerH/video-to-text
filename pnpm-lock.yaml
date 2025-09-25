@@ -35,9 +35,6 @@ importers:
       '@devnomic/marquee':
         specifier: ^1.0.2
         version: 1.0.2
-      '@distube/ytdl-core':
-        specifier: ^4.16.12
-        version: 4.16.12
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -754,10 +751,6 @@ packages:
   '@discoveryjs/json-ext@0.5.7':
     resolution: {integrity: sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==}
     engines: {node: '>=10.0.0'}
-
-  '@distube/ytdl-core@4.16.12':
-    resolution: {integrity: sha512-/NR8Jur1Q4E2oD+DJta7uwWu7SkqdEkhwERt7f4iune70zg7ZlLLTOHs1+jgg3uD2jQjpdk7RGC16FqstG4RsA==}
-    engines: {node: '>=20.18.1'}
 
   '@dnd-kit/accessibility@3.1.1':
     resolution: {integrity: sha512-2P+YgaXF+gRsIihwwY1gCsQSYnu9Zyj2py8kY5fFvUM1qm2WA2u639R6YNVfU4GWr+ZM5mqEsfHZZLoRONbemw==}
@@ -8169,18 +8162,6 @@ snapshots:
       tailwind-merge: 2.6.0
 
   '@discoveryjs/json-ext@0.5.7': {}
-
-  '@distube/ytdl-core@4.16.12':
-    dependencies:
-      http-cookie-agent: 7.0.2(tough-cookie@5.1.2)(undici@7.15.0)
-      https-proxy-agent: 7.0.6
-      m3u8stream: 0.8.6
-      miniget: 4.2.3
-      sax: 1.4.1
-      tough-cookie: 5.1.2
-      undici: 7.15.0
-    transitivePeerDependencies:
-      - supports-color
 
   '@dnd-kit/accessibility@3.1.1(react@19.0.0)':
     dependencies:

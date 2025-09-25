@@ -26,7 +26,15 @@ export async function POST(request: NextRequest) {
 
     // 2. 解析请求
     const body = await request.json();
-    const { type, content, options: rawOptions = {}, action } = body;
+    const { type, content, options: rawOptions = {}, action, turnstileToken, sessionToken } = body;
+    
+    console.log('[Async API] Request received:', {
+      hasUser: !!maybeUserUuid,
+      action,
+      hasSessionToken: !!sessionToken,
+      hasTurnstileToken: !!turnstileToken,
+      contentType: type
+    });
     const options: Record<string, any> = { ...rawOptions };
     if (options.highAccuracyMode === undefined) {
       const alias = options.high_accuracy ?? options.highAccuracy;
@@ -47,6 +55,96 @@ export async function POST(request: NextRequest) {
     const isPreview = String(action || '').toLowerCase() === 'preview';
     if (!maybeUserUuid && !isPreview) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // For anonymous preview, verify session token or Turnstile token
+    if (!maybeUserUuid && isPreview) {
+      // 优先使用session token
+      if (sessionToken) {
+        console.log('[Async] Verifying session token for anonymous preview');
+        try {
+          // 构建正确的验证URL
+          const baseUrl = request.url.split('/api/')[0];
+          const verifyUrl = `${baseUrl}/api/turnstile/verify`;
+
+          const forwardedFor = request.headers.get('x-forwarded-for');
+          const realIp = request.headers.get('x-real-ip');
+          const cfConnectingIp = request.headers.get('cf-connecting-ip');
+
+          const ipHeaders: Record<string, string> = {};
+          if (forwardedFor) ipHeaders['x-forwarded-for'] = forwardedFor;
+          if (realIp) ipHeaders['x-real-ip'] = realIp;
+          if (cfConnectingIp) ipHeaders['cf-connecting-ip'] = cfConnectingIp;
+
+          const verifyResponse = await fetch(verifyUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...ipHeaders
+            },
+            body: JSON.stringify({ token: sessionToken, action: 'verify_session' })
+          });
+          
+          const verifyData = await verifyResponse.json();
+          
+          if (!verifyData.success || !verifyData.valid) {
+            console.log('[Async] Session token invalid, requiring new verification');
+            return NextResponse.json(
+              { error: 'Session expired. Please verify again.' },
+              { status: 403 }
+            );
+          }
+          console.log('[Async] Session token valid');
+        } catch (error) {
+          console.error('[Async] Session verification error:', error);
+          return NextResponse.json(
+            { error: 'Session verification error. Please try again.' },
+            { status: 500 }
+          );
+        }
+      }
+      // 后向兼容：如果只有turnstile token，直接验证
+      else if (turnstileToken) {
+        console.log('[Async] Verifying Turnstile token for anonymous preview (legacy)');
+        try {
+          const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+          const formData = new URLSearchParams();
+          formData.append('secret', process.env.TURNSTILE_SECRET_KEY || '');
+          formData.append('response', turnstileToken);
+          
+          const verifyResponse = await fetch(verifyUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData,
+          });
+          
+          const verifyData = await verifyResponse.json();
+          console.log('[Async] Turnstile verification result:', verifyData.success);
+          
+          if (!verifyData.success) {
+            return NextResponse.json(
+              { error: 'Verification failed. Please try again.' },
+              { status: 403 }
+            );
+          }
+        } catch (error) {
+          console.error('[Async] Turnstile verification error:', error);
+          return NextResponse.json(
+            { error: 'Verification error. Please try again.' },
+            { status: 500 }
+          );
+        }
+      }
+      // 没有任何验证token
+      else {
+        console.log('[Async] No verification token provided for anonymous preview');
+        return NextResponse.json(
+          { error: 'Verification required. Please complete the security check.' },
+          { status: 403 }
+        );
+      }
     }
 
     const userUuid = maybeUserUuid || '';

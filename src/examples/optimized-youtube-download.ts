@@ -3,7 +3,7 @@
  * 
  * This demonstrates the various optimization features:
  * 1. Parallel chunk downloading
- * 2. Streaming with ytdl-core
+ * 2. Sequential HTTP streaming fallback
  * 3. Progress tracking
  * 4. CDN proxy support
  * 5. Error handling and retries
@@ -100,9 +100,9 @@ export async function robustDownloadWithFallbacks(videoId: string) {
   } catch (optimizedError) {
     console.warn('Optimized download failed:', optimizedError);
     
-    // Fallback to ytdl-core streaming
+    // Fallback to sequential HTTP streaming
     try {
-      console.log('Falling back to ytdl-core streaming...');
+      console.log('Falling back to HTTP streaming...');
       return await YouTubeService.downloadAudioWithYtdlStream(videoId, {
         onProgress: progressCallback,
         timeout: 90000,

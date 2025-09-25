@@ -1,6 +1,3 @@
-import ytdl from '@distube/ytdl-core';
-import { Readable, PassThrough } from 'stream';
-import { pipeline } from 'stream/promises';
 
 export interface VideoInfo {
   videoId: string;
@@ -50,6 +47,9 @@ export interface OptimizedAudioFormat {
   approxDurationMs: number;
   supportsRangeRequests?: boolean;
   isDrc?: boolean; // 是否使用了动态范围压缩
+  isDefaultAudio?: boolean;
+  audioTrackId?: string;
+  audioTrackDisplayName?: string;
 }
 
 export interface AudioTrackInfo {
@@ -59,17 +59,74 @@ export interface AudioTrackInfo {
   formats: number; // 可用格式数量
 }
 
+interface Mp36VideoData {
+  status?: string;
+  msg?: string;
+  link?: string;
+  title?: string;
+  filesize?: number | string;
+  duration?: number | string;
+  progress?: number | string;
+}
+
+const DEFAULT_RAPIDAPI_HOST = 'youtube-mp36.p.rapidapi.com';
+
+function parseDurationFromString(value: string): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    return parseFloat(trimmed);
+  }
+
+  if (trimmed.includes(':')) {
+    const parts = trimmed.split(':').map(Number);
+    if (parts.some(Number.isNaN)) return null;
+    let seconds = 0;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[parts.length - 1 - i];
+      seconds += part * Math.pow(60, i);
+    }
+    return seconds;
+  }
+
+  if (/^PT/.test(trimmed)) {
+    const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/;
+    const match = regex.exec(trimmed);
+    if (!match) return null;
+    const hours = match[1] ? parseInt(match[1], 10) : 0;
+    const minutes = match[2] ? parseInt(match[2], 10) : 0;
+    const seconds = match[3] ? parseFloat(match[3]) : 0;
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+
+  return null;
+}
+
+function parseSizeString(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const match = /(\d+(?:\.\d+)?)\s*(KB|MB|GB|B)/i.exec(value);
+  if (!match) return undefined;
+  const amount = parseFloat(match[1]);
+  const unit = match[2].toUpperCase();
+  const multipliers: Record<string, number> = {
+    B: 1,
+    KB: 1024,
+    MB: 1024 * 1024,
+    GB: 1024 * 1024 * 1024,
+  };
+  const multiplier = multipliers[unit];
+  return Number.isFinite(multiplier) ? Math.round(amount * multiplier) : undefined;
+}
+
 export class YouTubeService {
+  private static rapidApiCache = new Map<string, Mp36VideoData>();
+
   /**
    * 验证并解析 YouTube URL
    */
-  static validateAndParseUrl(url: string): string | null {
-    try {
-      const videoId = ytdl.getVideoID(url);
-      return videoId;
-    } catch (error) {
-      return null;
-    }
+  static validateAndParseUrl(input: string): string | null {
+    return this.extractVideoId(input);
   }
 
   /**
@@ -77,77 +134,14 @@ export class YouTubeService {
    */
   static async detectAudioTracks(videoId: string): Promise<AudioTrackInfo[]> {
     try {
-      const info = await ytdl.getInfo(videoId);
-      const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
-      
-      const tracks = new Map<string, AudioTrackInfo>();
-      
-      audioFormats.forEach(format => {
-        if (format.url) {
-          try {
-            const url = new URL(format.url);
-            const xtags = url.searchParams.get('xtags');
-            
-            if (xtags) {
-              const langMatch = xtags.match(/lang=([a-z]{2}(-[A-Z]{2})?)/i);
-              const typeMatch = xtags.match(/acont=(original|dubbed-auto)/i);
-              
-              if (langMatch) {
-                const languageCode = langMatch[1];
-                const trackType = (typeMatch ? typeMatch[1] : 'original') as 'original' | 'dubbed-auto';
-                const key = `${languageCode}_${trackType}`;
-                
-                if (!tracks.has(key)) {
-                  // 生成显示名称
-                  const languageNames: Record<string, string> = {
-                    'en-US': 'English (US)',
-                    'en': 'English',
-                    'zh-CN': 'Chinese (Simplified)',
-                    'zh-TW': 'Chinese (Traditional)',
-                    'es-US': 'Spanish (US)',
-                    'es': 'Spanish',
-                    'fr-FR': 'French',
-                    'de-DE': 'German',
-                    'ja': 'Japanese',
-                    'ko': 'Korean',
-                    'pt-BR': 'Portuguese (Brazil)',
-                    'ru': 'Russian',
-                    'it': 'Italian',
-                    'pl': 'Polish',
-                    'pl-PL': 'Polish',
-                    'hi': 'Hindi',
-                    'id': 'Indonesian'
-                  };
-                  
-                  const baseName = languageNames[languageCode] || languageCode;
-                  const displayName = trackType === 'dubbed-auto' 
-                    ? `${baseName} (AI Dubbed)` 
-                    : `${baseName} (Original)`;
-                  
-                  tracks.set(key, {
-                    languageCode,
-                    trackType,
-                    displayName,
-                    formats: 1
-                  });
-                } else {
-                  tracks.get(key)!.formats++;
-                }
-              }
-            }
-          } catch (e) {
-            // 忽略解析错误
-          }
-        }
-      });
-      
-      // 按原始音轨优先，然后按语言代码排序
-      return Array.from(tracks.values()).sort((a, b) => {
-        if (a.trackType !== b.trackType) {
-          return a.trackType === 'original' ? -1 : 1;
-        }
-        return a.languageCode.localeCompare(b.languageCode);
-      });
+      const formats = await this.getOptimizedAudioFormats(videoId);
+      if (!formats.length) return [];
+      return [{
+        languageCode: 'default',
+        trackType: 'original',
+        displayName: 'Default (Original)',
+        formats: formats.length,
+      }];
     } catch (error) {
       console.error('Error detecting audio tracks:', error);
       return [];
@@ -158,70 +152,32 @@ export class YouTubeService {
    * 获取视频信息和字幕
    */
   static async getVideoInfo(videoId: string, retryCount = 0): Promise<VideoInfo> {
-    // 速度优化：减少重试次数和延迟
-    const maxRetries = process.env.YOUTUBE_SPEED_MODE === 'true' ? 1 : 2; // 速度模式只重试1次
-    const baseDelay = 500; // 500ms基础延迟（原为1秒）
-    
+    const maxRetries = process.env.YOUTUBE_SPEED_MODE === 'true' ? 1 : 2;
+    const baseDelay = 500;
+
     try {
-      
-      const info = await ytdl.getInfo(videoId, {
-        requestOptions: {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
-          }
-        }
-      });
-      
-      const videoDetails = info.videoDetails;
-
-      // 提取字幕信息
-      const captions: Caption[] = [];
-      if (info.player_response?.captions?.playerCaptionsTracklistRenderer?.captionTracks) {
-        const tracks = info.player_response.captions.playerCaptionsTracklistRenderer.captionTracks;
-        
-        for (const track of tracks) {
-          captions.push({
-            languageCode: track.languageCode,
-            name: track.name?.simpleText || track.languageCode,
-            url: track.baseUrl,
-            isAutomatic: track.kind === 'asr'
-          });
-        }
-      }
-
-      const videoInfo: VideoInfo = {
-        videoId,
-        title: videoDetails.title,
-        duration: parseInt(videoDetails.lengthSeconds),
-        thumbnails: videoDetails.thumbnails?.map((t: any) => t.url) || [],
-        captions: captions.length > 0 ? captions : undefined
-      };
-      
-      return videoInfo;
+      const data = await this.fetchVideoData(videoId, retryCount > 0);
+      return this.parseVideoInfo(data, videoId);
     } catch (error: any) {
       console.error(`Error getting video info (attempt ${retryCount + 1}):`, {
-        error: error.message,
-        code: error.code,
-        errno: error.errno
+        error: error?.message,
       });
-      
-      // 检查是否是网络错误且还有重试机会
-      const isNetworkError = error.code === 'ECONNRESET' || 
-                            error.code === 'ENOTFOUND' || 
-                            error.code === 'ETIMEDOUT' ||
-                            error.message?.includes('socket hang up') ||
-                            error.message?.includes('read ECONNRESET') ||
-                            error.message?.includes('No playable formats found');
-      
+
+      const isNetworkError =
+        error?.name === 'AbortError' ||
+        error?.code === 'ECONNRESET' ||
+        error?.code === 'ENOTFOUND' ||
+        error?.code === 'ETIMEDOUT' ||
+        error?.message?.includes('socket hang up') ||
+        error?.message?.includes('read ECONNRESET');
+
       if (isNetworkError && retryCount < maxRetries) {
-        const delay = Math.min(baseDelay * Math.pow(1.5, retryCount), 2000); // 更快的重试，最多2秒
+        const delay = Math.min(baseDelay * Math.pow(1.5, retryCount), 2000);
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.getVideoInfo(videoId, retryCount + 1);
       }
-      
-      throw new Error(`Failed to get video info after ${retryCount + 1} attempts: ${error.message}`);
+
+      throw new Error(`Failed to get video info after ${retryCount + 1} attempts: ${error?.message ?? error}`);
     }
   }
 
@@ -241,218 +197,25 @@ export class YouTubeService {
 
   /**
    * 获取音频流 URL（用于转录）
-   * 包含增强的重试机制处理 ECONNRESET 错误
-   * @param videoId YouTube视频ID
-   * @param preferredLanguage 偏好的音轨语言代码（如 'en-US', 'zh-CN' 等）
-   * @param retryCount 重试次数
    */
   static async getAudioStreamUrl(videoId: string, preferredLanguage?: string, retryCount = 0): Promise<string> {
-    const maxRetries = 3;
-    const baseDelay = 1000;
-    
     try {
-      
-      // 添加 User-Agent 和其他请求头来避免被封
-      const info = await ytdl.getInfo(videoId, {
-        requestOptions: {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
-          }
-        }
-      });
-      
-      // 选择最佳音频格式 - 智能选择主音轨
-      const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
-      
-      if (audioFormats.length === 0) {
+      const formats = await this.getOptimizedAudioFormats(videoId, preferredLanguage);
+      if (!formats.length) {
         throw new Error('No audio formats available');
       }
-
-      // 检测多语言音轨
-      const languageTracks = new Map<string, any[]>();
-      audioFormats.forEach(format => {
-        if (format.url) {
-          try {
-            const url = new URL(format.url);
-            const xtags = url.searchParams.get('xtags');
-            
-            // 解析 xtags 中的语言信息
-            // 格式: "acont=original:lang=en-US" 或 "acont=dubbed-auto:lang=fr-FR"
-            let languageCode = 'default';
-            let trackType = 'original';
-            
-            if (xtags) {
-              const langMatch = xtags.match(/lang=([a-z]{2}(-[A-Z]{2})?)/i);
-              const typeMatch = xtags.match(/acont=(original|dubbed-auto)/i);
-              
-              if (langMatch) {
-                languageCode = langMatch[1];
-              }
-              if (typeMatch) {
-                trackType = typeMatch[1];
-              }
-            }
-            
-            const trackKey = `${languageCode}_${trackType}`;
-            if (!languageTracks.has(trackKey)) {
-              languageTracks.set(trackKey, []);
-            }
-            languageTracks.get(trackKey)!.push({
-              ...format,
-              languageCode,
-              trackType
-            });
-            
-          } catch (e) {
-            // URL 解析失败，使用默认分组
-            if (!languageTracks.has('default_original')) {
-              languageTracks.set('default_original', []);
-            }
-            languageTracks.get('default_original')!.push(format);
-          }
-        }
-      });
-      
-      
-      const drcFormats = audioFormats.filter(f => f.isDrc === true);
-      const nonDrcFormats = audioFormats.filter(f => !f.isDrc);
-
-      // 智能音轨选择策略（考虑语言偏好）
-      let bestFormat: any = null;
-      
-      // 如果指定了语言偏好
-      if (preferredLanguage && languageTracks.size > 1) {
-        // 先找原始音轨的指定语言
-        const preferredOriginalKey = `${preferredLanguage}_original`;
-        const preferredDubbedKey = `${preferredLanguage}_dubbed-auto`;
-        
-        // 处理语言代码兼容性（如 'pl' 匹配 'pl-PL'）
-        let candidateFormats = 
-          languageTracks.get(preferredOriginalKey) || 
-          languageTracks.get(preferredDubbedKey) ||
-          [];
-        
-        // 如果没找到，尝试匹配带区域码的版本（如 pl -> pl-PL）
-        if (candidateFormats.length === 0 && !preferredLanguage.includes('-')) {
-          // 遍历所有音轨，找到语言代码开头匹配的
-          for (const [key, formats] of languageTracks) {
-            if (key.startsWith(`${preferredLanguage}-`) && key.endsWith('_original')) {
-              candidateFormats = formats;
-              break;
-            }
-          }
-          // 如果还没找到原始音轨，尝试配音音轨
-          if (candidateFormats.length === 0) {
-            for (const [key, formats] of languageTracks) {
-              if (key.startsWith(`${preferredLanguage}-`) && key.endsWith('_dubbed-auto')) {
-                candidateFormats = formats;
-                break;
-              }
-            }
-          }
-        }
-        
-        if (candidateFormats.length > 0) {
-          // 在候选格式中选择最佳
-          bestFormat = candidateFormats.find(format => 
-            format.itag === 140 && format.url && !format.isDrc
-          ) || candidateFormats.find(format =>
-            format.url && !format.isDrc
-          );
-        }
-      }
-      
-      // 如果没有找到偏好语言，或没有指定语言，使用原始策略
-      if (!bestFormat) {
-        // 如果用户明确选择了语言但没找到，记录日志
-        if (preferredLanguage) {
-          console.log(`[YouTube] Preferred language '${preferredLanguage}' not found in available tracks. Available tracks:`, 
-            Array.from(languageTracks.keys()));
-        }
-        
-        // 优先选择原始英文音轨
-        const originalTracks = languageTracks.get('en-US_original') || 
-                              languageTracks.get('en_original') ||
-                              languageTracks.get('default_original') ||
-                              [];
-        
-        if (originalTracks.length > 0) {
-          bestFormat = originalTracks.find(format => 
-            format.itag === 140 && format.url && !format.isDrc
-          );
-        }
-        
-        // 如果还是没有，使用原始的选择逻辑
-        if (!bestFormat) {
-          bestFormat = audioFormats.find(format => 
-            format.itag === 140 && // 标准 AAC 128k 格式
-            format.url && 
-            !format.isDrc // 非DRC版本（原始音轨）
-          );
-        }
-      }
-
-
-      // 如果没有找到理想的格式，尝试其他非DRC格式
-      if (!bestFormat) {
-        bestFormat = audioFormats.find(format =>
-          format.url &&
-          format.audioBitrate && 
-          format.audioBitrate >= 96 && // 至少96kbps保证质量
-          !format.isDrc // 非DRC版本
-        );
-      }
-
-      // 如果还是没有，选择任何非DRC的音频
-      if (!bestFormat) {
-        bestFormat = audioFormats.find(format => 
-          format.url && !format.isDrc
-        );
-      }
-
-      // 最后的备选：选择最高质量的音频（即使是DRC）
-      if (!bestFormat) {
-        bestFormat = audioFormats
-          .filter(format => format.url && format.audioBitrate)
-          .sort((a, b) => {
-            // 优先选择标准格式
-            if (a.itag === 140 && b.itag !== 140) return -1;
-            if (b.itag === 140 && a.itag !== 140) return 1;
-            // 然后按比特率排序
-            const aQuality = parseInt(String(a.audioBitrate || '0'));
-            const bQuality = parseInt(String(b.audioBitrate || '0'));
-            return bQuality - aQuality;
-          })[0];
-      }
-
-      if (!bestFormat || !bestFormat.url) {
-        throw new Error('No valid audio format found');
-      }
-
-      return bestFormat.url;
+      return formats[0].url;
     } catch (error: any) {
       console.error(`Error getting audio stream (attempt ${retryCount + 1}):`, {
-        error: error.message,
-        code: error.code,
-        errno: error.errno
+        error: error?.message,
       });
-      
-      // 检查是否是网络错误且还有重试机会
-      const isNetworkError = error.code === 'ECONNRESET' || 
-                            error.code === 'ENOTFOUND' || 
-                            error.code === 'ETIMEDOUT' ||
-                            error.message?.includes('socket hang up') ||
-                            error.message?.includes('read ECONNRESET');
-      
-      if (isNetworkError && retryCount < maxRetries) {
-        const delay = baseDelay * Math.pow(2, retryCount); // 指数退避
-        await new Promise(resolve => setTimeout(resolve, delay));
+
+      if (retryCount < 2) {
+        await new Promise(resolve => setTimeout(resolve, 500 * (retryCount + 1)));
         return this.getAudioStreamUrl(videoId, preferredLanguage, retryCount + 1);
       }
-      
-      throw new Error(`Failed to get audio stream after ${retryCount + 1} attempts: ${error.message}`);
+
+      throw new Error(`Failed to get audio stream after ${retryCount + 1} attempts: ${error?.message ?? error}`);
     }
   }
 
@@ -460,134 +223,91 @@ export class YouTubeService {
    * 获取优化的音频格式列表（用于快速下载）
    */
   static async getOptimizedAudioFormats(videoId: string, preferredLanguage?: string): Promise<OptimizedAudioFormat[]> {
-    try {
-      const info = await ytdl.getInfo(videoId);
-      let audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
-      
-      // 如果指定了语言偏好，优先筛选该语言的音轨
-      if (preferredLanguage && audioFormats.length > 0) {
-        const preferredFormats = audioFormats.filter(format => {
-          if (format.url) {
-            try {
-              const url = new URL(format.url);
-              const xtags = url.searchParams.get('xtags');
-              if (xtags) {
-                // 处理语言代码兼容性
-                const hasExactMatch = xtags.includes(`lang=${preferredLanguage}`);
-                const hasPartialMatch = !preferredLanguage.includes('-') && 
-                  new RegExp(`lang=${preferredLanguage}-[A-Z]{2}`, 'i').test(xtags);
-                return hasExactMatch || hasPartialMatch;
-              }
-            } catch (e) {
-              // URL解析失败，忽略
-            }
-          }
-          return false;
-        });
-        
-        // 如果找到了偏好语言的格式，使用它们；否则使用所有格式
-        if (preferredFormats.length > 0) {
-          audioFormats = preferredFormats;
-          console.log(`[YouTube] Found ${preferredFormats.length} audio formats for language: ${preferredLanguage}`);
-        } else {
-          console.log(`[YouTube] No audio formats found for language: ${preferredLanguage}, using all formats`);
-        }
-      }
-      
-      if (audioFormats.length === 0) {
-        throw new Error('No audio formats available');
-      }
-
-      // 转换为优化格式并排序
-      const optimizedFormats: OptimizedAudioFormat[] = audioFormats
-        .map(format => ({
-          itag: format.itag,
-          url: format.url,
-          mimeType: format.mimeType || 'audio/unknown',
-          bitrate: format.audioBitrate || 0,
-          contentLength: format.contentLength ? parseInt(format.contentLength) : undefined,
-          quality: format.quality || 'unknown',
-          audioQuality: format.audioQuality || 'unknown',
-          approxDurationMs: parseInt(format.approxDurationMs || '0'),
-          supportsRangeRequests: format.hasAudio && !format.isLive,
-          isDrc: format.isDrc || false // 添加 DRC 信息
-        }))
-        .filter(format => format.bitrate > 0) // 过滤无效格式
-        .sort((a, b) => {
-          // 优先选择适合转录的格式：
-          // 1. 优先选择非DRC格式（原始音轨）
-          // 2. 保证音频质量足够用于转录（至少64kbps）
-          // 3. 优先选择支持范围请求的格式（可以并行下载）
-          
-          // 首先按DRC状态排序（非DRC优先）
-          if (a.isDrc !== b.isDrc) {
-            return a.isDrc ? 1 : -1; // 非DRC排在前面
-          }
-          
-          const minBitrate = 64; // 转录最低要求
-          const aValidBitrate = a.bitrate >= minBitrate ? a.bitrate : 999999;
-          const bValidBitrate = b.bitrate >= minBitrate ? b.bitrate : 999999;
-          
-          // 优先选择支持范围请求的格式
-          if (a.supportsRangeRequests !== b.supportsRangeRequests) {
-            return b.supportsRangeRequests ? 1 : -1;
-          }
-          
-          // 然后按文件大小排序（越小越好，下载更快）
-          if (a.contentLength && b.contentLength) {
-            return a.contentLength - b.contentLength;
-          }
-          
-          // 最后按比特率排序（选择合适的质量）
-          return aValidBitrate - bValidBitrate;
-        });
-
-      return optimizedFormats;
-    } catch (error) {
-      console.error('Error getting optimized audio formats:', error);
-      throw new Error('Failed to get optimized audio formats');
+    const data = await this.fetchVideoData(videoId);
+    if (!data.link) {
+      throw new Error('RapidAPI returned empty download link');
     }
+
+    const durationSeconds = this.parseDurationSeconds(data) ?? 0;
+    const fileSize = this.parseFileSize(data.filesize);
+
+    const format: OptimizedAudioFormat = {
+      itag: 0,
+      url: data.link,
+      mimeType: 'audio/mpeg',
+      bitrate: this.estimateBitrateKbps(durationSeconds, fileSize),
+      contentLength: fileSize,
+      quality: 'mp3',
+      audioQuality: 'mp3',
+      approxDurationMs: durationSeconds > 0 ? durationSeconds * 1000 : undefined,
+      supportsRangeRequests: true,
+      isDrc: false,
+      isDefaultAudio: true,
+      audioTrackDisplayName: 'Default (mp3)',
+      audioTrackId: undefined,
+    };
+
+    return [format];
   }
 
-  /**
-   * 选择最佳音频格式用于快速下载
-   */
   static async selectOptimizedAudioFormat(videoId: string, options?: { preferSmallSize?: boolean }): Promise<OptimizedAudioFormat> {
     const formats = await this.getOptimizedAudioFormats(videoId);
-    
-    if (formats.length === 0) {
+
+    if (!formats.length) {
       throw new Error('No suitable audio formats found');
     }
 
-    // 优先选择非DRC格式（原始音轨）
-    const nonDrcFormats = formats.filter(f => !f.isDrc);
-    const availableFormats = nonDrcFormats.length > 0 ? nonDrcFormats : formats;
+    const defaultFormats = formats.filter(f => f.isDefaultAudio);
+    const defaultPool = defaultFormats.length ? defaultFormats : formats;
 
-    // 如果偏好小文件，选择第一个（已按大小排序）
+    const nonDrc = defaultPool.filter(f => !f.isDrc);
+    const candidates = nonDrc.length ? nonDrc : defaultPool;
+
     if (options?.preferSmallSize) {
-      return availableFormats[0];
+      return candidates[0];
     }
 
-    // 否则选择质量和大小的平衡，优先选择非DRC格式
-    const balancedFormat = availableFormats.find(f => 
-      f.bitrate >= 96 && f.bitrate <= 128 && f.supportsRangeRequests && !f.isDrc
-    ) || availableFormats.find(f => 
-      f.bitrate >= 96 && f.bitrate <= 128 && f.supportsRangeRequests
-    ) || availableFormats[0];
+    const balanced = candidates.find(f => f.bitrate >= 96 && f.bitrate <= 160 && (f.supportsRangeRequests ?? true))
+      || candidates.find(f => f.bitrate >= 96 && (f.supportsRangeRequests ?? true))
+      || candidates[0];
 
-    return balancedFormat;
+    return balanced;
+  }
+
+  private static parseFileSize(input: number | string | undefined): number | undefined {
+    if (input === undefined || input === null) {
+      return undefined;
+    }
+    if (typeof input === 'number') {
+      return Number.isFinite(input) && input > 0 ? Math.round(input) : undefined;
+    }
+    if (/^\d+$/.test(input)) {
+      const parsed = parseInt(input, 10);
+      return parsed > 0 ? parsed : undefined;
+    }
+    const parsed = parseSizeString(input);
+    return parsed && parsed > 0 ? parsed : undefined;
+  }
+
+  private static estimateBitrateKbps(durationSeconds: number, fileSizeBytes?: number | undefined): number {
+    if (!fileSizeBytes || !Number.isFinite(fileSizeBytes) || fileSizeBytes <= 0 || !durationSeconds || durationSeconds <= 0) {
+      return 128; // sensible default for mp3
+    }
+    const bytesPerSecond = fileSizeBytes / durationSeconds;
+    const kbps = (bytesPerSecond * 8) / 1024;
+    return Math.max(64, Math.round(kbps));
   }
 
   /**
    * 流式下载音频（优化版本）
    */
   static async downloadAudioStreamOptimized(
-    videoId: string, 
+    videoId: string,
     options: DownloadOptions = {}
   ): Promise<Buffer> {
     const {
       enableParallelDownload = true,
-      chunkSize = 1024 * 1024, // 1MB chunks
+      chunkSize = 1024 * 1024,
       maxConcurrentChunks = 4,
       timeout = 60000,
       retryAttempts = 1,
@@ -598,45 +318,33 @@ export class YouTubeService {
     } = options;
 
     try {
-      // 获取最优音频格式：为保证识别准确率，优先选择较高比特率
-      const audioFormat = await this.selectOptimizedAudioFormat(videoId, { 
-        preferSmallSize: false 
-      });
-
-
+      const audioFormat = await this.selectOptimizedAudioFormat(videoId, { preferSmallSize: false });
       let audioUrl = audioFormat.url;
-      
-      // 使用CDN代理（如果提供）
+
       if (cdnProxy) {
         audioUrl = this.applyCdnProxy(audioUrl, cdnProxy);
       }
 
-      // 检查是否支持并行下载
-      if (enableParallelDownload && audioFormat.supportsRangeRequests && audioFormat.contentLength) {
-        return await this.downloadWithParallelChunks(
-          audioUrl, 
-          audioFormat.contentLength, 
-          {
-            chunkSize,
-            maxConcurrentChunks,
-            timeout,
-            retryAttempts,
-            retryDelay,
-            onProgress,
-            onError
-          }
-        );
-      } else {
-        // 使用标准流式下载
-        return await this.downloadWithStream(audioUrl, {
+      if (enableParallelDownload && (audioFormat.supportsRangeRequests ?? true) && audioFormat.contentLength) {
+        return await this.downloadWithParallelChunks(audioUrl, audioFormat.contentLength, {
+          chunkSize,
+          maxConcurrentChunks,
           timeout,
           retryAttempts,
           retryDelay,
           onProgress,
           onError,
-          totalSize: audioFormat.contentLength
         });
       }
+
+      return await this.downloadWithStream(audioUrl, {
+        timeout,
+        retryAttempts,
+        retryDelay,
+        onProgress,
+        onError,
+        totalSize: audioFormat.contentLength,
+      });
     } catch (error) {
       if (onError) {
         onError(error as Error);
@@ -646,352 +354,13 @@ export class YouTubeService {
   }
 
   /**
-   * 并行分块下载
-   */
-  private static async downloadWithParallelChunks(
-    url: string,
-    totalSize: number,
-    options: {
-      chunkSize: number;
-      maxConcurrentChunks: number;
-      timeout: number;
-      retryAttempts: number;
-      retryDelay: number;
-      onProgress?: (progress: DownloadProgress) => void;
-      onError?: (error: Error) => void;
-    }
-  ): Promise<Buffer> {
-    const { chunkSize, maxConcurrentChunks, timeout, retryAttempts, retryDelay, onProgress, onError } = options;
-    
-    const chunks: Buffer[] = [];
-    const totalChunks = Math.ceil(totalSize / chunkSize);
-    let completedChunks = 0;
-    let bytesDownloaded = 0;
-    const startTime = Date.now();
-
-
-    // 创建分块任务
-    const chunkTasks: Promise<{ index: number; buffer: Buffer }>[] = [];
-    
-    for (let i = 0; i < totalChunks; i += maxConcurrentChunks) {
-      const batch = [];
-      
-      for (let j = 0; j < maxConcurrentChunks && i + j < totalChunks; j++) {
-        const chunkIndex = i + j;
-        const start = chunkIndex * chunkSize;
-        const end = Math.min(start + chunkSize - 1, totalSize - 1);
-        
-        const chunkTask = this.downloadChunkWithRetry(
-          url, 
-          start, 
-          end, 
-          chunkIndex, 
-          timeout, 
-          retryAttempts, 
-          retryDelay
-        ).then(buffer => {
-          completedChunks++;
-          bytesDownloaded += buffer.length;
-          
-          // 报告进度
-          if (onProgress) {
-            const elapsed = (Date.now() - startTime) / 1000;
-            const speed = bytesDownloaded / elapsed;
-            const eta = (totalSize - bytesDownloaded) / speed;
-            
-            onProgress({
-              bytesDownloaded,
-              totalBytes: totalSize,
-              percentage: Math.round((bytesDownloaded / totalSize) * 100),
-              speed: Math.round(speed),
-              eta: Math.round(eta),
-              chunkIndex: completedChunks,
-              totalChunks
-            });
-          }
-          
-          return { index: chunkIndex, buffer };
-        }).catch(error => {
-          if (onError) {
-            onError(new Error(`Chunk ${chunkIndex} failed: ${error.message}`));
-          }
-          throw error;
-        });
-        
-        batch.push(chunkTask);
-      }
-      
-      // 等待当前批次完成
-      const batchResults = await Promise.all(batch);
-      chunkTasks.push(...batchResults.map(r => Promise.resolve(r)));
-    }
-
-    // 收集所有分块结果
-    const results = await Promise.all(chunkTasks);
-    
-    // 按索引排序并合并
-    results.sort((a, b) => a.index - b.index);
-    const finalBuffer = Buffer.concat(results.map(r => r.buffer));
-    
-    
-    return finalBuffer;
-  }
-
-  /**
-   * 下载单个分块（带重试）
-   */
-  private static async downloadChunkWithRetry(
-    url: string,
-    start: number,
-    end: number,
-    chunkIndex: number,
-    timeout: number,
-    retryAttempts: number,
-    retryDelay: number
-  ): Promise<Buffer> {
-    for (let attempt = 1; attempt <= retryAttempts; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-        const response = await fetch(url, {
-          headers: {
-            'Range': `bytes=${start}-${end}`,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          },
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        if (response.status === 206 || response.status === 200) {
-          const arrayBuffer = await response.arrayBuffer();
-          return Buffer.from(arrayBuffer);
-        } else {
-          throw new Error(`Unexpected status code: ${response.status}`);
-        }
-      } catch (error) {
-        
-        if (attempt === retryAttempts) {
-          throw error;
-        }
-        
-        // 指数退避延迟
-        const delay = retryDelay * Math.pow(2, attempt - 1);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-    
-    throw new Error(`Failed to download chunk ${chunkIndex} after ${retryAttempts} attempts`);
-  }
-
-  /**
-   * 标准流式下载
-   */
-  private static async downloadWithStream(
-    url: string,
-    options: {
-      timeout: number;
-      retryAttempts: number;
-      retryDelay: number;
-      onProgress?: (progress: DownloadProgress) => void;
-      onError?: (error: Error) => void;
-      totalSize?: number;
-    }
-  ): Promise<Buffer> {
-    const { timeout, retryAttempts, retryDelay, onProgress, onError, totalSize } = options;
-
-    for (let attempt = 1; attempt <= retryAttempts; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          },
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const chunks: Buffer[] = [];
-        let bytesDownloaded = 0;
-        const startTime = Date.now();
-        const contentLength = totalSize || (response.headers.get('content-length') ? parseInt(response.headers.get('content-length')!) : undefined);
-
-        if (!response.body) {
-          throw new Error('Response body is null');
-        }
-
-        const reader = response.body.getReader();
-        
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            
-            if (done) break;
-            
-            const chunk = Buffer.from(value);
-            chunks.push(chunk);
-            bytesDownloaded += chunk.length;
-
-            // 报告进度
-            if (onProgress) {
-              const elapsed = (Date.now() - startTime) / 1000;
-              const speed = bytesDownloaded / elapsed;
-              
-              onProgress({
-                bytesDownloaded,
-                totalBytes: contentLength,
-                percentage: contentLength ? Math.round((bytesDownloaded / contentLength) * 100) : undefined,
-                speed: Math.round(speed),
-                eta: contentLength ? Math.round((contentLength - bytesDownloaded) / speed) : undefined
-              });
-            }
-          }
-        } finally {
-          reader.releaseLock();
-        }
-
-        return Buffer.concat(chunks);
-      } catch (error) {
-        
-        if (attempt === retryAttempts) {
-          if (onError) {
-            onError(error as Error);
-          }
-          throw error;
-        }
-        
-        // 指数退避延迟
-        const delay = retryDelay * Math.pow(2, attempt - 1);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-    
-    throw new Error(`Failed to download after ${retryAttempts} attempts`);
-  }
-
-  /**
-   * 应用CDN代理
-   */
-  private static applyCdnProxy(url: string, cdnProxy: string): string {
-    try {
-      const originalUrl = new URL(url);
-      const proxyUrl = new URL(cdnProxy);
-      
-      // 将原始URL作为查询参数传递给代理
-      proxyUrl.searchParams.set('url', encodeURIComponent(url));
-      
-      return proxyUrl.toString();
-    } catch (error) {
-      console.warn('Failed to apply CDN proxy, using original URL:', error);
-      return url;
-    }
-  }
-
-  /**
-   * 使用ytdl-core流式下载（备用方法）
+   * 使用 HTTP 流作为保底方案，保留原签名
    */
   static async downloadAudioWithYtdlStream(videoId: string, options: DownloadOptions = {}): Promise<Buffer> {
-    const {
-      timeout = 60000,
-      retryAttempts = 3,
-      retryDelay = 1000,
-      onProgress,
-      onError
-    } = options;
-
-    for (let attempt = 1; attempt <= retryAttempts; attempt++) {
-      try {
-
-        const info = await ytdl.getInfo(videoId);
-        const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
-        
-        if (audioFormats.length === 0) {
-          throw new Error('No audio formats available');
-        }
-
-        // 选择最小的高质量格式用于快速下载
-        const bestFormat = audioFormats
-          .filter(f => f.audioBitrate && f.audioBitrate >= 64) // 最低64kbps用于转录
-          .sort((a, b) => {
-            const aSize = parseInt(a.contentLength || '999999999');
-            const bSize = parseInt(b.contentLength || '999999999');
-            return aSize - bSize; // 选择最小文件
-          })[0] || audioFormats[0];
-
-
-        const audioStream = ytdl(videoId, {
-          format: bestFormat,
-          quality: 'lowestaudio', // 优先选择最小音频用于快速下载
-        });
-
-        const chunks: Buffer[] = [];
-        let bytesDownloaded = 0;
-        const startTime = Date.now();
-        const totalSize = bestFormat.contentLength ? parseInt(bestFormat.contentLength) : undefined;
-
-        // 设置超时
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Download timeout')), timeout);
-        });
-
-        const downloadPromise = new Promise<Buffer>((resolve, reject) => {
-          audioStream.on('data', (chunk: Buffer) => {
-            chunks.push(chunk);
-            bytesDownloaded += chunk.length;
-
-            // 报告进度
-            if (onProgress) {
-              const elapsed = (Date.now() - startTime) / 1000;
-              const speed = bytesDownloaded / elapsed;
-
-              onProgress({
-                bytesDownloaded,
-                totalBytes: totalSize,
-                percentage: totalSize ? Math.round((bytesDownloaded / totalSize) * 100) : undefined,
-                speed: Math.round(speed),
-                eta: totalSize ? Math.round((totalSize - bytesDownloaded) / speed) : undefined
-              });
-            }
-          });
-
-          audioStream.on('end', () => {
-            const finalBuffer = Buffer.concat(chunks);
-            resolve(finalBuffer);
-          });
-
-          audioStream.on('error', (error) => {
-            reject(error);
-          });
-        });
-
-        return await Promise.race([downloadPromise, timeoutPromise]);
-      } catch (error) {
-        
-        if (attempt === retryAttempts) {
-          if (onError) {
-            onError(error as Error);
-          }
-          throw error;
-        }
-        
-        const delay = retryDelay * Math.pow(2, attempt - 1);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-    
-    throw new Error(`Failed to download with ytdl-core after ${retryAttempts} attempts`);
+    return this.downloadAudioStreamOptimized(videoId, {
+      ...options,
+      enableParallelDownload: false,
+    });
   }
 
   /**
@@ -999,51 +368,25 @@ export class YouTubeService {
    */
   static async downloadAudioClip(videoId: string, seconds: number = 10): Promise<Buffer> {
     const clipSeconds = Math.max(5, Math.min(20, Math.floor(seconds)));
-    const info = await ytdl.getInfo(videoId);
-    const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
-    if (audioFormats.length === 0) {
-      throw new Error('No audio formats available');
+    const format = await this.selectOptimizedAudioFormat(videoId, { preferSmallSize: true });
+    const bitrateKbps = format.bitrate || 96;
+    const bytesPerSecond = (bitrateKbps * 1024) / 8;
+    const targetBytes = Math.max(32_000, Math.floor(bytesPerSecond * clipSeconds * 1.2));
+
+    const headers: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0',
+    };
+    if (format.supportsRangeRequests ?? true) {
+      headers['Range'] = `bytes=0-${targetBytes - 1}`;
     }
-    // 选择更小的音频格式以尽快取得片段
-    const bestFormat = audioFormats
-      .filter(f => f.audioBitrate && f.audioBitrate >= 48)
-      .sort((a, b) => {
-        const aSize = parseInt(a.contentLength || '999999999');
-        const bSize = parseInt(b.contentLength || '999999999');
-        return aSize - bSize;
-      })[0] || audioFormats[0];
 
-    const bitrateKbps = bestFormat.audioBitrate || 96; // 近似值
-    const bytesPerSecond = (bitrateKbps * 1000) / 8; // kbps -> bytes/s
-    const targetBytes = Math.floor(bytesPerSecond * clipSeconds * 1.2); // 20% 裕量
-
-    return new Promise<Buffer>((resolve, reject) => {
-      try {
-        const stream = ytdl(videoId, { format: bestFormat, quality: 'lowestaudio' });
-        const chunks: Buffer[] = [];
-        let downloaded = 0;
-
-        const finalize = () => {
-          try {
-            stream.removeAllListeners();
-          } catch {}
-          resolve(Buffer.concat(chunks));
-        };
-
-        stream.on('data', (chunk: Buffer) => {
-          chunks.push(chunk);
-          downloaded += chunk.length;
-          if (downloaded >= targetBytes) {
-            try { stream.destroy(); } catch {}
-            finalize();
-          }
-        });
-        stream.on('end', finalize);
-        stream.on('error', (err: any) => reject(err));
-      } catch (e) {
-        reject(e);
-      }
-    });
+    const response = await fetch(format.url, { headers });
+    if (!response.ok) {
+      throw new Error(`Failed to download audio clip: ${response.status} ${response.statusText}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    return buffer.length > targetBytes ? buffer.subarray(0, targetBytes) : buffer;
   }
 
   /**
@@ -1054,23 +397,17 @@ export class YouTubeService {
     estimatedDownloadTime: number; // seconds
     supportsParallelDownload: boolean;
   }> {
-    try {
-      const selectedFormat = await this.selectOptimizedAudioFormat(videoId, { preferSmallSize: true });
-      
-      // 估算下载时间（基于平均网速10Mbps）
-      const averageSpeedBps = 10 * 1024 * 1024 / 8; // 10Mbps in bytes per second
-      const estimatedDownloadTime = selectedFormat.contentLength 
-        ? Math.ceil(selectedFormat.contentLength / averageSpeedBps)
-        : Math.ceil(selectedFormat.approxDurationMs / 1000 * selectedFormat.bitrate * 1024 / 8 / averageSpeedBps);
-      
-      return {
-        selectedFormat,
-        estimatedDownloadTime,
-        supportsParallelDownload: selectedFormat.supportsRangeRequests || false
-      };
-    } catch (error) {
-      throw new Error(`Failed to get audio format info: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    const selectedFormat = await this.selectOptimizedAudioFormat(videoId, { preferSmallSize: true });
+    const averageSpeedBps = (10 * 1024 * 1024) / 8;
+    const estimatedDownloadTime = selectedFormat.contentLength
+      ? Math.ceil(selectedFormat.contentLength / averageSpeedBps)
+      : Math.ceil((selectedFormat.approxDurationMs / 1000) * (selectedFormat.bitrate * 1024 / 8) / averageSpeedBps);
+
+    return {
+      selectedFormat,
+      estimatedDownloadTime,
+      supportsParallelDownload: selectedFormat.supportsRangeRequests ?? true,
+    };
   }
 
   /**
@@ -1082,36 +419,26 @@ export class YouTubeService {
     recommendations: string[];
   }> {
     try {
-      const info = await ytdl.getInfo(videoId);
+      const data = await this.fetchVideoData(videoId);
       const formats = await this.getOptimizedAudioFormats(videoId);
-      
+
       const reasons: string[] = [];
       const recommendations: string[] = [];
       let isOptimized = true;
 
-      // 检查是否是直播
-      if (info.videoDetails.isLiveContent) {
-        isOptimized = false;
-        reasons.push('Live content cannot be optimized for parallel download');
-        recommendations.push('Use standard streaming download for live content');
-      }
-
-      // 检查是否有支持范围请求的格式
-      const rangeFormats = formats.filter(f => f.supportsRangeRequests);
-      if (rangeFormats.length === 0) {
-        isOptimized = false;
-        reasons.push('No formats support range requests (parallel download)');
-        recommendations.push('Use ytdl-core streaming as fallback');
-      }
-
-      // 检查视频长度
-      const duration = parseInt(info.videoDetails.lengthSeconds);
-      if (duration > 3600) { // 1 hour
+      const duration = this.parseDurationSeconds(data) ?? 0;
+      if (duration > 3600) {
         reasons.push('Long video may benefit from parallel download');
         recommendations.push('Use larger chunk sizes and more concurrent connections');
       }
 
-      // 检查音频质量
+      const rangeFormats = formats.filter(f => f.supportsRangeRequests ?? true);
+      if (!rangeFormats.length) {
+        isOptimized = false;
+        reasons.push('No formats support range requests (parallel download)');
+        recommendations.push('Use sequential streaming download');
+      }
+
       const bestFormat = formats[0];
       if (bestFormat && bestFormat.bitrate < 64) {
         reasons.push('Low bitrate format may have quality issues for transcription');
@@ -1121,44 +448,33 @@ export class YouTubeService {
       return {
         isOptimized,
         reasons,
-        recommendations
+        recommendations,
       };
     } catch (error) {
       return {
         isOptimized: false,
         reasons: [`Error checking optimization: ${error instanceof Error ? error.message : String(error)}`],
-        recommendations: ['Use fallback download method']
+        recommendations: ['Use fallback download method'],
       };
     }
   }
 
-  /**
-   * 选择最佳字幕
-   */
   static selectBestCaption(captions: Caption[], preferredLanguages: string[] = ['en', 'en-US']): Caption | null {
     if (captions.length === 0) return null;
 
-    // 优先选择非自动生成的字幕
     const manualCaptions = captions.filter(c => !c.isAutomatic);
     const autoCaptions = captions.filter(c => c.isAutomatic);
-
     const allCaptions = [...manualCaptions, ...autoCaptions];
 
-    // 按语言偏好选择
     for (const lang of preferredLanguages) {
       const caption = allCaptions.find(c => c.languageCode.startsWith(lang));
       if (caption) return caption;
     }
 
-    // 返回第一个可用的字幕
     return allCaptions[0];
   }
 
-  /**
-   * 解析 XML 字幕为纯文本
-   */
   private static parseXMLCaptions(xmlContent: string): string {
-    // 兼容 srv1/srv3：允许内嵌标签，统一抽取纯文本
     const textRegex = /<text[^>]*>([\s\S]*?)<\/text>/g;
     const chunks: string[] = [];
     let match: RegExpExecArray | null;
@@ -1183,9 +499,6 @@ export class YouTubeService {
     return chunks.join(' ');
   }
 
-  /**
-   * 将字幕转换为 SRT 格式
-   */
   static async convertCaptionToSRT(captionUrl: string): Promise<string> {
     try {
       const xmlContent = await this.fetchCaptionXML(captionUrl);
@@ -1196,10 +509,6 @@ export class YouTubeService {
     }
   }
 
-  /**
-   * 带重试和兜底策略的字幕 XML 获取
-   * 顺序：baseUrl+fmt=srv3 -> baseUrl+fmt=srv1 -> timedtext?lang=..&v=..&fmt=srv3(或srv1)
-   */
   private static async fetchCaptionXML(captionUrl: string): Promise<string> {
     const tryFetch = async (url: string) => {
       const res = await fetch(url);
@@ -1208,18 +517,15 @@ export class YouTubeService {
       return text || '';
     };
 
-    // 1) baseUrl + fmt=srv3
     const hasFmt = /[?&]fmt=/.test(captionUrl);
     const urlSrv3 = hasFmt ? captionUrl : `${captionUrl}${captionUrl.includes('?') ? '&' : '?'}fmt=srv3`;
     let xml = await tryFetch(urlSrv3);
     if (xml && xml.length > 0) return xml;
 
-    // 2) baseUrl + fmt=srv1
     const urlSrv1 = hasFmt ? captionUrl : `${captionUrl}${captionUrl.includes('?') ? '&' : '?'}fmt=srv1`;
     xml = await tryFetch(urlSrv1);
     if (xml && xml.length > 0) return xml;
 
-    // 3) Rebuild via timedtext endpoint
     try {
       const u = new URL(captionUrl);
       const lang = u.searchParams.get('lang') || u.searchParams.get('lang_code') || 'en';
@@ -1241,20 +547,17 @@ export class YouTubeService {
     return '';
   }
 
-  /**
-   * 解析 XML 字幕为 SRT 格式
-   */
   private static parseXMLToSRT(xmlContent: string): string {
     const textRegex = /<text start="([^"]+)" dur="([^"]+)"[^>]*>([\s\S]*?)<\/text>/g;
-    const srtEntries = [];
-    let match;
+    const srtEntries: string[] = [];
+    let match: RegExpExecArray | null;
     let index = 1;
 
     while ((match = textRegex.exec(xmlContent)) !== null) {
       const startTime = parseFloat(match[1]);
       const duration = parseFloat(match[2]);
       const endTime = startTime + duration;
-      
+
       const inner = match[3]
         .replace(/<br\s*\/>/gi, '\n')
         .replace(/<[^>]+>/g, '');
@@ -1280,9 +583,6 @@ export class YouTubeService {
     return srtEntries.join('\n');
   }
 
-  /**
-   * 将秒数转换为 SRT 时间格式
-   */
   private static secondsToSRTTime(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -1290,5 +590,372 @@ export class YouTubeService {
     const ms = Math.floor((seconds % 1) * 1000);
 
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+  }
+
+  private static async fetchVideoData(videoId: string, forceRefresh = false): Promise<Mp36VideoData> {
+    if (!forceRefresh && this.rapidApiCache.has(videoId)) {
+      return this.rapidApiCache.get(videoId)!;
+    }
+
+    const { host, key } = this.getRapidApiCredentials();
+    const endpoint = `https://${host}/dl?id=${encodeURIComponent(videoId)}`;
+
+    const response = await fetch(endpoint, {
+      headers: {
+        'x-rapidapi-host': host,
+        'x-rapidapi-key': key,
+        'Accept': 'application/json',
+      },
+    });
+
+    const rawBody = await response.text();
+
+    if (!response.ok) {
+      console.error('[YouTube] RapidAPI request failed', {
+        status: response.status,
+        statusText: response.statusText,
+        body: rawBody,
+      });
+      throw new Error(`RapidAPI request failed with status ${response.status}`);
+    }
+
+    let data: Mp36VideoData;
+    try {
+      data = JSON.parse(rawBody) as Mp36VideoData;
+    } catch (parseError) {
+      console.error('[YouTube] Failed to parse RapidAPI response as JSON', {
+        parseError,
+        bodySnippet: rawBody.slice(0, 500),
+      });
+      throw new Error('RapidAPI response is not valid JSON');
+    }
+
+    if (!data) {
+      throw new Error('RapidAPI response is empty');
+    }
+
+    const status = data.status?.toLowerCase();
+    if (!data.link || (status && status !== 'ok' && status !== 'success')) {
+      throw new Error(data.msg ? String(data.msg) : 'RapidAPI returned invalid download data');
+    }
+
+    this.rapidApiCache.set(videoId, data);
+    return data;
+  }
+
+  private static parseVideoInfo(data: Mp36VideoData, videoId: string): VideoInfo {
+    const title = typeof data.title === 'string' && data.title.length > 0 ? data.title : '';
+    const duration = this.parseDurationSeconds(data) || 0;
+    const thumbnails = this.collectThumbnails(videoId);
+
+    return {
+      videoId,
+      title,
+      duration,
+      thumbnails,
+    };
+  }
+
+  private static parseDurationSeconds(data: Mp36VideoData): number | null {
+    const candidates: Array<string | number | undefined> = [
+      data.duration,
+    ];
+
+    for (const candidate of candidates) {
+      if (candidate === undefined || candidate === null) continue;
+      if (typeof candidate === 'number') {
+        if (Number.isFinite(candidate) && candidate > 0) {
+          return Math.round(candidate);
+        }
+        continue;
+      }
+
+      const parsed = parseDurationFromString(candidate);
+      if (parsed && parsed > 0) {
+        return Math.round(parsed);
+      }
+    }
+
+    return null;
+  }
+
+  private static collectThumbnails(videoId: string): string[] {
+    return [
+      `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+      `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    ];
+  }
+
+  private static applyCdnProxy(url: string, cdnProxy: string): string {
+    try {
+      const originalUrl = new URL(url);
+      const proxyUrl = new URL(cdnProxy);
+      proxyUrl.searchParams.set('url', encodeURIComponent(originalUrl.toString()));
+      return proxyUrl.toString();
+    } catch (error) {
+      console.warn('Failed to apply CDN proxy, using original URL:', error);
+      return url;
+    }
+  }
+
+  private static async downloadWithParallelChunks(
+    url: string,
+    totalSize: number,
+    options: {
+      chunkSize: number;
+      maxConcurrentChunks: number;
+      timeout: number;
+      retryAttempts: number;
+      retryDelay: number;
+      onProgress?: (progress: DownloadProgress) => void;
+      onError?: (error: Error) => void;
+    }
+  ): Promise<Buffer> {
+    const { chunkSize, maxConcurrentChunks, timeout, retryAttempts, retryDelay, onProgress, onError } = options;
+
+    const chunks: Buffer[] = [];
+    const totalChunks = Math.ceil(totalSize / chunkSize);
+    let completedChunks = 0;
+    let bytesDownloaded = 0;
+    const startTime = Date.now();
+
+    const chunkTasks: Promise<{ index: number; buffer: Buffer }>[] = [];
+
+    for (let i = 0; i < totalChunks; i += maxConcurrentChunks) {
+      const batch: Promise<{ index: number; buffer: Buffer }>[] = [];
+
+      for (let j = 0; j < maxConcurrentChunks && i + j < totalChunks; j++) {
+        const chunkIndex = i + j;
+        const start = chunkIndex * chunkSize;
+        const end = Math.min(start + chunkSize - 1, totalSize - 1);
+
+        const chunkTask = this.downloadChunkWithRetry(
+          url,
+          start,
+          end,
+          chunkIndex,
+          timeout,
+          retryAttempts,
+          retryDelay
+        ).then(buffer => {
+          completedChunks++;
+          bytesDownloaded += buffer.length;
+
+          if (onProgress) {
+            const elapsed = (Date.now() - startTime) / 1000;
+            const speed = bytesDownloaded / elapsed;
+            const eta = (totalSize - bytesDownloaded) / speed;
+
+            onProgress({
+              bytesDownloaded,
+              totalBytes: totalSize,
+              percentage: Math.round((bytesDownloaded / totalSize) * 100),
+              speed: Math.round(speed),
+              eta: Math.round(eta),
+              chunkIndex: completedChunks,
+              totalChunks,
+            });
+          }
+
+          return { index: chunkIndex, buffer };
+        }).catch(error => {
+          if (onError) {
+            onError(new Error(`Chunk ${chunkIndex} failed: ${error.message}`));
+          }
+          throw error;
+        });
+
+        batch.push(chunkTask);
+      }
+
+      const batchResults = await Promise.all(batch);
+      chunkTasks.push(...batchResults.map(r => Promise.resolve(r)));
+    }
+
+    const results = await Promise.all(chunkTasks);
+    results.sort((a, b) => a.index - b.index);
+    const finalBuffer = Buffer.concat(results.map(r => r.buffer));
+    return finalBuffer;
+  }
+
+  private static async downloadChunkWithRetry(
+    url: string,
+    start: number,
+    end: number,
+    chunkIndex: number,
+    timeout: number,
+    retryAttempts: number,
+    retryDelay: number
+  ): Promise<Buffer> {
+    for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+        const response = await fetch(url, {
+          headers: {
+            'Range': `bytes=${start}-${end}`,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        if (response.status === 206 || response.status === 200) {
+          const arrayBuffer = await response.arrayBuffer();
+          return Buffer.from(arrayBuffer);
+        }
+
+        throw new Error(`Unexpected status code: ${response.status}`);
+      } catch (error) {
+        if (attempt === retryAttempts) {
+          throw error;
+        }
+
+        const delay = retryDelay * Math.pow(2, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    throw new Error(`Failed to download chunk ${chunkIndex} after ${retryAttempts} attempts`);
+  }
+
+  private static async downloadWithStream(
+    url: string,
+    options: {
+      timeout: number;
+      retryAttempts: number;
+      retryDelay: number;
+      onProgress?: (progress: DownloadProgress) => void;
+      onError?: (error: Error) => void;
+      totalSize?: number;
+    }
+  ): Promise<Buffer> {
+    const { timeout, retryAttempts, retryDelay, onProgress, onError, totalSize } = options;
+
+    for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const chunks: Buffer[] = [];
+        let bytesDownloaded = 0;
+        const startTime = Date.now();
+        const contentLength = totalSize || (response.headers.get('content-length') ? parseInt(response.headers.get('content-length')!) : undefined);
+
+        if (!response.body) {
+          throw new Error('Response body is null');
+        }
+
+        const reader = response.body.getReader();
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = Buffer.from(value);
+            chunks.push(chunk);
+            bytesDownloaded += chunk.length;
+
+            if (onProgress) {
+              const elapsed = (Date.now() - startTime) / 1000;
+              const speed = bytesDownloaded / elapsed;
+
+              onProgress({
+                bytesDownloaded,
+                totalBytes: contentLength,
+                percentage: contentLength ? Math.round((bytesDownloaded / contentLength) * 100) : undefined,
+                speed: Math.round(speed),
+                eta: contentLength ? Math.round((contentLength - bytesDownloaded) / speed) : undefined,
+              });
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
+
+        return Buffer.concat(chunks);
+      } catch (error) {
+        if (attempt === retryAttempts) {
+          if (onError) {
+            onError(error as Error);
+          }
+          throw error;
+        }
+
+        const delay = retryDelay * Math.pow(2, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    throw new Error(`Failed to download after ${retryAttempts} attempts`);
+  }
+
+  private static extractVideoId(input: string): string | null {
+    if (!input) return null;
+    const trimmed = input.trim();
+
+    if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+      return trimmed;
+    }
+
+    try {
+      const url = new URL(trimmed);
+      if (url.hostname.endsWith('youtu.be')) {
+        const id = url.pathname.split('/').filter(Boolean)[0];
+        return id && /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
+      }
+
+      if (url.hostname.includes('youtube.com')) {
+        if (url.searchParams.has('v')) {
+          const id = url.searchParams.get('v');
+          return id && /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
+        }
+
+        const pathSegments = url.pathname.split('/').filter(Boolean);
+        if (pathSegments.length) {
+          const possibleId = pathSegments[pathSegments.length - 1];
+          if (/^[a-zA-Z0-9_-]{11}$/.test(possibleId)) {
+            return possibleId;
+          }
+        }
+      }
+    } catch {
+      if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+        return trimmed;
+      }
+    }
+
+    return null;
+  }
+
+  private static getRapidApiCredentials(): { host: string; key: string } {
+    const host = process.env.RAPIDAPI_YTSTREAM_HOST || DEFAULT_RAPIDAPI_HOST;
+    const key = process.env.RAPIDAPI_YTSTREAM_KEY || process.env.RAPIDAPI_KEY || process.env.RAPIDAPI_TOKEN;
+
+    if (!key) {
+      throw new Error('Missing RapidAPI credentials. Set RAPIDAPI_YTSTREAM_KEY or RAPIDAPI_KEY environment variable.');
+    }
+
+    return { host, key };
   }
 }

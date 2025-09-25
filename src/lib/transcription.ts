@@ -541,11 +541,11 @@ export class TranscriptionService {
         } catch (optimizedError) {
           console.warn(`Optimized download failed, immediately falling back:`, optimizedError);
           
-          // 立即降级到 ytdl-core，不重试
-          // 尝试 ytdl-core 流式下载作为降级方案
+          // 立即降级到顺序 HTTP 流式下载，不重试
+          // 尝试简单流式下载作为降级方案
           try {
-            console.log('[TEST][DL-002] fallback.ytdl');
-            downloadMethod = 'ytdl-stream';
+            console.log('[TEST][DL-002] fallback.http-stream');
+            downloadMethod = 'http-stream';
             
             const streamOptions = {
               ...downloadOptions,
@@ -558,10 +558,10 @@ export class TranscriptionService {
               videoInfo.videoId,
               streamOptions
             );
-            // ytdl-core download completed
+            // http-stream download completed
             break;
           } catch (streamError) {
-            console.warn('[TEST][DL-002] fallback.ytdl.failed', streamError);
+            console.warn('[TEST][DL-002] fallback.http-stream.failed', streamError);
             
             // 最终降级到传统方法（带重试）
             try {
@@ -1797,7 +1797,7 @@ export class TranscriptionService {
           downloadOptions
         );
       } catch (optimizedError) {
-        console.warn('Optimized download failed, trying ytdl-core stream...');
+        console.warn('Optimized download failed, trying HTTP stream fallback...');
         audioBuffer = await YouTubeService.downloadAudioWithYtdlStream(
           videoInfo.videoId,
           { ...downloadOptions, timeout: 60000 }
