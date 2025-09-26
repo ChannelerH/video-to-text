@@ -9,6 +9,7 @@ import {
   unique,
   uniqueIndex,
   numeric,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 // Users table
@@ -250,4 +251,55 @@ export const refunds = pgTable("v2tx_refunds", {
   currency: varchar({ length: 16 }).notNull().default('usd'),
   reason: varchar({ length: 128 }).notNull().default(''),
   created_at: timestamp({ withTimezone: true })
+});
+
+// Email rewards table
+export const email_rewards = pgTable(
+  "v2tx_email_rewards",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    user_uuid: varchar({ length: 255 }).notNull(),
+    campaign_id: varchar({ length: 50 }).notNull(),
+    minutes_granted: integer().notNull(),
+    pack_id: integer(),
+    status: varchar({ length: 20 }).default('pending'),
+    granted_at: timestamp({ withTimezone: true }),
+    created_at: timestamp({ withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("user_campaign_unique_idx").on(
+      table.user_uuid,
+      table.campaign_id
+    ),
+  ]
+);
+
+// User feedback table
+export const user_feedback = pgTable("v2tx_user_feedback", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  user_uuid: varchar({ length: 255 }).notNull(),
+  feedback_type: varchar({ length: 50 }),
+  content: text(),
+  status: varchar({ length: 50 }).default('received'),
+  priority: integer().default(0),
+  created_at: timestamp({ withTimezone: true }).defaultNow(),
+  updated_at: timestamp({ withTimezone: true }),
+  implemented_at: timestamp({ withTimezone: true }),
+  related_feature_id: integer(),
+  response: text(),
+  user_notified: boolean().default(false),
+});
+
+// Email history table
+export const email_history = pgTable("v2tx_email_history", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  user_uuid: varchar({ length: 255 }).notNull(),
+  campaign_id: varchar({ length: 50 }),
+  email_type: varchar({ length: 50 }),
+  sent_at: timestamp({ withTimezone: true }).defaultNow(),
+  opened_at: timestamp({ withTimezone: true }),
+  clicked_at: timestamp({ withTimezone: true }),
+  replied_at: timestamp({ withTimezone: true }),
+  unsubscribed: boolean().default(false),
+  metadata: jsonb("metadata"),
 });
