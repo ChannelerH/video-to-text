@@ -35,8 +35,8 @@ export async function generateMetadata({
   }
 
   return {
-    title: "Video to Text Converter - AI Transcription in Minutes | V2TX",
-    description: "Convert videos to text with 95% accuracy. Free 10 mins daily. No credit card required. Supports YouTube, MP4, 100+ languages. Powered by OpenAI Whisper.",
+    title: "Video to Text Converter - AI Transcript Generator Free | V2TX",
+    description: "Convert video to text instantly with 98.5% accuracy. Transcribe videos to text in 100+ languages online. Free daily quota, no signup needed. Try our AI-powered video to text converter now.",
     keywords: "",
     alternates: {
       canonical: canonicalUrl,

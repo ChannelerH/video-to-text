@@ -19,43 +19,43 @@ interface WhyChooseUsProps {
 
 const content: Record<string, any> = {
   en: {
-    title: "Why Choose V2TX?",
-    subtitle: "The most trusted video to text solution",
+    title: "Why Choose V2TX for Video to Text?",
+    subtitle: "The most trusted video to text converter - see why professionals choose our video to text solution",
     features: [
       {
         icon: RiRocketLine,
-        title: "Lightning Fast",
-        description: "Convert hours of video in minutes with our optimized AI pipeline",
+        title: "Lightning Fast Video to Text",
+        description: "Convert hours of video to text in minutes - fastest video to text conversion with optimized AI",
         highlight: "5x faster"
       },
       {
         icon: RiCheckDoubleLine,
-        title: "98.5% Accuracy",
-        description: "Industry-leading accuracy powered by advanced AI models",
+        title: "98.5% Video to Text Accuracy",
+        description: "Industry-leading video to text accuracy - convert video to text with near-perfect precision",
         highlight: "Best in class"
       },
       {
         icon: RiGlobalLine,
-        title: "98+ Languages",
-        description: "Support for all major languages and dialects worldwide",
+        title: "98+ Languages Video to Text",
+        description: "Convert video to text in any language - global video to text support for all dialects",
         highlight: "Global coverage"
       },
       {
         icon: RiMoneyDollarCircleLine,
-        title: "Cost Effective",
-        description: "Save 90% compared to manual transcription services",
+        title: "Affordable Video to Text",
+        description: "Save 90% on video to text conversion - most cost-effective video to text service available",
         highlight: "10x cheaper"
       },
       {
         icon: RiShieldCheckLine,
-        title: "Secure & Private",
-        description: "Your data is encrypted and never shared with third parties",
+        title: "Secure Video to Text Processing",
+        description: "Your video to text conversion is encrypted - private video to text with enterprise security",
         highlight: "Enterprise grade"
       },
       {
         icon: RiTimeLine,
-        title: "24/7 Available",
-        description: "Process videos anytime, no waiting for human transcribers",
+        title: "24/7 Video to Text Service",
+        description: "Convert video to text anytime - instant video to text processing without waiting",
         highlight: "Always online"
       }
     ]

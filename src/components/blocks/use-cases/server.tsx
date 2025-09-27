@@ -25,8 +25,8 @@ interface UseCasesProps {
 
 const content: Record<string, any> = {
   en: {
-    title: "Video to Text for Every Industry",
-    subtitle: "Trusted by professionals worldwide",
+    title: "Video to Text Use Cases - Convert Video to Text for Any Industry",
+    subtitle: "Discover how our video to text converter helps professionals transform video content to text daily",
     categories: [
       {
         title: "Education & Training",
@@ -34,60 +34,60 @@ const content: Record<string, any> = {
         cases: [
           {
             icon: RiGraduationCapLine,
-            title: "Online Courses",
-            description: "Create searchable transcripts for e-learning videos"
+            title: "Convert Online Course Videos to Text",
+            description: "Transform video to text for e-learning - make video content searchable with video to text conversion"
           },
           {
             icon: RiBookOpenLine,
-            title: "Lecture Notes",
-            description: "Convert recorded lectures into study materials"
+            title: "Convert Video Lectures to Text Notes",
+            description: "Video to text for education - convert lecture videos to text study materials instantly"
           },
           {
             icon: RiSearchEyeLine,
-            title: "Research Interviews",
-            description: "Transcribe qualitative research recordings"
+            title: "Research Interview Video to Text",
+            description: "Convert interview videos to text for analysis - essential video to text for research"
           }
         ]
       },
       {
-        title: "Content Creation",
-        subtitle: "Repurpose your videos",
+        title: "Video to Text for Content Creation",
+        subtitle: "Convert video to text to repurpose your content",
         cases: [
           {
             icon: RiVideoLine,
-            title: "YouTube Videos",
-            description: "Generate accurate captions and descriptions"
+            title: "YouTube Video to Text Conversion",
+            description: "Convert YouTube videos to text - generate captions with our video to text tool"
           },
           {
             icon: RiMicLine,
-            title: "Podcasts",
-            description: "Create show notes and blog posts from episodes"
+            title: "Podcast Video to Text Transcripts",
+            description: "Convert podcast video to text - create show notes from video to text conversion"
           },
           {
             icon: RiFileTextLine,
-            title: "Social Media",
-            description: "Extract quotes and snippets for posts"
+            title: "Social Media Video to Text",
+            description: "Extract video to text quotes - convert video clips to text for social posts"
           }
         ]
       },
       {
-        title: "Business & Corporate",
-        subtitle: "Boost productivity",
+        title: "Business Video to Text Solutions",
+        subtitle: "Convert corporate videos to text for productivity",
         cases: [
           {
             icon: RiTeamLine,
-            title: "Meeting Minutes",
-            description: "Automatically document video conferences"
+            title: "Meeting Video to Text Minutes",
+            description: "Convert video meetings to text automatically - video to text for documentation"
           },
           {
             icon: RiBuildingLine,
-            title: "Training Videos",
-            description: "Create searchable knowledge bases"
+            title: "Training Video to Text Conversion",
+            description: "Convert training videos to text - build searchable video to text knowledge bases"
           },
           {
             icon: RiChatQuoteLine,
-            title: "Customer Testimonials",
-            description: "Convert video feedback into case studies"
+            title: "Testimonial Video to Text",
+            description: "Convert customer video to text - transform video testimonials to text case studies"
           }
         ]
       },

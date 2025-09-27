@@ -10,15 +10,15 @@ interface TranscriptionDemoProps {
 
 const demoContent: Record<string, any> = {
   en: {
-    title: "🎬 Real Transcription Results",
-    description: "See how our AI accurately handles various types of video content",
-    subtitle: "From technical lectures to business meetings, from code tutorials to group discussions",
+    title: "🎬 Video to Text Demo - Real Transcription Results",
+    description: "See how our video to text AI accurately converts different video types to text",
+    subtitle: "Experience professional video to text conversion - from lectures to meetings, our video to text handles it all",
     tabs: [
       {
         id: "english",
         title: "English Lecture",
         videoInfo: {
-          duration: "5-minute technical lecture video",
+          duration: "5-minute video to text conversion",
           speaker: "Single",
           background: "Clean audio",
           accent: "American English"
@@ -42,7 +42,7 @@ One key advantage of neural networks is their ability to learn complex patterns 
         id: "chinese",
         title: "Chinese Dialogue",
         videoInfo: {
-          duration: "10-minute project discussion meeting",
+          duration: "10-minute meeting video to text",
           speaker: "Multiple",
           background: "Meeting room",
           accent: "Mandarin Chinese"

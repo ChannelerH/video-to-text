@@ -38,10 +38,6 @@ const faqContent: Record<string, any> = {
       {
         question: "Can I export subtitles?",
         answer: "Yes! You can export in multiple formats including SRT, VTT, TXT, JSON, and for Pro users, PDF and DOCX. The subtitle formats include proper timestamps for video editors."
-      },
-      {
-        question: "Do you offer API access?",
-        answer: "API access is available for Pro and Enterprise users. You can integrate our transcription service directly into your workflow with our RESTful API."
       }
     ]
   },
@@ -90,7 +86,18 @@ export default function FAQServer({ section, locale }: FAQServerProps) {
     return null;
   }
 
-  const t = faqContent[locale] || faqContent.en;
+  // Use section data from internationalization file if available, fallback to faqContent
+  const hasInternationalizedData = section.items && section.items.length > 0;
+  const title = section.title || faqContent[locale]?.title || faqContent.en.title;
+  const description = section.description || faqContent[locale]?.description || faqContent.en.description;
+  
+  // Map items based on source - internationalized file uses title/description, local uses question/answer
+  const items = hasInternationalizedData 
+    ? section.items?.map((item: any) => ({
+        question: item.title,
+        answer: item.description
+      })) || []
+    : (faqContent[locale]?.items || faqContent.en.items);
 
   return (
     <section id={section.name} className="design-section">
@@ -99,14 +106,14 @@ export default function FAQServer({ section, locale }: FAQServerProps) {
           <div className="design-icon pulse mx-auto mb-6">
             <RiQuestionLine />
           </div>
-          <h2 className="design-heading-2">{t.title}</h2>
+          <h2 className="design-heading-2">{title}</h2>
           <p className="design-description">
-            {t.description}
+            {description}
           </p>
         </div>
         
         <div className="space-y-4">
-          {t.items.map((item: any, index: number) => (
+          {items.map((item: any, index: number) => (
             <details
               key={index}
               className="group design-card border-l-4 border-l-purple-500/30"

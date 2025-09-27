@@ -302,9 +302,9 @@ export default function ROICalculatorServer({ section, locale }: ROICalculatorPr
                 </div>
 
                 {/* V2TX Method */}
-                <div className="design-card border-green-500/30 bg-gradient-to-br from-green-900/10 to-emerald-900/10">
-                  <div className="absolute -top-3 -right-3">
-                    <span className="px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-semibold rounded-full">
+                <div className="design-card border-green-500/30 bg-gradient-to-br from-green-900/10 to-emerald-900/10 relative" style={{ overflow: 'visible' }}>
+                  <div className="absolute -top-2 -right-2 z-50">
+                    <span className="inline-block px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold rounded-full shadow-lg whitespace-nowrap">
                       BEST VALUE
                     </span>
                   </div>
