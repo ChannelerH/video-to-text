@@ -21,6 +21,11 @@
           "title": "Pricing",
           "url": "/#pricing",
           "icon": "RiMoneyDollarCircleLine"
+        },
+        {
+          "title": "Changelog",
+          "url": "/changelog",
+          "icon": "RiTimeLine"
         }
       ]
     },

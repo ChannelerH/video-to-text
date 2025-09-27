@@ -1,0 +1,29 @@
+/* Changelog animations */
+@keyframes gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes scroll-indicator {
+  0% {
+    transform: translateY(0) translateX(-50%);
+  }
+  50% {
+    transform: translateY(0.5rem) translateX(-50%);
+  }
+  100% {
+    transform: translateY(0) translateX(-50%);
+  }
+}
+
+.animate-gradient {
+  animation: gradient 3s ease infinite;
+}
+
+.animate-scroll-indicator {
+  animation: scroll-indicator 1.5s ease-in-out infinite;
+}

@@ -2,6 +2,7 @@
 @import "./theme.css";
 @import "./design-system.css";
 @import "./audio-demo.css";
+@import "./changelog.css";
 
 @plugin "tailwindcss-animate";
 

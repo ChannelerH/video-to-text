@@ -21,6 +21,11 @@
           "title": "定价",
           "url": "/pricing",
           "icon": "RiMoneyDollarCircleLine"
+        },
+        {
+          "title": "更新日志",
+          "url": "/changelog",
+          "icon": "RiTimeLine"
         }
       ]
     },

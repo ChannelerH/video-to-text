@@ -1,0 +1,200 @@
+{
+  "title": "Changelog",
+  "subtitle": "All notable changes and updates to our service",
+  "description": "Stay up to date with the latest features, improvements, and fixes",
+  "releases": [
+    {
+      "version": "2.5.0",
+      "date": "2025-09-27",
+      "tag": "Latest",
+      "tagColor": "green",
+      "title": "Audio to Text Enhancement",
+      "description": "Major improvements to audio transcription capabilities",
+      "changes": [
+        {
+          "type": "feature",
+          "title": "Enhanced Audio to Text",
+          "description": "Improved audio to text conversion with 99.2% accuracy for clear audio files"
+        },
+        {
+          "type": "feature",
+          "title": "Multi-language Support",
+          "description": "Added support for 80+ languages in audio transcription"
+        },
+        {
+          "type": "improvement",
+          "title": "SEO Optimization",
+          "description": "Optimized keyword density for better search engine visibility"
+        },
+        {
+          "type": "fix",
+          "title": "Pricing Display",
+          "description": "Fixed pricing tiers to correctly show Basic ($19) and Pro ($29) plans"
+        }
+      ]
+    },
+    {
+      "version": "2.4.0",
+      "date": "2025-09-15",
+      "tag": "Major Update",
+      "tagColor": "blue",
+      "title": "UI/UX Overhaul",
+      "description": "Complete redesign of the user interface",
+      "changes": [
+        {
+          "type": "feature",
+          "title": "New Dashboard",
+          "description": "Completely redesigned dashboard with better navigation and insights"
+        },
+        {
+          "type": "feature",
+          "title": "Dark Mode",
+          "description": "Added system-wide dark mode support with automatic detection"
+        },
+        {
+          "type": "improvement",
+          "title": "Performance Boost",
+          "description": "50% faster processing speed for video and audio files"
+        },
+        {
+          "type": "improvement",
+          "title": "Mobile Experience",
+          "description": "Enhanced mobile responsiveness and touch interactions"
+        }
+      ]
+    },
+    {
+      "version": "2.3.0",
+      "date": "2025-09-10",
+      "tag": "Feature Release",
+      "tagColor": "purple",
+      "title": "Export Formats & API",
+      "description": "New export options and API improvements",
+      "changes": [
+        {
+          "type": "feature",
+          "title": "DOCX Export",
+          "description": "Export transcripts as formatted Word documents"
+        },
+        {
+          "type": "feature",
+          "title": "API v2",
+          "description": "New RESTful API with improved rate limits and documentation"
+        },
+        {
+          "type": "improvement",
+          "title": "Batch Processing",
+          "description": "Process multiple files simultaneously with queue management"
+        },
+        {
+          "type": "fix",
+          "title": "Export Formatting",
+          "description": "Fixed timestamp alignment issues in SRT exports"
+        }
+      ]
+    },
+    {
+      "version": "2.2.0",
+      "date": "2025-09-05",
+      "title": "Speaker Detection",
+      "description": "Advanced speaker identification features",
+      "changes": [
+        {
+          "type": "feature",
+          "title": "Multi-Speaker Detection",
+          "description": "Automatically identify and label different speakers in conversations"
+        },
+        {
+          "type": "feature",
+          "title": "Speaker Timeline",
+          "description": "Visual timeline showing when each speaker talks"
+        },
+        {
+          "type": "improvement",
+          "title": "Accuracy Improvements",
+          "description": "Enhanced transcription accuracy for overlapping speech"
+        }
+      ]
+    },
+    {
+      "version": "2.1.0",
+      "date": "2025-08-25",
+      "title": "Performance Update",
+      "description": "Major performance improvements and bug fixes",
+      "changes": [
+        {
+          "type": "improvement",
+          "title": "Faster Processing",
+          "description": "3x faster transcription for files under 30 minutes"
+        },
+        {
+          "type": "improvement",
+          "title": "Memory Optimization",
+          "description": "Reduced memory usage by 40% during processing"
+        },
+        {
+          "type": "fix",
+          "title": "Upload Issues",
+          "description": "Fixed file upload failures for large files over 1GB"
+        },
+        {
+          "type": "fix",
+          "title": "Character Encoding",
+          "description": "Resolved UTF-8 encoding issues in exported files"
+        }
+      ]
+    },
+    {
+      "version": "2.0.0",
+      "date": "2025-08-15",
+      "tag": "Major Release",
+      "tagColor": "green",
+      "title": "V2TX Launch",
+      "description": "Initial release of our video and audio to text service",
+      "changes": [
+        {
+          "type": "feature",
+          "title": "Video to Text Conversion",
+          "description": "Convert any video format to accurate text transcripts"
+        },
+        {
+          "type": "feature",
+          "title": "Multi-format Support",
+          "description": "Support for MP4, MOV, AVI, WebM and 40+ video formats"
+        },
+        {
+          "type": "feature",
+          "title": "Real-time Preview",
+          "description": "5-minute free preview for all uploads"
+        },
+        {
+          "type": "feature",
+          "title": "Multiple Export Formats",
+          "description": "Export as TXT, SRT, VTT, JSON, and more"
+        }
+      ]
+    }
+  ],
+  "types": {
+    "feature": {
+      "label": "New Feature",
+      "icon": "✨",
+      "color": "text-green-400"
+    },
+    "improvement": {
+      "label": "Improvement",
+      "icon": "🚀",
+      "color": "text-blue-400"
+    },
+    "fix": {
+      "label": "Bug Fix",
+      "icon": "🐛",
+      "color": "text-yellow-400"
+    },
+    "breaking": {
+      "label": "Breaking Change",
+      "icon": "💥",
+      "color": "text-red-400"
+    }
+  }
+}
