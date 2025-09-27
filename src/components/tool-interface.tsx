@@ -21,6 +21,7 @@ import AudioTrackSelector from '@/components/audio-track-selector';
 import type { AudioTrack } from '@/components/audio-track-selector';
 import { callApiWithRetry, pollStatus, getErrorType } from "@/lib/api-utils";
 import { ErrorDialog } from '@/components/error-dialog';
+import { trackMixpanelEvent } from "@/lib/mixpanel-browser";
 import TurnstileModal from '@/components/turnstile-modal';
 
 function isMediaFileType(mime: string): boolean {
@@ -87,7 +88,6 @@ async function measureFileDuration(file: File): Promise<number | null> {
 
       setTimeout(() => finish(null), 7000);
     } catch (error) {
-      console.warn('[DEBUG] Unable to create media element for duration probing:', error);
       finish(null);
     }
   });
@@ -133,19 +133,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   const canUseDiarization = isAuthenticated && ['basic', 'pro', 'premium'].includes(normalizedTier);
   const diarizationTierEligible = ['basic', 'pro', 'premium'].includes(normalizedTier);
   
-  // Debug logging
   const [enableDiarizationAfterWhisper, setEnableDiarizationAfterWhisper] = useState(false);
-  
-  useEffect(() => {
-    console.log('[HighAccuracy Debug]', {
-      isAuthenticated,
-      tier,
-      userTier,
-      userFromContext: user,
-      canUseHighAccuracy,
-      canUseDiarization
-    });
-  }, [isAuthenticated, tier, userTier, user, canUseHighAccuracy, canUseDiarization]);
   
   useEffect(() => {
     if (!canUseDiarization && enableDiarizationAfterWhisper) {
@@ -414,6 +402,12 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   const goToHistory = () => {
     setIsNavigatingToHistory(true);
     const href = locale && locale !== 'en' ? `/${locale}/dashboard/transcriptions` : `/dashboard/transcriptions`;
+    trackMixpanelEvent('transcription.tool_view_history', {
+      source: 'tool_interface',
+      href,
+      authenticated: isAuthenticated,
+      locale,
+    });
     try {
       router.push(href);
       // 保险兜底：如果 SPA 跳转被阻塞，fallback 到硬跳转
@@ -442,22 +436,27 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement> | { target: { files: FileList | null } }) => {
     const selectedFile = event.target.files?.[0] || null;
     
-    console.log('[DEBUG] handleFileChange called, file:', selectedFile?.name);
-    
     if (selectedFile) {
       let detectedDurationSec: number | null = null;
       try {
         detectedDurationSec = await measureFileDuration(selectedFile);
         if (detectedDurationSec) {
-          console.log('[DEBUG] Detected media duration (sec):', detectedDurationSec);
         }
       } catch (err) {
-        console.warn('[DEBUG] Failed to detect media duration:', err);
       }
+
+      trackMixpanelEvent('transcription.tool_file_selected', {
+        source: 'tool_interface',
+        file_name: selectedFile.name,
+        file_size: selectedFile.size,
+        file_type: selectedFile.type,
+        duration_seconds: detectedDurationSec ?? undefined,
+        authenticated: isAuthenticated,
+        locale,
+      });
 
       // 如果有正在进行的上传，先中断它（静默处理，不报错）
       if (uploadXhrRef.current) {
-        console.log('[DEBUG] Aborting previous upload');
         isAbortingRef.current = true; // 标记为主动中断
         try {
           uploadXhrRef.current.abort();
@@ -488,7 +487,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
       try {
         // 判断是否使用分片上传（50MB以上）
         if (MultipartUploader.shouldUseMultipart(selectedFile.size)) {
-          console.log('[DEBUG] Using multipart upload for large file:', selectedFile.name);
           
           // 使用分片上传
           const uploader = new MultipartUploader();
@@ -514,7 +512,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
               });
             },
             onPartComplete: (partNumber, totalParts) => {
-              console.log(`[Multipart] Part ${partNumber}/${totalParts} completed`);
+              console.debug(`[Multipart] Part ${partNumber}/${totalParts} completed`);
             }
             });
             
@@ -532,11 +530,21 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
               uploadMethod: 'multipart',
               durationSec: detectedDurationSec ?? null
             });
+
+            trackMixpanelEvent('transcription.tool_upload_succeeded', {
+              source: 'tool_interface',
+              method: 'multipart',
+              file_name: selectedFile.name,
+              file_size: selectedFile.size,
+              file_type: selectedFile.type,
+              duration_seconds: detectedDurationSec ?? undefined,
+              authenticated: isAuthenticated,
+              locale,
+            });
             
             setProgress(t("progress.upload_success"));
             setProgressInfo({ stage: null, percentage: 0, message: '' });
             setUploadProgress(0);
-            console.log('[DEBUG] Multipart upload success');
           
             // 清除文件输入
             if (fileInputRef.current) {
@@ -550,7 +558,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
             
             // 检查是否是用户取消
             if (isAbortingRef.current || (multipartError instanceof Error && multipartError.message === 'Upload aborted')) {
-              console.log('[DEBUG] Multipart upload cancelled by user');
               isAbortingRef.current = false;
               setProgress("");
               setProgressInfo({ stage: null, percentage: 0, message: '' });
@@ -559,11 +566,21 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
             }
             
             // 其他错误
-            console.error('[DEBUG] Multipart upload error:', multipartError);
             setProgress(`Upload failed: ${multipartError instanceof Error ? multipartError.message : 'Unknown error'}`);
             setFile(null);
             setProgressInfo({ stage: null, percentage: 0, message: '' });
             setUploadProgress(0);
+
+            trackMixpanelEvent('transcription.tool_upload_failed', {
+              source: 'tool_interface',
+              method: 'multipart',
+              file_name: selectedFile.name,
+              file_size: selectedFile.size,
+              file_type: selectedFile.type,
+              error: multipartError instanceof Error ? multipartError.message : String(multipartError),
+              authenticated: isAuthenticated,
+              locale,
+            });
             
             if (fileInputRef.current) {
               fileInputRef.current.value = '';
@@ -677,7 +694,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         // 等待上传完成
         try {
           await uploadPromise;
-          console.log('[DEBUG] Direct upload to R2 successful');
           
           // 上传成功，清除XHR引用
           uploadXhrRef.current = null;
@@ -693,12 +709,22 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
             uploadMethod: 'presigned-url',
             durationSec: detectedDurationSec ?? null
           };
-          
+
           setUploadedFileInfo(uploadedInfo);
           setProgress(t("progress.upload_success"));
           setProgressInfo({ stage: null, percentage: 0, message: '' });
           setUploadProgress(0);
-          console.log('[DEBUG] Upload success, uploadedFileInfo set:', uploadedInfo);
+
+          trackMixpanelEvent('transcription.tool_upload_succeeded', {
+            source: 'tool_interface',
+            method: 'presigned-url',
+            file_name: selectedFile.name,
+            file_size: selectedFile.size,
+            file_type: selectedFile.type,
+            duration_seconds: detectedDurationSec ?? undefined,
+            authenticated: isAuthenticated,
+            locale,
+          });
           
           // 注意：不要清除 setFile(selectedFile)，因为我们需要显示文件信息
           // 只清除文件输入控件的值，以便可以重新选择同一个文件
@@ -711,7 +737,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           
           // 如果是用户主动取消（通过标志判断），不显示错误，只清理状态
           if (isAbortingRef.current || (uploadError instanceof Error && uploadError.message === 'USER_CANCELLED')) {
-            console.log('[DEBUG] Upload cancelled by user (silent)');
             isAbortingRef.current = false; // 重置标志
             setProgress("");
             setProgressInfo({ stage: null, percentage: 0, message: '' });
@@ -719,11 +744,9 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
             return;
           }
           
-          console.error('[DEBUG] Direct upload error:', uploadError);
-          
           // 如果是CORS错误，尝试回退到传统上传方式
           if (uploadError instanceof Error && uploadError.message.includes('CORS')) {
-            console.log('CORS error detected, falling back to traditional upload...');
+            console.debug('CORS error detected, falling back to traditional upload...');
             setProgress('Uploading file...');
             
             // 回退到传统上传
@@ -754,7 +777,17 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                 setProgress(t("progress.upload_success"));
                 setProgressInfo({ stage: null, percentage: 0, message: '' });
                 setUploadProgress(0);
-                console.log('[DEBUG] Fallback upload success');
+
+                trackMixpanelEvent('transcription.tool_upload_succeeded', {
+                  source: 'tool_interface',
+                  method: 'fallback-api',
+                  file_name: selectedFile.name,
+                  file_size: selectedFile.size,
+                  file_type: selectedFile.type,
+                  duration_seconds: detectedDurationSec ?? undefined,
+                  authenticated: isAuthenticated,
+                  locale,
+                });
                 
                 // 保持file状态，只清除input的值
                 if (fileInputRef.current) {
@@ -773,6 +806,17 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
               if (fileInputRef.current) {
                 fileInputRef.current.value = '';
               }
+
+              trackMixpanelEvent('transcription.tool_upload_failed', {
+                source: 'tool_interface',
+                method: 'fallback-api',
+                file_name: selectedFile.name,
+                file_size: selectedFile.size,
+                file_type: selectedFile.type,
+                error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+                authenticated: isAuthenticated,
+                locale,
+              });
               return;
             }
           } else {
@@ -791,6 +835,16 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
             if (fileInputRef.current) {
               fileInputRef.current.value = '';
             }
+            trackMixpanelEvent('transcription.tool_upload_failed', {
+              source: 'tool_interface',
+              method: 'presigned-url',
+              file_name: selectedFile.name,
+              file_size: selectedFile.size,
+              file_type: selectedFile.type,
+              error: uploadError instanceof Error ? uploadError.message : String(uploadError),
+              authenticated: isAuthenticated,
+              locale,
+            });
             return;
           }
         }
@@ -805,6 +859,17 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
+
+        trackMixpanelEvent('transcription.tool_upload_failed', {
+          source: 'tool_interface',
+          method: 'unknown',
+          file_name: selectedFile?.name,
+          file_size: selectedFile?.size,
+          file_type: selectedFile?.type,
+          error: error instanceof Error ? error.message : String(error),
+          authenticated: isAuthenticated,
+          locale,
+        });
       }
     }
   };
@@ -833,7 +898,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         sessionExpiryRef.current = 0;
         if (sessionToken) setSessionToken(null);
         if (sessionExpiry) setSessionExpiry(0);
-        console.log('[ToolInterface] Anonymous user without valid session, prompting Turnstile');
+        console.debug('[ToolInterface] Anonymous user without valid session, prompting Turnstile');
         pendingTranscriptionRef.current = { preferredLanguage: undefined };
         setShowTurnstile(true);
         return;
@@ -853,10 +918,10 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         
         if (detectResponse.ok) {
           const response = await detectResponse.json();
-          console.log('[YouTube] Detect tracks response:', response);
+          console.debug('[YouTube] Detect tracks response:', response);
           const { tracks, videoTitle, hasMultipleTracks } = response;
           
-          console.log('[YouTube] Track detection result:', {
+          console.debug('[YouTube] Track detection result:', {
             hasMultipleTracks,
             tracksLength: tracks?.length,
             shouldShowSelector: hasMultipleTracks && tracks?.length > 1
@@ -864,14 +929,14 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           
           if (hasMultipleTracks && tracks.length > 1) {
             // 显示音轨选择对话框
-            console.log('[YouTube] Showing track selector with tracks:', tracks);
+            console.debug('[YouTube] Showing track selector with tracks:', tracks);
             setAvailableTracks(tracks);
             setTrackVideoTitle(videoTitle);
             setShowTrackSelector(true);
             setProgress("");
             return; // 等待用户选择
           } else {
-            console.log('[YouTube] Not showing track selector, proceeding with default');
+            console.debug('[YouTube] Not showing track selector, proceeding with default');
           }
         }
       } catch (error) {
@@ -885,7 +950,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   
   // 音轨选择后继续转录
   const handleTrackSelected = async (languageCode: string) => {
-    console.log('[AudioTrack] User selected language:', languageCode);
+    console.debug('[AudioTrack] User selected language:', languageCode);
     setSelectedLanguage(languageCode);
     setShowTrackSelector(false);
     
@@ -895,7 +960,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   
   // Handle Turnstile verification success
   const handleTurnstileSuccess = async (token: string) => {
-    console.log('[ToolInterface] Turnstile verification success, verifying token with backend');
+    console.debug('[ToolInterface] Turnstile verification success, verifying token with backend');
 
     try {
       const response = await fetch('/api/turnstile/verify', {
@@ -919,13 +984,13 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
 
         setTimeout(async () => {
           if (pending) {
-            console.log('[ToolInterface] Resuming pending transcription after verification', pending);
+            console.debug('[ToolInterface] Resuming pending transcription after verification', pending);
             await performTranscription(pending.preferredLanguage);
             return;
           }
 
           if (url || uploadedFileInfo) {
-            console.log('[ToolInterface] Continuing transcription after verification');
+            console.debug('[ToolInterface] Continuing transcription after verification');
             await performTranscription();
           }
         }, 100);
@@ -954,7 +1019,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         sessionExpiryRef.current = 0;
         if (sessionToken) setSessionToken(null);
         if (sessionExpiry) setSessionExpiry(0);
-        console.log('[ToolInterface] Missing or expired Turnstile session, requesting verification');
+        console.debug('[ToolInterface] Missing or expired Turnstile session, requesting verification');
         pendingTranscriptionRef.current = { preferredLanguage };
         setShowTurnstile(true);
         return;
@@ -977,12 +1042,14 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
     setGeneratedChapters([]);
     setGeneratedSummary("");
 
+    let submissionInput: 'youtube_url' | 'audio_url' | 'file_upload' = url ? 'audio_url' : 'file_upload';
+    let requestData: any;
+
     try {
       // Determine action based on authentication status
       const action = isAuthenticated ? "transcribe" : "preview";
-      console.log(`Using action: ${action} (authenticated: ${isAuthenticated})`);
+      console.debug(`Using action: ${action} (authenticated: ${isAuthenticated})`);
       
-      let requestData: any;
       if (url) {
         // 检测URL类型
         const isYouTubeUrl = url.includes('youtube.com/watch') || 
@@ -991,6 +1058,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                            url.includes('m.youtube.com/watch');
         
         const urlType = isYouTubeUrl ? "youtube_url" : "audio_url";
+        submissionInput = urlType;
         
         const progressText = isYouTubeUrl 
           ? (action === "preview" ? t("progress.generating_preview") : t("progress.processing_youtube"))
@@ -1073,7 +1141,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           ...(turnstileToken ? { turnstileToken } : {}),
         };
 
-        console.log('[performTranscription] Using anonymous verification tokens', {
+        console.debug('[performTranscription] Using anonymous verification tokens', {
           hasSession: !!sessionPayload.sessionToken,
           hasTurnstile: !!turnstileToken,
           sessionPrefix: sessionPayload.sessionToken?.slice(0, 8) || null,
@@ -1081,12 +1149,25 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
       }
 
       // Add preferred language if provided
-      console.log('[performTranscription] preferredLanguage:', preferredLanguage);
+      console.debug('[performTranscription] preferredLanguage:', preferredLanguage);
       if (preferredLanguage) {
         requestData.options = { ...requestData.options, preferred_language: preferredLanguage };
-        console.log('[performTranscription] Added preferred_language to options:', requestData.options.preferred_language);
+        console.debug('[performTranscription] Added preferred_language to options:', requestData.options.preferred_language);
       }
       
+      trackMixpanelEvent('transcription.tool_submit', {
+        source: 'tool_interface',
+        input_type: submissionInput,
+        action,
+        authenticated: isAuthenticated,
+        formats: selectedFormats,
+        high_accuracy: canUseHighAccuracy && highAccuracy && action === 'transcribe',
+        diarization: canUseDiarization && enableDiarizationAfterWhisper,
+        file_name: submissionInput === 'file_upload' ? (uploadedFileInfo?.originalName || file?.name || '') : undefined,
+        file_size: submissionInput === 'file_upload' ? (uploadedFileInfo?.fileSize || file?.size) : undefined,
+        locale,
+      });
+
       // Send request with SSE support for authenticated users
       let result: any = null;
       
@@ -1172,6 +1253,16 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           });
 
           showToast('error', displayTitle, displayMessage);
+
+          trackMixpanelEvent('transcription.tool_result_error', {
+            source: 'tool_interface',
+            stage: 'async_transcribe',
+            input_type: requestData?.type || submissionInput,
+            error: rawMessage,
+            error_code: errorCode,
+            authenticated: isAuthenticated,
+            locale,
+          });
 
           setProgress("");
           setIsProcessing(false);
@@ -1262,6 +1353,16 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
 
           showToast('error', displayTitle, displayMessage);
 
+          trackMixpanelEvent('transcription.tool_result_error', {
+            source: 'tool_interface',
+            stage: 'async_transcribe',
+            input_type: requestData?.type || submissionInput,
+            error: rawMessage,
+            error_code: errorCode,
+            authenticated: false,
+            locale,
+          });
+
           setProgress("");
           setIsProcessing(false);
           setProgressInfo({ stage: null, percentage: 0, message: '' });
@@ -1279,6 +1380,16 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           if (isZh) showChineseToast(); else setShowChineseUpgrade(false);
         } catch {}
         setResult({ type: "full", data: result.data });
+        trackMixpanelEvent('transcription.tool_result_ready', {
+          source: 'tool_interface',
+          result_type: 'full',
+          job_id: result.data.jobId,
+          input_type: requestData?.type || submissionInput,
+          language: result.data?.transcription?.language,
+          duration_seconds: result.data?.transcription?.duration,
+          authenticated: isAuthenticated,
+          locale,
+        });
         // Set audio URL for editor view
         if (uploadedFileInfo?.publicUrl) {
           setAudioUrl(uploadedFileInfo.publicUrl);
@@ -1301,11 +1412,27 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           if (isZh) showChineseToast(); else setShowChineseUpgrade(false);
         } catch {}
         setResult({ type: "preview", data: result.preview, authRequired: result.authRequired });
+        trackMixpanelEvent('transcription.tool_preview_ready', {
+          source: 'tool_interface',
+          result_type: 'preview',
+          auth_required: result.authRequired,
+          input_type: requestData?.type || submissionInput,
+          language: (result.preview as any)?.language,
+          authenticated: isAuthenticated,
+          locale,
+        });
         setProgress(t("progress.preview_ready"));
       } else if (result?.success && !result?.data && !result?.preview) {
         setProgress('Received empty success response. Please try again or refresh.');
       } else {
         console.error('Transcription API error:', result.error);
+        trackMixpanelEvent('transcription.tool_result_error', {
+          source: 'tool_interface',
+          input_type: requestData?.type || submissionInput,
+          error: result.error,
+          authenticated: isAuthenticated,
+          locale,
+        });
         let userFriendlyError = '';
         
         if (result.error.includes('null response')) {
@@ -1352,6 +1479,14 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         t("errors.transcription_failed_title") || "Transcription Failed",
         `${errorMessage}. ${t("errors.please_try_again") || "Please try again."}`
       );
+
+      trackMixpanelEvent('transcription.tool_result_error', {
+        source: 'tool_interface',
+        input_type: requestData?.type || submissionInput,
+        error: error instanceof Error ? error.message : String(error),
+        authenticated: isAuthenticated,
+        locale,
+      });
       
       // Reset all UI states to allow retry
       setProgress("");
@@ -1446,11 +1581,20 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
     if (!requireAuthenticatedUpgrade()) return;
     if (!result?.data || result.type !== 'full') return;
 
+    const jobId = result.data.jobId as string | undefined;
+    trackMixpanelEvent('transcription.tool_download', {
+      source: 'tool_interface',
+      format,
+      job_id: jobId,
+      method: jobId ? 'server' : 'client',
+      authenticated: isAuthenticated,
+      locale,
+    });
+
     // Set loading state for this format
     setDownloadingFormats(prev => ({ ...prev, [format]: true }));
 
     try {
-      const jobId = result.data.jobId as string | undefined;
       if (jobId) {
         // 统一走后端导出（Free 自动裁到 5 分钟并去 speaker）
         await fetchAndDownload(`/api/transcriptions/${jobId}/file?format=${format}`, buildDownloadFileName(format));
@@ -1530,6 +1674,13 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
 
   const downloadPreview = async () => {
     if (!result?.data || result.type !== 'preview') return;
+    trackMixpanelEvent('transcription.tool_download', {
+      source: 'tool_interface',
+      format: 'preview_txt',
+      method: 'preview-download',
+      authenticated: isAuthenticated,
+      locale,
+    });
     try {
       const previewMarker = `[PREVIEW - First 5 minutes only]\n[完整版预览 - 仅前5分钟]\n\n`;
       const watermark = `\n\n---\n[This is a preview of the first 5 minutes. Sign in for full transcription.]\n[这是前5分钟的预览。登录以获取完整转录。]`;
@@ -1546,11 +1697,18 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   };
 
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, context: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedText(true);
       setTimeout(() => setCopiedText(false), 2000);
+      trackMixpanelEvent('transcription.tool_copy', {
+        source: 'tool_interface',
+        context,
+        text_length: text?.length,
+        authenticated: isAuthenticated,
+        locale,
+      });
     } catch (error) {
       console.error('Failed to copy text:', error);
     }
@@ -2312,6 +2470,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                     }
                   ]}
                   transcription={result.data.transcription}
+                  jobId={result.data.jobId}
                   onClose={() => setViewMode('simple')}
                 />
               </div>
@@ -2344,7 +2503,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(displayText || result.data.transcription.text)}
+                        onClick={() => copyToClipboard(displayText || result.data.transcription.text, 'transcript_full')}
                         className=""
                       >
                         {copiedText ? (
@@ -2376,7 +2535,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                           {generatedChapters.length > 0 ? t("results.chapters_with_timestamps") : t("results.timestamped_segments")}
                         </h4>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             let segmentsText = '';
                             
                             if (generatedChapters.length > 0) {
@@ -2407,9 +2566,21 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                               }).join('\n');
                             }
                             
-                            navigator.clipboard.writeText(segmentsText);
-                            setCopiedSegments(true);
-                            setTimeout(() => setCopiedSegments(false), 2000);
+                            try {
+                              await navigator.clipboard.writeText(segmentsText);
+                              trackMixpanelEvent('transcription.tool_copy', {
+                                source: 'tool_interface',
+                                context: 'segments',
+                                text_length: segmentsText.length,
+                                with_chapters: generatedChapters.length > 0,
+                                authenticated: isAuthenticated,
+                                locale,
+                              });
+                              setCopiedSegments(true);
+                              setTimeout(() => setCopiedSegments(false), 2000);
+                            } catch (error) {
+                              console.error('Failed to copy segments:', error);
+                            }
                           }}
                           className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-all hover:bg-white/10"
                           style={{ color: copiedSegments ? '#10b981' : '#9ca3af' }}
@@ -2533,7 +2704,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                           try {
                             // Use a dummy jobId since we don't need to persist chapters yet
                             const jobId = 'temp-' + Date.now();
-                            console.log('Generating chapters for segments:', result.data.transcription.segments.length);
+                            console.debug('Generating chapters for segments:', result.data.transcription.segments.length);
                             const response = await fetch(`/api/transcriptions/${jobId}/chapters`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
@@ -2545,7 +2716,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                             
                             const data = await response.json();
                             if (data.success) {
-                              console.log('Chapters generated:', data.data.chapters);
+                              console.debug('Chapters generated:', data.data.chapters);
                               // Show success toast
                               showToast('success', t("results.chapters_generated"), t("results.chapters_generated_desc"));
                               // Store chapters in state for display
@@ -2604,7 +2775,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                           try {
                             // Use a dummy jobId since we don't need to persist summary yet
                             const jobId = 'temp-' + Date.now();
-                            console.log('Generating summary for segments:', result.data.transcription.segments.length);
+                            console.debug('Generating summary for segments:', result.data.transcription.segments.length);
                             const response = await fetch(`/api/transcriptions/${jobId}/summary`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
@@ -2616,7 +2787,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                             
                             const data = await response.json();
                             if (data.success) {
-                              console.log('Summary generated:', data.data.summary);
+                              console.debug('Summary generated:', data.data.summary);
                               // Show success toast
                               showToast('success', t("results.summary_generated"), t("results.summary_generated_desc"));
                               // Store summary in state for display
@@ -2683,13 +2854,24 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                             {t("results.chapters")}
                           </h5>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               const chaptersText = generatedChapters
                                 .map(ch => `${Math.floor(ch.startTime / 60)}:${String(Math.floor(ch.startTime % 60)).padStart(2, '0')} - ${ch.title}`)
                                 .join('\n');
-                              navigator.clipboard.writeText(chaptersText);
-                              setCopiedChapters(true);
-                              setTimeout(() => setCopiedChapters(false), 2000);
+                              try {
+                                await navigator.clipboard.writeText(chaptersText);
+                                trackMixpanelEvent('transcription.tool_copy', {
+                                  source: 'tool_interface',
+                                  context: 'chapters',
+                                  text_length: chaptersText.length,
+                                  authenticated: isAuthenticated,
+                                  locale,
+                                });
+                                setCopiedChapters(true);
+                                setTimeout(() => setCopiedChapters(false), 2000);
+                              } catch (error) {
+                                console.error('Failed to copy chapters:', error);
+                              }
                             }}
                             className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-all hover:bg-white/10"
                             style={{ color: copiedChapters ? '#10b981' : '#9ca3af' }}
@@ -2738,10 +2920,21 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                             {t("results.summary")}
                           </h5>
                           <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(generatedSummary);
-                              setCopiedSummary(true);
-                              setTimeout(() => setCopiedSummary(false), 2000);
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(generatedSummary);
+                                trackMixpanelEvent('transcription.tool_copy', {
+                                  source: 'tool_interface',
+                                  context: 'summary',
+                                  text_length: generatedSummary.length,
+                                  authenticated: isAuthenticated,
+                                  locale,
+                                });
+                                setCopiedSummary(true);
+                                setTimeout(() => setCopiedSummary(false), 2000);
+                              } catch (error) {
+                                console.error('Failed to copy summary:', error);
+                              }
                             }}
                             className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-all hover:bg-white/10"
                             style={{ color: copiedSummary ? '#10b981' : '#9ca3af' }}

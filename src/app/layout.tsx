@@ -2,7 +2,7 @@ import "@/app/globals.css";
 
 import { getLocale, setRequestLocale } from "next-intl/server";
 import { locales } from "@/i18n/locale";
-import { cn } from "@/lib/utils";
+import LoggingProvider from "@/components/providers/logging-provider";
 
 export default async function RootLayout({
   children,
@@ -36,7 +36,10 @@ export default async function RootLayout({
           ))}
         <link rel="alternate" hrefLang="x-default" href={webUrl} />
       </head>
-      <body>{children}</body>
+      <body>
+        <LoggingProvider />
+        {children}
+      </body>
     </html>
   );
 }

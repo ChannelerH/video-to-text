@@ -1,4 +1,5 @@
 import { installConsoleErrorPatch } from './logger';
+import { installConsoleFilter } from './console-filter';
 import { handleServerError } from './server-error-handler';
 
 function registerProcessHandlers() {
@@ -17,6 +18,7 @@ function registerProcessHandlers() {
 }
 
 if (typeof window === 'undefined') {
+  installConsoleFilter();
   installConsoleErrorPatch();
   registerProcessHandlers();
 }

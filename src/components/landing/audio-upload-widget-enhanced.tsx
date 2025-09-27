@@ -27,6 +27,7 @@ import {
   Clock,
   User
 } from "lucide-react";
+import { trackMixpanelEvent } from "@/lib/mixpanel-browser";
 
 interface Props {
   locale: string;
@@ -208,11 +209,23 @@ export default function AudioUploadWidgetEnhanced({ locale, notice }: Props) {
 
   const triggerBrowse = () => {
     if (busy) return;
+    trackMixpanelEvent('landing.cta_click', {
+      source: 'audio_widget_enhanced',
+      action: 'open_file_picker',
+      auth: isAuthenticated ? 'logged_in' : 'guest',
+      plan: normalizedTier,
+    });
     fileInputRef.current?.click();
   };
 
   const handlePasteUrl = () => {
     if (busy) return;
+    trackMixpanelEvent('landing.cta_click', {
+      source: 'audio_widget_enhanced',
+      action: 'paste_url',
+      auth: isAuthenticated ? 'logged_in' : 'guest',
+      plan: normalizedTier,
+    });
     setShowUrlDialog(true);
   };
 
@@ -271,6 +284,14 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
 
   const handleExport = async (format: string) => {
     if (!transcriptionResult) return;
+
+    trackMixpanelEvent('transcription.tool_download', {
+      source: 'audio_widget_enhanced',
+      format,
+      job_id: transcriptionResult.id || currentJobId,
+      authenticated: isAuthenticated,
+      locale,
+    });
 
     const filenameBase = (transcriptionResult.title || 'transcription').replace(/\s+/g, '_');
     const segments = transcriptionResult.segments || [];
@@ -424,11 +445,22 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
           .join('\n\n')
       : (previewIsChinese ? enhanceChineseText(transcriptionResult.text || '') : transcriptionResult.text || '');
 
-    await navigator.clipboard.writeText(text);
-    setCopiedToClipboard(true);
-    showToast('success', 'Copied!', 'Transcription copied to clipboard');
-    
-    setTimeout(() => setCopiedToClipboard(false), 3000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedToClipboard(true);
+      showToast('success', 'Copied!', 'Transcription copied to clipboard');
+      trackMixpanelEvent('transcription.tool_copy', {
+        source: 'audio_widget_enhanced',
+        context: 'transcription',
+        text_length: text?.length,
+        authenticated: isAuthenticated,
+        locale,
+      });
+      setTimeout(() => setCopiedToClipboard(false), 3000);
+    } catch (error) {
+      console.error('[AudioUploadWidget] Copy error:', error);
+      showToast('error', 'Copy Failed', 'Unable to copy transcript.');
+    }
   };
 
   const runTranscription = useCallback(async (
@@ -516,6 +548,17 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
         fullData: requestData
       });
 
+      trackMixpanelEvent('transcription.tool_submit', {
+        source: 'audio_widget_enhanced',
+        input_type: type,
+        action: requestData.action,
+        authenticated: isAuthenticated,
+        formats: requestOptions.formats,
+        high_accuracy: requestOptions.highAccuracyMode,
+        diarization: requestOptions.enableDiarizationAfterWhisper,
+        locale,
+      });
+
       const result = await transcribeAsync(
         requestData,
         (stage, percentage, message) => {
@@ -561,6 +604,22 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
         setProcessingProgress(100);
         setProcessingMessage(t('progress.completed') || 'Transcription complete!');
         setUploadStage('completed');
+        trackMixpanelEvent('transcription.tool_result_ready', {
+          source: 'audio_widget_enhanced',
+          result_type: 'full',
+          job_id: result.data.jobId,
+          input_type: type,
+          language: transcription.language,
+          duration_seconds: transcription.duration,
+          authenticated: isAuthenticated,
+          locale,
+        });
+        trackMixpanelEvent('transcription.job_started', {
+          method: type,
+          auth: isAuthenticated ? 'logged_in' : 'guest',
+          plan: normalizedTier,
+          source: 'audio_widget_enhanced',
+        });
         return;
       }
 
@@ -589,6 +648,14 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
         setProcessingProgress(100);
         setProcessingMessage(t('progress.preview_ready') || 'Preview ready.');
         setUploadStage('completed');
+        trackMixpanelEvent('transcription.tool_preview_ready', {
+          source: 'audio_widget_enhanced',
+          result_type: 'preview',
+          input_type: type,
+          language: preview.language,
+          authenticated: isAuthenticated,
+          locale,
+        });
         return;
       }
 
@@ -601,6 +668,20 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
       setProcessingMessage('');
       setUploadStage('failed');
       showToast('error', t('errors.transcription_failed_title') || 'Transcription Failed', message);
+      trackMixpanelEvent('transcription.job_failed', {
+        method: params.type,
+        auth: isAuthenticated ? 'logged_in' : 'guest',
+        plan: normalizedTier,
+        source: 'audio_widget_enhanced',
+        error: message,
+      });
+      trackMixpanelEvent('transcription.tool_result_error', {
+        source: 'audio_widget_enhanced',
+        input_type: params.type,
+        error: message,
+        authenticated: isAuthenticated,
+        locale,
+      });
     }
   }, [
     canUseDiarization,
@@ -675,6 +756,12 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
       return;
     }
 
+    trackMixpanelEvent('transcription.tool_open_editor', {
+      source: 'audio_widget_enhanced',
+      job_id: currentJobId,
+      locale,
+    });
+
     setOpeningEditor(true);
 
     setTimeout(() => {
@@ -718,7 +805,8 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
     const url = urlInput.trim();
     if (!url) return;
     setShowUrlDialog(false);
-    
+    let urlType: 'youtube_url' | 'audio_url' = 'audio_url';
+
     try {
       setBusy(true);
       setPreviewError(null);
@@ -727,7 +815,7 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
       setProcessingMessage('');
 
       const isYouTube = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)/i.test(url);
-      const urlType: 'youtube_url' | 'audio_url' = isYouTube ? 'youtube_url' : 'audio_url';
+      urlType = isYouTube ? 'youtube_url' : 'audio_url';
 
       // 改进的 title 提取逻辑
       let derivedTitle = 'Transcription';
@@ -799,6 +887,20 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
         setPreviewError(e?.message || 'Preview unavailable');
         setUploadStage('failed');
         showToast('error', t('errors.general_error'), e?.message || t('errors.general_error'));
+        trackMixpanelEvent('transcription.job_failed', {
+          method: urlType,
+          auth: isAuthenticated ? 'logged_in' : 'guest',
+          plan: normalizedTier,
+          source: 'audio_widget_enhanced',
+          error: e?.message,
+        });
+        trackMixpanelEvent('transcription.tool_result_error', {
+          source: 'audio_widget_enhanced',
+          input_type: urlType,
+          error: e?.message,
+          authenticated: isAuthenticated,
+          locale,
+        });
       }
     } finally {
       setBusy(false);
@@ -818,6 +920,24 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
       setPreviewError(null);
       setTranscriptionResult(null);
       setUploadStage('uploading');
+
+      trackMixpanelEvent('transcription.tool_file_selected', {
+        source: 'audio_widget_enhanced',
+        file_name: file.name,
+        file_size: file.size,
+        file_type: file.type,
+        authenticated: isAuthenticated,
+        locale,
+      });
+
+      trackMixpanelEvent('transcription.upload_start', {
+        method: 'file',
+        file_name: file.name,
+        file_size: file.size,
+        auth: isAuthenticated ? 'logged_in' : 'guest',
+        plan: normalizedTier,
+        source: 'audio_widget_enhanced',
+      });
 
       let detectedDuration: number | null = null;
       try {
@@ -869,6 +989,17 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
 
       const fileUrl = downloadUrl || publicUrl;
 
+      trackMixpanelEvent('transcription.tool_upload_succeeded', {
+        source: 'audio_widget_enhanced',
+        method: 'presigned-url',
+        file_name: file.name,
+        file_size: file.size,
+        file_type: file.type,
+        duration_seconds: detectedDuration ?? undefined,
+        authenticated: isAuthenticated,
+        locale,
+      });
+
       await runTranscription({
         type: 'file_upload',
         content: fileUrl,
@@ -886,6 +1017,16 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
       setPreviewError(e?.message || 'Preview unavailable');
       setUploadStage('failed');
       showToast('error', t('errors.upload_failed'), e?.message || t('errors.general_error'));
+      trackMixpanelEvent('transcription.tool_upload_failed', {
+        source: 'audio_widget_enhanced',
+        method: 'presigned-url',
+        file_name: file.name,
+        file_size: file.size,
+        file_type: file.type,
+        error: e?.message,
+        authenticated: isAuthenticated,
+        locale,
+      });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
       setBusy(false);

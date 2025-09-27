@@ -75,6 +75,10 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
   };
 
   const handleSignOut = async () => {
+    trackMixpanelEvent('auth.sign_out', {
+      source: 'sidebar',
+      locale,
+    });
     await signOut({ callbackUrl: `/${locale}` });
   };
 
