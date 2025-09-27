@@ -59,18 +59,31 @@ export async function POST(request: NextRequest) {
     }
 
     if (!videoTitle) {
-      // Fallback to lightweight oEmbed request for title (no RapidAPI usage)
-      try {
-        const oembedUrl = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`;
-        const oembedResp = await fetch(oembedUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-        if (oembedResp.ok) {
+      const oembedUrl = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`;
+      let lastError: unknown = null;
+
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const oembedResp = await fetch(oembedUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+          if (!oembedResp.ok) {
+            throw new Error(`HTTP ${oembedResp.status}`);
+          }
           const data = await oembedResp.json();
           if (typeof data.title === 'string') {
             videoTitle = data.title;
           }
+          break;
+        } catch (error) {
+          lastError = error;
+          console.warn(`[Track Detection] oEmbed attempt ${attempt} failed:`, error);
+          if (attempt < 3) {
+            await new Promise((resolve) => setTimeout(resolve, attempt * 300));
+          }
         }
-      } catch (error) {
-        console.warn('[Track Detection] oEmbed fetch failed:', error);
+      }
+
+      if (!videoTitle && lastError) {
+        console.warn('[Track Detection] oEmbed fetch failed after retries:', lastError);
       }
     }
 
