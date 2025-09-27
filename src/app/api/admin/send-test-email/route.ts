@@ -33,6 +33,12 @@ export async function POST(request: Request) {
     
     // Get template
     const template = getEmailTemplate(templateType as any);
+    if (!template) {
+      return NextResponse.json(
+        { error: `Template '${templateType}' not found` },
+        { status: 404 }
+      );
+    }
     
     // Generate test PS
     const psGenerator = new PersonalizedPSGenerator();

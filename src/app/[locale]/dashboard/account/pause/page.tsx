@@ -7,12 +7,12 @@ export const metadata: Metadata = {
   description: 'Pause your subscription temporarily',
 };
 
-interface Props {
-  params: { locale: string };
-}
-
-export default async function PauseSubscriptionPage({ params }: Props) {
-  const { locale } = params;
+export default async function PauseSubscriptionPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'dashboard' });
 
   return (

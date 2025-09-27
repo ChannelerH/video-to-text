@@ -159,8 +159,8 @@ export class GmailSender {
   
   private htmlToText(html: string): string {
     return html
-      .replace(/<style[^>]*>.*?<\/style>/gs, '')
-      .replace(/<script[^>]*>.*?<\/script>/gs, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/g, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/g, '')
       .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')

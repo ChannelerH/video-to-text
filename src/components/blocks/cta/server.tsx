@@ -36,13 +36,16 @@ export default async function CTAServer({ section }: { section: SectionType }) {
             {/* Enhanced CTA buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
               {section.buttons?.map((button, index) => {
-                const isExternal = button.url?.startsWith("http");
+                const href = button.url;
+                if (!href) return null;
+                
+                const isExternal = href.startsWith("http");
                 const ButtonWrapper = isExternal ? "a" : Link;
                 
                 return (
                   <ButtonWrapper
                     key={index}
-                    href={button.url}
+                    href={href}
                     {...(isExternal && { target: "_blank", rel: "noopener noreferrer" })}
                   >
                     <Button

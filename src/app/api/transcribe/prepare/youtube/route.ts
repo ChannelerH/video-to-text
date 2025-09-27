@@ -741,7 +741,7 @@ async function findReusableAudioForVideo(videoId: string, variantSuffix: string)
       .limit(1);
 
     if (existing && existing.processedUrl) {
-      return existing;
+      return existing as ReusableAudioRecord;
     }
   } catch (error) {
     console.warn('[YouTube Prepare] Failed to look up reusable audio:', error);

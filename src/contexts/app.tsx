@@ -71,7 +71,12 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
       if (resolvedUser) {
         setUser(resolvedUser);
         if (typeof window !== 'undefined') {
-          identifyMixpanelUser(resolvedUser.uuid || resolvedUser.id || '');
+          const mixpanelId =
+            (typeof resolvedUser.uuid === 'string' && resolvedUser.uuid.trim()) ? resolvedUser.uuid.trim() :
+            resolvedUser.id !== undefined && resolvedUser.id !== null ? String(resolvedUser.id) : '';
+          if (mixpanelId) {
+            identifyMixpanelUser(mixpanelId);
+          }
         }
       } else {
         setUser(null);

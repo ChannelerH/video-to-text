@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       const durationSec = Math.ceil(t.duration || 0);
       const updateTranscription: any = {
         status: 'completed',
-        title: result.data.title || tr.title,
+        title: result.data.videoInfo?.title || tr.title,
         duration_sec: durationSec,
         cost_minutes: Number(((t.duration || 0) / 60).toFixed(3)),
         completed_at: new Date()

@@ -122,17 +122,18 @@ export async function POST(req: NextRequest) {
     const { title, language, duration, summary, chapters, text, includeChapters, includeTimestamps } = body || {};
 
     // Lazy import chromium + puppeteer-core to reduce cold start
-    const chromium = await import('@sparticuz/chromium');
-    const puppeteer = await import('puppeteer-core');
+    const [{ default: chromium }, { default: puppeteer }] = await Promise.all([
+      import('@sparticuz/chromium'),
+      import('puppeteer-core')
+    ]);
 
     const html = buildHtml({ title, language, duration, summary, chapters, text, includeChapters, includeTimestamps });
 
-    const executablePath = await chromium.executablePath;
+    const executablePath = await chromium.executablePath();
     const browser = await puppeteer.launch({
       args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
       executablePath,
-      headless: chromium.headless,
+      headless: true,
     });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });

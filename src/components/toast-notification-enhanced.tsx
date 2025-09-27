@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
 import Link from 'next/link';
 
@@ -155,9 +155,9 @@ export function useToastEnhanced() {
     message: '',
   });
 
-  const showToast = (
-    type: ToastType, 
-    title: string, 
+  const showToast = useCallback((
+    type: ToastType,
+    title: string,
     message?: string,
     actionLink?: { text: string; href: string }
   ) => {
@@ -168,11 +168,11 @@ export function useToastEnhanced() {
       message,
       actionLink
     });
-  };
+  }, []);
 
-  const hideToast = () => {
+  const hideToast = useCallback(() => {
     setToastState(prev => ({ ...prev, isOpen: false }));
-  };
+  }, []);
 
   return {
     toast: toastState,

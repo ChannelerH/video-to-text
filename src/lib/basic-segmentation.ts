@@ -220,7 +220,7 @@ export class BasicSegmentationService {
         /(.{2,10})起来/,     // Begin to: ...起来
       ];
       for (const pattern of patterns) {
-        const match = firstSentence.match(pattern);
+        const match = firstSentence?.match(pattern);
         if (match) return match[1].replace(/[，。]/g, '');
       }
     } else {
@@ -232,12 +232,12 @@ export class BasicSegmentationService {
       ];
       
       for (const pattern of verbPatterns) {
-        const match = firstSentence.match(pattern);
+        const match = firstSentence?.match(pattern);
         if (match) return this.capitalizeWords(match[1]);
       }
       
       // Look for action words in keywords
-      const actionWords = this.extractKeywords(firstSentence)
+      const actionWords = this.extractKeywords(firstSentence ?? '')
         .filter(word => !['the', 'a', 'an', 'this', 'that'].includes(word.toLowerCase()));
       
       if (actionWords.length > 1) {

@@ -1,8 +1,9 @@
 import Empty from "@/components/blocks/empty";
-import { ReactNode } from "react";
+import { CSSProperties, ReactNode } from "react";
 import { getUserInfo } from "@/services/user";
 import { redirect } from "next/navigation";
 import AdminSidebar from "@/components/admin/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 export default async function AdminLayout({
   children,
@@ -23,16 +24,22 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen bg-[#0a0a0f]">
-      {/* Admin Sidebar */}
+    <SidebarProvider
+      style={
+        {
+          "--sidebar-width": "calc(var(--spacing) * 60)",
+          "--header-height": "calc(var(--spacing) * 12)",
+        } as CSSProperties
+      }
+    >
       <AdminSidebar locale={locale} />
-      
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-8">
-          {children}
+      <SidebarInset>
+        <div className="h-screen overflow-y-auto bg-[#0a0a0f]">
+          <div className="p-8">
+            {children}
+          </div>
         </div>
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

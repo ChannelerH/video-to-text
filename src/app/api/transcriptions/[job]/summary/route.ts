@@ -9,9 +9,10 @@ import { and, eq, gte, count } from 'drizzle-orm';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { job: string } }
+  { params }: { params: Promise<{ job: string }> }
 ) {
   try {
+    await params;
     // Get user UUID
     const userUuid = await getUserUuid();
     

@@ -28,7 +28,7 @@ export default async function DashboardLayout({
     <>
       <div className="flex h-screen bg-[#0a0a0f]">
         {/* Sidebar */}
-        <DashboardSidebar locale={locale} userUuid={userUuid} />
+        <DashboardSidebar locale={locale} />
         
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto">

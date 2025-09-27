@@ -24,9 +24,9 @@ export default async function OrdersPage({ params, searchParams }: PageProps) {
   const { items, total } = await getOrders(userUuid, currentPage, size);
   const totalPages = Math.max(1, Math.ceil(total / size));
 
-  const formatDateTime = (d?: string | null) => {
+  const formatDateTime = (d?: string | Date | null) => {
     if (!d) return '-';
-    const x = new Date(d);
+    const x = d instanceof Date ? d : new Date(d);
     const pad = (n: number) => n.toString().padStart(2, '0');
     return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())} ${pad(x.getHours())}:${pad(x.getMinutes())}:${pad(x.getSeconds())}`;
   };
@@ -120,7 +120,7 @@ export default async function OrdersPage({ params, searchParams }: PageProps) {
 async function getOrders(userUuid: string, page: number, pageSize: number) {
   const offset = (page - 1) * pageSize;
   const [countRow] = await db()
-    .select({ count: (sql`COUNT(*)`) as unknown as number })
+    .select({ count: sql<number>`COUNT(*)` })
     .from(orders)
     .where(and(eq(orders.user_uuid, userUuid), eq(orders.status, 'paid')));
 

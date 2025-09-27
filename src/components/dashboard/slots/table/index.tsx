@@ -1,4 +1,4 @@
-import Header from "@/components/dashboard/header";
+import Header from "@/components/dashboard/header/index";
 import TableBlock from "@/components/blocks/table";
 import { Table as TableSlotType } from "@/types/slots/table";
 import Toolbar from "@/components/blocks/toolbar";

@@ -12,11 +12,10 @@ export interface UserEmailCandidate {
   locale?: string;
   timezone?: string;
   country?: string;
-  created_at?: Date;
+  created_at: Date;
   subscription_status?: string;
   total_transcriptions?: number;
   total_minutes?: number;
-  last_usage?: Date | null;
 }
 
 type CampaignType =
@@ -45,35 +44,6 @@ export class EmailScheduler {
   private psGenerator = new PersonalizedPSGenerator();
   private rateLimitMs = 1000;
 
-  private toNumber(value: unknown): number | undefined {
-    if (value === null || value === undefined) return undefined;
-    const num = Number(value);
-    return Number.isNaN(num) ? undefined : num;
-  }
-
-  private toDate(value: unknown): Date | undefined {
-    if (!value) return undefined;
-    if (value instanceof Date) return value;
-    const date = new Date(value as string);
-    return Number.isNaN(date.getTime()) ? undefined : date;
-  }
-
-  private mapCandidateRows(rows: any[]): UserEmailCandidate[] {
-    return rows.map((row: any) => ({
-      uuid: String(row.uuid),
-      email: String(row.email),
-      nickname: row.nickname ? String(row.nickname) : undefined,
-      locale: row.locale ? String(row.locale) : undefined,
-      timezone: row.timezone ? String(row.timezone) : undefined,
-      country: row.country ? String(row.country) : undefined,
-      created_at: this.toDate(row.created_at),
-      subscription_status: row.subscription_status ? String(row.subscription_status) : undefined,
-      total_transcriptions: this.toNumber(row.total_transcriptions),
-      total_minutes: this.toNumber(row.total_minutes),
-      last_usage: this.toDate(row.last_usage),
-    }));
-  }
-
   private createEmptyResult(campaign: CampaignType): CampaignResult {
     return {
       campaign,
@@ -92,7 +62,7 @@ export class EmailScheduler {
     const summary = this.createEmptyResult('day_3_activation');
 
     try {
-      const rows = await db().execute(sql`
+      const users = await db().execute(sql`
         SELECT 
           u.uuid,
           u.email,
@@ -117,9 +87,7 @@ export class EmailScheduler {
         HAVING COUNT(t.id) < 2
       `);
 
-      const users = this.mapCandidateRows(rows as any[]);
-
-      for (const user of users) {
+      for (const user of users as unknown as UserEmailCandidate[]) {
         try {
           const outcome = await this.sendActivationEmail(user);
           if (outcome.skipped) {
@@ -161,7 +129,7 @@ export class EmailScheduler {
     const summary = this.createEmptyResult('day_7_feedback');
 
     try {
-      const rows = await db().execute(sql`
+      const users = await db().execute(sql`
         SELECT 
           u.uuid,
           u.email,
@@ -187,9 +155,7 @@ export class EmailScheduler {
         HAVING COUNT(t.id) >= 1
       `);
 
-      const users = this.mapCandidateRows(rows as any[]);
-
-      for (const user of users) {
+      for (const user of users as unknown as UserEmailCandidate[]) {
         try {
           const outcome = await this.sendFeedbackEmail(user);
           if (outcome.skipped) {
@@ -231,7 +197,7 @@ export class EmailScheduler {
     const summary = this.createEmptyResult('paid_user_feedback');
 
     try {
-      const rows = await db().execute(sql`
+      const users = await db().execute(sql`
         SELECT 
           u.uuid,
           u.email,
@@ -258,9 +224,7 @@ export class EmailScheduler {
         LIMIT 20
       `);
 
-      const users = this.mapCandidateRows(rows as any[]);
-
-      for (const user of users) {
+      for (const user of users as unknown as UserEmailCandidate[]) {
         try {
           const outcome = await this.sendPaidUserFeedbackEmail(user);
           if (outcome.skipped) {
@@ -302,7 +266,7 @@ export class EmailScheduler {
     const summary = this.createEmptyResult('win_back');
 
     try {
-      const rows = await db().execute(sql`
+      const users = await db().execute(sql`
         SELECT 
           u.uuid,
           u.email,
@@ -330,9 +294,7 @@ export class EmailScheduler {
         LIMIT 50
       `);
 
-      const users = this.mapCandidateRows(rows as any[]);
-
-      for (const user of users) {
+      for (const user of users as unknown as UserEmailCandidate[]) {
         try {
           const outcome = await this.sendWinBackEmail(user);
           if (outcome.skipped) {
@@ -605,7 +567,7 @@ export class EmailScheduler {
          )`
     );
     
-    return Number((result as any[])[0]?.user_number || 100);
+    return Number((result as unknown as any[])[0]?.user_number || 100);
   }
   
   /**
@@ -639,7 +601,7 @@ export class EmailScheduler {
            NOW(), 
            ${successCount}, 
            ${failCount},
-           ${(totalMinutes as any[])[0]?.total || 0},
+           ${(totalMinutes as unknown as any[])[0]?.total || 0},
            ${JSON.stringify({ timestamp: new Date().toISOString() })}
          )`
     );

@@ -39,8 +39,11 @@ export interface TranscriptionRequest {
       message: string;
       estimatedTime?: string;
     }) => void; // 总体进度回调
+    trimToSeconds?: number; // 预览裁剪秒数限制
   };
 }
+
+type TranscriptionType = TranscriptionRequest['type'];
 
 export interface TranscriptionResponse {
   success: boolean;
@@ -484,7 +487,7 @@ export class TranscriptionService {
         maxConcurrentChunks: downloadOptions.maxConcurrentChunks
       });
 
-      let audioBuffer: Buffer;
+      let audioBuffer: Buffer | null = null;
       let downloadMethod = 'optimized';
       let downloadAttempts = 0;
       // 快速失败：只尝试一次优化下载，失败立即降级
@@ -786,8 +789,7 @@ export class TranscriptionService {
           transcription.segments = alignSentencesWithSegments(
             transcription.text,
             transcription.segments as any,
-            transcription.language,
-            transcription.duration
+            transcription.language
           );
           (transcription as any).srtText = undefined;
           console.log('[Align] Non-Deepgram sentence alignment applied');
@@ -1048,8 +1050,7 @@ export class TranscriptionService {
           transcription.segments = alignSentencesWithSegments(
             transcription.text,
             transcription.segments as any,
-            transcription.language,
-            transcription.duration
+            transcription.language
           );
           (transcription as any).srtText = undefined;
         } else {
@@ -1069,7 +1070,10 @@ export class TranscriptionService {
         const limits = POLICY.limits(tier as any);
         const maxSec = (limits.maxFileMinutes || 0) * 60;
         if (maxSec > 0 && transcription.duration > maxSec) {
-          return { success: false, error: `This audio is too long for your plan. Max ${limits.maxFileMinutes} minutes. Upgrade`, upgrade: { url: '/pricing', reason: 'file_duration_limit', required: 'upgrade' } };
+          return {
+            success: false,
+            error: `This audio is too long for your plan. Max ${limits.maxFileMinutes} minutes. Upgrade at /pricing`
+          };
         }
       } catch {}
 
@@ -1517,7 +1521,10 @@ export class TranscriptionService {
         const limits = POLICY.limits(tier as any);
         const maxSec = (limits.maxFileMinutes || 0) * 60;
         if (maxSec > 0 && transcription.duration > maxSec) {
-          return { success: false, error: `This file is too long for your plan. Max ${limits.maxFileMinutes} minutes. Upgrade`, upgrade: { url: '/pricing', reason: 'file_duration_limit', required: 'upgrade' } };
+          return {
+            success: false,
+            error: `This file is too long for your plan. Max ${limits.maxFileMinutes} minutes. Upgrade at /pricing`
+          };
         }
       } catch {}
 
@@ -1579,8 +1586,7 @@ export class TranscriptionService {
         transcription.segments = alignSentencesWithSegments(
           transcription.text,
           transcription.segments as any,
-          transcription.language,
-          transcription.duration
+          transcription.language
         );
         (transcription as any).srtText = undefined;
       } catch {}

@@ -133,6 +133,8 @@ export async function POST(request: NextRequest) {
     // };
 
     // Process transcription
+    const jobId = `api-job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
     const result = await transcriptionService.processTranscription({
       type,
       content,
@@ -161,7 +163,7 @@ export async function POST(request: NextRequest) {
       jobId,
       data: {
         transcription: result.data?.transcription,
-        files: result.data?.files,
+        formats: result.data?.formats,
         metadata: {
           duration: result.data?.transcription?.duration,
           language: result.data?.transcription?.language,

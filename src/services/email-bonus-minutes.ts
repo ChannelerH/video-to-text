@@ -220,13 +220,13 @@ export class EmailBonusMinutesService {
           campaign_id: reward.campaign_id,
           success: result.success
         });
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(`Retry failed for ${reward.user_uuid}:`, error);
         results.push({
           user_uuid: reward.user_uuid,
           campaign_id: reward.campaign_id,
           success: false,
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     }

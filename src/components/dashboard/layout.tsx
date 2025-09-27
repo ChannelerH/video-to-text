@@ -2,7 +2,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 import { ReactNode } from "react";
 import { Sidebar as SidebarType } from "@/types/blocks/sidebar";
-import DashboardSidebar from "./sidebar";
+import DashboardSidebar from "./sidebar/index";
 
 export default function DashboardLayout({
   children,

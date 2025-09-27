@@ -9,9 +9,10 @@ import { and, eq, gte, count } from 'drizzle-orm';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { job: string } }
+  { params }: { params: Promise<{ job: string }> }
 ) {
   try {
+    await params;
     const { segments, options } = await request.json();
     
     if (!segments || !Array.isArray(segments)) {
@@ -143,9 +144,10 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { job: string } }
+  { params }: { params: Promise<{ job: string }> }
 ) {
   try {
+    await params;
     // TODO: Fetch saved chapters from database
     // For now, return empty array
     return NextResponse.json({

@@ -59,8 +59,8 @@ export function DiscountCouponIntl({ userHasPurchased = false, userSubscription 
 
     // Track time spent on page
     let startTime = Date.now();
-    let timeoutId: NodeJS.Timeout;
-    let intervalId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
 
     const trackTime = () => {
       intervalId = setInterval(() => {
@@ -73,7 +73,7 @@ export function DiscountCouponIntl({ userHasPurchased = false, userSubscription 
           // Mark as shown
           sessionStorage.setItem(COUPON_CONFIG.sessionKey, '1');
           localStorage.setItem(COUPON_CONFIG.storageKey, Date.now().toString());
-          clearInterval(intervalId);
+          if (intervalId) clearInterval(intervalId);
         }
       }, 1000); // Check every second
     };
@@ -82,7 +82,7 @@ export function DiscountCouponIntl({ userHasPurchased = false, userSubscription 
     const handleVisibilityChange = () => {
       if (document.hidden) {
         // Page is hidden, pause tracking
-        clearInterval(intervalId);
+        if (intervalId) clearInterval(intervalId);
       } else {
         // Page is visible again, resume tracking
         if (!showCoupon && canShowCoupon()) {
@@ -98,8 +98,8 @@ export function DiscountCouponIntl({ userHasPurchased = false, userSubscription 
     }
 
     return () => {
-      clearInterval(intervalId);
-      clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+      if (timeoutId) clearTimeout(timeoutId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [userHasPurchased, userSubscription]);

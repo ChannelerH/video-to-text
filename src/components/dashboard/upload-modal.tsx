@@ -66,12 +66,11 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
         const uploader = new MultipartUploader();
         const abort = new AbortController();
         try {
-          await uploader.upload({
+          const result = await uploader.upload({
             file: file!,
             abortSignal: abort.signal,
             onProgress: () => {}
           });
-          const result = uploader.getResult?.();
           r2Key = result?.key || '';
           fileUrl = result?.downloadUrl || result?.publicUrl || '';
         } catch (e) {

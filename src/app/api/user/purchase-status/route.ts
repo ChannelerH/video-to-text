@@ -1,6 +1,7 @@
 import { getUserUuid } from "@/services/user";
 import { getActiveOrdersByUserUuid } from "@/models/order";
 import { findUserByUuid } from "@/models/user";
+import { getMinuteSummary } from "@/services/minutes";
 import { respData, respErr } from "@/lib/resp";
 
 export async function GET() {
@@ -65,8 +66,12 @@ export async function GET() {
     }
 
     // Check user's stored minutes/subscription as well
-    if (user.minutes_balance && user.minutes_balance > 0) {
-      minutesPurchased = Math.max(minutesPurchased, user.minutes_balance);
+    try {
+      const summary = await getMinuteSummary(user_uuid);
+      const minuteBalance = summary.stdTotal ?? summary.std ?? 0;
+      minutesPurchased = Math.max(minutesPurchased, minuteBalance);
+    } catch (error) {
+      console.warn('Failed to fetch minute summary for user:', error);
     }
 
     const hasPurchased = hasActiveOrders || minutesPurchased > 0 || subscription !== null;

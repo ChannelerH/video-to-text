@@ -248,7 +248,7 @@ export class YouTubeService {
       contentLength: fileSize,
       quality: 'mp3',
       audioQuality: 'mp3',
-      approxDurationMs: durationSeconds > 0 ? durationSeconds * 1000 : undefined,
+      approxDurationMs: Math.max(0, durationSeconds) * 1000,
       supportsRangeRequests: true,
       isDrc: false,
       isDefaultAudio: true,

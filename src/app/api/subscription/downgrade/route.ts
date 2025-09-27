@@ -235,7 +235,11 @@ export async function POST(request: NextRequest) {
 
       const scheduleDetails = await stripe.subscriptionSchedules.retrieve(schedule.id);
       const currentPhase = scheduleDetails.phases?.[0];
-      const currentPhaseStart = currentPhase?.start_date ?? scheduleDetails.start_date ?? 'now';
+      const currentPhaseStart =
+        currentPhase?.start_date ??
+        scheduleDetails.current_phase?.start_date ??
+        subscription.current_period_start ??
+        'now';
       const currentPhaseEnd = currentPhase?.end_date ?? subscription.current_period_end ?? undefined;
       const nextPhaseStart = scheduleDetails.current_phase?.end_date
         ?? currentPhaseEnd

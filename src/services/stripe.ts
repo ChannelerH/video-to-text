@@ -145,10 +145,18 @@ export async function handleInvoice(stripe: Stripe, invoice: Stripe.Invoice) {
       return;
     }
 
+    const directSub = invoice.subscription;
+    const lineSub = invoice.lines?.data?.[0]?.subscription;
     const subId =
-      (invoice.subscription as string | null | undefined) ??
-      invoice.lines?.data?.[0]?.subscription ??
-      "";
+      typeof directSub === 'string'
+        ? directSub
+        : typeof (directSub as Stripe.Subscription | undefined)?.id === 'string'
+          ? (directSub as Stripe.Subscription).id
+          : typeof lineSub === 'string'
+            ? lineSub
+            : typeof (lineSub as Stripe.Subscription | undefined)?.id === 'string'
+              ? (lineSub as Stripe.Subscription).id
+              : '';
     // 如果不是订阅账单，例如一次性计费/分钟包补扣，直接跳过
     if (!subId) {
       console.log('[Stripe] invoice payment (non-subscription) received, skipping');

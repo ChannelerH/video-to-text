@@ -103,7 +103,9 @@ async function measureFileDuration(file: File): Promise<number | null> {
       media = document.createElement(tagName);
       media.preload = 'metadata';
       media.muted = true;
-      media.playsInline = true;
+      if ('playsInline' in media) {
+        (media as HTMLVideoElement).playsInline = true;
+      }
       media.src = objectUrl;
       media.style.position = 'absolute';
       media.style.opacity = '0';

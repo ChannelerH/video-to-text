@@ -1,6 +1,6 @@
 import FormBlock from "@/components/blocks/form";
 import { Form as FormSlotType } from "@/types/slots/form";
-import Header from "@/components/dashboard/header";
+import Header from "@/components/dashboard/header/index";
 import { Card } from "@/components/ui/card";
 
 export default function ({ ...form }: FormSlotType) {

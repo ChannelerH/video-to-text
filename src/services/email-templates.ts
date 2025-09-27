@@ -461,13 +461,13 @@ Howard
 };
 
 export function getEmailTemplate(
-  templateName: string, 
+  templateName: string,
   language: string = 'en'
 ): EmailTemplate | null {
-  const template = EMAIL_TEMPLATES[templateName];
+  const template = EMAIL_TEMPLATES[templateName as keyof typeof EMAIL_TEMPLATES];
   if (!template) return null;
   
-  return template[language] || template['en'];
+  return template?.[language as keyof typeof template] || template?.['en'];
 }
 
 export function renderTemplate(
