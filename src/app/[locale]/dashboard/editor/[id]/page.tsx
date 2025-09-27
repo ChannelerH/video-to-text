@@ -273,6 +273,7 @@ export default async function EditorPage({
             rawSegmentMax || 0,
             visibleSegmentMax || 0
           )}
+          jobId={id}
         />
       </div>
     </div>

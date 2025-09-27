@@ -41,6 +41,7 @@ interface ThreeColumnEditorProps {
   onSegmentsUpdate?: (segments: any[]) => void;
   isPreviewMode?: boolean;
   originalDurationSec?: number;
+  jobId: string;
 }
 
 export default function ThreeColumnEditor({ 
@@ -53,7 +54,8 @@ export default function ThreeColumnEditor({
   backHref,
   onSegmentsUpdate,
   isPreviewMode,
-  originalDurationSec
+  originalDurationSec,
+  jobId
 }: ThreeColumnEditorProps) {
   const tPaywall = useTranslations('paywall');
   const { userTier } = useAppContext();
@@ -182,8 +184,23 @@ export default function ThreeColumnEditor({
     jumpToChapter,
     setChapters,
     updateChapter,
-    setVolume
+    setVolume,
+    setCurrentChapter
   } = usePlayerStore();
+
+  const previousJobIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!jobId) return;
+    if (previousJobIdRef.current === jobId) return;
+    previousJobIdRef.current = jobId;
+    setChapters([]);
+    setCurrentChapter(-1);
+    setCurrentTime(0);
+    setPlaying(false);
+    setDuration(0);
+    setSegments(initialSegments);
+  }, [jobId, initialSegments, setChapters, setCurrentChapter, setCurrentTime, setPlaying, setDuration]);
 
 
   // Initialize chapters once, or when there are no chapters yet.
@@ -205,7 +222,8 @@ export default function ThreeColumnEditor({
     if (transcription?.duration) {
       setDuration(transcription.duration);
     }
-  }, [chapters, initialChapters, transcription]);
+  }, [chapters, initialChapters, transcription, jobId]);
+  
   
   // Generate AI chapters
   const generateAIChapters = async () => {
@@ -213,11 +231,14 @@ export default function ThreeColumnEditor({
     
     setGeneratingChapters(true);
     try {
-      const jobId = (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '') as string;
-      console.log('Generating AI chapters for job:', jobId);
+      const targetJobId = jobId;
+      if (!targetJobId) {
+        throw new Error('Missing job id for AI chapter request');
+      }
+      console.log('Generating AI chapters for job:', targetJobId);
       toast.info('Generating AI chapters... This may take a moment.');
       
-      const response = await fetch(`/api/transcriptions/${jobId}/chapters`, {
+      const response = await fetch(`/api/transcriptions/${targetJobId}/chapters`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -26,6 +26,7 @@ interface EditorWrapperProps {
   backHref?: string;
   isPreviewMode?: boolean;
   originalDurationSec?: number;
+  jobId: string;
 }
 
 export default function EditorWrapper(props: EditorWrapperProps) {
