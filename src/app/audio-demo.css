@@ -1,0 +1,25 @@
+/* Audio Demo Tab System */
+.transcription-demo-tabs .demo-tab-radio {
+  display: none;
+}
+
+.transcription-demo-tabs .demo-tab-content {
+  display: none;
+}
+
+/* Show content based on selected radio button */
+#audio-demo-tab-podcast:checked ~ .audio-demo-content-podcast,
+#audio-demo-tab-interview:checked ~ .audio-demo-content-interview,
+#audio-demo-tab-lecture:checked ~ .audio-demo-content-lecture,
+#audio-demo-tab-meeting:checked ~ .audio-demo-content-meeting {
+  display: block;
+}
+
+/* Style active tab labels */
+#audio-demo-tab-podcast:checked ~ div label[for="audio-demo-tab-podcast"],
+#audio-demo-tab-interview:checked ~ div label[for="audio-demo-tab-interview"],
+#audio-demo-tab-lecture:checked ~ div label[for="audio-demo-tab-lecture"],
+#audio-demo-tab-meeting:checked ~ div label[for="audio-demo-tab-meeting"] {
+  background: rgb(107 33 168 / 0.3);
+  border-color: rgb(168 85 247 / 0.5);
+}

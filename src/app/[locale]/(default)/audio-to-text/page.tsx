@@ -21,9 +21,8 @@ export async function generateMetadata({
   }
 
   return {
-    title: "Audio to Text Online – Upload or paste MP3/M4A/WAV, free 5-minute preview, export TXT/SRT",
-    description: "Convert audio to text instantly. Upload MP3, M4A, WAV files or paste audio links. Free 5-minute preview, automatic language detection, export multiple formats.",
-    keywords: "audio to text, audio transcription, MP3 to text, voice to text, podcast transcription, audio subtitles",
+    title: "Audio to Text Converter - Free AI Transcription Online | V2TX",
+    description: "Convert audio to text instantly with 99.2% accuracy. Free audio to text converter supporting MP3, WAV, M4A and 45+ formats. Transcribe audio to text in 80+ languages online.",
     alternates: {
       canonical: canonicalUrl,
     },
@@ -76,21 +75,21 @@ export default async function AudioToTextPage({
           {/* Left */}
           <div>
             <span className="inline-block text-cyan-400 border border-cyan-500/40 bg-cyan-500/10 px-3 py-1 rounded-full text-sm mb-4">
-              🎯 #1 Audio Transcription Tool
+              🎯 #1 Audio to Text Converter Online
             </span>
             <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-4">
               {page?.hero?.title || "Audio to Text — Convert audio to text & subtitles instantly"}
             </h1>
             <p className="text-slate-300 mb-8 text-base md:text-lg">
               {page?.hero?.description ||
-                "Transform your audio recordings into accurate transcripts with our advanced AI. Perfect for podcasts, meetings, interviews, and lectures."}
+                "Transform audio to text instantly with our advanced AI converter. Perfect for podcasts, meetings, interviews, and lectures. Start transcribing now."}
             </p>
 
             <div className="flex flex-col gap-3 mb-8">
               {[
-                "99.2% accuracy with speaker detection",
-                "Support for 80+ languages and dialects",
-                "Real-time transcription available",
+                "99.2% transcription accuracy",
+                "Support for 80+ languages",
+                "Real-time processing",
               ].map((t) => (
                 <div key={t} className="flex items-center gap-3 text-slate-300">
                   <span className="w-6 h-6 inline-flex items-center justify-center rounded-full bg-cyan-500/20 text-cyan-400">✓</span>
@@ -126,10 +125,10 @@ export default async function AudioToTextPage({
       <section className="border-y border-slate-800 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 py-10">
         <div className="container grid grid-cols-2 md:grid-cols-5 gap-6 text-center">
           {[
-            { n: "99.2%", l: "Accuracy Rate" },
+            { n: "99.2%", l: "Accuracy" },
             { n: "80+", l: "Languages" },
-            { n: "10M+", l: "Audio Transcribed" },
-            { n: "5min", l: "Average Time" },
+            { n: "10M+", l: "Conversions" },
+            { n: "5min", l: "Processing Speed" },
             { n: "24/7", l: "Support" },
           ].map((s) => (
             <div key={s.l} className="relative">
@@ -143,26 +142,26 @@ export default async function AudioToTextPage({
       {/* How It Works */}
       <section className="container py-16 md:py-24" id="how-it-works">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-semibold">How It Works</h2>
-          <p className="text-slate-400 mt-3">Simple 3-step process to get your transcripts</p>
+          <h2 className="text-3xl md:text-4xl font-semibold">How Audio to Text Works</h2>
+          <p className="text-slate-400 mt-3">Simple 3-step process - convert your files in minutes</p>
         </div>
         <div className="relative max-w-3xl mx-auto pl-10">
           <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-gradient-to-b from-cyan-400/80 to-transparent" />
           {[
             {
-              t: "Upload or Record",
+              t: "Upload Your Audio",
               d:
-                "Upload your audio file in any format or record directly in your browser. Our system accepts files up to 5GB and supports batch processing.",
+                "Upload any format - MP3, WAV, M4A, and more. Our system accepts files up to 5GB for batch processing.",
             },
             {
               t: "AI Processing",
               d:
-                "Our advanced AI analyzes your audio, identifies different speakers, and creates accurate transcripts with proper punctuation.",
+                "Our advanced AI analyzes your files with speaker identification and automatic punctuation.",
             },
             {
-              t: "Download & Edit",
+              t: "Download Results",
               d:
-                "Review your transcript, make edits if needed, and export in your preferred format including TXT, DOCX, PDF, SRT, and more.",
+                "Review your transcription, edit if needed, and export in multiple formats including TXT, SRT, DOCX, and more.",
             },
           ].map((x, i) => (
             <div key={x.t} className="relative mb-10">
@@ -182,22 +181,22 @@ export default async function AudioToTextPage({
       <section className="py-16 bg-slate-900/60">
         <div className="container text-center mb-10">
           <h2 className="text-3xl md:text-4xl font-semibold">
-            Audio to Text Online for Every Industry
+            Transcription for Every Industry
           </h2>
-          <p className="text-slate-400 mt-3">Trusted by professionals worldwide</p>
+          <p className="text-slate-400 mt-3">Professional solutions trusted by millions worldwide</p>
         </div>
         <div className="container overflow-hidden">
           <div className="flex gap-6 min-w-full will-change-transform animate-[marquee_22s_linear_infinite]">
             {[
-              { icon: "🎙️", title: "Podcast Production", desc: "Create searchable show notes and transcripts for SEO." },
-              { icon: "💼", title: "Business Meetings", desc: "Get accurate minutes and searchable archives." },
-              { icon: "📰", title: "Journalism", desc: "Transcribe interviews and extract quotes quickly." },
-              { icon: "🎓", title: "Academic Research", desc: "Lectures, interviews and focus groups transcription." },
-              { icon: "⚖️", title: "Legal", desc: "Depositions and court proceedings with timestamps." },
-              { icon: "🏥", title: "Healthcare", desc: "Consultations and dictations with compliance." },
+              { icon: "🎙️", title: "Podcasts", desc: "Create searchable show notes and transcripts." },
+              { icon: "💼", title: "Business Meetings", desc: "Generate accurate meeting minutes automatically." },
+              { icon: "📰", title: "Interviews", desc: "Transcribe interviews for journalism and research." },
+              { icon: "🎓", title: "Education", desc: "Convert lectures and academic content for students." },
+              { icon: "⚖️", title: "Legal", desc: "Create timestamped depositions and court transcripts." },
+              { icon: "🏥", title: "Healthcare", desc: "HIPAA-compliant medical transcription services." },
               // repeat a few for continuous track
-              { icon: "🎙️", title: "Podcast Production", desc: "Create searchable show notes and transcripts." },
-              { icon: "💼", title: "Business Meetings", desc: "Minutes, action items, and archives." },
+              { icon: "🎙️", title: "Podcasts", desc: "Transform episodes into searchable content." },
+              { icon: "💼", title: "Business", desc: "Professional meeting documentation." },
             ].map((c, idx) => (
               <div
                 key={idx}
@@ -216,7 +215,7 @@ export default async function AudioToTextPage({
       <section className="container py-16">
         <div className="text-center">
           <h2 className="text-3xl md:text-4xl font-semibold">
-            Powerful Audio Transcription Features
+            Powerful Features
           </h2>
           <p className="text-slate-400 mt-3">Everything you need for professional transcription</p>
         </div>
@@ -224,30 +223,30 @@ export default async function AudioToTextPage({
           {/* Large item */}
           <div className="md:col-span-2 rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-800 p-6 hover:border-cyan-500/60 transition">
             <div className="text-3xl mb-2">👥</div>
-            <div className="text-cyan-400 font-semibold mb-1">Speaker Diarization</div>
+            <div className="text-cyan-400 font-semibold mb-1">Speaker Detection</div>
             <p className="text-slate-300 text-sm">
-              Automatically identify and label different speakers in your audio. Perfect for interviews, meetings, and multi-person conversations.
+              Automatically identify and label different speakers.
             </p>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-800 p-6 hover:border-cyan-500/60 transition">
             <div className="text-3xl mb-2">🔊</div>
             <div className="text-cyan-400 font-semibold mb-1">Noise Reduction</div>
-            <p className="text-slate-300 text-sm">AI-powered background noise removal for crystal clear transcripts.</p>
+            <p className="text-slate-300 text-sm">AI removes background noise for crystal-clear transcriptions.</p>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-800 p-6 hover:border-cyan-500/60 transition">
             <div className="text-3xl mb-2">⏱️</div>
-            <div className="text-cyan-400 font-semibold mb-1">Timestamps</div>
-            <p className="text-slate-300 text-sm">Precise time markers for easy navigation and reference.</p>
+            <div className="text-cyan-400 font-semibold mb-1">Precise Timestamps</div>
+            <p className="text-slate-300 text-sm">Navigate transcripts easily with accurate time markers.</p>
           </div>
           <div className="md:row-span-2 rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-800 p-6 hover:border-cyan-500/60 transition">
             <div className="text-3xl mb-2">🌍</div>
-            <div className="text-cyan-400 font-semibold mb-1">Multi-Language</div>
-            <p className="text-slate-300 text-sm">Support for 80+ languages with accent recognition. Transcribe content from around the world with high accuracy.</p>
+            <div className="text-cyan-400 font-semibold mb-1">80+ Languages</div>
+            <p className="text-slate-300 text-sm">Transcribe in multiple languages with accent recognition.</p>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-800 p-6 hover:border-cyan-500/60 transition">
             <div className="text-3xl mb-2">📝</div>
-            <div className="text-cyan-400 font-semibold mb-1">Smart Punctuation</div>
-            <p className="text-slate-300 text-sm">Automatic punctuation and paragraph formatting.</p>
+            <div className="text-cyan-400 font-semibold mb-1">Smart Formatting</div>
+            <p className="text-slate-300 text-sm">Automatic punctuation and paragraph breaks for readable transcripts.</p>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-800 p-6 hover:border-cyan-500/60 transition">
             <div className="text-3xl mb-2">🎧</div>
@@ -265,8 +264,8 @@ export default async function AudioToTextPage({
       {/* Results */}
       <section className="py-16 bg-gradient-to-b from-black to-slate-900" id="demo">
         <div className="container text-center">
-          <h2 className="text-3xl md:text-4xl font-semibold">See the Transformation</h2>
-          <p className="text-slate-400 mt-3">From raw audio to polished transcript in minutes</p>
+          <h2 className="text-3xl md:text-4xl font-semibold">Audio to Text Results</h2>
+          <p className="text-slate-400 mt-3">See how our audio to text converter transforms files instantly</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
             {/* Before */}
             <div className="rounded-2xl border border-slate-800 overflow-hidden">
@@ -363,16 +362,16 @@ export default async function AudioToTextPage({
               features: ["30 minutes/month", "Basic features", "3 export formats", "Community support"],
             },
             {
-              t: "Pro",
+              t: "Basic",
               price: "$19",
               unit: "/month",
-              features: ["10 hours/month", "All features unlocked", "All export formats", "Priority support", "API access"],
+              features: ["10 hours/month", "All features unlocked", "All export formats", "Priority support"],
             },
             {
-              t: "Team",
-              price: "$49",
+              t: "Pro",
+              price: "$29",
               unit: "/month",
-              features: ["30 hours/month", "Team collaboration", "Advanced API access", "Dedicated support", "Custom integrations"],
+              features: ["30 hours/month", "Team collaboration", "API access", "Dedicated support", "Custom integrations"],
             },
           ].map((p, idx) => (
             <div key={p.t} className={`relative flex items-center gap-6 mb-10 ${idx % 2 ? "flex-row-reverse" : ""}`}>
@@ -395,29 +394,29 @@ export default async function AudioToTextPage({
       <section className="container py-16 max-w-3xl">
         <div className="text-center mb-8">
           <h2 className="text-3xl md:text-4xl font-semibold">Frequently Asked Questions</h2>
-          <p className="text-slate-400 mt-3">Everything you need to know about audio transcription</p>
+          <p className="text-slate-400 mt-3">Get answers to common questions about our service</p>
         </div>
         <div className="space-y-3">
           {[
             {
               q: "What audio formats are supported?",
-              a: "We support all major audio formats including MP3, WAV, M4A, AAC, OGG, FLAC, WMA, and more. You can also paste URLs from cloud storage services or record directly in your browser.",
+              a: "Our audio to text converter supports all major formats including MP3, WAV, M4A, AAC, OGG, FLAC, and 40+ more.",
             },
             {
               q: "How accurate is the transcription?",
-              a: "Our AI achieves 99.2% accuracy for clear audio. Accuracy may vary based on audio quality, background noise, accents, and technical terminology. Our noise reduction feature helps improve accuracy.",
+              a: "Our AI achieves 99.2% accuracy for clear recordings. Quality depends on the audio source, but handles accents well.",
             },
             {
-              q: "Can I transcribe multiple speakers?",
-              a: "Yes! Our speaker diarization feature automatically identifies and labels different speakers in your audio. This is perfect for interviews, meetings, podcasts, and panel discussions.",
+              q: "Can you identify different speakers?",
+              a: "Yes! Our system automatically detects and labels speakers, perfect for interviews and multi-person conversations.",
             },
             {
-              q: "Is my audio data secure?",
-              a: "Absolutely. We use enterprise-grade encryption for all uploads and processing. Your files are automatically deleted after processing, and we never share your data with third parties.",
+              q: "Is my data secure?",
+              a: "Absolutely. All uploads are encrypted, processed securely, and automatically deleted after conversion. We never share or store your data.",
             },
             {
               q: "How long does transcription take?",
-              a: "Most audio files are transcribed in less than 5 minutes. A 1-hour podcast typically takes 3-4 minutes to process. Processing time may vary based on file size and current server load.",
+              a: "Most files are processed in under 5 minutes. A 1-hour recording typically takes just 3-4 minutes to transcribe completely.",
             },
           ].map((f) => (
             <details key={f.q} className="group rounded-xl overflow-hidden border border-slate-800 bg-slate-900/60">
