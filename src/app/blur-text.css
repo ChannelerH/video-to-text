@@ -1,0 +1,64 @@
+@keyframes blurFadeIn {
+  0% {
+    filter: blur(8px);
+    opacity: 0;
+    transform: translateY(-20px) scale(0.9);
+  }
+  40% {
+    filter: blur(3px);
+    opacity: 0.7;
+    transform: translateY(-5px) scale(0.97);
+  }
+  100% {
+    filter: blur(0);
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes subtleGlow {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.1);
+  }
+}
+
+.blur-text-wrapper {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+.blur-text-span {
+  display: inline-block;
+  opacity: 0;
+  will-change: transform, filter, opacity;
+}
+
+/* 触发动画的类 - 更流畅的贝塞尔曲线 */
+.blur-text-animate .blur-text-span {
+  animation: blurFadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  will-change: transform, filter, opacity;
+}
+
+/* 动画完成后添加微妙的光晕效果 */
+.blur-text-animate .blur-text-span:nth-child(odd) {
+  animation: blurFadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards,
+             subtleGlow 3s ease-in-out infinite;
+}
+
+/* 为了实现视口检测，需要配合最小的客户端JS */
+.blur-text-wrapper:not(.blur-text-animate) .blur-text-span {
+  opacity: 0;
+  filter: blur(8px);
+  transform: translateY(-20px) scale(0.9);
+}
+
+/* 添加渐变动画的平滑过渡 */
+.blur-text-span {
+  transition: none;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  transform-style: preserve-3d;
+}

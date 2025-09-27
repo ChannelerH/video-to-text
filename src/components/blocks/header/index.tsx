@@ -1,5 +1,3 @@
-"use client";
-
 import {
   Accordion,
   AccordionContent,
@@ -27,7 +25,6 @@ import {
 import { Header as HeaderType } from "@/types/blocks/header";
 import Icon from "@/components/icon";
 import { Link } from "@/i18n/navigation";
-import { trackMixpanelEvent } from "@/lib/mixpanel-browser";
 import LocaleToggle from "@/components/locale/toggle";
 import { Menu } from "lucide-react";
 import SignToggle from "@/components/sign/toggle";
@@ -47,21 +44,6 @@ export default function Header({ header }: { header: HeaderType }) {
       return /sign|login|auth/.test(title) || /sign|login|auth/.test(url);
     })
   );
-
-  const trackNav = (
-    item: { title?: string | null; url?: string | null; target?: string | null },
-    origin: "desktop" | "desktop_dropdown" | "mobile" | "mobile_dropdown",
-    parent?: string
-  ) => {
-    if (!item?.url) return;
-    trackMixpanelEvent("site.navigation_click", {
-      label: item.title || "",
-      href: item.url,
-      target: item.target || "",
-      origin,
-      parent: parent || "",
-    });
-  };
 
   return (
     <section className="py-3">
@@ -96,11 +78,7 @@ export default function Header({ header }: { header: HeaderType }) {
                           key={i}
                           className="text-muted-foreground"
                         >
-                          <NavigationMenuTrigger
-                            onClick={() =>
-                              trackNav(item, "desktop_dropdown")
-                            }
-                          >
+                          <NavigationMenuTrigger>
                             {item.icon && (
                               <Icon
                                 name={item.icon}
@@ -120,9 +98,6 @@ export default function Header({ header }: { header: HeaderType }) {
                                       )}
                                       href={iitem.url as any}
                                       target={iitem.target}
-                                      onClick={() =>
-                                        trackNav(iitem, "desktop_dropdown", item.title || "")
-                                      }
                                     >
                                       {iitem.icon && (
                                         <Icon
@@ -160,7 +135,6 @@ export default function Header({ header }: { header: HeaderType }) {
                           )}
                           href={item.url as any}
                           target={item.target}
-                          onClick={() => trackNav(item, "desktop")}
                         >
                           {item.icon && (
                             <Icon
@@ -188,7 +162,6 @@ export default function Header({ header }: { header: HeaderType }) {
                     href={item.url as any}
                     target={item.target || ""}
                     className="flex items-center gap-1 cursor-pointer"
-                    onClick={() => trackNav(item, "desktop")}
                   >
                     {item.title}
                     {item.icon && (
@@ -234,15 +207,6 @@ export default function Header({ header }: { header: HeaderType }) {
                     <Link
                       href={(header.brand?.url || "/") as any}
                       className="flex items-center gap-2"
-                      onClick={() =>
-                        trackNav(
-                          {
-                            title: header.brand?.title,
-                            url: header.brand?.url || "/",
-                          },
-                          "mobile"
-                        )
-                      }
                     >
                       {header.brand?.logo?.src && (
                         <img
@@ -281,13 +245,6 @@ export default function Header({ header }: { header: HeaderType }) {
                                   )}
                                   href={iitem.url as any}
                                   target={iitem.target}
-                                  onClick={() =>
-                                    trackNav(
-                                      iitem,
-                                      "mobile_dropdown",
-                                      item.title || ""
-                                    )
-                                  }
                                 >
                                   {iitem.icon && (
                                     <Icon
@@ -315,7 +272,6 @@ export default function Header({ header }: { header: HeaderType }) {
                           href={item.url as any}
                           target={item.target}
                           className="font-semibold my-4 flex items-center gap-2 px-4"
-                          onClick={() => trackNav(item, "mobile")}
                         >
                           {item.icon && (
                             <Icon
@@ -339,7 +295,6 @@ export default function Header({ header }: { header: HeaderType }) {
                             href={item.url as any}
                             target={item.target || ""}
                             className="flex items-center gap-1"
-                            onClick={() => trackNav(item, "mobile")}
                           >
                             {item.title}
                             {item.icon && (

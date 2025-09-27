@@ -6,8 +6,7 @@ import { Hero as HeroType } from "@/types/blocks/hero";
 import Icon from "@/components/icon";
 import { Link } from "@/i18n/navigation";
 import ToolInterface from "@/components/tool-interface";
-import BlurText from "./BlurText";
-import { trackMixpanelEvent } from "@/lib/mixpanel-browser";
+import TypewriterText from "./TypewriterText";
 
 interface HeroProps {
   hero: HeroType;
@@ -24,20 +23,6 @@ export default function Hero({ hero, notice }: HeroProps) {
   if (highlightText) {
     texts = hero.title?.split(highlightText, 2);
   }
-
-  const trackHeroClick = (
-    item: { title?: string | null; url?: string | null; variant?: string | null; target?: string | null },
-    position: string
-  ) => {
-    if (!item?.url) return;
-    trackMixpanelEvent("site.hero_cta_click", {
-      label: item.title || "",
-      href: item.url,
-      variant: item.variant || "",
-      target: item.target || "",
-      position,
-    });
-  };
 
   return (
     <>
@@ -58,14 +43,6 @@ export default function Hero({ hero, notice }: HeroProps) {
               <Link
                 href={hero.announcement.url as any}
                 className="mx-auto mb-3 inline-flex items-center gap-3 rounded-full border px-2 py-1 text-sm"
-                onClick={() =>
-                  trackHeroClick({
-                    title: hero.announcement?.title,
-                    url: hero.announcement?.url,
-                    variant: 'announcement',
-                    target: hero.announcement?.target,
-                  }, 'announcement')
-                }
               >
                 {hero.announcement.label && (
                   <Badge>{hero.announcement.label}</Badge>
@@ -75,13 +52,12 @@ export default function Hero({ hero, notice }: HeroProps) {
             )}
 
             <h1 className="design-heading-1">
-              <BlurText
+              <TypewriterText
                 text={hero.title || ""}
-                delay={120}
-                animateBy="words"
-                direction="top"
+                speed={50}
                 className="inline"
                 spanClassName="hero-title"
+                showCursor={false}
               />
             </h1>
 
@@ -110,7 +86,6 @@ export default function Hero({ hero, notice }: HeroProps) {
                       href={item.url as any}
                       target={item.target || ""}
                       className={isPrimary ? "design-btn-primary" : "design-btn-secondary"}
-                      onClick={() => trackHeroClick(item, `cta_${i}`)}
                     >
                       {item.icon && <Icon name={item.icon} className="w-5 h-5" />}
                       {item.title}

@@ -1,0 +1,78 @@
+/* 增强版的模糊文字动画效果 */
+@keyframes blurFadeInEnhanced {
+  0% {
+    filter: blur(12px) brightness(0.8);
+    opacity: 0;
+    transform: translateY(-25px) translateZ(0) scale(0.85) rotateX(10deg);
+  }
+  25% {
+    filter: blur(8px) brightness(0.9);
+    opacity: 0.3;
+    transform: translateY(-15px) translateZ(0) scale(0.92) rotateX(5deg);
+  }
+  50% {
+    filter: blur(4px) brightness(1.05);
+    opacity: 0.7;
+    transform: translateY(-8px) translateZ(0) scale(0.97) rotateX(2deg);
+  }
+  75% {
+    filter: blur(1px) brightness(1.02);
+    opacity: 0.9;
+    transform: translateY(-2px) translateZ(0) scale(0.99) rotateX(0deg);
+  }
+  100% {
+    filter: blur(0) brightness(1);
+    opacity: 1;
+    transform: translateY(0) translateZ(0) scale(1) rotateX(0deg);
+  }
+}
+
+/* 波浪式进入效果 */
+@keyframes waveIn {
+  0% {
+    transform: translateY(-20px) translateX(-5px);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(-10px) translateX(2px);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(0) translateX(0);
+    opacity: 1;
+  }
+}
+
+/* 脉冲光晕效果 */
+@keyframes pulseGlow {
+  0%, 100% {
+    text-shadow: 0 0 20px rgba(189, 0, 255, 0.3),
+                 0 0 40px rgba(189, 0, 255, 0.1);
+  }
+  50% {
+    text-shadow: 0 0 30px rgba(189, 0, 255, 0.5),
+                 0 0 60px rgba(189, 0, 255, 0.2);
+  }
+}
+
+.blur-text-enhanced {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+.blur-text-enhanced .blur-text-span {
+  display: inline-block;
+  animation: blurFadeInEnhanced 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: center bottom;
+}
+
+/* 交替动画效果 */
+.blur-text-enhanced .blur-text-span:nth-child(even) {
+  animation: blurFadeInEnhanced 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* 添加完成后的脉冲效果 */
+.blur-text-enhanced.animation-complete .blur-text-span {
+  animation: pulseGlow 4s ease-in-out infinite;
+  animation-delay: calc(var(--index) * 0.1s);
+}
