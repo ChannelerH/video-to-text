@@ -3,6 +3,7 @@
 @import "./design-system.css";
 @import "./audio-demo.css";
 @import "./changelog.css";
+@import "./mobile-optimizations.css";
 
 @plugin "tailwindcss-animate";
 

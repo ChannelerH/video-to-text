@@ -17,6 +17,13 @@ import { getTranslations } from "next-intl/server";
 // Added new core content modules for Video to Text functionality
 import { getLandingPage } from "@/services/page";
 import { setRequestLocale } from "next-intl/server";
+import { 
+  StructuredData, 
+  webApplicationSchema, 
+  serviceSchema, 
+  organizationSchema,
+  howToSchema 
+} from "@/components/structured-data";
 
 export const revalidate = 60;
 export const dynamic = "force-static";
@@ -34,12 +41,49 @@ export async function generateMetadata({
     canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL}/${locale}`;
   }
 
+  const title = "Video to Text Converter - AI Transcript Generator Free | V2TX";
+  const description = "Convert video to text instantly with 98.5% accuracy. Transcribe videos to text in 100+ languages online. Free daily quota, no signup needed. Try our AI-powered video to text converter now.";
+
   return {
-    title: "Video to Text Converter - AI Transcript Generator Free | V2TX",
-    description: "Convert video to text instantly with 98.5% accuracy. Transcribe videos to text in 100+ languages online. Free daily quota, no signup needed. Try our AI-powered video to text converter now.",
-    keywords: "",
+    title,
+    description,
     alternates: {
       canonical: canonicalUrl,
+    },
+    openGraph: {
+      title,
+      description,
+      url: canonicalUrl,
+      siteName: "V2TX",
+      locale: locale === "zh" ? "zh_CN" : "en_US",
+      type: "website",
+      images: [
+        {
+          url: `${process.env.NEXT_PUBLIC_WEB_URL}/og-image.png`,
+          width: 1200,
+          height: 630,
+          alt: "V2TX - AI-Powered Video to Text Converter",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [`${process.env.NEXT_PUBLIC_WEB_URL}/og-image.png`],
+      creator: "@V2TX",
+      site: "@V2TX",
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-video-preview": -1,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+      },
     },
   };
 }
@@ -57,6 +101,12 @@ export default async function VideoToTextPage({
 
   return (
     <>
+      {/* Structured Data for SEO */}
+      <StructuredData data={organizationSchema} />
+      <StructuredData data={webApplicationSchema} />
+      <StructuredData data={serviceSchema} />
+      <StructuredData data={howToSchema} />
+      
       {/* 1. Hero区（转换工具） */}
       {page.hero && <Hero hero={page.hero} notice={t("notices.chinese_processing")} />}
 

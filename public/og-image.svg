@@ -1,0 +1,57 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#764ba2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f093fb;stop-opacity:1" />
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="1" fill="rgba(255,255,255,0.1)"/>
+    </pattern>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  
+  <!-- Wave decoration -->
+  <path d="M0,500 C300,520 600,480 900,500 C1050,510 1150,520 1200,500 L1200,630 L0,630 Z" 
+        fill="rgba(255,255,255,0.1)"/>
+  <path d="M0,520 C300,540 600,500 900,520 C1050,530 1150,540 1200,520 L1200,630 L0,630 Z" 
+        fill="rgba(255,255,255,0.08)"/>
+  
+  <!-- Logo -->
+  <text x="600" y="120" font-family="Arial, sans-serif" font-size="56" font-weight="900" 
+        fill="white" text-anchor="middle" letter-spacing="-2">V2TX</text>
+  
+  <!-- Main Title -->
+  <text x="600" y="240" font-family="Arial, sans-serif" font-size="72" font-weight="800" 
+        fill="white" text-anchor="middle">Video to Text</text>
+  <text x="600" y="320" font-family="Arial, sans-serif" font-size="72" font-weight="800" 
+        fill="white" text-anchor="middle">Converter</text>
+  
+  <!-- Subtitle -->
+  <text x="600" y="400" font-family="Arial, sans-serif" font-size="32" font-weight="400" 
+        fill="white" text-anchor="middle" opacity="0.95">
+    AI-Powered Transcription with 98.5% Accuracy
+  </text>
+  
+  <!-- Features -->
+  <g transform="translate(300, 480)">
+    <circle cx="15" cy="15" r="14" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="2"/>
+    <text x="12" y="20" font-family="Arial, sans-serif" font-size="18" fill="white">✓</text>
+    <text x="40" y="20" font-family="Arial, sans-serif" font-size="24" fill="white">100+ Languages</text>
+  </g>
+  
+  <g transform="translate(500, 480)">
+    <circle cx="15" cy="15" r="14" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="2"/>
+    <text x="12" y="20" font-family="Arial, sans-serif" font-size="18" fill="white">✓</text>
+    <text x="40" y="20" font-family="Arial, sans-serif" font-size="24" fill="white">Free Daily Quota</text>
+  </g>
+  
+  <g transform="translate(720, 480)">
+    <circle cx="15" cy="15" r="14" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="2"/>
+    <text x="12" y="20" font-family="Arial, sans-serif" font-size="18" fill="white">✓</text>
+    <text x="40" y="20" font-family="Arial, sans-serif" font-size="24" fill="white">No Signup</text>
+  </g>
+</svg>

@@ -1,0 +1,340 @@
+/* Mobile Optimizations for V2TX */
+
+/* ===== Touch Target Optimization ===== */
+@media (max-width: 768px) {
+  /* Ensure all interactive elements meet 44x44px minimum touch target */
+  button, 
+  a, 
+  [role="button"],
+  input[type="checkbox"],
+  input[type="radio"],
+  .clickable,
+  [onclick] {
+    min-height: 44px;
+    min-width: 44px;
+    position: relative;
+  }
+  
+  /* Small buttons get invisible expanded hit area */
+  button:not(.mobile-optimized)::after,
+  [role="button"]:not(.mobile-optimized)::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 44px;
+    min-height: 44px;
+    pointer-events: all;
+  }
+  
+  /* Increase spacing between clickable elements */
+  .btn-group > *,
+  .action-buttons > * {
+    margin: 0.5rem;
+  }
+}
+
+/* ===== Typography Optimization ===== */
+@media (max-width: 640px) {
+  /* Improve readability on small screens */
+  html {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  body {
+    line-height: 1.6;
+    word-spacing: 0.05em;
+  }
+  
+  /* Scale down hero text responsively */
+  h1, .hero-title {
+    font-size: clamp(1.75rem, 8vw, 3rem) !important;
+    line-height: 1.2;
+  }
+  
+  h2 {
+    font-size: clamp(1.5rem, 6vw, 2.25rem) !important;
+  }
+  
+  h3 {
+    font-size: clamp(1.25rem, 5vw, 1.875rem) !important;
+  }
+  
+  p, .body-text {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+}
+
+/* ===== Form and Input Optimization ===== */
+@media (max-width: 768px) {
+  /* Optimize form inputs for mobile */
+  input[type="text"],
+  input[type="email"],
+  input[type="url"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px; /* Prevent zoom on iOS */
+    padding: 12px 16px;
+    min-height: 48px;
+    border-radius: 8px;
+    width: 100%;
+  }
+  
+  /* File upload area optimization */
+  .upload-area,
+  [class*="upload"] {
+    min-height: 120px;
+    padding: 20px;
+    touch-action: manipulation;
+  }
+  
+  /* Optimize dropzone for mobile */
+  .dropzone {
+    min-height: 150px;
+    border-width: 3px;
+    border-style: dashed;
+  }
+}
+
+/* ===== Navigation Optimization ===== */
+@media (max-width: 768px) {
+  /* Mobile navigation spacing */
+  nav {
+    padding: 1rem;
+  }
+  
+  nav a,
+  nav button {
+    padding: 12px 16px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+  }
+  
+  /* Hamburger menu optimization */
+  .mobile-menu-toggle {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* ===== Layout Optimization ===== */
+@media (max-width: 640px) {
+  /* Optimize container padding */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Stack elements on mobile */
+  .flex-row-mobile {
+    flex-direction: column;
+  }
+  
+  /* Full width buttons on mobile */
+  .mobile-full-width {
+    width: 100%;
+  }
+  
+  /* Remove horizontal scroll */
+  * {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  /* Card and panel spacing */
+  [class*="card"],
+  [class*="panel"] {
+    padding: 1rem;
+    margin: 0.5rem 0;
+  }
+}
+
+/* ===== Performance Optimization ===== */
+@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+  /* Reduce animation complexity on mobile */
+  * {
+    animation-duration: 0.2s !important;
+    transition-duration: 0.2s !important;
+  }
+  
+  /* Disable heavy animations */
+  .hero-title {
+    animation: none !important;
+    background-size: 100% 100% !important;
+  }
+  
+  /* Simplify gradients */
+  .gradient-animation {
+    animation: none;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+  }
+}
+
+/* Disable animations for low-end devices */
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ===== Tool Interface Mobile Optimization ===== */
+@media (max-width: 768px) {
+  /* Tool interface layout */
+  .tool-interface {
+    padding: 1rem;
+  }
+  
+  .tool-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .tool-buttons button {
+    width: 100%;
+    min-height: 48px;
+    font-size: 16px;
+    padding: 12px 20px;
+  }
+  
+  /* Progress indicators */
+  .progress-bar {
+    height: 6px;
+    border-radius: 3px;
+  }
+  
+  /* Results section */
+  .results-container {
+    padding: 1rem;
+    font-size: 14px;
+  }
+  
+  /* Copy button optimization */
+  .copy-button {
+    min-width: 48px;
+    min-height: 48px;
+    padding: 12px;
+  }
+}
+
+/* ===== Accessibility Improvements ===== */
+@media (max-width: 768px) {
+  /* Focus indicators */
+  *:focus {
+    outline: 3px solid #00d4ff;
+    outline-offset: 2px;
+  }
+  
+  /* Skip links */
+  .skip-link:focus {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 9999;
+    padding: 1rem;
+    background: #000;
+    color: #fff;
+  }
+  
+  /* Error messages */
+  .error-message {
+    padding: 1rem;
+    font-size: 14px;
+    border-left: 4px solid #ff0080;
+  }
+}
+
+/* ===== Scroll Optimization ===== */
+@media (max-width: 768px) {
+  /* Smooth scrolling with momentum */
+  .scroll-container {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Hide scrollbars on mobile */
+  .hide-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ===== Specific Component Fixes ===== */
+@media (max-width: 640px) {
+  /* Hero section */
+  .design-section {
+    padding: 2rem 0;
+  }
+  
+  /* Feature cards */
+  .feature-card {
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  /* Stats section */
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  /* FAQ items */
+  .faq-item {
+    padding: 1rem;
+  }
+  
+  /* CTA buttons */
+  .cta-button {
+    width: 100%;
+    padding: 1rem;
+    font-size: 18px;
+    font-weight: 600;
+  }
+}
+
+/* ===== iOS Specific Fixes ===== */
+@supports (-webkit-touch-callout: none) {
+  /* iOS elastic scroll fix */
+  body {
+    position: fixed;
+    width: 100%;
+  }
+  
+  /* iOS input zoom prevention */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+  
+  /* iOS tap highlight */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* ===== Android Specific Fixes ===== */
+@media (max-width: 768px) {
+  /* Android touch delay fix */
+  * {
+    touch-action: manipulation;
+  }
+  
+  /* Prevent text selection on buttons */
+  button, [role="button"] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}

@@ -20,11 +20,49 @@ export async function generateMetadata({
     canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL}/${locale}/audio-to-text`;
   }
 
+  const title = "Audio to Text Converter - Free AI Transcription Online | V2TX";
+  const description = "Convert audio to text instantly with 99.2% accuracy. Free audio to text converter supporting MP3, WAV, M4A and 45+ formats. Transcribe audio to text in 80+ languages online.";
+
   return {
-    title: "Audio to Text Converter - Free AI Transcription Online | V2TX",
-    description: "Convert audio to text instantly with 99.2% accuracy. Free audio to text converter supporting MP3, WAV, M4A and 45+ formats. Transcribe audio to text in 80+ languages online.",
+    title,
+    description,
     alternates: {
       canonical: canonicalUrl,
+    },
+    openGraph: {
+      title,
+      description,
+      url: canonicalUrl,
+      siteName: "V2TX",
+      locale: locale === "zh" ? "zh_CN" : "en_US",
+      type: "website",
+      images: [
+        {
+          url: `${process.env.NEXT_PUBLIC_WEB_URL}/og-image.png`,
+          width: 1200,
+          height: 630,
+          alt: "V2TX - AI-Powered Audio to Text Converter",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [`${process.env.NEXT_PUBLIC_WEB_URL}/og-image.png`],
+      creator: "@V2TX",
+      site: "@V2TX",
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-video-preview": -1,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+      },
     },
   };
 }

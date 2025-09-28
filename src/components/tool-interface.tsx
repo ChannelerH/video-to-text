@@ -2319,7 +2319,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         {/* Action Button */}
         <div className="balloon-button-container">
           <button
-            className="balloon-button"
+            className="balloon-button mobile-optimized min-h-[48px] sm:min-h-[44px]"
             onClick={handleTranscribe}
             disabled={isProcessing}
             style={{ opacity: isProcessing ? 0.7 : 1 }}
@@ -2503,6 +2503,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="mobile-optimized min-h-[44px] min-w-[44px] touch-manipulation"
                         onClick={() => copyToClipboard(displayText || result.data.transcription.text, 'transcript_full')}
                         className=""
                       >
@@ -2693,9 +2694,10 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Generate Chapters Button */}
                       <button
+                        className="mobile-optimized min-h-[48px] touch-manipulation"
                         onClick={async () => {
                           if (!requireAuthenticatedUpgrade()) return;
                           if (!result.data?.transcription?.segments || generatingChapters) return;
@@ -2767,6 +2769,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
 
                       {/* Generate Summary Button */}
                       <button
+                        className="mobile-optimized min-h-[48px] touch-manipulation"
                         onClick={async () => {
                           if (!requireAuthenticatedUpgrade()) return;
                           if (!result.data?.transcription?.segments || generatingSummary) return;
@@ -2981,7 +2984,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                             size="lg"
                             onClick={() => downloadFormat(format)}
                             disabled={downloadingFormats[format]}
-                            className="download-format-btn group relative overflow-hidden transition-all hover:scale-105"
+                            className="download-format-btn mobile-optimized group relative overflow-hidden transition-all hover:scale-105 min-h-[48px] w-full sm:w-auto"
                             style={{
                               background: 'rgba(0,0,0,0.4)',
                               border: '1px solid rgba(168,85,247,0.3)',
@@ -3032,6 +3035,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                         <Button
                           variant="outline"
                           size="lg"
+                          className="mobile-optimized min-h-[48px] w-full sm:w-auto"
                           onClick={async () => {
                             if (!requireAuthenticatedUpgrade()) return;
                             setExportingWord(true);
@@ -3118,6 +3122,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                         <Button
                           variant="outline"
                           size="lg"
+                          className="mobile-optimized min-h-[48px] w-full sm:w-auto"
                           onClick={async () => {
                             if (!requireAuthenticatedUpgrade()) return;
                             setExportingPDF(true);
@@ -3230,9 +3235,9 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                   </p>
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <a className="design-btn-primary" href="/auth/signin">{t('preview.sign_in')}</a>
+                  <a className="design-btn-primary mobile-optimized min-h-[48px] flex items-center justify-center" href="/auth/signin">{t('preview.sign_in')}</a>
                   <button 
-                    className="design-btn-secondary"
+                    className="design-btn-secondary mobile-optimized min-h-[48px]"
                     onClick={() => downloadPreview()}
                   >
                     {t('preview.download_preview')} (5m)
@@ -3272,9 +3277,9 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
             {t("success.message")}
           </p>
           <div className="mt-4 flex items-center justify-center gap-2">
-            <button className="balloon-button" onClick={() => setShowSuccess(false)}>{t("success.continue")}</button>
+            <button className="balloon-button mobile-optimized min-h-[48px] px-6" onClick={() => setShowSuccess(false)}>{t("success.continue")}</button>
             <button 
-              className="design-btn-primary" 
+              className="design-btn-primary mobile-optimized min-h-[48px] px-6" 
               onClick={goToHistory}
               disabled={isNavigatingToHistory}
               style={{ opacity: isNavigatingToHistory ? 0.7 : 1 }}

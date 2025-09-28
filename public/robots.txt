@@ -1,4 +1,13 @@
 User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /my-*/
 Disallow: /*?*q=
-Disallow: /privacy-policy
-Disallow: /terms-of-service
+
+# Sitemap location
+Sitemap: https://v2tx.com/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1

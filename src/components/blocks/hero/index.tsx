@@ -1,3 +1,5 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import HappyUsers from "./happy-users";
@@ -7,6 +9,8 @@ import Icon from "@/components/icon";
 import { Link } from "@/i18n/navigation";
 import ToolInterface from "@/components/tool-interface";
 import TypewriterText from "./TypewriterText";
+import Image from "next/image";
+import { useMobileOptimization } from "@/hooks/use-mobile-optimization";
 
 interface HeroProps {
   hero: HeroType;
@@ -14,6 +18,8 @@ interface HeroProps {
 }
 
 export default function Hero({ hero, notice }: HeroProps) {
+  const { isMobile, shouldAnimate } = useMobileOptimization();
+  
   if (hero.disabled) {
     return null;
   }
@@ -31,10 +37,14 @@ export default function Hero({ hero, notice }: HeroProps) {
         <div className="container">
           {hero.show_badge && (
             <div className="flex items-center justify-center mb-8">
-              <img
+              <Image
                 src="/imgs/badges/phdaily.svg"
-                alt="phdaily"
-                className="h-10 object-cover"
+                alt="Product Hunt daily badge - V2TX featured product"
+                width={122}
+                height={37}
+                className="h-10 w-auto object-cover"
+                priority
+                sizes="(max-width: 768px) 120px, 160px"
               />
             </div>
           )}
