@@ -334,7 +334,6 @@ Founder & Your Co-builder
     
     <div class="footer">
       <p>You're receiving this as a valued PRO user</p>
-      <p><a href="${process.env.NEXT_PUBLIC_WEB_URL}/preferences" style="color: #666;">Email Preferences</a></p>
     </div>
   </div>
 </body>
