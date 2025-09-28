@@ -3,10 +3,10 @@
   "theme": "light",
   "header": {
     "brand": {
-      "title": "Textuno",
+      "title": "V2TX",
       "logo": {
         "src": "/logo.png",
-        "alt": "Textuno"
+        "alt": "V2TX"
       },
       "url": "/"
     },
@@ -21,11 +21,6 @@
           "title": "Pricing",
           "url": "/pricing",
           "icon": "RiMoneyDollarCircleLine"
-        },
-        {
-          "title": "Changelog",
-          "url": "/changelog",
-          "icon": "RiTimeLine"
         }
       ]
     },
@@ -299,13 +294,13 @@
   },
   "testimonial": {
     "name": "testimonials",
-    "title": "Video to Text User Reviews",
-    "description": "See why professionals choose our video to text converter - real feedback from video to text users",
+    "title": "Loved by early users",
+    "description": "Real feedback from professionals who save hours daily",
     "items": [
       {
         "title": "Sarah Chen",
         "label": "Video Creator",
-        "description": "This video to text converter is incredibly fast! Converting my video to text with perfect accuracy - even complex technical terms. Best video to text tool I've used.",
+        "description": "Way faster than other tools I've tried. The accuracy even gets technical terms right.",
         "image": {
           "src": "/imgs/users/7.png",
           "alt": "Sarah"
@@ -314,7 +309,7 @@
       {
         "title": "Dr. Martinez",
         "label": "Educator",
-        "description": "Perfect video to text solution for education! I convert lecture video to text daily. Students love having video content as text for studying. Essential video to text tool for teaching.",
+        "description": "Perfect for creating lecture transcripts. My students love having searchable notes.",
         "image": {
           "src": "/imgs/users/5.png",
           "alt": "Dr. Martinez"
@@ -323,7 +318,7 @@
       {
         "title": "Alex Kim",
         "label": "Podcast Host",
-        "description": "Finally, a video to text converter that just works! Converting podcast video to text is simple and fast. This video to text service delivers perfect transcripts every time. Highly recommend for video to text needs.",
+        "description": "Finally found a simple tool that just works. No complex setup, great results.",
         "image": {
           "src": "/imgs/users/9.png",
           "alt": "Alex"
@@ -343,7 +338,7 @@
       },
       {
         "title": "I'm hesitant about free trials that require credit cards - can I really convert my videos to text for free without any signup, hidden fees, or payment information?",
-        "description": "Absolutely! We offer a generous free tier that resets daily - convert up to 10 minutes of video to text completely free, no credit card or signup required. Just upload your video and start transcribing immediately. Free users enjoy full access to our core features: upload files up to 500MB (5x larger than most competitors), process videos in MP4, MOV, AVI, and 20+ formats, export transcripts in multiple formats (SRT for subtitles, TXT for documents, VTT for web videos), use our online editor to refine transcriptions, and download results without watermarks. The free tier is perfect for students working on lecture notes, content creators testing our service, small businesses with occasional transcription needs, or anyone wanting to try before upgrading. When you're ready for unlimited transcription, our Pro plan starts at just $9/month."
+        "description": "Absolutely! We offer a generous free tier that resets daily - convert up to 10 minutes of video to text completely free, no credit card or signup required. Just upload your video and start transcribing immediately. Free users enjoy full access to our core features: upload files up to 500MB (5x larger than most competitors), process videos in MP4, MOV, AVI, and 20+ formats, export transcripts in multiple formats (SRT for subtitles, TXT for documents, VTT for web videos), use our online editor to refine transcriptions, and download results without watermarks. The free tier is perfect for students working on lecture notes, content creators testing our service, small businesses with occasional transcription needs, or anyone wanting to try before upgrading. When you're ready for unlimited transcription, our Pro plan starts at just $29/month."
       },
       {
         "title": "I have a 2-hour meeting recording that I need transcribed urgently - how long will it take to convert my video to text, and will I have to wait in a processing queue?",
@@ -367,11 +362,11 @@
       },
       {
         "title": "After converting my video to text, I might need to make corrections or adjustments - can I edit the transcript directly in your platform, and what file formats can I export the final text to?",
-        "description": "Yes! Our built-in editor makes refining your transcripts effortless. After your video converts to text, you'll access our powerful online editor with synchronized playback - click any text to jump to that moment in the video. Essential editing features include: real-time text editing with auto-save, find and replace functionality for quick corrections, speaker label management and identification, timestamp adjustment with frame precision, and paragraph formatting with automatic breaks. Export options are comprehensive: SRT files for YouTube/video subtitles, VTT for HTML5 web players, clean TXT for documents and blogs, formatted DOCX for Word processing, structured JSON for developers, and PDF for final presentations."
+        "description": "Yes! Our built-in editor makes refining your transcripts effortless. After your video converts to text, you'll access our powerful online editor with synchronized playback - click any text to jump to that moment in the video. Essential editing features include: real-time text editing with auto-saveimage.png, find and replace functionality for quick corrections, speaker label management and identification, timestamp adjustment with frame precision, and paragraph formatting with automatic breaks. Export options are comprehensive: SRT files for YouTube/video subtitles, VTT for HTML5 web players, clean TXT for documents and blogs, formatted DOCX for Word processing, structured JSON for developers, and PDF for final presentations."
       },
       {
-        "title": "I'm comparing different transcription services and wondering what makes Textuno different - why should I choose your video to text converter over established services like Rev, Otter.ai, Descript, or even YouTube's auto-captions?",
-        "description": "Textuno stands out with superior technology and generous features. Here's how we compare: ACCURACY - Textuno achieves 98.5% with Whisper V3 vs 85-90% for most competitors using older models. FREE TIER - We offer 10 minutes daily (300min/month) vs others limiting to 3-5 minutes or requiring signup. PROCESSING SPEED - 1-hour video in 2 minutes vs 5-10 minutes elsewhere, thanks to our GPU optimization. FILE SIZE - 500MB free limit vs 100MB industry standard, letting you upload longer videos. PRICING - $9/month for unlimited vs $15-30 for similar services. NO WATERMARKS - Clean exports even on free plan vs branded outputs elsewhere. KEY ADVANTAGES: No account required to start (unlike Rev, Otter.ai), better accuracy than Google's auto-captions, faster than Descript or Sonix, more languages than Happy Scribe, cheaper than human services ($600+), no software installation needed (unlike desktop apps), works on any device with a browser, and continuous AI improvements. Users consistently choose Textuno for reliability, speed, and value. Try it free and see the difference!"
+        "title": "I'm comparing different transcription services and wondering what makes V2TX different - why should I choose your video to text converter over established services like Rev, Otter.ai, Descript, or even YouTube's auto-captions?",
+        "description": "V2TX stands out with superior technology and generous features. Here's how we compare: ACCURACY - V2TX achieves 98.5% with Whisper V3 vs 85-90% for most competitors using older models. FREE TIER - We offer 10 minutes daily (300min/month) vs others limiting to 3-5 minutes or requiring signup. PROCESSING SPEED - 1-hour video in 2 minutes vs 5-10 minutes elsewhere, thanks to our GPU optimization. FILE SIZE - 500MB free limit vs 100MB industry standard, letting you upload longer videos. PRICING - $29/month for unlimited vs $15-30 for similar services. NO WATERMARKS - Clean exports even on free plan vs branded outputs elsewhere. KEY ADVANTAGES: No account required to start (unlike Rev, Otter.ai), better accuracy than Google's auto-captions, faster than Descript or Sonix, more languages than Happy Scribe, cheaper than human services ($600+), no software installation needed (unlike desktop apps), works on any device with a browser, and continuous AI improvements. Users consistently choose V2TX for reliability, speed, and value. Try it free and see the difference!"
       }
     ],
     "disabled": false
@@ -403,7 +398,7 @@
   },
   "stats": {
     "title": "⚡ Live Performance Dashboard",
-    "description": "Real-time metrics showing Textuno in action across the globe<br />Refreshed periodically with aggregated usage data",
+    "description": "Real-time metrics showing V2TX in action across the globe<br />Refreshed periodically with aggregated usage data",
     "items": [
       {
         "title": "2,847",
@@ -449,7 +444,7 @@
       },
       {
         "title": "156",
-        "description": "Countries using Textuno",
+        "description": "Countries using V2TX",
         "trend": "Global reach",
         "icon": "RiGlobalLine",
         "color": "indigo"
@@ -599,22 +594,22 @@
   "footer": {
     "name": "footer",
     "brand": {
-      "title": "Textuno - Video to Text Converter",
+      "title": "V2TX - Video to Text Converter",
       "description": "Convert video to text instantly with 98.5% accuracy. Free online video to text converter supporting 100+ languages. Transcribe YouTube videos, lectures, meetings, and podcasts to text in minutes.",
       "logo": {
         "src": "/logo.png",
-        "alt": "Textuno"
+        "alt": "V2TX"
       },
       "url": "/"
     },
-    "copyright": "© 2025 • Textuno All rights reserved.",
+    "copyright": "© 2025 • V2TX All rights reserved.",
     "nav": {
       "items": [
         {
           "title": "Tools",
           "children": [
             {
-              "title": "Textuno",
+              "title": "V2TX",
               "url": "/",
               "target": "_self"
             },
@@ -842,24 +837,24 @@
   },
   "use_cases": {
     "name": "use-cases",
-    "title": "📹 Video to Text Use Cases - Transform Your Workflow",
-    "description": "Discover how our video to text converter revolutionizes content workflows<br />From converting video to text for education to transforming video content into text for business - see real video to text applications",
+    "title": "📹 What can Video to Text do for you?",
+    "description": "From education to content creation, from business to research<br />Discover the powerful applications of video-to-text across various fields",
     "categories": [
       {
         "title": "Education",
         "subtitle": "Education",
         "cases": [
           {
-            "title": "Auto-generate video to text subtitles for online courses",
-            "description": "Convert educational video to text instantly - enhance learning with our video to text tool"
+            "title": "Auto-generate subtitles for online courses",
+            "description": "Enhance learning experience with multilingual support"
           },
           {
-            "title": "Convert lecture video recordings to text notes",
-            "description": "Video to text conversion for students - transform video lectures to text for easy studying"
+            "title": "Convert lecture recordings to text notes",
+            "description": "Convenient for review and knowledge organization"
           },
           {
-            "title": "Add bilingual video to text subtitles to foreign language videos",
-            "description": "Convert video to text in multiple languages - perfect video to text for language learning"
+            "title": "Add bilingual subtitles to foreign language videos",
+            "description": "Assist language learning and comprehension"
           }
         ]
       },
@@ -868,16 +863,16 @@
         "subtitle": "Content Creation",
         "cases": [
           {
-            "title": "Convert YouTube videos to text for blog articles",
-            "description": "Video to text for content creators - transform video to text with one click using our video to text converter"
+            "title": "Convert YouTube videos to blog articles",
+            "description": "One-click generation of text version content"
           },
           {
-            "title": "Generate video to text transcripts from podcast recordings",
-            "description": "Convert podcast video to text quickly - save hours with automated video to text transcription"
+            "title": "Quickly generate transcripts from podcast audio",
+            "description": "Save significant organization time"
           },
           {
-            "title": "Locate key dialogue with video to text search",
-            "description": "Video to text for editors - convert video to text to quickly find specific moments"
+            "title": "Quickly locate key dialogue in video editing",
+            "description": "Improve editing efficiency"
           }
         ]
       },
@@ -886,16 +881,16 @@
         "subtitle": "Business Use",
         "cases": [
           {
-            "title": "Auto-generate video to text meeting minutes from Zoom",
-            "description": "Convert meeting video to text automatically - efficient video to text for business meetings"
+            "title": "Auto-generate meeting minutes from Zoom meetings",
+            "description": "Improve meeting efficiency"
           },
           {
-            "title": "Convert customer interview videos to text documents",
-            "description": "Video to text for research - transform interview video to text for analysis"
+            "title": "Quickly organize customer interviews into documents",
+            "description": "Convenient for analysis and decision-making"
           },
           {
-            "title": "Convert training videos to text manuals",
-            "description": "Video to text for HR - convert training video to text to create documentation"
+            "title": "Convert training videos into training manuals",
+            "description": "Standardize training processes"
           }
         ]
       },
@@ -904,16 +899,16 @@
         "subtitle": "Research",
         "cases": [
           {
-            "title": "Convert interview video to text for coding analysis",
-            "description": "Video to text for researchers - essential video to text tool for qualitative analysis"
+            "title": "Transcribe interview recordings for coding analysis",
+            "description": "Essential tool for qualitative research"
           },
           {
-            "title": "Convert focus group video discussions to text",
-            "description": "Video to text for research - efficient video to text data collection"
+            "title": "Text-convert focus group discussion content",
+            "description": "More efficient data collection"
           },
           {
-            "title": "Convert multilingual video to text with translation",
-            "description": "Video to text across languages - break barriers with our video to text converter"
+            "title": "Quickly translate and transcribe multilingual content",
+            "description": "Break language barriers"
           }
         ]
       }

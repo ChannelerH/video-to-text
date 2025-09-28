@@ -110,6 +110,9 @@ export default async function PricingCTA({ locale }: PricingCTAProps) {
 
         {/* CTA Button */}
         <div className="text-center">
+          <p className="text-gray-400 mb-4">
+            {t('compare_features')}
+          </p>
           <Link
             href={`/${locale}/pricing`}
             className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 

@@ -397,24 +397,30 @@ export default async function AudioToTextPage({
             {
               t: "Free",
               price: "$0",
-              unit: "/month",
-              features: ["30 minutes/month", "Basic features", "3 export formats", "Community support"],
+              unit: "/mo",
+              features: ["30 minutes free monthly", "Max 10 min per file", "98 languages supported", "TXT, SRT export formats", "7 days history"],
             },
             {
               t: "Basic",
-              price: "$19",
-              unit: "/month",
-              features: ["10 hours/month", "All features unlocked", "All export formats", "Priority support"],
+              price: "$10",
+              unit: "/mo",
+              features: ["500 minutes monthly", "Max 60 min per file", "All formats (TXT, SRT, VTT, DOCX)", "Online editor access", "30 days history"],
             },
             {
               t: "Pro",
               price: "$29",
-              unit: "/month",
-              features: ["30 hours/month", "Team collaboration", "API access", "Dedicated support", "Custom integrations"],
+              unit: "/mo",
+              features: ["2000 standard + 200 high-accuracy min", "Max 180 min (3 hours) per file", "Priority processing queue", "Advanced editor", "365 days history"],
+              popular: true,
             },
           ].map((p, idx) => (
             <div key={p.t} className={`relative flex items-center gap-6 mb-10 ${idx % 2 ? "flex-row-reverse" : ""}`}>
-              <div className="flex-1 rounded-2xl border border-slate-800 bg-slate-900/60 p-8 hover:border-cyan-500/60 hover:scale-[1.01] transition">
+              <div className={`flex-1 rounded-2xl border ${p.popular ? 'border-cyan-500' : 'border-slate-800'} bg-slate-900/60 p-8 hover:border-cyan-500/60 hover:scale-[1.01] transition relative`}>
+                {p.popular && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-cyan-500 text-black text-xs font-semibold rounded-full">
+                    RECOMMENDED
+                  </span>
+                )}
                 <div className="text-2xl text-cyan-400 mb-1">{p.t}</div>
                 <div className="text-3xl font-bold mb-3">{p.price}<span className="text-base text-slate-400">{p.unit}</span></div>
                 <ul className="text-slate-300 space-y-1">
@@ -426,6 +432,15 @@ export default async function AudioToTextPage({
               <div className="absolute left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-cyan-500 border-[6px] border-black" />
             </div>
           ))}
+        </div>
+        <div className="text-center mt-12">
+          <Link
+            href={`/${locale}/pricing`}
+            className="inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-semibold bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 transition-all transform hover:scale-105 shadow-lg"
+          >
+            View Full Pricing Plans →
+          </Link>
+          <p className="text-slate-400 mt-4 text-sm">Compare all features and find the perfect plan for your audio to text needs</p>
         </div>
       </section>
 
