@@ -39,7 +39,7 @@ export default function Hero({ hero, notice }: HeroProps) {
             <div className="flex items-center justify-center mb-8">
               <Image
                 src="/imgs/badges/phdaily.svg"
-                alt="Product Hunt daily badge - V2TX featured product"
+                alt="Product Hunt daily badge - Textuno featured product"
                 width={122}
                 height={37}
                 className="h-10 w-auto object-cover"

@@ -51,12 +51,12 @@ export class EmailSender {
     this.useResend = !!resend;
     
     if (this.useResend) {
-      this.from = process.env.EMAIL_FROM || 'V2TX <noreply@video2text.app>';
-      this.replyTo = process.env.EMAIL_REPLY_TO || 'support@video2text.app';
+      this.from = process.env.EMAIL_FROM || 'Textuno <noreply@textuno.io>';
+      this.replyTo = process.env.EMAIL_REPLY_TO || 'support@textuno.io';
       console.log('[EmailSender] Using Resend for email delivery');
     } else {
       // For now, we'll use a simplified approach without nodemailer
-      this.from = `V2TX <${gmailUser}>`;
+      this.from = `Textuno <${gmailUser}>`;
       this.replyTo = gmailUser;
       console.log('[EmailSender] Gmail configuration detected, but using simplified approach');
     }

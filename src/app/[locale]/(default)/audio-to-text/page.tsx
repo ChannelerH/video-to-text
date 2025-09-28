@@ -14,13 +14,14 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  let canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL}/audio-to-text`;
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io";
+  let canonicalUrl = `${baseUrl}/audio-to-text`;
 
   if (locale !== "en") {
-    canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL}/${locale}/audio-to-text`;
+    canonicalUrl = `${baseUrl}/${locale}/audio-to-text`;
   }
 
-  const title = "Audio to Text Converter - Free AI Transcription Online | V2TX";
+  const title = "Audio to Text Converter - Free AI Transcription Online | Textuno";
   const description = "Convert audio to text instantly with 99.2% accuracy. Free audio to text converter supporting MP3, WAV, M4A and 45+ formats. Transcribe audio to text in 80+ languages online.";
 
   return {
@@ -33,15 +34,15 @@ export async function generateMetadata({
       title,
       description,
       url: canonicalUrl,
-      siteName: "V2TX",
+      siteName: "Textuno",
       locale: locale === "zh" ? "zh_CN" : "en_US",
       type: "website",
       images: [
         {
-          url: `${process.env.NEXT_PUBLIC_WEB_URL}/og-image.png`,
+          url: `${baseUrl}/og-image.png`,
           width: 1200,
           height: 630,
-          alt: "V2TX - AI-Powered Audio to Text Converter",
+          alt: "Textuno - AI-Powered Audio to Text Converter",
         },
       ],
     },
@@ -49,9 +50,9 @@ export async function generateMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: [`${process.env.NEXT_PUBLIC_WEB_URL}/og-image.png`],
-      creator: "@V2TX",
-      site: "@V2TX",
+      images: [`${baseUrl}/og-image.png`],
+      creator: "@TextunoAI",
+      site: "@TextunoAI",
     },
     robots: {
       index: true,

@@ -9,7 +9,7 @@
 3. 选择"安全性" → "2步验证"（必须先开启2步验证）
 4. 在2步验证页面底部，点击"应用专用密码"
 5. 选择应用类型为"邮件"，设备选择"其他"
-6. 输入名称如"Video2Text Email"
+6. 输入名称如"Textuno Email"
 7. 点击生成，复制16位密码
 
 ### 2. 配置环境变量
@@ -85,7 +85,7 @@ curl http://localhost:3000/api/admin/email-status
    - 更新环境变量：
    ```env
    RESEND_API_KEY=re_your_api_key
-   EMAIL_FROM="Video2Text <noreply@your-domain.com>"
+   EMAIL_FROM="Textuno <noreply@your-domain.com>"
    EMAIL_REPLY_TO=support@your-domain.com
    # 注释掉Gmail配置
    # GMAIL_USER=...
@@ -102,7 +102,7 @@ curl http://localhost:3000/api/admin/email-status
 - 查看控制台日志了解具体错误
 
 ### Q: 如何更改发件人名称
-- 使用Gmail时，发件人会显示为"Video2Text <channelerH@gmail.com>"
+- 使用Gmail时，发件人会显示为"Textuno <channelerH@gmail.com>"
 - 切换到Resend后可以自定义发件人域名
 
 ### Q: 如何避免邮件进垃圾箱

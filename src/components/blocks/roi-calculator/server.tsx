@@ -13,7 +13,7 @@ interface ROICalculatorProps {
 const roiContent: Record<string, any> = {
   en: {
     title: "💰 ROI Analysis & Cost Optimization",
-    description: "Compare traditional transcription methods vs. V2TX AI solution",
+    description: "Compare traditional transcription methods vs. Textuno AI solution",
     subtitle: "See how much you can save with our automated transcription",
     scenarios: [
       {
@@ -35,7 +35,7 @@ const roiContent: Record<string, any> = {
           accuracy: "90-95%"
         },
         v2tx: {
-          method: "V2TX AI",
+          method: "Textuno AI",
           plan: "Basic Plan",
           cost: "$10/month",
           time: "20 minutes",
@@ -62,7 +62,7 @@ const roiContent: Record<string, any> = {
           accuracy: "90-95%"
         },
         v2tx: {
-          method: "V2TX AI",
+          method: "Textuno AI",
           plan: "Pro Plan",
           cost: "$29/month",
           time: "100 minutes",
@@ -89,7 +89,7 @@ const roiContent: Record<string, any> = {
           accuracy: "95-98%"
         },
         v2tx: {
-          method: "V2TX AI",
+          method: "Textuno AI",
           plan: "Enterprise",
           cost: "Custom pricing",
           time: "6-7 hours",
@@ -113,7 +113,7 @@ const roiContent: Record<string, any> = {
   },
   zh: {
     title: "💰 投资回报率分析与成本优化",
-    description: "传统转录方法与V2TX AI解决方案对比",
+    description: "传统转录方法与Textuno AI解决方案对比",
     subtitle: "了解使用我们的自动转录能节省多少成本",
     scenarios: [
       {
@@ -135,7 +135,7 @@ const roiContent: Record<string, any> = {
           accuracy: "90-95%"
         },
         v2tx: {
-          method: "V2TX AI",
+          method: "Textuno AI",
           plan: "基础套餐",
           cost: "¥70/月",
           time: "20分钟",
@@ -162,7 +162,7 @@ const roiContent: Record<string, any> = {
           accuracy: "90-95%"
         },
         v2tx: {
-          method: "V2TX AI",
+          method: "Textuno AI",
           plan: "专业套餐",
           cost: "¥199/月",
           time: "100分钟",
@@ -189,7 +189,7 @@ const roiContent: Record<string, any> = {
           accuracy: "95-98%"
         },
         v2tx: {
-          method: "V2TX AI",
+          method: "Textuno AI",
           plan: "企业版",
           cost: "定制价格",
           time: "6-7小时",
@@ -301,7 +301,7 @@ export default function ROICalculatorServer({ section, locale }: ROICalculatorPr
                   </div>
                 </div>
 
-                {/* V2TX Method */}
+                {/* Textuno Method */}
                 <div className="design-card border-green-500/30 bg-gradient-to-br from-green-900/10 to-emerald-900/10 relative" style={{ overflow: 'visible' }}>
                   <div className="absolute -top-2 -right-2 z-50">
                     <span className="inline-block px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold rounded-full shadow-lg whitespace-nowrap">

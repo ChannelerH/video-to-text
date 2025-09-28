@@ -35,14 +35,14 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  let canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL}`;
+  let canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}`;
 
   if (locale !== "en") {
     canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL}/${locale}`;
   }
 
-  const title = "Video to Text Converter - AI Transcript Generator Free | V2TX";
-  const description = "Convert video to text instantly with 98.5% accuracy. Transcribe videos to text in 100+ languages online. Free daily quota, no signup needed. Try our AI-powered video to text converter now.";
+  const title = "Textuno · AI Video to Text Converter & Transcript Generator";
+  const description = "Convert video to text instantly with 98.5% accuracy. Transcribe videos to text in 100+ languages online. Free daily quota, no signup needed. Try Textuno’s AI-powered video to text converter now.";
 
   return {
     title,
@@ -54,15 +54,15 @@ export async function generateMetadata({
       title,
       description,
       url: canonicalUrl,
-      siteName: "V2TX",
+      siteName: "Textuno",
       locale: locale === "zh" ? "zh_CN" : "en_US",
       type: "website",
       images: [
         {
-          url: `${process.env.NEXT_PUBLIC_WEB_URL}/og-image.png`,
+          url: `${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}/og-image.png`,
           width: 1200,
           height: 630,
-          alt: "V2TX - AI-Powered Video to Text Converter",
+          alt: "Textuno - AI-Powered Video to Text Converter",
         },
       ],
     },
@@ -70,9 +70,9 @@ export async function generateMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: [`${process.env.NEXT_PUBLIC_WEB_URL}/og-image.png`],
-      creator: "@V2TX",
-      site: "@V2TX",
+      images: [`${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}/og-image.png`],
+      creator: "@TextunoAI",
+      site: "@TextunoAI",
     },
     robots: {
       index: true,

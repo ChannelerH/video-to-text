@@ -48,7 +48,7 @@ export const EMAIL_TEMPLATES = {
     </div>
     
     <div class="content">
-      <p>I noticed you signed up for V2TX a few days ago but haven't had a chance to fully explore yet.</p>
+      <p>I noticed you signed up for Textuno a few days ago but haven't had a chance to fully explore yet.</p>
       
       <p>No worries - getting started with new tools can be overwhelming. That's why I wanted to personally reach out and help.</p>
       
@@ -83,13 +83,13 @@ export const EMAIL_TEMPLATES = {
       
       <p>Best,<br>
       Howard<br>
-      Founder, V2TX</p>
+      Founder, Textuno</p>
       
       <p style="color: #666; font-style: italic;">{{ps}}</p>
     </div>
     
     <div class="footer">
-      <p>You're receiving this because you signed up for V2TX</p>
+      <p>You're receiving this because you signed up for Textuno</p>
       <p><a href="${process.env.NEXT_PUBLIC_WEB_URL}/unsubscribe" style="color: #666;">Unsubscribe</a></p>
     </div>
   </div>
@@ -99,7 +99,7 @@ export const EMAIL_TEMPLATES = {
       text: `
 Hi {{userName}},
 
-I noticed you signed up for V2TX a few days ago but haven't had a chance to fully explore yet.
+I noticed you signed up for Textuno a few days ago but haven't had a chance to fully explore yet.
 
 Here's a little boost to get you started:
 🎁 30 bonus minutes - Already added to your account!
@@ -113,7 +113,7 @@ Need help? Just reply to this email.
 
 Best,
 Howard
-Founder, V2TX
+Founder, Textuno
 
 {{ps}}
       `
@@ -150,7 +150,7 @@ Founder, V2TX
     </div>
     
     <div class="content">
-      <p>You're not just an early user - <strong>you're a co-creator of V2TX</strong>.</p>
+      <p>You're not just an early user - <strong>you're a co-creator of Textuno</strong>.</p>
       
       <p>Over the past {{daysUsed}} days, you've transcribed {{totalMinutes}} minutes. But more importantly, you've become part of our product's DNA.</p>
       
@@ -164,7 +164,7 @@ Founder, V2TX
       <div class="question-box">
         <h3>🤔 I have 3 questions that will directly influence our next update:</h3>
         <ol>
-          <li><strong>What made you choose V2TX?</strong><br>
+          <li><strong>What made you choose Textuno?</strong><br>
           <span style="color: #666; font-size: 14px;">Your answer shapes our messaging</span></li>
           
           <li><strong>What's the ONE thing that frustrates you?</strong><br>
@@ -215,7 +215,7 @@ Founder, V2TX
       <p>Best,<br>
       Howard<br>
       Founder & Your Co-builder<br>
-      V2TX</p>
+      Textuno</p>
       
       <p style="color: #666; font-style: italic;">{{ps}}</p>
       
@@ -237,11 +237,11 @@ Hi {{userName}},
 
 You're User #{{userNumber}} - One of Our First 100!
 
-You're not just an early user - you're a co-creator of V2TX.
+You're not just an early user - you're a co-creator of Textuno.
 
 I have 3 questions that will directly influence our next update:
 
-1. What made you choose V2TX?
+1. What made you choose Textuno?
 2. What's the ONE thing that frustrates you?
 3. If you had a magic wand, what feature would you add?
 
@@ -294,7 +294,7 @@ Founder & Your Co-builder
     </div>
     
     <div class="content">
-      <p><strong>You're not just a user - you're an investor in V2TX's future.</strong></p>
+      <p><strong>You're not just a user - you're an investor in Textuno's future.</strong></p>
       
       <p>You've transcribed {{totalHours}} hours this month. That's amazing! But more importantly, you've chosen to trust us with your work.</p>
       
@@ -307,7 +307,7 @@ Founder & Your Co-builder
           <li><strong>What feature would save you the most time?</strong><br>
           → We'll prioritize this immediately</li>
           
-          <li><strong>What's still frustrating about V2TX?</strong><br>
+          <li><strong>What's still frustrating about Textuno?</strong><br>
           → I'll personally ensure this gets fixed</li>
           
           <li><strong>What integration would be most valuable?</strong><br>
@@ -344,7 +344,7 @@ Hi {{userName}},
 
 [PRO USER]
 
-You're not just a user - you're an investor in V2TX's future.
+You're not just a user - you're an investor in Textuno's future.
 
 Your feedback has PRIORITY status.
 
@@ -392,7 +392,7 @@ Howard
     <div class="content">
       <h2>Hi {{userName}} 👋</h2>
       
-      <p>It's been a while since we've seen you at V2TX. We hope everything's okay!</p>
+      <p>It's been a while since we've seen you at Textuno. We hope everything's okay!</p>
       
       <p>If you moved on to another tool, we understand. But if you just got busy (happens to all of us!), we'd love to welcome you back.</p>
       
@@ -416,11 +416,11 @@ Howard
         <li>📱 New mobile experience</li>
       </ul>
       
-      <p>No hard feelings if you don't need V2TX anymore. But if you do, we're here with open arms (and free minutes!).</p>
+      <p>No hard feelings if you don't need Textuno anymore. But if you do, we're here with open arms (and free minutes!).</p>
       
       <p>Best,<br>
       Howard<br>
-      V2TX Team</p>
+      Textuno Team</p>
       
       <p style="color: #666; font-style: italic;">{{ps}}</p>
     </div>

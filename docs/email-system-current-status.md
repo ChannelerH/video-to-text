@@ -9,7 +9,7 @@
 - **邮件发送**: 开发模式下模拟发送（返回成功但不实际发送）
 - **模板系统**: 4种邮件模板已就绪
 - **奖励系统**: 与现有分钟包系统集成
-- **调度系统**: Vercel Cron Job已配置（每小时运行）
+- **调度系统**: Vercel Cron Job已配置（每日 09:00 UTC 运行）
 
 ## 🚀 如何启用真实邮件发送
 
@@ -40,7 +40,7 @@ pnpm add nodemailer @types/nodemailer
 2. 配置 `.env.local`：
 ```env
 RESEND_API_KEY=re_你的API密钥
-RESEND_SENDER_EMAIL=noreply@video2text.app
+RESEND_SENDER_EMAIL=noreply@textuno.io
 ```
 
 系统会自动检测并使用Resend。

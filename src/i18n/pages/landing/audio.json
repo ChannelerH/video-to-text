@@ -3,10 +3,10 @@
   "theme": "light",
   "header": {
     "brand": {
-      "title": "V2TX",
+      "title": "Textuno",
       "logo": {
         "src": "/logo.png",
-        "alt": "V2TX"
+        "alt": "Textuno"
       },
       "url": "/"
     },
@@ -244,22 +244,22 @@
   "footer": {
     "name": "footer",
     "brand": {
-      "title": "V2TX",
+      "title": "Textuno",
       "description": "Convert videos and audio to text online. Free 5-minute previews, multiple export formats including SRT, TXT, VTT, DOCX, and JSON.",
       "logo": {
         "src": "/logo.png",
-        "alt": "V2TX"
+        "alt": "Textuno"
       },
       "url": "/"
     },
-    "copyright": "© 2025 • V2TX All rights reserved.",
+    "copyright": "© 2025 • Textuno All rights reserved.",
     "nav": {
       "items": [
         {
           "title": "Tools",
           "children": [
             {
-              "title": "V2TX",
+              "title": "Textuno",
               "url": "/",
               "target": "_self"
             },

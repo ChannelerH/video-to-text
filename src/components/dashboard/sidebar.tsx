@@ -103,8 +103,8 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
       {/* Logo */}
       <div className="px-6 py-5 border-b border-gray-800">
         <a href={`/`} className="flex items-center gap-2">
-          <img src="/logo.png" alt="V2TX" className="w-8 h-8 rounded-lg" />
-          <span className="text-lg font-semibold text-white">V2TX</span>
+          <img src="/logo.png" alt="Textuno" className="w-8 h-8 rounded-lg" />
+          <span className="text-lg font-semibold text-white">Textuno</span>
         </a>
       </div>
 

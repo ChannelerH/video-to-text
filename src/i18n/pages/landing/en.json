@@ -3,10 +3,10 @@
   "theme": "light",
   "header": {
     "brand": {
-      "title": "V2TX",
+      "title": "Textuno",
       "logo": {
         "src": "/logo.png",
-        "alt": "V2TX"
+        "alt": "Textuno"
       },
       "url": "/"
     },
@@ -370,8 +370,8 @@
         "description": "Yes! Our built-in editor makes refining your transcripts effortless. After your video converts to text, you'll access our powerful online editor with synchronized playback - click any text to jump to that moment in the video. Essential editing features include: real-time text editing with auto-save, find and replace functionality for quick corrections, speaker label management and identification, timestamp adjustment with frame precision, and paragraph formatting with automatic breaks. Export options are comprehensive: SRT files for YouTube/video subtitles, VTT for HTML5 web players, clean TXT for documents and blogs, formatted DOCX for Word processing, structured JSON for developers, and PDF for final presentations."
       },
       {
-        "title": "I'm comparing different transcription services and wondering what makes V2TX different - why should I choose your video to text converter over established services like Rev, Otter.ai, Descript, or even YouTube's auto-captions?",
-        "description": "V2TX stands out with superior technology and generous features. Here's how we compare: ACCURACY - V2TX achieves 98.5% with Whisper V3 vs 85-90% for most competitors using older models. FREE TIER - We offer 10 minutes daily (300min/month) vs others limiting to 3-5 minutes or requiring signup. PROCESSING SPEED - 1-hour video in 2 minutes vs 5-10 minutes elsewhere, thanks to our GPU optimization. FILE SIZE - 500MB free limit vs 100MB industry standard, letting you upload longer videos. PRICING - $9/month for unlimited vs $15-30 for similar services. NO WATERMARKS - Clean exports even on free plan vs branded outputs elsewhere. KEY ADVANTAGES: No account required to start (unlike Rev, Otter.ai), better accuracy than Google's auto-captions, faster than Descript or Sonix, more languages than Happy Scribe, cheaper than human services ($600+), no software installation needed (unlike desktop apps), works on any device with a browser, and continuous AI improvements. Users consistently choose V2TX for reliability, speed, and value. Try it free and see the difference!"
+        "title": "I'm comparing different transcription services and wondering what makes Textuno different - why should I choose your video to text converter over established services like Rev, Otter.ai, Descript, or even YouTube's auto-captions?",
+        "description": "Textuno stands out with superior technology and generous features. Here's how we compare: ACCURACY - Textuno achieves 98.5% with Whisper V3 vs 85-90% for most competitors using older models. FREE TIER - We offer 10 minutes daily (300min/month) vs others limiting to 3-5 minutes or requiring signup. PROCESSING SPEED - 1-hour video in 2 minutes vs 5-10 minutes elsewhere, thanks to our GPU optimization. FILE SIZE - 500MB free limit vs 100MB industry standard, letting you upload longer videos. PRICING - $9/month for unlimited vs $15-30 for similar services. NO WATERMARKS - Clean exports even on free plan vs branded outputs elsewhere. KEY ADVANTAGES: No account required to start (unlike Rev, Otter.ai), better accuracy than Google's auto-captions, faster than Descript or Sonix, more languages than Happy Scribe, cheaper than human services ($600+), no software installation needed (unlike desktop apps), works on any device with a browser, and continuous AI improvements. Users consistently choose Textuno for reliability, speed, and value. Try it free and see the difference!"
       }
     ],
     "disabled": false
@@ -403,7 +403,7 @@
   },
   "stats": {
     "title": "⚡ Live Performance Dashboard",
-    "description": "Real-time metrics showing V2TX in action across the globe<br />Refreshed periodically with aggregated usage data",
+    "description": "Real-time metrics showing Textuno in action across the globe<br />Refreshed periodically with aggregated usage data",
     "items": [
       {
         "title": "2,847",
@@ -449,7 +449,7 @@
       },
       {
         "title": "156",
-        "description": "Countries using V2TX",
+        "description": "Countries using Textuno",
         "trend": "Global reach",
         "icon": "RiGlobalLine",
         "color": "indigo"
@@ -599,22 +599,22 @@
   "footer": {
     "name": "footer",
     "brand": {
-      "title": "V2TX - Video to Text Converter",
+      "title": "Textuno - Video to Text Converter",
       "description": "Convert video to text instantly with 98.5% accuracy. Free online video to text converter supporting 100+ languages. Transcribe YouTube videos, lectures, meetings, and podcasts to text in minutes.",
       "logo": {
         "src": "/logo.png",
-        "alt": "V2TX"
+        "alt": "Textuno"
       },
       "url": "/"
     },
-    "copyright": "© 2025 • V2TX All rights reserved.",
+    "copyright": "© 2025 • Textuno All rights reserved.",
     "nav": {
       "items": [
         {
           "title": "Tools",
           "children": [
             {
-              "title": "V2TX",
+              "title": "Textuno",
               "url": "/",
               "target": "_self"
             },

@@ -122,7 +122,7 @@ async function flushQueue() {
     const mergedSubject =
       batch.length === 1
         ? batch[0].subject
-        : `[${process.env.NEXT_PUBLIC_PROJECT_NAME || 'V2TX'}] Error Digest (${batch.length})`;
+        : `[${process.env.NEXT_PUBLIC_PROJECT_NAME || 'Textuno'}] Error Digest (${batch.length})`;
 
     const mergedBody = batch
       .map((payload, idx) => `[#${idx + 1}] ${payload.subject}\n${payload.text}`)

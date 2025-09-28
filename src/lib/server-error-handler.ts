@@ -66,7 +66,7 @@ export function handleServerError(
     return;
   }
 
-  const subject = `[V2TX] Server Error: ${message}`;
+  const subject = `[Textuno] Server Error: ${message}`;
   const text = `Message: ${message}\n${stack ? `Stack: ${stack}\n` : ''}${contextInfo}${payloadInfo}`;
 
   try {

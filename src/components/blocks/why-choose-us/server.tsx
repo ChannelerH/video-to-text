@@ -19,7 +19,7 @@ interface WhyChooseUsProps {
 
 const content: Record<string, any> = {
   en: {
-    title: "Why Choose V2TX for Video to Text?",
+    title: "Why Choose Textuno for Video to Text?",
     subtitle: "The most trusted video to text converter - see why professionals choose our video to text solution",
     features: [
       {
@@ -61,7 +61,7 @@ const content: Record<string, any> = {
     ]
   },
   zh: {
-    title: "为什么选择 V2TX？",
+    title: "为什么选择 Textuno？",
     subtitle: "最值得信赖的视频转文字解决方案",
     features: [
       {

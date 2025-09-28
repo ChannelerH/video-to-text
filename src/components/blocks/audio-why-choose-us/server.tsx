@@ -19,7 +19,7 @@ interface AudioWhyChooseUsProps {
 
 const content: Record<string, any> = {
   en: {
-    title: "Why Choose V2TX for Audio to Text?",
+    title: "Why Choose Textuno for Audio to Text?",
     subtitle: "The most trusted audio to text converter - see why professionals choose our audio to text solution",
     features: [
       {
@@ -61,7 +61,7 @@ const content: Record<string, any> = {
     ]
   },
   zh: {
-    title: "为什么选择 V2TX 音频转文字？",
+    title: "为什么选择 Textuno 音频转文字？",
     subtitle: "最值得信赖的音频转文字解决方案",
     features: [
       {

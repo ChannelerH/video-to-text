@@ -1,6 +1,6 @@
-# ShipAny Template One
+# Textuno Template One
 
-Ship Any AI SaaS Startups in hours.
+Launch your AI transcription SaaS in hours.
 
 ![preview](preview.png)
 
@@ -9,7 +9,7 @@ Ship Any AI SaaS Startups in hours.
 1. Clone the repository
 
 ```bash
-git clone https://github.com/shipanyai/shipany-template-one.git
+git clone https://github.com/textunoai/textuno-template-one.git
 ```
 
 2. Install dependencies
@@ -44,14 +44,14 @@ cp .env.example .env.development
 
 - Deploy to Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fshipanyai%2Fshipany-template-one&project-name=my-shipany-project&repository-name=my-shipany-project&redirect-url=https%3A%2F%2Fshipany.ai&demo-title=ShipAny&demo-description=Ship%20Any%20AI%20Startup%20in%20hours%2C%20not%20days&demo-url=https%3A%2F%2Fshipany.ai&demo-image=https%3A%2F%2Fpbs.twimg.com%2Fmedia%2FGgGSW3La8AAGJgU%3Fformat%3Djpg%26name%3Dlarge)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Ftextunoai%2Ftextuno-template-one&project-name=my-textuno-project&repository-name=my-textuno-project&redirect-url=https%3A%2F%2Ftextuno.io&demo-title=Textuno&demo-description=Launch%20your%20AI%20transcription%20startup%20in%20hours%2C%20not%20days&demo-url=https%3A%2F%2Ftextuno.io&demo-image=https%3A%2F%2Fpbs.twimg.com%2Fmedia%2FGgGSW3La8AAGJgU%3Fformat%3Djpg%26name%3Dlarge)
 
 - Deploy to Cloudflare
 
 for new project, clone with branch "cloudflare"
 
 ```shell
-git clone -b cloudflare https://github.com/shipanyai/shipany-template-one.git
+git clone -b cloudflare https://github.com/textunoai/textuno-template-one.git
 ```
 
 for exist project, checkout to branch "cloudflare"
@@ -79,9 +79,9 @@ npm run cf:deploy
 
 ## Community
 
-- [ShipAny](https://shipany.ai)
-- [Documentation](https://docs.shipany.ai)
+- [Textuno](https://textuno.io)
+- [Documentation](https://docs.textuno.io)
 
 ## License
 
-- [ShipAny AI SaaS Boilerplate License Agreement](LICENSE)
+- [Textuno AI SaaS Boilerplate License Agreement](LICENSE)

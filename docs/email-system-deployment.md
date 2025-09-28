@@ -22,8 +22,8 @@ Add these to your `.env.local`:
 RESEND_API_KEY=re_your_api_key_here
 
 # Email Settings
-EMAIL_FROM="Video2Text <noreply@video2text.app>"
-EMAIL_REPLY_TO=support@video2text.app
+EMAIL_FROM="Textuno <noreply@textuno.io>"
+EMAIL_REPLY_TO=support@textuno.io
 
 # Security
 CRON_SECRET=generate_random_32_char_string
@@ -41,7 +41,7 @@ The `vercel.json` has been updated to include the hourly cron job:
   "crons": [
     {
       "path": "/api/cron/hourly-emails",
-      "schedule": "0 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }
