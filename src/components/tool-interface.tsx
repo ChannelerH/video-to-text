@@ -15,6 +15,7 @@ import { MultipartUploader } from "@/lib/multipart-upload";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { ToastNotification, useToast } from "@/components/toast-notification";
 import { DocumentExportService } from "@/lib/export-document";
+import { cn } from "@/lib/utils";
 import { usePlayerStore } from "@/stores/player-store";
 import dynamic from 'next/dynamic';
 import AudioTrackSelector from '@/components/audio-track-selector';
@@ -2505,7 +2506,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                         size="sm"
                         className="mobile-optimized min-h-[44px] min-w-[44px] touch-manipulation"
                         onClick={() => copyToClipboard(displayText || result.data.transcription.text, 'transcript_full')}
-                        className=""
                       >
                         {copiedText ? (
                           <>
@@ -2697,7 +2697,11 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Generate Chapters Button */}
                       <button
-                        className="mobile-optimized min-h-[48px] touch-manipulation"
+                        className={cn(
+                          "mobile-optimized min-h-[48px] touch-manipulation",
+                          "flex items-center justify-center gap-2 p-3 rounded-lg transition-all hover:scale-105",
+                          "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        )}
                         onClick={async () => {
                           if (!requireAuthenticatedUpgrade()) return;
                           if (!result.data?.transcription?.segments || generatingChapters) return;
@@ -2743,7 +2747,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                           }
                         }}
                         disabled={generatingChapters}
-                        className="flex items-center justify-center gap-2 p-3 rounded-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                         style={{
                           background: 'rgba(0,0,0,0.4)',
                           border: '1px solid rgba(168,85,247,0.3)',
@@ -2769,7 +2772,11 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
 
                       {/* Generate Summary Button */}
                       <button
-                        className="mobile-optimized min-h-[48px] touch-manipulation"
+                        className={cn(
+                          "mobile-optimized min-h-[48px] touch-manipulation",
+                          "flex items-center justify-center gap-2 p-3 rounded-lg transition-all hover:scale-105",
+                          "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        )}
                         onClick={async () => {
                           if (!requireAuthenticatedUpgrade()) return;
                           if (!result.data?.transcription?.segments || generatingSummary) return;
@@ -2813,7 +2820,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                           }
                         }}
                         disabled={generatingSummary}
-                        className="flex items-center justify-center gap-2 p-3 rounded-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                         style={{
                           background: 'rgba(0,0,0,0.4)',
                           border: '1px solid rgba(34,211,238,0.3)',
@@ -3035,7 +3041,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                         <Button
                           variant="outline"
                           size="lg"
-                          className="mobile-optimized min-h-[48px] w-full sm:w-auto"
+                          className="mobile-optimized min-h-[48px] w-full sm:w-auto group relative overflow-hidden transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                           onClick={async () => {
                             if (!requireAuthenticatedUpgrade()) return;
                             setExportingWord(true);
@@ -3088,7 +3094,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                             }
                           }}
                           disabled={exportingWord}
-                          className="group relative overflow-hidden transition-all hover:scale-105"
                           style={{
                             background: 'rgba(0,0,0,0.4)',
                             border: '1px solid rgba(59,130,246,0.3)',
@@ -3122,7 +3127,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                         <Button
                           variant="outline"
                           size="lg"
-                          className="mobile-optimized min-h-[48px] w-full sm:w-auto"
+                          className="mobile-optimized min-h-[48px] w-full sm:w-auto group relative overflow-hidden transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                           onClick={async () => {
                             if (!requireAuthenticatedUpgrade()) return;
                             setExportingPDF(true);
@@ -3175,7 +3180,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                             }
                           }}
                           disabled={exportingPDF}
-                          className="group relative overflow-hidden transition-all hover:scale-105"
                           style={{
                             background: 'rgba(0,0,0,0.4)',
                             border: '1px solid rgba(239,68,68,0.3)',

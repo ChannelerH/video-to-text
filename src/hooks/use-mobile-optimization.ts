@@ -54,7 +54,7 @@ export function useMobileOptimization() {
       document.body.classList.add('touch-device');
       
       // Enable hardware acceleration for scrolling
-      document.body.style.webkitOverflowScrolling = 'touch';
+      document.body.style.setProperty('-webkit-overflow-scrolling', 'touch');
       
       // Prevent iOS bounce effect
       document.body.style.overscrollBehavior = 'none';
@@ -63,6 +63,8 @@ export function useMobileOptimization() {
     return () => {
       window.removeEventListener('resize', handleResize);
       document.body.classList.remove('touch-device');
+      document.body.style.removeProperty('-webkit-overflow-scrolling');
+      document.body.style.overscrollBehavior = '';
       cleanup();
     };
   }, [isMobile]);
