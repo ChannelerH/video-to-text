@@ -4,7 +4,7 @@ import {
   RiBuildingLine,
   RiSearchEyeLine,
   RiBookOpenLine,
-  RiVoiceLine,
+  RiVoiceAiLine,
   RiTranslate2,
   RiTeamLine,
   RiRecordCircleLine,
@@ -54,7 +54,7 @@ const content: Record<string, any> = {
         subtitle: "Convert audio to text for productivity",
         cases: [
           {
-            icon: RiVoiceLine,
+            icon: RiVoiceAiLine,
             title: "Voice Memo Audio to Text",
             description: "Convert voice recording audio to text - instant audio to text for notes"
           },
@@ -144,7 +144,7 @@ const content: Record<string, any> = {
         subtitle: "提高工作效率",
         cases: [
           {
-            icon: RiVoiceLine,
+            icon: RiVoiceAiLine,
             title: "语音备忘录",
             description: "语音录音音频转文字笔记"
           },
