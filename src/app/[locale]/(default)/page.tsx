@@ -113,7 +113,7 @@ export default async function VideoToTextPage({
       <RealUseCases locale={locale} />
 
       {/* 6. Technical Specifications */}
-      <TechnicalSpecs locale={locale} />
+      {/* <TechnicalSpecs locale={locale} /> */}
 
       {/* 7. Pricing CTA */}
       <PricingCTA locale={locale} />
