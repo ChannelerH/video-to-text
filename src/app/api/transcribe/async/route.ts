@@ -8,6 +8,7 @@ import { getUniSeq } from '@/lib/hash';
 import crypto from 'crypto';
 import { and, gte, eq, count, ne } from 'drizzle-orm';
 import { computeEstimatedMinutes } from '@/lib/estimate-usage';
+import { verifySessionToken } from '@/lib/turnstile-session';
 
 export const maxDuration = 10; // Vercel hobby limit
 
@@ -68,41 +69,21 @@ export async function POST(request: NextRequest) {
         console.log('[Async] Verifying session token for anonymous preview');
         try {
           // 构建正确的验证URL
-          const verifyUrl = new URL('/api/turnstile/verify', request.url).toString();
-
           const forwardedFor = request.headers.get('x-forwarded-for');
           const realIp = request.headers.get('x-real-ip');
           const cfConnectingIp = request.headers.get('cf-connecting-ip');
+          const clientIp =
+            forwardedFor?.split(',')[0]?.trim() ||
+            realIp ||
+            cfConnectingIp ||
+            'unknown';
 
-          const ipHeaders: Record<string, string> = {};
-          if (forwardedFor) ipHeaders['x-forwarded-for'] = forwardedFor;
-          if (realIp) ipHeaders['x-real-ip'] = realIp;
-          if (cfConnectingIp) ipHeaders['cf-connecting-ip'] = cfConnectingIp;
+          const { valid, error } = verifySessionToken(sessionToken, clientIp);
 
-          const verifyResponse = await fetch(verifyUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...ipHeaders
-            },
-            body: JSON.stringify({ token: sessionToken, action: 'verify_session' })
-          });
-          
-          if (!verifyResponse.ok) {
-            const errorText = await verifyResponse.text();
-            console.error('[Async] Session verify HTTP error:', verifyResponse.status, errorText.slice(0, 200));
-            return NextResponse.json(
-              { error: 'Session verification failed. Please try again.' },
-              { status: 500 }
-            );
-          }
-
-          const verifyData = await verifyResponse.json();
-          
-          if (!verifyData.success || !verifyData.valid) {
+          if (!valid) {
             console.log('[Async] Session token invalid, requiring new verification');
             return NextResponse.json(
-              { error: 'Session expired. Please verify again.' },
+              { error: error || 'Session expired. Please verify again.' },
               { status: 403 }
             );
           }

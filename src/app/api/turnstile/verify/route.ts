@@ -1,36 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
+import { createSessionToken, verifySessionToken as verifyToken } from '@/lib/turnstile-session';
 
-// 内存存储（生产环境建议使用Redis）
 const usedTokens = new Map<string, number>();
 const ipAttempts = new Map<string, { count: number; resetTime: number }>();
-const sessionTokens = new Map<string, { ip: string; expiry: number }>();
 
-// 定期清理过期数据
 setInterval(() => {
   const now = Date.now();
-  
-  // 清理使用过的tokens（保留1小时）
   for (const [token, timestamp] of usedTokens) {
     if (now - timestamp > 3600000) {
       usedTokens.delete(token);
     }
   }
-  
-  // 清理过期的session tokens
-  for (const [token, data] of sessionTokens) {
-    if (now > data.expiry) {
-      sessionTokens.delete(token);
-    }
-  }
-  
-  // 清理过期的IP限制记录
   for (const [ip, data] of ipAttempts) {
     if (now > data.resetTime) {
       ipAttempts.delete(ip);
     }
   }
-}, 300000); // 每5分钟清理一次
+}, 300000);
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,26 +28,13 @@ export async function POST(req: NextRequest) {
     const realIp = req.headers.get('x-real-ip');
     const clientIp = (forwardedFor?.split(',')[0] || realIp || 'unknown').trim();
     
-    // 如果是验证session token
-    if (action === 'verify_session') {
-      const sessionData = sessionTokens.get(token);
-      if (!sessionData) {
-        return NextResponse.json({ success: false, error: 'Invalid session' }, { status: 403 });
-      }
-      
-      if (Date.now() > sessionData.expiry) {
-        sessionTokens.delete(token);
-        return NextResponse.json({ success: false, error: 'Session expired' }, { status: 403 });
-      }
-      
-      // 验证IP是否一致（防止token被盗用）
-      if (sessionData.ip !== clientIp) {
-        console.warn(`[Turnstile] Session IP mismatch: expected ${sessionData.ip}, got ${clientIp}`);
-        return NextResponse.json({ success: false, error: 'IP mismatch' }, { status: 403 });
-      }
-      
-      return NextResponse.json({ success: true, valid: true });
+  if (action === 'verify_session') {
+    const result = verifyToken(token, clientIp);
+    if (!result.valid) {
+      return NextResponse.json({ success: false, error: result.error || 'Invalid session' }, { status: 403 });
     }
+    return NextResponse.json({ success: true, valid: true, sessionExpiry: result.expiry });
+  }
 
     if (!token) {
       return NextResponse.json(
@@ -132,17 +105,8 @@ export async function POST(req: NextRequest) {
     const outcome = await result.json();
 
     if (outcome.success) {
-      // 标记token为已使用
       usedTokens.set(token, now);
-      
-      // 生成session token（有效期20分钟）
-      const sessionToken = crypto.randomBytes(32).toString('hex');
-      const expiry = now + 1200000; // 20分钟
-      
-      sessionTokens.set(sessionToken, {
-        ip: clientIp,
-        expiry
-      });
+      const { token: sessionToken, expiry } = createSessionToken(clientIp);
       
       return NextResponse.json({ 
         success: true,
