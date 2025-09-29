@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
         console.log('[Async] Verifying session token for anonymous preview');
         try {
           // 构建正确的验证URL
-          const baseUrl = request.url.split('/api/')[0];
-          const verifyUrl = `${baseUrl}/api/turnstile/verify`;
+          const { origin } = new URL(request.url);
+          const verifyUrl = `${origin}/api/turnstile/verify`;
 
           const forwardedFor = request.headers.get('x-forwarded-for');
           const realIp = request.headers.get('x-real-ip');
