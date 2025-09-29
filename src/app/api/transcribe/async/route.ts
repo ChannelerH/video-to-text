@@ -68,8 +68,7 @@ export async function POST(request: NextRequest) {
         console.log('[Async] Verifying session token for anonymous preview');
         try {
           // 构建正确的验证URL
-          const { origin } = new URL(request.url);
-          const verifyUrl = `${origin}/api/turnstile/verify`;
+          const verifyUrl = new URL('/api/turnstile/verify', request.url).toString();
 
           const forwardedFor = request.headers.get('x-forwarded-for');
           const realIp = request.headers.get('x-real-ip');
@@ -89,6 +88,15 @@ export async function POST(request: NextRequest) {
             body: JSON.stringify({ token: sessionToken, action: 'verify_session' })
           });
           
+          if (!verifyResponse.ok) {
+            const errorText = await verifyResponse.text();
+            console.error('[Async] Session verify HTTP error:', verifyResponse.status, errorText.slice(0, 200));
+            return NextResponse.json(
+              { error: 'Session verification failed. Please try again.' },
+              { status: 500 }
+            );
+          }
+
           const verifyData = await verifyResponse.json();
           
           if (!verifyData.success || !verifyData.valid) {
