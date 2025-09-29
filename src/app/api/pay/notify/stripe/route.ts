@@ -4,7 +4,7 @@ import { handleCheckoutSession, handleInvoice } from "@/services/stripe";
 import { syncUserSubscriptionTier } from "@/services/user-subscription";
 import { db } from "@/db";
 import { users, orders, refunds } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { getOrderType } from "@/services/order-type";
 
 // Ensure Node runtime for crypto used by Stripe webhook signature verification
@@ -108,6 +108,7 @@ export async function POST(req: Request) {
             .select({ order_type: orders.order_type, order_no: orders.order_no, product_name: orders.product_name })
             .from(orders)
             .where(eq(orders.sub_id as any, subId))
+            .orderBy(desc(orders.created_at))
             .limit(1);
 
           const priceOrderType = (item?.price?.metadata?.order_type as string | undefined) || undefined;
@@ -131,49 +132,38 @@ export async function POST(req: Request) {
             cancelAtPeriodEnd,
           });
 
+          const updateOrderRecord = async (data: Record<string, any>) => {
+            const whereClause = existingOrder?.order_no
+              ? eq(orders.order_no as any, existingOrder.order_no as any)
+              : eq(orders.sub_id as any, subId);
+
+            await db().update(orders).set(data as any).where(whereClause);
+          };
+
+          const baseUpdate = {
+            product_name: (effectiveProductName || existingOrder?.product_name) as any,
+            product_id: product as any,
+            order_type: orderType as any,
+          };
+
           if (sub.status === "canceled") {
-            await db()
-              .update(orders)
-              .set({
-                product_name: (effectiveProductName || existingOrder?.product_name) as any, 
-                product_id: product as any, 
-                order_type: orderType as any,
-                expired_at: new Date(),
-              } as any)
-              .where(eq(orders.sub_id as any, subId));
+            await updateOrderRecord({ ...baseUpdate, expired_at: new Date() });
           } else if (cancelAtPeriodEnd && end) {
             const exp = new Date(end.getTime() + 24 * 60 * 60 * 1000);
-            await db()
-              .update(orders)
-              .set({ 
-                product_name: (effectiveProductName || existingOrder?.product_name) as any, 
-                product_id: product as any, 
-                order_type: orderType as any,
-                expired_at: exp 
-              } as any)
-              .where(eq(orders.sub_id as any, subId));
+            await updateOrderRecord({ ...baseUpdate, expired_at: exp });
           } else if (end) {
             const exp = new Date(end.getTime() + 24 * 60 * 60 * 1000);
-            await db()
-              .update(orders)
-              .set({ 
-                product_name: (effectiveProductName || existingOrder?.product_name) as any, 
-                product_id: product as any, 
-                order_type: orderType as any,
-                expired_at: exp 
-              } as any)
-              .where(eq(orders.sub_id as any, subId));
+            await updateOrderRecord({ ...baseUpdate, expired_at: exp });
           } else {
-            await db()
-              .update(orders)
-              .set({ 
-                product_name: (effectiveProductName || existingOrder?.product_name) as any, 
-                product_id: product as any,
-                order_type: orderType as any 
-              } as any)
-              .where(eq(orders.sub_id as any, subId));
+            await updateOrderRecord(baseUpdate);
           }
-        } catch {}
+        } catch (error) {
+          console.error('[Stripe][Webhook][subscription.updated] failed to update order', {
+            subId,
+            error,
+          });
+          throw error;
+        }
 
         // 同步 users 订阅状态等详细字段
         try {
@@ -212,7 +202,13 @@ export async function POST(req: Request) {
             .where(eq(users.stripe_customer_id as any, customerId));
 
           await syncUserSubscriptionTier({ stripeCustomerId: customerId, stripe });
-        } catch {}
+        } catch (error) {
+          console.error('[Stripe][Webhook][subscription.updated] failed to sync user subscription', {
+            subId: sub.id,
+            error,
+          });
+          throw error;
+        }
 
         break;
       }
