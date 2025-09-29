@@ -22,8 +22,8 @@ Add these to your `.env.local`:
 RESEND_API_KEY=re_your_api_key_here
 
 # Email Settings
-EMAIL_FROM="Textuno <noreply@textuno.io>"
-EMAIL_REPLY_TO=support@textuno.io
+EMAIL_FROM="Harku <noreply@harku.io>"
+EMAIL_REPLY_TO=support@harku.io
 
 # Security
 CRON_SECRET=generate_random_32_char_string

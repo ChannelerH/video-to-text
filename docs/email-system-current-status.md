@@ -40,7 +40,7 @@ pnpm add nodemailer @types/nodemailer
 2. 配置 `.env.local`：
 ```env
 RESEND_API_KEY=re_你的API密钥
-RESEND_SENDER_EMAIL=noreply@textuno.io
+RESEND_SENDER_EMAIL=noreply@harku.io
 ```
 
 系统会自动检测并使用Resend。

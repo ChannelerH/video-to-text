@@ -324,7 +324,7 @@ But more importantly, you've become part of our product's DNA.
 
 I have 3 questions that could directly influence our next update:
 
-1. What made you choose Textuno?
+1. What made you choose Harku?
 2. What's the ONE thing that frustrates you?
 3. If you had a magic wand, what feature would you add?
 
@@ -349,7 +349,7 @@ Subject: [Name], as a PRO user, your opinion matters most 👑
 
 Hi [Name],
 
-You're not just a user - you're an investor in Textuno's future.
+You're not just a user - you're an investor in Harku's future.
 
 [Same questions but with different framing]
 

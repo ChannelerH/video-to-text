@@ -12,7 +12,7 @@ export default async function RootLayout({
   const locale = await getLocale();
   setRequestLocale(locale);
 
-  const webUrl = process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io";
+  const webUrl = process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io";
   const googleAdsenseCode = process.env.NEXT_PUBLIC_GOOGLE_ADCODE || "";
 
   return (

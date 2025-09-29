@@ -30,7 +30,7 @@ export async function generateMetadata({
   }
 
   return {
-    title: "Changelog - Updates & Release Notes | Textuno",
+    title: "Changelog - Updates & Release Notes | Harku",
     description: "Stay updated with the latest features, improvements, and fixes to our video and audio transcription service.",
     alternates: {
       canonical: canonicalUrl,

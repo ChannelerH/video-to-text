@@ -9,56 +9,56 @@ export default function FeatureComparison({ locale }: { locale: string }) {
   const features = [
     {
       feature: t("price_per_minute"),
-      textuno: "$0.10",
+      harku: "$0.10",
       rev: "$1.50",
       otter: "$0.20",
       descript: "$0.30"
     },
     {
       feature: t("languages_count"),
-      textuno: "95+",
+      harku: "95+",
       rev: "38",
       otter: "31",
       descript: "23"
     },
     {
       feature: t("offline_files"),
-      textuno: true,
+      harku: true,
       rev: true,
       otter: false,
       descript: true
     },
     {
       feature: t("speaker_identification"),
-      textuno: true,
+      harku: true,
       rev: true,
       otter: true,
       descript: true
     },
     {
       feature: t("batch_processing"),
-      textuno: true,
+      harku: true,
       rev: false,
       otter: false,
       descript: true
     },
     {
       feature: t("no_installation"),
-      textuno: true,
+      harku: true,
       rev: true,
       otter: true,
       descript: false
     },
     {
       feature: t("api_access"),
-      textuno: true,
+      harku: true,
       rev: true,
       otter: false,
       descript: false
     },
     {
       feature: t("real_time_processing"),
-      textuno: true,
+      harku: true,
       rev: false,
       otter: true,
       descript: false
@@ -90,7 +90,7 @@ export default function FeatureComparison({ locale }: { locale: string }) {
               <tr className="border-b border-white/10">
                 <th className="text-left py-4 px-4"></th>
                 <th className="text-center py-4 px-4">
-                  <div className="font-bold text-lg text-blue-600">Textuno</div>
+                  <div className="font-bold text-lg text-blue-600">Harku</div>
                 </th>
                 <th className="text-center py-4 px-4">
                   <div className="font-semibold text-gray-600">Rev</div>
@@ -116,7 +116,7 @@ export default function FeatureComparison({ locale }: { locale: string }) {
                   </td>
                   <td className="py-3 px-4 text-center">
                     <div className="text-blue-600 font-semibold">
-                      {renderCell(row.textuno)}
+                      {renderCell(row.harku)}
                     </div>
                   </td>
                   <td className="py-3 px-4 text-center text-gray-400">

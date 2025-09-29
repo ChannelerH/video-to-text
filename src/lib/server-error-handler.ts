@@ -66,7 +66,7 @@ export function handleServerError(
     return;
   }
 
-  const subject = `[Textuno] Server Error: ${message}`;
+  const subject = `[Harku] Server Error: ${message}`;
   const text = `Message: ${message}\n${stack ? `Stack: ${stack}\n` : ''}${contextInfo}${payloadInfo}`;
 
   try {

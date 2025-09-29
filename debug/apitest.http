@@ -49,7 +49,7 @@ Content-Type: application/json
 Authorization: Bearer {{apiKey}}
 
 {
-  "emails": ["test@mail.textuno.io"],
-  "subject": "Hello from Textuno, with Resend",
-  "content": "<p style='color: red;'>Hello from <a href='https://textuno.io'>Textuno</a></p>"
+  "emails": ["test@mail.harku.io"],
+  "subject": "Hello from Harku, with Resend",
+  "content": "<p style='color: red;'>Hello from <a href='https://harku.io'>Harku</a></p>"
 }

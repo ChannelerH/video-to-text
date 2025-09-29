@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     const processedImages = await Promise.all(
       images.map(async (image, index) => {
         const filename = `${provider}_image_${batch}_${index}.png`;
-        const key = `textuno/${filename}`;
+        const key = `harku/${filename}`;
         const body = Buffer.from(image.base64, "base64");
 
         try {

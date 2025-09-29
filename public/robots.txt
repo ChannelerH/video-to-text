@@ -7,7 +7,7 @@ Disallow: /my-*/
 Disallow: /*?*q=
 
 # Sitemap location
-Sitemap: https://v2tx.com/sitemap.xml
+Sitemap: https://harku.io/sitemap.xml
 
 # Crawl-delay for respectful crawling
 Crawl-delay: 1

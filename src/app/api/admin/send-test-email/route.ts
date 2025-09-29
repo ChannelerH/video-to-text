@@ -51,8 +51,8 @@ export async function POST(request: Request) {
     const templateData = {
       userName: testData.userName || 'Test User',
       bonusMinutes: testData.bonusMinutes || 20,
-      loginLink: testData.loginLink || 'https://textuno.io/signin',
-      feedbackLink: testData.feedbackLink || 'https://textuno.io/feedback',
+      loginLink: testData.loginLink || 'https://harku.io/signin',
+      feedbackLink: testData.feedbackLink || 'https://harku.io/feedback',
       unsubscribeLink: testData.unsubscribeLink || '#',
       personalizedPS: ps,
       ...testData

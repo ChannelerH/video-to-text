@@ -15,7 +15,7 @@ export function baseOptions(locale: string): BaseLayoutProps {
             height={28}
             className=""
           />
-          <span className="text-lg text-primary font-bold">Textuno</span>
+          <span className="text-lg text-primary font-bold">Harku</span>
         </>
       ),
       transparentMode: "top",

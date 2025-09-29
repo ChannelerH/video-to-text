@@ -3,7 +3,7 @@
 核心必需
 
 DATABASE_URL: Postgres 连接串（必需）。例如：postgres://user:pass@host:5432/db
-NEXT_PUBLIC_WEB_URL: 站点基础地址（前端/回调用）。例如：https://textuno.io
+NEXT_PUBLIC_WEB_URL: 站点基础地址（前端/回调用）。例如：https://harku.io
 REPLICATE_API_TOKEN: Replicate 的 API Key（转写 Whisper；强烈建议配置）
 STORAGE_ENDPOINT / STORAGE_REGION / STORAGE_ACCESS_KEY / STORAGE_SECRET_KEY / STORAGE_BUCKET: R2/S3 兼容存储（上传/YouTube 语言探针必需）
 STORAGE_DOMAIN: 存储公共域名（可选，没配则走 r2.dev 公域）

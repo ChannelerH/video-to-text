@@ -12,19 +12,19 @@ export function StructuredData({ data }: { data: any }) {
 export const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  name: "Textuno",
-  url: process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io",
-  logo: `${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}/logo.png`,
+  name: "Harku",
+  url: process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io",
+  logo: `${process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io"}/logo.png`,
   sameAs: [
-    "https://twitter.com/TextunoAI",
-    "https://github.com/textunoai",
+    "https://twitter.com/HarkuAI",
+    "https://github.com/harkuai",
   ],
 };
 
 export const webApplicationSchema = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "Textuno Video to Text Converter",
+  name: "Harku Video to Text Converter",
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web Browser",
   description: "Convert video to text instantly with 98.5% accuracy. AI-powered transcription in 100+ languages.",
@@ -124,8 +124,8 @@ export const howToSchema = {
   "@context": "https://schema.org",
   "@type": "HowTo",
   name: "How to Convert Video to Text",
-  description: "Step-by-step guide to convert your videos to text using Textuno",
-  image: `${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}/tutorial-image.png`,
+  description: "Step-by-step guide to convert your videos to text using Harku",
+  image: `${process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io"}/tutorial-image.png`,
   totalTime: "PT2M",
   estimatedCost: {
     "@type": "MonetaryAmount",
@@ -139,25 +139,25 @@ export const howToSchema = {
       "@type": "HowToStep",
       name: "Upload Video",
       text: "Click the upload button and select your video file or paste a video URL",
-      image: `${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}/step1.png`,
+      image: `${process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io"}/step1.png`,
     },
     {
       "@type": "HowToStep",
       name: "Select Language",
       text: "Choose the language of your video from 100+ supported languages",
-      image: `${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}/step2.png`,
+      image: `${process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io"}/step2.png`,
     },
     {
       "@type": "HowToStep",
       name: "Start Conversion",
       text: "Click 'Convert' to start the AI-powered transcription process",
-      image: `${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}/step3.png`,
+      image: `${process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io"}/step3.png`,
     },
     {
       "@type": "HowToStep",
       name: "Download Transcript",
       text: "Download your transcript in your preferred format (TXT, SRT, VTT)",
-      image: `${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}/step4.png`,
+      image: `${process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io"}/step4.png`,
     },
   ],
 };

@@ -26,14 +26,14 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  let canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}`;
+  let canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io"}`;
 
   if (locale !== "en") {
     canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL}/${locale}`;
   }
 
-  const title = "Video to Text Converter - Textuno AI Video to Text Tool";
-  const description = "Convert video to text instantly with Textuno's video to text converter. Transform any video to text with 98.5% accuracy. Our online video to text tool supports 100+ languages. Free video to text conversion - no signup needed. Start video to text transcription now.";
+  const title = "Video to Text Converter - Harku AI Video to Text Tool";
+  const description = "Convert video to text instantly with Harku's video to text converter. Transform any video to text with 98.5% accuracy. Our online video to text tool supports 100+ languages. Free video to text conversion - no signup needed. Start video to text transcription now.";
 
   return {
     title,
@@ -45,15 +45,15 @@ export async function generateMetadata({
       title,
       description,
       url: canonicalUrl,
-      siteName: "Textuno",
+      siteName: "Harku",
       locale: locale === "zh" ? "zh_CN" : "en_US",
       type: "website",
       images: [
         {
-          url: `${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}/og-image.png`,
+          url: `${process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io"}/og-image.png`,
           width: 1200,
           height: 630,
-          alt: "Textuno - AI-Powered Video to Text Converter",
+          alt: "Harku - AI-Powered Video to Text Converter",
         },
       ],
     },
@@ -61,9 +61,9 @@ export async function generateMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: [`${process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io"}/og-image.png`],
-      creator: "@TextunoAI",
-      site: "@TextunoAI",
+      images: [`${process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io"}/og-image.png`],
+      creator: "@HarkuAI",
+      site: "@HarkuAI",
     },
     robots: {
       index: true,

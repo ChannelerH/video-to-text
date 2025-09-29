@@ -226,15 +226,15 @@ export async function GET(request: NextRequest) {
     authentication: {
       type: 'API Key',
       description: 'API keys are available for Pro and Premium subscribers',
-      example: 'curl -X POST https://api.v2tx.com/v1/transcribe -H "X-API-Key: your_key" -d {...}'
+      example: 'curl -X POST https://api.harku.io/v1/transcribe -H "X-API-Key: your_key" -d {...}'
     },
     rateLimits: {
       pro: '100 requests per hour',
       premium: '1000 requests per hour'
     },
     support: {
-      documentation: 'https://docs.v2tx.com/api',
-      email: 'api@v2tx.com'
+      documentation: 'https://docs.harku.io/api',
+      email: 'api.io'
     }
   });
 }

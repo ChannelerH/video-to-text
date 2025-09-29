@@ -103,8 +103,8 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
       {/* Logo */}
       <div className="px-6 py-5 border-b border-gray-800">
         <a href={`/`} className="flex items-center gap-2">
-          <img src="/logo.png" alt="Textuno" className="w-8 h-8 rounded-lg" />
-          <span className="text-lg font-semibold text-white">Textuno</span>
+          <img src="/logo.png" alt="Harku" className="w-8 h-8 rounded-lg" />
+          <span className="text-lg font-semibold text-white">Harku</span>
         </a>
       </div>
 
@@ -240,7 +240,7 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
               </button>
               
               <a
-                href="https://discord.gg/v2tx"
+                href="https://discord.gg/harku"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg transition-colors"

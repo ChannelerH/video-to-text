@@ -3,10 +3,10 @@
   "theme": "light",
   "header": {
     "brand": {
-      "title": "Textuno",
+      "title": "Harku",
       "logo": {
         "src": "/logo.png",
-        "alt": "Textuno"
+        "alt": "Harku"
       },
       "url": "/"
     },
@@ -244,22 +244,22 @@
   "footer": {
     "name": "footer",
     "brand": {
-      "title": "Textuno",
+      "title": "Harku",
       "description": "Convert videos and audio to text online. Free 5-minute previews, multiple export formats including SRT, TXT, VTT, DOCX, and JSON.",
       "logo": {
         "src": "/logo.png",
-        "alt": "Textuno"
+        "alt": "Harku"
       },
       "url": "/"
     },
-    "copyright": "© 2025 • Textuno All rights reserved.",
+    "copyright": "© 2025 • Harku All rights reserved.",
     "nav": {
       "items": [
         {
           "title": "Tools",
           "children": [
             {
-              "title": "Textuno",
+              "title": "Harku",
               "url": "/",
               "target": "_self"
             },

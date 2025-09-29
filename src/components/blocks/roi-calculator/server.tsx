@@ -13,7 +13,7 @@ interface ROICalculatorProps {
 const roiContent: Record<string, any> = {
   en: {
     title: "💰 ROI Analysis & Cost Optimization",
-    description: "Compare traditional transcription methods vs. Textuno AI solution",
+    description: "Compare traditional transcription methods vs. Harku AI solution",
     subtitle: "See how much you can save with our automated transcription",
     scenarios: [
       {
@@ -34,8 +34,8 @@ const roiContent: Record<string, any> = {
           time: "3-5 days",
           accuracy: "90-95%"
         },
-        v2tx: {
-          method: "Textuno AI",
+        harku: {
+          method: "Harku AI",
           plan: "Basic Plan",
           cost: "$10/month",
           time: "20 minutes",
@@ -61,8 +61,8 @@ const roiContent: Record<string, any> = {
           time: "15-25 days",
           accuracy: "90-95%"
         },
-        v2tx: {
-          method: "Textuno AI",
+        harku: {
+          method: "Harku AI",
           plan: "Pro Plan",
           cost: "$29/month",
           time: "100 minutes",
@@ -88,8 +88,8 @@ const roiContent: Record<string, any> = {
           time: "30-50 days",
           accuracy: "95-98%"
         },
-        v2tx: {
-          method: "Textuno AI",
+        harku: {
+          method: "Harku AI",
           plan: "Enterprise",
           cost: "Custom pricing",
           time: "6-7 hours",
@@ -113,7 +113,7 @@ const roiContent: Record<string, any> = {
   },
   zh: {
     title: "💰 投资回报率分析与成本优化",
-    description: "传统转录方法与Textuno AI解决方案对比",
+    description: "传统转录方法与Harku AI解决方案对比",
     subtitle: "了解使用我们的自动转录能节省多少成本",
     scenarios: [
       {
@@ -134,8 +134,8 @@ const roiContent: Record<string, any> = {
           time: "3-5天",
           accuracy: "90-95%"
         },
-        v2tx: {
-          method: "Textuno AI",
+        harku: {
+          method: "Harku AI",
           plan: "基础套餐",
           cost: "¥70/月",
           time: "20分钟",
@@ -161,8 +161,8 @@ const roiContent: Record<string, any> = {
           time: "15-25天",
           accuracy: "90-95%"
         },
-        v2tx: {
-          method: "Textuno AI",
+        harku: {
+          method: "Harku AI",
           plan: "专业套餐",
           cost: "¥199/月",
           time: "100分钟",
@@ -188,8 +188,8 @@ const roiContent: Record<string, any> = {
           time: "30-50天",
           accuracy: "95-98%"
         },
-        v2tx: {
-          method: "Textuno AI",
+        harku: {
+          method: "Harku AI",
           plan: "企业版",
           cost: "定制价格",
           time: "6-7小时",
@@ -301,7 +301,7 @@ export default function ROICalculatorServer({ section, locale }: ROICalculatorPr
                   </div>
                 </div>
 
-                {/* Textuno Method */}
+                {/* Harku Method */}
                 <div className="design-card border-green-500/30 bg-gradient-to-br from-green-900/10 to-emerald-900/10 relative" style={{ overflow: 'visible' }}>
                   <div className="absolute -top-2 -right-2 z-50">
                     <span className="inline-block px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold rounded-full shadow-lg whitespace-nowrap">
@@ -312,29 +312,29 @@ export default function ROICalculatorServer({ section, locale }: ROICalculatorPr
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center">
                       <RiCheckDoubleLine className="w-5 h-5 text-green-400" />
                     </div>
-                    <h4 className="font-semibold text-white">{scenario.v2tx.method}</h4>
+                    <h4 className="font-semibold text-white">{scenario.harku.method}</h4>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-400">Plan:</span>
-                      <span className="text-gray-300">{scenario.v2tx.plan}</span>
+                      <span className="text-gray-300">{scenario.harku.plan}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Total Cost:</span>
-                      <span className="text-green-400 font-semibold">{scenario.v2tx.cost}</span>
+                      <span className="text-green-400 font-semibold">{scenario.harku.cost}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Time Required:</span>
-                      <span className="text-gray-300">{scenario.v2tx.time}</span>
+                      <span className="text-gray-300">{scenario.harku.time}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Accuracy:</span>
-                      <span className="text-gray-300">{scenario.v2tx.accuracy}</span>
+                      <span className="text-gray-300">{scenario.harku.accuracy}</span>
                     </div>
                     <div className="mt-3 pt-3 border-t border-green-500/20">
                       <div className="flex justify-between items-center">
                         <span className="text-green-400 font-semibold">You Save:</span>
-                        <span className="text-xl font-bold text-green-400">{scenario.v2tx.savings}</span>
+                        <span className="text-xl font-bold text-green-400">{scenario.harku.savings}</span>
                       </div>
                     </div>
                   </div>

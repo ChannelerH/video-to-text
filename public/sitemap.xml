@@ -3,78 +3,78 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <!-- Main Pages -->
   <url>
-    <loc>https://v2tx.com/</loc>
+    <loc>https://harku.io/</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://v2tx.com/"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://v2tx.com/zh/"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://v2tx.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://harku.io/"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://harku.io/zh/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://harku.io/"/>
   </url>
   
   <!-- Audio to Text Page -->
   <url>
-    <loc>https://v2tx.com/audio-to-text</loc>
+    <loc>https://harku.io/audio-to-text</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://v2tx.com/audio-to-text"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://v2tx.com/zh/audio-to-text"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://harku.io/audio-to-text"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://harku.io/zh/audio-to-text"/>
   </url>
   
   <!-- Pricing Page -->
   <url>
-    <loc>https://v2tx.com/pricing</loc>
+    <loc>https://harku.io/pricing</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://v2tx.com/pricing"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://v2tx.com/zh/pricing"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://harku.io/pricing"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://harku.io/zh/pricing"/>
   </url>
   
   <!-- Changelog Page -->
   <url>
-    <loc>https://v2tx.com/changelog</loc>
+    <loc>https://harku.io/changelog</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://v2tx.com/changelog"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://v2tx.com/zh/changelog"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://harku.io/changelog"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://harku.io/zh/changelog"/>
   </url>
   
   <!-- Showcase Page -->
   <url>
-    <loc>https://v2tx.com/showcase</loc>
+    <loc>https://harku.io/showcase</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://v2tx.com/showcase"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://v2tx.com/zh/showcase"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://harku.io/showcase"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://harku.io/zh/showcase"/>
   </url>
   
   <!-- Blog/Posts Page -->
   <url>
-    <loc>https://v2tx.com/posts</loc>
+    <loc>https://harku.io/posts</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://v2tx.com/posts"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://v2tx.com/zh/posts"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://harku.io/posts"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://harku.io/zh/posts"/>
   </url>
   
   <!-- Documentation -->
   <url>
-    <loc>https://v2tx.com/docs</loc>
+    <loc>https://harku.io/docs</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://v2tx.com/docs"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://v2tx.com/zh/docs"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://harku.io/docs"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://harku.io/zh/docs"/>
   </url>
   
   <!-- Dashboard (for logged-in users) -->
   <url>
-    <loc>https://v2tx.com/dashboard</loc>
+    <loc>https://harku.io/dashboard</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
@@ -82,59 +82,59 @@
   
   <!-- Auth Pages -->
   <url>
-    <loc>https://v2tx.com/auth/signin</loc>
+    <loc>https://harku.io/auth/signin</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://v2tx.com/auth/signin"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://v2tx.com/zh/auth/signin"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://harku.io/auth/signin"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://harku.io/zh/auth/signin"/>
   </url>
   
   <!-- Chinese Version Pages -->
   <url>
-    <loc>https://v2tx.com/zh/</loc>
+    <loc>https://harku.io/zh/</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   
   <url>
-    <loc>https://v2tx.com/zh/audio-to-text</loc>
+    <loc>https://harku.io/zh/audio-to-text</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   
   <url>
-    <loc>https://v2tx.com/zh/pricing</loc>
+    <loc>https://harku.io/zh/pricing</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   
   <url>
-    <loc>https://v2tx.com/zh/changelog</loc>
+    <loc>https://harku.io/zh/changelog</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   
   <url>
-    <loc>https://v2tx.com/zh/showcase</loc>
+    <loc>https://harku.io/zh/showcase</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   
   <url>
-    <loc>https://v2tx.com/zh/posts</loc>
+    <loc>https://harku.io/zh/posts</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   
   <url>
-    <loc>https://v2tx.com/zh/docs</loc>
+    <loc>https://harku.io/zh/docs</loc>
     <lastmod>2025-01-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>

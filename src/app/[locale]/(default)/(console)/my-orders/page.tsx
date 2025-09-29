@@ -99,7 +99,7 @@ export default async function () {
         {
           title: t("my_orders.read_docs"),
           icon: "RiBookLine",
-          url: "https://docs.textuno.io",
+          url: "https://docs.harku.io",
           target: "_blank",
           variant: "default",
         },

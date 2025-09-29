@@ -54,7 +54,7 @@ export default async function () {
         validation: {
           required: true,
         },
-        tip: "post slug should be unique, input: what-is-textuno, visit like: /blog/what-is-textuno",
+        tip: "post slug should be unique, input: what-is-harku, visit like: /blog/what-is-harku",
       },
       {
         name: "locale",

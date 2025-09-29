@@ -14,14 +14,14 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || "https://textuno.io";
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io";
   let canonicalUrl = `${baseUrl}/audio-to-text`;
 
   if (locale !== "en") {
     canonicalUrl = `${baseUrl}/${locale}/audio-to-text`;
   }
 
-  const title = "Audio to Text Converter - Free AI Transcription Online | Textuno";
+  const title = "Audio to Text Converter - Free AI Transcription Online | Harku";
   const description = "Convert audio to text instantly with 99.2% accuracy. Free audio to text converter supporting MP3, WAV, M4A and 45+ formats. Transcribe audio to text in 80+ languages online.";
 
   return {
@@ -34,7 +34,7 @@ export async function generateMetadata({
       title,
       description,
       url: canonicalUrl,
-      siteName: "Textuno",
+      siteName: "Harku",
       locale: locale === "zh" ? "zh_CN" : "en_US",
       type: "website",
       images: [
@@ -42,7 +42,7 @@ export async function generateMetadata({
           url: `${baseUrl}/og-image.png`,
           width: 1200,
           height: 630,
-          alt: "Textuno - AI-Powered Audio to Text Converter",
+          alt: "Harku - AI-Powered Audio to Text Converter",
         },
       ],
     },
@@ -51,8 +51,8 @@ export async function generateMetadata({
       title,
       description,
       images: [`${baseUrl}/og-image.png`],
-      creator: "@TextunoAI",
-      site: "@TextunoAI",
+      creator: "@HarkuAI",
+      site: "@HarkuAI",
     },
     robots: {
       index: true,

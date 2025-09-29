@@ -113,7 +113,7 @@ export class GmailSender {
           // Create email with proper MIME structure
           const boundary = `----=_NextPart_${Date.now()}`;
         const headers = [
-            `From: Textuno <${user}>`,
+            `From: Harku <${user}>`,
             `To: ${to}`,
             `Subject: ${subject}`,
             `MIME-Version: 1.0`,
