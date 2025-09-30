@@ -26,6 +26,19 @@ const nextConfig = {
   async redirects() {
     return [];
   },
+  // Ensure ffmpeg binaries are included in the build
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+
+      // Don't externalize ffmpeg packages
+      config.externals.push({
+        'ffmpeg-static': 'commonjs ffmpeg-static',
+        '@ffmpeg-installer/ffmpeg': 'commonjs @ffmpeg-installer/ffmpeg',
+      });
+    }
+    return config;
+  },
 };
 
 // Make sure experimental mdx flag is enabled
