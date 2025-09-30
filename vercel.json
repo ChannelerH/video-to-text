@@ -1,8 +1,7 @@
 {
   "functions": {
     "app/api/transcribe/async/route.ts": {
-      "maxDuration": 10,
-      "memory": 3008
+      "maxDuration": 10
     },
     "app/api/transcribe/prepare/youtube/route.ts": {
       "maxDuration": 10
