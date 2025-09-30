@@ -3,5 +3,6 @@ import { createFromSource } from "fumadocs-core/search/server";
 
 export const { GET } = createFromSource(source, {
   // https://docs.orama.com/open-source/supported-languages
-  language: "english",
+  // Use undefined to support multiple languages
+  language: undefined,
 });

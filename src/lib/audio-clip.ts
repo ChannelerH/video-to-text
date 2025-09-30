@@ -33,14 +33,33 @@ async function clipAudioViaWorker(audioUrl: string, seconds: number, startOffset
 
 /**
  * Create a WAV clip (16kHz mono PCM) of the first N seconds from a remote audio URL using ffmpeg.
- * Tries local ffmpeg first, then falls back to Cloudflare Worker if configured.
+ * On Vercel, uses Cloudflare Worker. In local dev, uses local ffmpeg.
  */
 export async function createWavClipFromUrl(audioUrl: string, seconds: number = 10, startOffset: number = 0): Promise<Buffer> {
   // Allow up to 300s to support 5-minute clips for Free users
   const clipSeconds = Math.max(1, Math.min(300, Math.floor(seconds || 10)));
   const offsetSeconds = Math.max(0, Math.floor(startOffset || 0));
 
-  // Resolve ffmpeg binary
+  // On Vercel, skip local ffmpeg entirely and use worker
+  const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+  console.log('[audio-clip] Environment check:', {
+    VERCEL: process.env.VERCEL,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    isVercel,
+    AUDIO_CLIP_WORKER_URL: process.env.AUDIO_CLIP_WORKER_URL ? 'configured' : 'missing'
+  });
+
+  if (isVercel) {
+    console.log('[audio-clip] Running on Vercel, using Cloudflare Worker for clipping');
+    const workerResult = await clipAudioViaWorker(audioUrl, clipSeconds, offsetSeconds);
+    if (workerResult) {
+      console.log('[audio-clip] Successfully clipped via Cloudflare Worker');
+      return workerResult;
+    }
+    throw new Error('Cloudflare Worker clipping failed. Please configure AUDIO_CLIP_WORKER_URL environment variable.');
+  }
+
+  // Local dev: use local ffmpeg
   const ffmpegPath = getFfmpegPath();
 
   return new Promise<Buffer>((resolve, reject) => {
