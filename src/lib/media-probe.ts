@@ -1,26 +1,12 @@
 import { spawn } from 'child_process';
-import fs from 'fs';
-
-function resolveFfmpegPath(): string {
-  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('ffmpeg-static');
-    const p: string = (mod && (mod.default || mod)) as string;
-    if (typeof p === 'string' && p.length > 0) {
-      const cleaned = p.replace(/\s*\[app-route\].*$/i, '');
-      if (fs.existsSync(cleaned)) return cleaned;
-    }
-  } catch {}
-  return 'ffmpeg';
-}
+import { getFfmpegPath } from '@/lib/ffmpeg-path';
 
 /**
  * Best-effort probe to get media duration in seconds using ffmpeg.
  * Works for most HTTP(S) URLs and R2 public URLs.
  */
 export async function probeDurationSeconds(url: string, timeoutMs: number = 15000): Promise<number | null> {
-  const ffmpegPath = resolveFfmpegPath();
+  const ffmpegPath = getFfmpegPath();
   return new Promise<number | null>((resolve) => {
     try {
       const args = ['-hide_banner', '-i', url, '-f', 'null', '-'];
@@ -49,4 +35,3 @@ export async function probeDurationSeconds(url: string, timeoutMs: number = 1500
     }
   });
 }
-

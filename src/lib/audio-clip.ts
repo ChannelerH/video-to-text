@@ -1,34 +1,17 @@
 import { spawn } from 'child_process';
-import fs from 'fs';
-import path from 'path';
+import { getFfmpegPath } from '@/lib/ffmpeg-path';
 
 /**
  * Create a WAV clip (16kHz mono PCM) of the first N seconds from a remote audio URL using ffmpeg.
  * Tries ffmpeg-static first, then falls back to system ffmpeg.
  */
-function resolveFfmpegPath(): string {
-  // Highest priority: explicit env override
-  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('ffmpeg-static');
-    const p: string = (mod && (mod.default || mod)) as string;
-    if (typeof p === 'string' && p.length > 0) {
-      // Next/Turbopack sometimes rewrites the string in logs; validate at runtime
-      const cleaned = p.replace(/\s*\[app-route\].*$/i, '');
-      if (fs.existsSync(cleaned)) return cleaned;
-    }
-  } catch {}
-  return 'ffmpeg'; // Fallback to system ffmpeg in PATH
-}
-
 export async function createWavClipFromUrl(audioUrl: string, seconds: number = 10, startOffset: number = 0): Promise<Buffer> {
   // Allow up to 300s to support 5-minute clips for Free users
   const clipSeconds = Math.max(1, Math.min(300, Math.floor(seconds || 10)));
   const offsetSeconds = Math.max(0, Math.floor(startOffset || 0));
 
   // Resolve ffmpeg binary
-  const ffmpegPath = resolveFfmpegPath();
+  const ffmpegPath = getFfmpegPath();
 
   return new Promise<Buffer>((resolve, reject) => {
     try {
