@@ -47,3 +47,4 @@ supabase
 .source
 YOUTUBE_OPTIMIZATION.md
 .claude/settings.local.json
+node_modules/
