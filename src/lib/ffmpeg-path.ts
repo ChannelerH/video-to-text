@@ -1,7 +1,5 @@
 import { existsSync, chmodSync } from 'fs';
 import { join, dirname } from 'path';
-import ffmpegStatic from 'ffmpeg-static';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 
 let cachedPath: string | null = null;
 
@@ -20,8 +18,15 @@ export function getFfmpegPath(): string {
   }
 
   // Try @ffmpeg-installer/ffmpeg first (better Vercel support)
-  const installerPath = ffmpegInstaller?.path;
-  console.log(`[ffmpeg-path] @ffmpeg-installer/ffmpeg path: ${installerPath}`);
+  let installerPath: string | undefined;
+  try {
+    // Dynamic import to avoid errors when package is not available
+    const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+    installerPath = ffmpegInstaller?.path;
+    console.log(`[ffmpeg-path] @ffmpeg-installer/ffmpeg path: ${installerPath}`);
+  } catch (e) {
+    console.log(`[ffmpeg-path] @ffmpeg-installer/ffmpeg not available:`, (e as Error).message);
+  }
 
   if (installerPath) {
     try {
@@ -62,7 +67,14 @@ export function getFfmpegPath(): string {
   }
 
   // Fallback to ffmpeg-static
-  console.log(`[ffmpeg-path] ffmpeg-static raw path: ${ffmpegStatic}`);
+  let ffmpegStatic: string | null = null;
+  try {
+    ffmpegStatic = require('ffmpeg-static');
+    console.log(`[ffmpeg-path] ffmpeg-static raw path: ${ffmpegStatic}`);
+  } catch (e) {
+    console.log(`[ffmpeg-path] ffmpeg-static not available:`, (e as Error).message);
+  }
+
   if (typeof ffmpegStatic === 'string' && ffmpegStatic.length > 0) {
     const candidate = ffmpegStatic.replace(/\s*\[app-route\].*$/i, '');
     console.log(`[ffmpeg-path] ffmpeg-static cleaned path: ${candidate}`);
