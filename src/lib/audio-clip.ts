@@ -2,8 +2,38 @@ import { spawn } from 'child_process';
 import { getFfmpegPath } from '@/lib/ffmpeg-path';
 
 /**
+ * Fallback to Cloudflare Worker for audio clipping if local ffmpeg fails
+ */
+async function clipAudioViaWorker(audioUrl: string, seconds: number, startOffset: number): Promise<Buffer | null> {
+  const workerUrl = process.env.AUDIO_CLIP_WORKER_URL;
+  if (!workerUrl) {
+    console.log('[audio-clip] No AUDIO_CLIP_WORKER_URL configured, skipping worker fallback');
+    return null;
+  }
+
+  try {
+    console.log(`[audio-clip] Attempting to clip via Cloudflare Worker: ${workerUrl}`);
+    const response = await fetch(workerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audioUrl, seconds, startOffset }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Worker responded with ${response.status}: ${await response.text()}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error: any) {
+    console.error(`[audio-clip] Worker fallback failed:`, error.message);
+    return null;
+  }
+}
+
+/**
  * Create a WAV clip (16kHz mono PCM) of the first N seconds from a remote audio URL using ffmpeg.
- * Tries ffmpeg-static first, then falls back to system ffmpeg.
+ * Tries local ffmpeg first, then falls back to Cloudflare Worker if configured.
  */
 export async function createWavClipFromUrl(audioUrl: string, seconds: number = 10, startOffset: number = 0): Promise<Buffer> {
   // Allow up to 300s to support 5-minute clips for Free users
@@ -53,9 +83,17 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
       const errChunks: Buffer[] = [];
       proc.stderr.on('data', (d) => errChunks.push(d as Buffer));
 
-      proc.on('error', (err) => {
+      proc.on('error', async (err) => {
         console.error('[ffmpeg] spawn failed:', err);
-        reject(new Error(`ffmpeg spawn failed: ${err.message}`));
+
+        // Try worker fallback
+        const workerResult = await clipAudioViaWorker(audioUrl, clipSeconds, offsetSeconds);
+        if (workerResult) {
+          console.log('[audio-clip] Successfully clipped via worker fallback');
+          resolve(workerResult);
+        } else {
+          reject(new Error(`ffmpeg spawn failed: ${err.message}`));
+        }
       });
       proc.on('close', (code) => {
         if (code === 0) {
