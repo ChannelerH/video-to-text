@@ -1,23 +1,21 @@
 /**
- * Cloudflare Worker for audio clipping using ffmpeg
+ * Cloudflare Worker for audio passthrough
  *
- * Deploy this to Cloudflare Workers:
- * 1. npm install -g wrangler
- * 2. wrangler login
- * 3. wrangler deploy
+ * Since ffmpeg.wasm doesn't work in Cloudflare Workers due to missing browser APIs,
+ * this worker simply returns the full audio file for now.
  *
- * Environment variables needed:
- * - R2_BUCKET: Your R2 bucket binding
- * - ALLOWED_ORIGINS: Comma-separated list of allowed origins
+ * For real audio clipping in production, consider:
+ * 1. Use a different platform (AWS Lambda with ffmpeg layer)
+ * 2. Use a dedicated service like Cloudflare Stream
+ * 3. Skip clipping and let the full audio be transcribed (with cost implications)
  */
 
 export default {
   async fetch(request, env) {
-    // CORS handling
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     };
 
     if (request.method === 'OPTIONS') {
@@ -38,33 +36,31 @@ export default {
         });
       }
 
-      // Download the audio file
+      console.log(`[Worker] Passthrough for ${audioUrl} (requested: ${seconds}s from ${startOffset}s)`);
+      console.log('[Worker] WARNING: Audio clipping not implemented - returning full audio');
+
+      // Download and return the full audio file
       const audioResponse = await fetch(audioUrl);
       if (!audioResponse.ok) {
         throw new Error(`Failed to download audio: ${audioResponse.statusText}`);
       }
 
-      const audioBuffer = await audioResponse.arrayBuffer();
+      const audioData = await audioResponse.arrayBuffer();
+      const contentType = audioResponse.headers.get('content-type') || 'audio/wav';
 
-      // Use ffmpeg.wasm to clip the audio
-      // Note: This is a simplified example. You'll need to integrate ffmpeg.wasm properly
-      // For production, consider using a service like Cloudflare Stream or AWS MediaConvert
+      console.log(`[Worker] Returning full audio: ${audioData.byteLength} bytes`);
 
-      // For now, return a success response indicating the worker is set up
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Worker is ready. Integrate ffmpeg.wasm for actual processing.',
-          inputUrl: audioUrl,
-          requestedDuration: seconds,
-          startOffset: startOffset,
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      // Return the full audio file
+      return new Response(audioData, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': contentType,
+          'Content-Length': audioData.byteLength.toString(),
+        },
+      });
     } catch (error) {
+      console.error('[Worker] Error:', error);
       return new Response(
         JSON.stringify({ error: error.message }),
         {
