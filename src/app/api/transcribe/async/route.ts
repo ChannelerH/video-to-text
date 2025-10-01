@@ -65,11 +65,11 @@ export async function POST(request: NextRequest) {
 
     // For anonymous preview, verify session token or Turnstile token
     if (!maybeUserUuid && isPreview) {
-      // 优先使用session token
+      let sessionValid = false;
+
       if (sessionToken) {
         console.log('[Async] Verifying session token for anonymous preview');
         try {
-          // 构建正确的验证URL
           const forwardedFor = request.headers.get('x-forwarded-for');
           const realIp = request.headers.get('x-real-ip');
           const cfConnectingIp = request.headers.get('cf-connecting-ip');
@@ -83,14 +83,12 @@ export async function POST(request: NextRequest) {
 
           const { valid, error } = verifySessionToken(sessionToken, clientIp);
 
-          if (!valid) {
-            console.log('[Async] Session token invalid, requiring new verification');
-            return NextResponse.json(
-              { error: error || 'Session expired. Please verify again.' },
-              { status: 403 }
-            );
+          if (valid) {
+            sessionValid = true;
+            console.log('[Async] Session token valid');
+          } else {
+            console.log('[Async] Session token invalid:', error);
           }
-          console.log('[Async] Session token valid');
         } catch (error) {
           console.error('[Async] Session verification error:', error);
           return NextResponse.json(
@@ -99,47 +97,61 @@ export async function POST(request: NextRequest) {
           );
         }
       }
-      // 后向兼容：如果只有turnstile token，直接验证
-      else if (turnstileToken) {
-        console.log('[Async] Verifying Turnstile token for anonymous preview (legacy)');
-        try {
-          const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-          const formData = new URLSearchParams();
-          formData.append('secret', process.env.TURNSTILE_SECRET_KEY || '');
-          formData.append('response', turnstileToken);
-          
-          const verifyResponse = await fetch(verifyUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: formData,
-          });
-          
-          const verifyData = await verifyResponse.json();
-          console.log('[Async] Turnstile verification result:', verifyData.success);
-          
-          if (!verifyData.success) {
+
+      if (!sessionValid) {
+        if (turnstileToken) {
+          console.log('[Async] Falling back to Turnstile token verification');
+          try {
+            const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+            const formData = new URLSearchParams();
+            const turnstileSecret =
+              process.env.TURNSTILE_SECRET ||
+              process.env.TURNSTILE_SECRE ||
+              process.env.TURNSTILE_SECRET_KEY ||
+              '';
+
+            if (!turnstileSecret) {
+              console.error('[Async] Turnstile secret not configured for fallback verification');
+              return NextResponse.json(
+                { error: 'Verification temporarily unavailable. Please try again later.' },
+                { status: 500 }
+              );
+            }
+
+            formData.append('secret', turnstileSecret);
+            formData.append('response', turnstileToken);
+
+            const verifyResponse = await fetch(verifyUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: formData,
+            });
+
+            const verifyData = await verifyResponse.json();
+            console.log('[Async] Turnstile verification result:', verifyData.success);
+
+            if (!verifyData.success) {
+              return NextResponse.json(
+                { error: 'Verification failed. Please verify again.' },
+                { status: 403 }
+              );
+            }
+          } catch (error) {
+            console.error('[Async] Turnstile verification error:', error);
             return NextResponse.json(
-              { error: 'Verification failed. Please try again.' },
-              { status: 403 }
+              { error: 'Verification error. Please try again.' },
+              { status: 500 }
             );
           }
-        } catch (error) {
-          console.error('[Async] Turnstile verification error:', error);
+        } else {
+          console.log('[Async] No verification token provided for anonymous preview');
           return NextResponse.json(
-            { error: 'Verification error. Please try again.' },
-            { status: 500 }
+            { error: 'Verification required. Please complete the security check.' },
+            { status: 403 }
           );
         }
-      }
-      // 没有任何验证token
-      else {
-        console.log('[Async] No verification token provided for anonymous preview');
-        return NextResponse.json(
-          { error: 'Verification required. Please complete the security check.' },
-          { status: 403 }
-        );
       }
     }
 
