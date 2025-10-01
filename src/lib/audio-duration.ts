@@ -5,7 +5,7 @@
  * Works without ffmpeg, making it compatible with Vercel serverless functions.
  */
 
-import { parseBuffer, parseStream } from 'music-metadata';
+import { parseBuffer } from 'music-metadata';
 import { Readable } from 'stream';
 
 /**
@@ -45,29 +45,10 @@ export async function getDurationFromUrl(url: string): Promise<number | null> {
       throw new Error(`Failed to fetch audio: ${response.statusText}`);
     }
 
-    // Convert web ReadableStream to Node.js Readable
-    const webStream = response.body;
-    if (!webStream) {
-      throw new Error('No response body');
-    }
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-    const reader = webStream.getReader();
-    const nodeStream = new Readable({
-      async read() {
-        try {
-          const { done, value } = await reader.read();
-          if (done) {
-            this.push(null);
-          } else {
-            this.push(Buffer.from(value));
-          }
-        } catch (err) {
-          this.destroy(err as Error);
-        }
-      }
-    });
-
-    const metadata = await parseStream(nodeStream, {
+    const metadata = await parseBuffer(buffer, {
       mimeType: response.headers.get('content-type') || undefined,
       size: parseInt(response.headers.get('content-length') || '0') || undefined
     });
@@ -98,7 +79,8 @@ export async function getDurationFromStream(
   mimeType?: string
 ): Promise<number | null> {
   try {
-    const metadata = await parseStream(stream, { mimeType });
+    const buffer = await streamToBuffer(stream);
+    const metadata = await parseBuffer(buffer, { mimeType });
     const duration = metadata.format.duration;
 
     if (duration === undefined || duration === null) {
@@ -112,6 +94,18 @@ export async function getDurationFromStream(
     console.error('[Audio Duration] Failed to parse stream:', error?.message || error);
     return null;
   }
+}
+
+async function streamToBuffer(stream: Readable): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    if (typeof chunk === 'string') {
+      chunks.push(Buffer.from(chunk));
+    } else {
+      chunks.push(Buffer.from(chunk));
+    }
+  }
+  return Buffer.concat(chunks);
 }
 
 /**
