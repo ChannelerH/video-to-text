@@ -1219,6 +1219,20 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           const errorType = getErrorType(error as Error);
           const errorCode = (error as any)?.errorCode || rawMessage;
 
+          if (['session_invalid', 'verification_required', 'turnstile_invalid'].includes(errorCode)) {
+            console.warn('[Async Transcribe Anon] Verification required, prompting Turnstile:', errorCode);
+            sessionTokenRef.current = null;
+            sessionExpiryRef.current = 0;
+            setSessionToken(null);
+            setSessionExpiry(0);
+            pendingTranscriptionRef.current = { preferredLanguage };
+            setShowTurnstile(true);
+            setIsProcessing(false);
+            setProgress('');
+            setProgressInfo({ stage: null, percentage: 0, message: '' });
+            return;
+          }
+
           const defaultTitle = t("errors.transcription_failed_title") || "Transcription Failed";
           const retrySuggestion = t("errors.retry_suggestion") || "Click Retry to try again.";
 

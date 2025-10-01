@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
             if (!turnstileSecret) {
               console.error('[Async] Turnstile secret not configured for fallback verification');
               return NextResponse.json(
-                { error: 'Verification temporarily unavailable. Please try again later.' },
+                { error: 'Verification temporarily unavailable. Please try again later.', code: 'verification_unavailable' },
                 { status: 500 }
               );
             }
@@ -134,21 +134,21 @@ export async function POST(request: NextRequest) {
 
             if (!verifyData.success) {
               return NextResponse.json(
-                { error: 'Verification failed. Please verify again.' },
+                { error: 'Verification failed. Please verify again.', code: 'turnstile_invalid', requires_verification: true },
                 { status: 403 }
               );
             }
           } catch (error) {
             console.error('[Async] Turnstile verification error:', error);
             return NextResponse.json(
-              { error: 'Verification error. Please try again.' },
+              { error: 'Verification error. Please try again.', code: 'verification_error' },
               { status: 500 }
             );
           }
         } else {
           console.log('[Async] No verification token provided for anonymous preview');
           return NextResponse.json(
-            { error: 'Verification required. Please complete the security check.' },
+            { error: 'Verification required. Please complete the security check.', code: 'verification_required', requires_verification: true },
             { status: 403 }
           );
         }

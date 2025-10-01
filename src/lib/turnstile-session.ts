@@ -59,8 +59,15 @@ export function verifySessionToken(token: string, ip: string) {
       return { valid: false, error: 'Session expired' };
     }
 
-    if (normalizedTokenIp !== normalizedRequestIp && normalizedTokenIp !== 'unknown' && normalizedRequestIp !== 'unknown') {
-      return { valid: false, error: 'IP mismatch' };
+    if (
+      normalizedTokenIp !== normalizedRequestIp &&
+      normalizedTokenIp !== 'unknown' &&
+      normalizedRequestIp !== 'unknown'
+    ) {
+      console.warn('[TurnstileSession] IP mismatch detected, but accepting session token', {
+        tokenIp: normalizedTokenIp,
+        requestIp: normalizedRequestIp
+      });
     }
 
     return { valid: true, expiry };
