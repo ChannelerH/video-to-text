@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSessionToken, verifySessionToken as verifyToken } from '@/lib/turnstile-session';
+import { createSessionToken, verifySessionToken as verifyToken, normalizeIp } from '@/lib/turnstile-session';
 
 const usedTokens = new Map<string, number>();
 const ipAttempts = new Map<string, { count: number; resetTime: number }>();
@@ -26,7 +26,9 @@ export async function POST(req: NextRequest) {
     // 获取真实IP
     const forwardedFor = req.headers.get('x-forwarded-for');
     const realIp = req.headers.get('x-real-ip');
-    const clientIp = (forwardedFor?.split(',')[0] || realIp || 'unknown').trim();
+    const cfConnectingIp = req.headers.get('cf-connecting-ip');
+    const clientIpRaw = (forwardedFor?.split(',')[0] || realIp || cfConnectingIp || 'unknown').trim();
+    const clientIp = normalizeIp(clientIpRaw);
     
   if (action === 'verify_session') {
     const result = verifyToken(token, clientIp);
