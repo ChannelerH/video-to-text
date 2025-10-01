@@ -226,6 +226,36 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          // Check YouTube video duration limit
+          if (videoDurationSeconds && videoDurationSeconds > 0) {
+            const { getUploadLimitForTier, formatSeconds } = await import('@/lib/duration-limits');
+            // For YouTube, we don't have userUuid here, use tier string directly
+            const uploadLimit = getUploadLimitForTier(user_tier as any, undefined);
+
+            if (uploadLimit > 0 && videoDurationSeconds > uploadLimit) {
+              console.warn(`[YouTube Prepare] Video duration ${videoDurationSeconds}s exceeds ${uploadLimit}s limit for ${user_tier}`);
+
+              // Mark job as failed
+              if (job_id) {
+                await db().update(transcriptions)
+                  .set({
+                    status: 'failed',
+                    completed_at: new Date()
+                  })
+                  .where(eq(transcriptions.job_id, job_id));
+              }
+
+              return NextResponse.json({
+                ok: false,
+                error: `Video duration ${formatSeconds(Math.floor(videoDurationSeconds))} exceeds limit of ${formatSeconds(uploadLimit)}`,
+                code: 'duration_limit_exceeded',
+                actualDuration: Math.floor(videoDurationSeconds),
+                maxDuration: uploadLimit,
+                suggestion: user_tier === 'free' ? 'Upgrade to Basic for longer videos' : 'Please try a shorter video'
+              }, { status: 400 });
+            }
+          }
+
           const resolveAudioUrl = async () => {
             if (audioUrl) return audioUrl;
             audioUrl = await YouTubeService.getAudioStreamUrl(vid!, preferred_language);

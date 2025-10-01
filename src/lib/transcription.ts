@@ -9,6 +9,8 @@ import { punctuateTextLLM } from './punctuate-llm';
 import { fixLatinNoise, fixLatinNoiseInSegments } from './lexicon-fix';
 import crypto from 'crypto';
 import { POLICY } from '@/services/policy';
+import { ffmpegEnabled } from '@/lib/ffmpeg-config';
+import { getDurationFromUrl } from '@/lib/audio-duration';
 
 // Unified preview window for all preview paths
 const PREVIEW_WINDOW_SEC = 90;
@@ -920,10 +922,11 @@ export class TranscriptionService {
       // 2.5 尝试探测原始总时长（展示用）
       let originalDurationSec: number | null = null;
       try {
-        const { probeDurationSeconds } = await import('./media-probe');
-        originalDurationSec = await probeDurationSeconds(url);
-        if (originalDurationSec) console.log('[Probe] audio_url original duration:', originalDurationSec, 's');
-      } catch {}
+        originalDurationSec = await getDurationFromUrl(url);
+        if (originalDurationSec) console.log('[Duration] audio_url original duration:', originalDurationSec.toFixed(2), 's');
+      } catch (durationErr) {
+        console.warn('[Duration] Failed to read audio URL duration:', durationErr);
+      }
 
       // 3. 下载音频文件
       const audioBuffer = await this.time('audio.download', this.downloadAudioFromUrl(url, audioInfo));
@@ -947,7 +950,7 @@ export class TranscriptionService {
 
       // Free用户：先切割音频到5分钟
       let audioUrlForTranscription = uploadResult.publicUrl || uploadResult.url;
-      if (request.options?.trimToSeconds) {
+      if (request.options?.trimToSeconds && ffmpegEnabled) {
         console.log(`[FREE_CLIP] Starting audio URL clip for Free user:`, {
           originalUrl: uploadResult.url,
           targetSeconds: request.options.trimToSeconds
@@ -984,6 +987,8 @@ export class TranscriptionService {
           clippedUrl: clipUpload.publicUrl || clipUpload.url,
           clippedDuration: request.options.trimToSeconds
         });
+      } else if (request.options?.trimToSeconds && !ffmpegEnabled) {
+        console.log('[FREE_CLIP] FFmpeg disabled; skipping clip and using full audio for transcription');
       } else {
         console.log(`[FREE_CLIP] No clipping needed for audio URL - using full audio`);
       }
@@ -1456,14 +1461,15 @@ export class TranscriptionService {
       // 先尝试探测原始总时长（展示用）
       let originalDurationSec: number | null = null;
       try {
-        const { probeDurationSeconds } = await import('./media-probe');
-        originalDurationSec = await probeDurationSeconds(filePath);
-        if (originalDurationSec) console.log('[Probe] file_upload original duration:', originalDurationSec, 's');
-      } catch {}
+        originalDurationSec = await getDurationFromUrl(filePath);
+        if (originalDurationSec) console.log('[Duration] file_upload original duration:', originalDurationSec.toFixed(2), 's');
+      } catch (durationErr) {
+        console.warn('[Duration] Failed to read uploaded file duration:', durationErr);
+      }
 
       // Free用户：先切割音频到5分钟
       let audioForTranscription = filePath;
-      if (request.options?.trimToSeconds) {
+      if (request.options?.trimToSeconds && ffmpegEnabled) {
         console.log(`[FREE_CLIP] Starting file upload clip for Free user:`, {
           originalFile: filePath,
           targetSeconds: request.options.trimToSeconds
@@ -1501,6 +1507,8 @@ export class TranscriptionService {
           clippedUrl: clipUpload.url,
           clippedDuration: request.options.trimToSeconds
         });
+      } else if (request.options?.trimToSeconds && !ffmpegEnabled) {
+        console.log('[FREE_CLIP] FFmpeg disabled; using full uploaded audio');
       } else {
         console.log(`[FREE_CLIP] No clipping needed for file upload - using full audio`);
       }
@@ -1789,155 +1797,41 @@ export class TranscriptionService {
       console.log('[Preview][YouTube] Anonymous preview allowed by PREVIEW_ALLOW_ANON=true');
     }
     
-    try {
-      console.log('[Preview][YouTube] Starting audio transcription fallback...');
-      
-      // 使用完整的下载逻辑（包含降级机制）
-      const downloadOptions = this.createOptimizedDownloadOptions(request, videoInfo.duration);
-      
-      // 先尝试优化下载，失败后自动降级
-      let audioBuffer: Buffer;
-      try {
-        audioBuffer = await YouTubeService.downloadAudioStreamOptimized(
-          videoInfo.videoId,
-          downloadOptions
-        );
-      } catch (optimizedError) {
-        console.warn('Optimized download failed, trying HTTP stream fallback...');
-        audioBuffer = await YouTubeService.downloadAudioWithYtdlStream(
-          videoInfo.videoId,
-          { ...downloadOptions, timeout: 60000 }
-        );
+    console.log('[Preview][YouTube] Preview generation disabled. Returning placeholder preview.');
+    return {
+      success: true,
+      preview: {
+        text: 'Preview unavailable. Run full transcription to view results.',
+        srt: '',
+        duration: 0
       }
-
-      // 上传原音频到 R2（临时），随后用 ffmpeg 从该 URL 生成 90s WAV 片段
-      const audioFileName = `youtube_preview_${videoInfo.videoId}_${Date.now()}.m4a`;
-      const uploadResult = await this.r2Service.uploadFile(
-        audioBuffer,
-        audioFileName,
-        'audio/mp4',
-        { folder: 'youtube-preview-src', expiresIn: 1, makePublic: true }
-      );
-
-      // 生成 90 秒 WAV 片段
-      const { createWavClipFromUrl } = await import('./audio-clip');
-      
-      const wavClip = await createWavClipFromUrl(uploadResult.url, 90);
-      const clipUpload = await this.r2Service.uploadFile(
-        wavClip,
-        `youtube_preview_clip_${videoInfo.videoId}_${Date.now()}.wav`,
-        'audio/wav',
-        { folder: 'youtube-preview', expiresIn: 1, makePublic: true }
-      );
-
-      // 转录音频（预览模式使用快速模型），仅对片段进行
-      console.log(`Starting preview transcription with URL: ${clipUpload.url}`);
-      console.log(`Preview options: isPreview=true, userTier=${request.options?.userTier || 'pro'}`);
-      
-      const transcription = await this.transcriptionService.transcribeAudio(clipUpload.url, {
-        language: request.options?.language || 'auto',
-        userTier: request.options?.userTier || 'pro', // 预览模式优先使用快速模型
-        isPreview: true,
-        fallbackEnabled: request.options?.fallbackEnabled !== false, // 预览默认启用降级
-        outputFormat: request.options?.outputFormat || 'json',
-        highAccuracyMode: request.options?.highAccuracyMode,
-        enableDiarizationAfterWhisper: !!request.options?.enableDiarizationAfterWhisper
-      });
-
-      // 异步清理临时文件
-      setTimeout(async () => {
-        try {
-          await this.r2Service.deleteFile(uploadResult.key);
-          await this.r2Service.deleteFile(clipUpload.key);
-        } catch (error) {
-          console.error('Failed to cleanup preview audio:', error);
-        }
-      }, 30000);
-
-      // 提取90秒预览
-      const preview = await this.extractPreview(transcription, {
-        txt: transcription.text,
-        srt: this.transcriptionService.convertToSRT(transcription)
-      });
-
-      console.log('[Preview][YouTube] Audio preview generated successfully');
-      return { success: true, preview };
-    } catch (error) {
-      console.error('YouTube preview generation failed with all methods:', error);
-      
-      // 如果是网络或API错误，返回错误状态
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      // 检查是否是特定的已知错误
-      if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-        return {
-          success: false,
-          error: 'Unable to access video. It may be private, age-restricted, or region-locked.'
-        };
-      }
-      
-      if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
-        return {
-          success: false,
-          error: 'Request timed out. Please try again.'
-        };
-      }
-      
-      // 对于其他错误，返回通用的预览不可用消息，但仍标记为成功避免前端显示错误
-      return {
-        success: true,
-        preview: {
-          text: "Preview temporarily unavailable. Please sign in for full transcription.",
-          srt: "",
-          duration: 0
-        }
-      };
-    }
+    };
   }
 
   /**
    * 生成文件预览
    */
   private async generateFilePreview(request: TranscriptionRequest): Promise<TranscriptionResponse> {
-    try {
-      // 改为：先对原始 URL 生成 90s WAV 片段，再仅对片段转录
-      console.log('Generating file preview by clipping a WAV probe (preview window)...');
-      const { createWavClipFromUrl } = await import('./audio-clip');
-      console.log('[Preview] Clipping WAV from file/audio URL for preview window (ffmpeg)');
-      const wavClip = await createWavClipFromUrl(request.content, 90);
-
-      const clipUpload = await this.r2Service.uploadFile(
-        wavClip,
-        `file_preview_clip_${Date.now()}.wav`,
-        'audio/wav',
-        { folder: 'file-preview', expiresIn: 1, makePublic: true }
-      );
-
-      const transcription = await this.transcriptionService.transcribeAudio(clipUpload.url, {
-        language: request.options?.language || 'auto',
-        userTier: request.options?.userTier || 'pro',
-        isPreview: true,
-        fallbackEnabled: request.options?.fallbackEnabled !== false,
-        outputFormat: request.options?.outputFormat || 'json',
-        highAccuracyMode: request.options?.highAccuracyMode,
-        enableDiarizationAfterWhisper: !!request.options?.enableDiarizationAfterWhisper
-      });
-
-      setTimeout(() => this.r2Service.deleteFile(clipUpload.key).catch(() => {}), 30000);
-
-      const preview = await this.extractPreview(transcription, {
-        txt: transcription.text,
-        srt: this.transcriptionService.convertToSRT(transcription)
-      });
-
-      return { success: true, preview };
-    } catch (error) {
-      console.error('File preview generation failed:', error);
+    if (!ffmpegEnabled) {
+      console.log('[Preview][File] FFmpeg disabled; returning placeholder preview');
       return {
-        success: false,
-        error: `Preview generation failed: ${error instanceof Error ? error.message : String(error)}`
+        success: true,
+        preview: {
+          text: 'Preview unavailable in this environment. Run transcription to view results.',
+          srt: '',
+          duration: 0
+        }
       };
     }
+    console.log('[Preview][File] Preview generation disabled. Returning placeholder preview.');
+    return {
+      success: true,
+      preview: {
+        text: 'Preview unavailable. Run full transcription to view results.',
+        srt: '',
+        duration: 0
+      }
+    };
   }
 
   /**
@@ -1957,6 +1851,16 @@ export class TranscriptionService {
    * 对直链音频/已上传文件进行语言探针
    */
   async probeLanguageFromUrl(audioUrl: string, options?: { userTier?: string; languageProbeSeconds?: number; startOffset?: number }): Promise<{ language: string; isChinese: boolean }> {
+    if (!ffmpegEnabled) {
+      try {
+        console.log('[Probe] FFmpeg disabled; probing language directly from source audio');
+        return await this.transcriptionService.probeLanguage(audioUrl, { userTier: options?.userTier } as any);
+      } catch (error) {
+        console.warn('[Probe] Direct language probe failed:', error);
+        return { language: 'unknown', isChinese: false };
+      }
+    }
+
     // One quick attempt (8–10s), then a single retry (12s) if result unknown/failed.
     const attempt = async (sec: number, offset: number = 0) => {
       console.log(`[Probe] Start creating ${sec}s WAV clip for language detection (offset: ${offset}s)`);

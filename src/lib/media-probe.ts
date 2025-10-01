@@ -1,11 +1,16 @@
 import { spawn } from 'child_process';
 import { getFfmpegPath } from '@/lib/ffmpeg-path';
+import { ffmpegEnabled } from '@/lib/ffmpeg-config';
 
 /**
  * Best-effort probe to get media duration in seconds using ffmpeg.
  * Works for most HTTP(S) URLs and R2 public URLs.
  */
 export async function probeDurationSeconds(url: string, timeoutMs: number = 15000): Promise<number | null> {
+  if (!ffmpegEnabled) {
+    console.warn('[media-probe] FFmpeg disabled; probeDurationSeconds returning null');
+    return null;
+  }
   const ffmpegPath = getFfmpegPath();
   return new Promise<number | null>((resolve) => {
     try {

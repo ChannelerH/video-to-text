@@ -1,5 +1,6 @@
 import { existsSync, chmodSync } from 'fs';
 import { join, dirname } from 'path';
+import { ffmpegEnabled } from '@/lib/ffmpeg-config';
 
 let cachedPath: string | null = null;
 
@@ -9,6 +10,12 @@ let cachedPath: string | null = null;
  */
 export function getFfmpegPath(): string {
   if (cachedPath) return cachedPath;
+
+  if (!ffmpegEnabled) {
+    cachedPath = 'ffmpeg';
+    console.log('[ffmpeg-path] FFmpeg disabled; using placeholder command');
+    return cachedPath;
+  }
 
   const envPath = process.env.FFMPEG_PATH?.trim();
   if (envPath) {

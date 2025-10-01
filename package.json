@@ -93,6 +93,7 @@
     "jspdf": "^3.0.2",
     "lucide-react": "^0.439.0",
     "markdown-it": "^14.1.0",
+    "music-metadata": "^10.5.0",
     "moment": "^2.30.1",
     "motion": "^12.23.12",
     "next": "15.2.3",

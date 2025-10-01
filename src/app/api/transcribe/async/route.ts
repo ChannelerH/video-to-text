@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
     const maybeUserUuid = await getUserUuid();
 
     const ipHeader = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '';
-    const anonIp = ipHeader.split(',')[0].trim() || '0.0.0.0';
+    const { normalizeIp } = await import('@/lib/turnstile-session');
+    const anonIp = normalizeIp(ipHeader.split(',')[0] || '0.0.0.0');
     const anonUsageKey = !maybeUserUuid ? `anon:${anonIp}` : null;
 
     // 2. 解析请求
@@ -72,11 +73,13 @@ export async function POST(request: NextRequest) {
           const forwardedFor = request.headers.get('x-forwarded-for');
           const realIp = request.headers.get('x-real-ip');
           const cfConnectingIp = request.headers.get('cf-connecting-ip');
-          const clientIp =
-            forwardedFor?.split(',')[0]?.trim() ||
+          const { normalizeIp } = await import('@/lib/turnstile-session');
+          const clientIp = normalizeIp(
+            forwardedFor?.split(',')[0] ||
             realIp ||
             cfConnectingIp ||
-            'unknown';
+            'unknown'
+          );
 
           const { valid, error } = verifySessionToken(sessionToken, clientIp);
 
@@ -377,18 +380,38 @@ export async function POST(request: NextRequest) {
 
     if (!originalDurationCandidate && (type === 'audio_url' || type === 'file_upload')) {
       try {
-        const { probeDurationSeconds } = await import('@/lib/media-probe');
-        const probed = await probeDurationSeconds(content);
-        if (probed !== null && Number.isFinite(probed) && probed > 0) {
-          originalDurationCandidate = probed;
+        // Use music-metadata instead of ffmpeg-based probeDurationSeconds (Vercel compatible)
+        const { getDurationFromUrl } = await import('@/lib/audio-duration');
+        const duration = await getDurationFromUrl(content);
+        if (duration !== null && Number.isFinite(duration) && duration > 0) {
+          originalDurationCandidate = duration;
+          console.log(`[Async] Extracted duration from ${type}: ${duration.toFixed(2)}s`);
         }
-      } catch (probeErr) {
-        console.warn('[Async] Failed to probe original duration:', probeErr);
+      } catch (err) {
+        console.warn('[Async] Failed to extract duration:', err);
       }
     }
 
     if (typeof originalDurationCandidate === 'number' && Number.isFinite(originalDurationCandidate) && originalDurationCandidate > 0) {
       initialOriginalDurationSec = Math.ceil(originalDurationCandidate);
+    }
+
+    // Check upload duration limit (prevent excessively long audio from being transcribed)
+    if (originalDurationCandidate) {
+      const { getUploadLimitForTier, formatSeconds } = await import('@/lib/duration-limits');
+      const uploadLimit = getUploadLimitForTier(userTier, maybeUserUuid);
+
+      if (uploadLimit > 0 && originalDurationCandidate > uploadLimit) {
+        console.warn(`[Async] Duration ${originalDurationCandidate}s exceeds ${uploadLimit}s limit for ${userTier || 'anonymous'}`);
+        return NextResponse.json({
+          success: false,
+          error: `Audio duration ${formatSeconds(Math.floor(originalDurationCandidate))} exceeds limit of ${formatSeconds(uploadLimit)}`,
+          code: 'duration_limit_exceeded',
+          actualDuration: Math.floor(originalDurationCandidate),
+          maxDuration: uploadLimit,
+          upgradeTier: !maybeUserUuid ? 'Please sign up for more' : (userTier === UserTier.FREE ? 'basic' : 'pro')
+        }, { status: 400 });
+      }
     }
 
     // 6. 创建占位transcription记录
@@ -467,13 +490,25 @@ export async function POST(request: NextRequest) {
             const clippedUrl = await clipAudioForFreeTier(content, jobId, 'file');
             if (clippedUrl) {
               audioUrlForSupplier = clippedUrl;
-              await db().update(transcriptions)
-                .set({ processed_url: audioUrlForSupplier })
-                .where(eq(transcriptions.job_id, jobId));
             }
           } catch (clipErr) {
             console.warn('[Async] Failed to clip audio for free tier:', clipErr);
           }
+        }
+
+        const maybeCdnUrl = getSupplierAcceleratedUrl(audioUrlForSupplier, options?.r2Key);
+        if (maybeCdnUrl) {
+          audioUrlForSupplier = maybeCdnUrl;
+        }
+
+        try {
+          if (audioUrlForSupplier) {
+            await db().update(transcriptions)
+              .set({ processed_url: audioUrlForSupplier })
+              .where(eq(transcriptions.job_id, jobId));
+          }
+        } catch (err) {
+          console.warn('[Async] Failed to persist processed_url', err);
         }
 
         const callbackBase = process.env.CALLBACK_BASE_URL || origin;
@@ -665,4 +700,55 @@ function getDurationFromOptions(options: Record<string, any> | undefined): numbe
     }
   }
   return null;
+}
+
+function getSupplierAcceleratedUrl(originalUrl: string | null | undefined, r2Key?: string | null): string | null {
+  if (!originalUrl) return null;
+
+  const cdnBaseRaw = process.env.STORAGE_DOMAIN || process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN;
+  if (!cdnBaseRaw) return null;
+
+  let cdnBase: URL;
+  try {
+    cdnBase = new URL(cdnBaseRaw);
+  } catch (err) {
+    console.warn('[Async] Invalid STORAGE_DOMAIN provided, skip CDN rewrite:', err);
+    return null;
+  }
+
+  const trimmedBase = cdnBase.origin + (cdnBase.pathname.replace(/\/$/, ''));
+  if (!trimmedBase) return null;
+
+  const normalizedKey = typeof r2Key === 'string' && r2Key.trim().length > 0
+    ? r2Key.replace(/^\/+/, '')
+    : null;
+
+  if (normalizedKey) {
+    return `${trimmedBase}/${normalizedKey}`;
+  }
+
+  let parsedSource: URL;
+  try {
+    parsedSource = new URL(originalUrl);
+  } catch {
+    return null;
+  }
+
+  if (parsedSource.hostname === cdnBase.hostname) {
+    return originalUrl;
+  }
+
+  const isR2Host = parsedSource.hostname.endsWith('.r2.cloudflarestorage.com')
+    || parsedSource.hostname.endsWith('.cloudflarestorage.com');
+
+  if (!isR2Host) {
+    return null;
+  }
+
+  const path = parsedSource.pathname.replace(/^\/+/, '');
+  if (!path) {
+    return null;
+  }
+
+  return `${trimmedBase}/${path}`;
 }

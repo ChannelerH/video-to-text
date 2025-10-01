@@ -1,6 +1,7 @@
 import { POLICY } from '@/services/policy';
 import { UserTier } from '@/services/user-tier';
 import { YouTubeService } from '@/lib/youtube';
+import { getDurationFromUrl } from '@/lib/audio-duration';
 
 export type TranscriptionSourceKind = 'youtube_url' | 'file_upload' | 'audio_url';
 
@@ -70,14 +71,13 @@ export async function computeEstimatedMinutes(params: EstimateParams): Promise<n
       }
     } else if (type === 'audio_url' || type === 'file_upload') {
       try {
-        const { probeDurationSeconds } = await import('@/lib/media-probe');
-        const probed = await probeDurationSeconds(content);
-        if (probed !== null && Number.isFinite(probed) && probed > 0) {
-          options.estimatedDurationSec = probed;
-          estimatedSeconds = probed;
+        const duration = await getDurationFromUrl(content);
+        if (duration !== null && Number.isFinite(duration) && duration > 0) {
+          options.estimatedDurationSec = duration;
+          estimatedSeconds = duration;
         }
       } catch (error) {
-        console.warn('[EstimateUsage] Media probing failed', error);
+        console.warn('[EstimateUsage] Failed to read media duration', error);
       }
     }
   }

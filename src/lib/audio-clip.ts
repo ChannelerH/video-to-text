@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { getFfmpegPath } from '@/lib/ffmpeg-path';
+import { ffmpegEnabled } from '@/lib/ffmpeg-config';
 
 /**
  * Fallback to Cloudflare Worker for audio clipping if local ffmpeg fails
@@ -36,6 +37,9 @@ async function clipAudioViaWorker(audioUrl: string, seconds: number, startOffset
  * On Vercel, uses Cloudflare Worker. In local dev, uses local ffmpeg.
  */
 export async function createWavClipFromUrl(audioUrl: string, seconds: number = 10, startOffset: number = 0): Promise<Buffer> {
+  if (!ffmpegEnabled) {
+    throw new Error('FFmpeg is disabled');
+  }
   // Allow up to 300s to support 5-minute clips for Free users
   const clipSeconds = Math.max(1, Math.min(300, Math.floor(seconds || 10)));
   const offsetSeconds = Math.max(0, Math.floor(startOffset || 0));
