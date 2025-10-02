@@ -6,6 +6,7 @@ import { db } from '@/db';
 import { transcriptions } from '@/db/schema';
 import { and, eq, ne, desc, isNotNull } from 'drizzle-orm';
 import { CloudflareR2Service } from '@/lib/r2-upload';
+import { POLICY } from '@/services/policy';
 
 export const runtime = 'nodejs';
 export const maxDuration = 10; // keep it short
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     ({ job_id } = body);
-    const { video, user_tier, preferred_language, enable_diarization_after_whisper, high_accuracy, video_prefetch } = body;
+    const { video, user_tier, preferred_language, enable_diarization_after_whisper, high_accuracy, video_prefetch, clip_seconds, is_preview } = body;
     const forceHighAccuracy = high_accuracy === true;
     console.log('[YouTube Prepare] incoming request', {
       job_id,
@@ -30,7 +31,11 @@ export async function POST(request: NextRequest) {
     }
 
     const [currentTranscription] = await db()
-      .select({ status: transcriptions.status })
+      .select({
+        status: transcriptions.status,
+        user_uuid: transcriptions.user_uuid,
+        original_duration_sec: transcriptions.original_duration_sec,
+      })
       .from(transcriptions)
       .where(eq(transcriptions.job_id, job_id))
       .limit(1);
@@ -44,6 +49,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ cancelled: true, success: false });
     }
 
+    const jobUserUuid = (currentTranscription.user_uuid || '').trim() || null;
+    const recordedOriginalDuration = Number(currentTranscription.original_duration_sec);
+    const jobOriginalDuration = Number.isFinite(recordedOriginalDuration) && recordedOriginalDuration > 0
+      ? recordedOriginalDuration
+      : null;
+
+    const clipSecondsOverride = typeof clip_seconds === 'number' && Number.isFinite(clip_seconds)
+      ? clip_seconds
+      : null;
+    const isPreviewRequest = is_preview === true;
+    const effectiveClipSeconds = await determineClipSecondsForYoutube({
+      userTier: user_tier,
+      userUuid: jobUserUuid,
+      clipSecondsOverride,
+      isPreview: isPreviewRequest,
+    });
+
     // Check if this is already an R2/processed URL (from Re-run)
     const isProcessedUrl = video.includes('.r2.dev/') || video.includes('pub-') || video.includes('/api/media/proxy');
     
@@ -53,9 +75,9 @@ export async function POST(request: NextRequest) {
       let supplierAudioUrl = video;
       
       // For FREE users, need to clip the R2 URL
-      if (user_tier === 'free' || user_tier === 'FREE') {
+      if (effectiveClipSeconds && shouldClipMedia(jobOriginalDuration, effectiveClipSeconds)) {
         const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
-        const clippedUrl = await clipAudioForFreeTier(video, job_id, 'rerun');
+        const clippedUrl = await clipAudioForFreeTier(video, job_id, 'rerun', effectiveClipSeconds);
         
         if (clippedUrl) {
           supplierAudioUrl = clippedUrl;
@@ -232,7 +254,9 @@ export async function POST(request: NextRequest) {
             // For YouTube, we don't have userUuid here, use tier string directly
             const uploadLimit = getUploadLimitForTier(user_tier as any, undefined);
 
-            if (uploadLimit > 0 && videoDurationSeconds > uploadLimit) {
+            const skipDurationLimit = effectiveClipSeconds && shouldClipMedia(videoDurationSeconds, effectiveClipSeconds);
+
+            if (!skipDurationLimit && uploadLimit > 0 && videoDurationSeconds > uploadLimit) {
               console.warn(`[YouTube Prepare] Video duration ${videoDurationSeconds}s exceeds ${uploadLimit}s limit for ${user_tier}`);
 
               // Mark job as failed
@@ -266,32 +290,35 @@ export async function POST(request: NextRequest) {
 
           if (isFreeTier) {
             const finalUrl = await resolveAudioUrl();
-            const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
-            const clippedUrl = await clipAudioForFreeTier(finalUrl, job_id, 'youtube');
-            if (clippedUrl) {
-              supplierAudioUrl = clippedUrl;
-            } else {
-              // fallback: full download
-              try {
-                const response = await fetch(finalUrl, {
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                  },
-                });
-                if (!response.ok) {
-                  throw new Error(`Failed to fetch audio stream (${response.status})`);
+            supplierAudioUrl = finalUrl;
+            if (effectiveClipSeconds && shouldClipMedia(videoDurationSeconds ?? jobOriginalDuration, effectiveClipSeconds)) {
+              const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
+              const clippedUrl = await clipAudioForFreeTier(finalUrl, job_id, 'youtube', effectiveClipSeconds);
+              if (clippedUrl) {
+                supplierAudioUrl = clippedUrl;
+              } else {
+                // fallback: full download
+                try {
+                  const response = await fetch(finalUrl, {
+                    headers: {
+                      'User-Agent': 'Mozilla/5.0',
+                      'Accept-Language': 'en-US,en;q=0.9',
+                    },
+                  });
+                  if (!response.ok) {
+                    throw new Error(`Failed to fetch audio stream (${response.status})`);
+                  }
+                  const buffer = Buffer.from(await response.arrayBuffer());
+                  const contentType = response.headers.get('content-type') || 'audio/webm';
+                  const upload = await r2.uploadFile(buffer, `${vid}.webm`, contentType, {
+                    folder: 'youtube-audio',
+                    expiresIn: 24,
+                    makePublic: true,
+                  });
+                  supplierAudioUrl = upload.publicUrl || upload.url;
+                } catch (clipFallbackError) {
+                  console.error('[YouTube Prepare] Free-tier fallback upload failed:', clipFallbackError);
                 }
-                const buffer = Buffer.from(await response.arrayBuffer());
-                const contentType = response.headers.get('content-type') || 'audio/webm';
-                const upload = await r2.uploadFile(buffer, `${vid}.webm`, contentType, {
-                  folder: 'youtube-audio',
-                  expiresIn: 24,
-                  makePublic: true,
-                });
-                supplierAudioUrl = upload.publicUrl || upload.url;
-              } catch (clipFallbackError) {
-                console.error('[YouTube Prepare] Free-tier fallback upload failed:', clipFallbackError);
               }
             }
           } else {
@@ -751,6 +778,39 @@ function parseVideoPrefetch(raw: any): PrefetchedVideoPayload | null {
     payload.filesize = Math.round(filesize);
   }
   return payload;
+}
+
+async function determineClipSecondsForYoutube(params: {
+  userTier?: string;
+  userUuid: string | null;
+  clipSecondsOverride: number | null;
+  isPreview: boolean;
+}): Promise<number | null> {
+  const { userTier, userUuid, clipSecondsOverride, isPreview } = params;
+
+  if (clipSecondsOverride && clipSecondsOverride > 0) {
+    return Math.max(1, Math.ceil(clipSecondsOverride));
+  }
+
+  const normalizedTier = String(userTier || '').toLowerCase();
+  const isAnonymous = !userUuid;
+  const isFreeTier = normalizedTier === 'free';
+
+  if (!isPreview && !isAnonymous && !isFreeTier) {
+    return null;
+  }
+
+  const previewBase = POLICY.preview.freePreviewSeconds || 300;
+  return Math.max(1, Math.ceil(previewBase));
+}
+
+function shouldClipMedia(originalDurationSeconds: number | null, limitSeconds: number): boolean {
+  if (!limitSeconds || limitSeconds <= 0) return false;
+  if (!originalDurationSeconds || !Number.isFinite(originalDurationSeconds)) {
+    return true;
+  }
+  const tolerance = 1;
+  return originalDurationSeconds - limitSeconds > tolerance;
 }
 
 async function findReusableAudioForVideo(videoId: string, variantSuffix: string): Promise<ReusableAudioRecord | null> {

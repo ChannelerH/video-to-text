@@ -1,73 +1,118 @@
+import { createWavClipFromUrl } from '@/lib/audio-clip';
+import { POLICY } from '@/services/policy';
 import { CloudflareR2Service } from '@/lib/r2-upload';
+import { ffmpegEnabled } from '@/lib/ffmpeg-config';
+
+function resolveClipSeconds(seconds?: number | null): number {
+  const base = POLICY.preview.freePreviewSeconds || 300;
+  const numeric = Number(seconds);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return Math.max(1, Math.ceil(numeric));
+  }
+  return Math.max(1, Math.ceil(base));
+}
 
 /**
- * For FREE tier users: return the original audio URL without clipping
- *
- * NOTE: Audio clipping is disabled because:
- * 1. Vercel serverless doesn't support ffmpeg (50MB limit, binary not found)
- * 2. Cloudflare Workers can't run ffmpeg.wasm (missing browser APIs)
- * 3. Alternative solutions (AWS Lambda) add complexity
- *
- * Free users can now transcribe full audio files.
- * Consider adding duration limits at the transcription service level instead.
- *
- * @param sourceUrl - The original audio URL
- * @param jobId - Job ID for logging
- * @param filePrefix - Prefix for logging
- * @returns The original audio URL (no clipping)
+ * Clip audio for preview/free usage and upload to R2. Falls back to original URL when FFmpeg is disabled.
  */
 export async function clipAudioForFreeTier(
   sourceUrl: string,
   jobId: string,
-  filePrefix: string = 'audio'
+  filePrefix: string = 'audio',
+  seconds?: number | null
 ): Promise<string | null> {
   try {
-    console.log(`[Audio Clip Helper] FREE tier - returning full audio (clipping disabled): ${filePrefix}_${jobId}`);
-    console.log(`[Audio Clip Helper] Audio URL: ${sourceUrl}`);
+    const clipSeconds = resolveClipSeconds(seconds);
 
-    // Simply return the original URL - no clipping
-    return sourceUrl;
+    if (!ffmpegEnabled) {
+      console.log('[Audio Clip Helper] FFmpeg disabled; returning original audio for clipping request', {
+        jobId,
+        filePrefix,
+        clipSeconds,
+      });
+      return sourceUrl;
+    }
+
+    const clippedBuffer = await createWavClipFromUrl(sourceUrl, clipSeconds);
+
+    const r2 = new CloudflareR2Service();
+    const upload = await r2.uploadFile(
+      clippedBuffer,
+      `${filePrefix}_preview_${jobId}_${clipSeconds}s.wav`,
+      'audio/wav',
+      {
+        folder: 'clipped-audio',
+        expiresIn: 24,
+        makePublic: true,
+      }
+    );
+
+    const clippedUrl = upload.publicUrl || upload.url;
+    console.log('[Audio Clip Helper] Successfully clipped audio', {
+      jobId,
+      filePrefix,
+      clipSeconds,
+      clippedUrl,
+    });
+    return clippedUrl;
   } catch (error: any) {
-    console.error(`[Audio Clip Helper] Failed to process audio:`, error?.message || error);
+    console.error('[Audio Clip Helper] Failed to clip audio', {
+      jobId,
+      filePrefix,
+      message: error?.message || error,
+    });
     return null;
   }
 }
 
 /**
- * Upload full audio buffer to R2 (no clipping)
- * @param fullAudioBuffer - The full audio buffer to process
- * @param videoId - Video/Job ID for unique file naming
- * @param originalFormat - Original audio format (e.g., 'webm', 'mp3')
- * @returns The URL of the uploaded audio, or null if upload fails
+ * Clip audio when only the raw buffer is available (e.g., after downloading YouTube media).
+ * Uploads a temporary asset first, then reuses clipAudioForFreeTier for the actual trimming.
  */
 export async function clipAudioFromBuffer(
   fullAudioBuffer: Buffer,
   videoId: string,
-  originalFormat: string = 'webm'
+  originalFormat: string = 'webm',
+  seconds?: number | null
 ): Promise<string | null> {
   try {
     const r2 = new CloudflareR2Service();
 
-    console.log(`[Audio Clip Helper] Uploading full audio (no clipping): ${videoId}.${originalFormat}`);
+    if (!ffmpegEnabled) {
+      console.log('[Audio Clip Helper] FFmpeg disabled; uploading full audio without clipping', {
+        videoId,
+        originalFormat,
+      });
+      const upload = await r2.uploadFile(
+        fullAudioBuffer,
+        `free_${videoId}.${originalFormat}`,
+        `audio/${originalFormat}`,
+        {
+          folder: 'free-audio',
+          expiresIn: 24,
+          makePublic: true,
+        }
+      );
+      return upload.publicUrl || upload.url;
+    }
 
-    // Upload the full audio file
-    const upload = await r2.uploadFile(
+    const tempUpload = await r2.uploadFile(
       fullAudioBuffer,
-      `free_${videoId}.${originalFormat}`,
+      `temp_${videoId}.${originalFormat}`,
       `audio/${originalFormat}`,
       {
-        folder: 'free-audio',
-        expiresIn: 24,
-        makePublic: true
+        folder: 'temp-audio',
+        expiresIn: 1,
+        makePublic: true,
       }
     );
 
-    const audioUrl = upload.publicUrl || upload.url;
-    console.log(`[Audio Clip Helper] Successfully uploaded: ${audioUrl}`);
-
-    return audioUrl;
+    return clipAudioForFreeTier(tempUpload.publicUrl || tempUpload.url, videoId, 'youtube', seconds);
   } catch (error: any) {
-    console.error(`[Audio Clip Helper] Failed to upload audio:`, error?.message || error);
+    console.error('[Audio Clip Helper] Failed to process audio buffer', {
+      videoId,
+      message: error?.message || error,
+    });
     return null;
   }
 }

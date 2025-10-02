@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+export const runtime = 'nodejs';
 import { getUserUuid } from '@/services/user';
 import { getUserTier, UserTier } from '@/services/user-tier';
 import { quotaTracker } from '@/services/quota-tracker';
@@ -6,9 +7,10 @@ import { db } from '@/db';
 import { q_jobs, transcriptions, usage_records } from '@/db/schema';
 import { getUniSeq } from '@/lib/hash';
 import crypto from 'crypto';
-import { and, gte, eq, count, ne } from 'drizzle-orm';
+import { and, gte, eq, count, ne, sql } from 'drizzle-orm';
 import { computeEstimatedMinutes } from '@/lib/estimate-usage';
 import { verifySessionToken } from '@/lib/turnstile-session';
+import { POLICY } from '@/services/policy';
 
 export const maxDuration = 10; // Vercel hobby limit
 
@@ -293,22 +295,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 3.1 匿名预览限流（按 IP 每日次数）
-    if (!maybeUserUuid && isPreview) {
-      const now = new Date();
-      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-      try {
-        const [row] = await db().select({ c: count() }).from(usage_records)
-          .where(and(eq(usage_records.user_id, anonUsageKey!), gte(usage_records.created_at as any, dayStart), eq(usage_records.model_type, 'anon_preview')));
-        const used = Number((row as any)?.c || 0);
-        // 单变量方案：优先读取 NEXT_PUBLIC_ANON_PREVIEW_DAILY_LIMIT（也可在服务端使用），否则回退 ANON_PREVIEW_DAILY_LIMIT，再回退 10
-        const limit = Number(process.env.NEXT_PUBLIC_ANON_PREVIEW_DAILY_LIMIT || process.env.ANON_PREVIEW_DAILY_LIMIT || 10);
-        if (used >= limit) {
-          return NextResponse.json({ error: `Anonymous preview limit reached (${limit}/day). Please sign in.` }, { status: 429 });
-        }
-        await db().insert(usage_records).values({ user_id: anonUsageKey!, date: new Date().toISOString().slice(0,10), minutes: '0' as any, model_type: 'anon_preview', created_at: new Date() });
-      } catch {}
-    }
-
     if (shouldRecordAnonYoutubeUsage && anonUsageKey) {
       try {
         await db().insert(usage_records).values({
@@ -408,12 +394,69 @@ export async function POST(request: NextRequest) {
       initialOriginalDurationSec = Math.ceil(originalDurationCandidate);
     }
 
+    const clipConfig = await resolveClipConfig({
+      isPreview,
+      userTier,
+      userUuid: maybeUserUuid || null,
+      originalDurationSeconds: originalDurationCandidate,
+    });
+
+    if (clipConfig?.limitSeconds) {
+      options.trimToSeconds = clipConfig.limitSeconds;
+    }
+
+    const estimatedAnonMinutes = calculateAnonMinutes(clipConfig, originalDurationCandidate);
+
+    if (!maybeUserUuid) {
+      const now = new Date();
+      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      try {
+        const [dailyRow] = await db().select({ c: count() }).from(usage_records)
+          .where(and(
+            eq(usage_records.user_id, anonUsageKey!),
+            eq(usage_records.model_type, 'anon_usage'),
+            gte(usage_records.created_at as any, dayStart)
+          ));
+        const dailyUsed = Number((dailyRow as any)?.c || 0);
+        const dailyLimit = Number(process.env.ANON_DAILY_LIMIT || 5);
+        if (dailyUsed >= dailyLimit) {
+          return NextResponse.json({ error: `Anonymous daily limit reached (${dailyLimit}/day). Please sign in.` }, { status: 429 });
+        }
+
+        const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        const [monthRow] = await db().select({
+          total: sql`COALESCE(SUM(${usage_records.minutes}), 0)`
+        }).from(usage_records)
+          .where(and(
+            eq(usage_records.user_id, anonUsageKey!),
+            eq(usage_records.model_type, 'anon_usage'),
+            gte(usage_records.created_at as any, monthStart)
+          ));
+        const monthlyUsed = Number((monthRow as any)?.total || 0);
+        const monthlyLimit = Number(process.env.ANON_MONTHLY_MINUTES || 30);
+        if (monthlyUsed + estimatedAnonMinutes > monthlyLimit) {
+          return NextResponse.json({ error: `Anonymous monthly limit reached (${monthlyLimit} minutes). Please sign in.` }, { status: 429 });
+        }
+
+        await db().insert(usage_records).values({
+          user_id: anonUsageKey!,
+          date: new Date().toISOString().slice(0, 10),
+          minutes: estimatedAnonMinutes.toFixed(2),
+          model_type: 'anon_usage',
+          created_at: new Date()
+        });
+      } catch (err) {
+        console.warn('[Async] Failed to enforce anonymous quotas:', err);
+      }
+    }
+
     // Check upload duration limit (prevent excessively long audio from being transcribed)
     if (originalDurationCandidate) {
       const { getUploadLimitForTier, formatSeconds } = await import('@/lib/duration-limits');
+      const enforceUploadLimit = !clipConfig;
       const uploadLimit = getUploadLimitForTier(userTier, maybeUserUuid);
 
-      if (uploadLimit > 0 && originalDurationCandidate > uploadLimit) {
+      if (enforceUploadLimit && uploadLimit > 0 && originalDurationCandidate > uploadLimit) {
         console.warn(`[Async] Duration ${originalDurationCandidate}s exceeds ${uploadLimit}s limit for ${userTier || 'anonymous'}`);
         return NextResponse.json({
           success: false,
@@ -495,16 +538,16 @@ export async function POST(request: NextRequest) {
       if (type === 'audio_url' || type === 'file_upload') {
         let audioUrlForSupplier = content;
 
-        // FREE 用户上传文件时仍需裁剪
-        if (type === 'file_upload' && userTier === UserTier.FREE) {
+        if (clipConfig?.limitSeconds && clipConfig.shouldClip) {
           try {
             const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
-            const clippedUrl = await clipAudioForFreeTier(content, jobId, 'file');
+            const filePrefix = type === 'file_upload' ? 'file' : 'audio';
+            const clippedUrl = await clipAudioForFreeTier(content, jobId, filePrefix, clipConfig.limitSeconds);
             if (clippedUrl) {
               audioUrlForSupplier = clippedUrl;
             }
           } catch (clipErr) {
-            console.warn('[Async] Failed to clip audio for free tier:', clipErr);
+            console.warn('[Async] Failed to clip audio for preview/free tier:', clipErr);
           }
         }
 
@@ -652,7 +695,9 @@ export async function POST(request: NextRequest) {
             user_tier: userTier,
             preferred_language: options?.preferred_language,
             enable_diarization_after_whisper: options?.enableDiarizationAfterWhisper === true,
-            high_accuracy: isHighAccuracyRequest
+            high_accuracy: isHighAccuracyRequest,
+            clip_seconds: clipConfig?.limitSeconds ?? null,
+            is_preview: isPreview
           })
         }).catch(() => {});
       }
@@ -712,6 +757,52 @@ function getDurationFromOptions(options: Record<string, any> | undefined): numbe
     }
   }
   return null;
+}
+
+type ClipConfig = {
+  limitSeconds: number;
+  shouldClip: boolean;
+};
+
+async function resolveClipConfig(args: {
+  isPreview: boolean;
+  userTier: UserTier;
+  userUuid: string | null;
+  originalDurationSeconds: number | null;
+}): Promise<ClipConfig | null> {
+  const { isPreview, userTier, userUuid, originalDurationSeconds } = args;
+  const isAnonymous = !userUuid;
+  const isFreeTier = userTier === UserTier.FREE;
+
+  if (!isPreview && !isAnonymous && !isFreeTier) {
+    return null;
+  }
+
+  const limitSeconds = Math.max(1, Math.ceil(POLICY.preview.freePreviewSeconds || 300));
+
+  return {
+    limitSeconds,
+    shouldClip: shouldClipMedia(originalDurationSeconds, limitSeconds),
+  };
+}
+
+function calculateAnonMinutes(clipConfig: ClipConfig | null, originalDurationSeconds: number | null): number {
+  const limitSeconds = clipConfig?.limitSeconds ?? Math.max(1, Math.ceil(POLICY.preview.freePreviewSeconds || 300));
+  // If we have original duration, take the lesser of original and limit
+  const effectiveSeconds = originalDurationSeconds && Number.isFinite(originalDurationSeconds)
+    ? Math.min(originalDurationSeconds, limitSeconds)
+    : limitSeconds;
+  const minutes = effectiveSeconds / 60;
+  return Math.max(1, Math.ceil(minutes));
+}
+
+function shouldClipMedia(originalDurationSeconds: number | null, limitSeconds: number): boolean {
+  if (!limitSeconds || limitSeconds <= 0) return false;
+  if (!originalDurationSeconds || !Number.isFinite(originalDurationSeconds)) {
+    return true;
+  }
+  const tolerance = 1; // seconds
+  return originalDurationSeconds - limitSeconds > tolerance;
 }
 
 function getSupplierAcceleratedUrl(originalUrl: string | null | undefined, r2Key?: string | null): string | null {
