@@ -6,6 +6,7 @@ import TechnicalSpecs from "@/components/blocks/technical-specs";
 import RealUseCases from "@/components/blocks/real-use-cases";
 import PricingCTA from "@/components/blocks/pricing-cta";
 import FAQ from "@/components/blocks/faq/server";
+import Feedback from "@/components/feedback";
 import { getLandingPage } from "@/services/page";
 import { setRequestLocale } from "next-intl/server";
 import { 
@@ -120,6 +121,8 @@ export default async function VideoToTextPage({
 
       {/* 8. FAQ */}
       {page.faq && <FAQ section={page.faq} locale={locale} />}
+
+      <Feedback />
     </>
   );
 }

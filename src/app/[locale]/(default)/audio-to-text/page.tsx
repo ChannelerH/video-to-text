@@ -2,6 +2,7 @@ import { setRequestLocale, getTranslations } from "next-intl/server";
 import Link from "next/link";
 import ToolInterface from "@/components/tool-interface";
 import AudioUploadWidgetEnhanced from "@/components/landing/audio-upload-widget-enhanced";
+import Feedback from "@/components/feedback";
 import React from "react";
 
 export const revalidate = 60;
@@ -107,6 +108,7 @@ export default async function AudioToTextPage({
   const startHref = `/${locale}/dashboard/transcriptions`;
 
   return (
+    <>
     <div className="relative">
       {/* Hero */}
       <section className="container py-16 md:py-24">
@@ -489,5 +491,7 @@ export default async function AudioToTextPage({
         @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
       `}</style>
     </div>
+    <Feedback />
+    </>
   );
 }
