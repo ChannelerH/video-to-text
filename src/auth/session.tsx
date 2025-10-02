@@ -9,7 +9,12 @@ export function NextAuthSessionProvider({
   children: React.ReactNode;
 }) {
   if (!isAuthEnabled()) {
-    return <>{children}</>;
+    // Even when auth is disabled, provide a SessionProvider shell so that
+    // downstream components relying on useSession() continue to receive the
+    // expected context shape ({ data, status }). This prevents build-time
+    // crashes during static rendering where the hook would otherwise try to
+    // destructure from an undefined context value.
+    return <SessionProvider session={null}>{children}</SessionProvider>;
   }
 
   return <SessionProvider>{children}</SessionProvider>;
