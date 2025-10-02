@@ -2,7 +2,9 @@ import { source } from "@/lib/source";
 import { createFromSource } from "fumadocs-core/search/server";
 
 export const { GET } = createFromSource(source, {
-  // https://docs.orama.com/open-source/supported-languages
-  // Use undefined to support multiple languages
+  // Allow multiple locales, but map unsupported ones (like zh) to english tokenizer
   language: undefined,
+  localeMap: {
+    zh: "english",
+  },
 });

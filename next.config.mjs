@@ -23,6 +23,21 @@ const nextConfig = {
       },
     ],
   },
+  webpack(config, { isServer }) {
+    if (isServer) {
+      const externalEntry = {
+        "@ffmpeg-installer/ffmpeg": "commonjs @ffmpeg-installer/ffmpeg",
+      };
+      if (!config.externals) {
+        config.externals = [externalEntry];
+      } else if (Array.isArray(config.externals)) {
+        config.externals.push(externalEntry);
+      } else {
+        config.externals = [config.externals, externalEntry];
+      }
+    }
+    return config;
+  },
   async redirects() {
     return [];
   },
