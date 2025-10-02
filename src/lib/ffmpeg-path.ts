@@ -42,6 +42,15 @@ function resolveInstallerBinary(): string | null {
   return null;
 }
 
+function normalizeStaticExport(mod: any): string {
+  if (typeof mod === 'string') return mod;
+  if (mod && typeof mod === 'object') {
+    if (typeof mod.path === 'string') return mod.path;
+    if (typeof mod.default === 'string') return mod.default;
+  }
+  return '';
+}
+
 /**
  * Resolve an ffmpeg binary path that works in both local dev and serverless environments.
  * Priority order: explicit env override -> @ffmpeg-installer -> ffmpeg-static -> system PATH fallback.
@@ -85,8 +94,25 @@ export function getFfmpegPath(): string {
   // Fallback to ffmpeg-static
   let ffmpegStatic: string | null = null;
   try {
-    ffmpegStatic = require('ffmpeg-static');
-    console.log(`[ffmpeg-path] ffmpeg-static raw path: ${ffmpegStatic}`);
+    const mod = require('ffmpeg-static');
+    const normalized = normalizeStaticExport(mod);
+
+    if (normalized) {
+      ffmpegStatic = normalized;
+      console.log(`[ffmpeg-path] ffmpeg-static raw path: ${ffmpegStatic}`);
+    } else {
+      console.log(`[ffmpeg-path] ffmpeg-static export not a direct path (type=${typeof mod}); attempting manual resolution`);
+      try {
+        const resolved = require.resolve('ffmpeg-static');
+        const candidate = join(dirname(resolved), 'ffmpeg');
+        if (existsSync(candidate)) {
+          ffmpegStatic = candidate;
+          console.log(`[ffmpeg-path] ffmpeg-static resolved via require.resolve: ${candidate}`);
+        }
+      } catch (resolveError) {
+        console.warn('[ffmpeg-path] Failed to resolve ffmpeg-static via require.resolve:', resolveError);
+      }
+    }
   } catch (e) {
     console.log(`[ffmpeg-path] ffmpeg-static not available:`, (e as Error).message);
   }
