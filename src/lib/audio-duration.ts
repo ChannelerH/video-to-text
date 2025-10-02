@@ -1,12 +1,15 @@
 /**
  * Audio Duration Parser
  *
- * Extracts duration from audio files using music-metadata library.
- * Works without ffmpeg, making it compatible with Vercel serverless functions.
+ * Extracts duration from audio sources.
+ * Priority: ffmpeg/ffprobe probing (streaming, no full download) when available;
+ * fallback to music-metadata buffer parsing when ffmpeg isn't present or probing fails.
  */
 
 import { parseBuffer } from 'music-metadata';
 import { Readable } from 'stream';
+import { ffmpegEnabled } from '@/lib/ffmpeg-config';
+import { probeDurationSeconds } from '@/lib/media-probe';
 
 /**
  * Get audio duration from a Buffer
@@ -37,8 +40,22 @@ export async function getDurationFromBuffer(buffer: Buffer): Promise<number | nu
  * @returns Duration in seconds, or null if parsing fails
  */
 export async function getDurationFromUrl(url: string): Promise<number | null> {
+  // Prefer ffmpeg-based probing as it can read duration without downloading the full file.
+  if (ffmpegEnabled) {
+    try {
+      const probed = await probeDurationSeconds(url);
+      if (probed !== null && Number.isFinite(probed) && probed > 0) {
+        console.log(`[Audio Duration] Probed via ffmpeg: ${probed}s`);
+        return probed;
+      }
+    } catch (error: any) {
+      console.warn('[Audio Duration] ffmpeg probe failed, falling back:', error?.message || error);
+    }
+  }
+
+  // Fallback: download and parse with music-metadata (may require buffering the file).
   try {
-    console.log(`[Audio Duration] Fetching audio from URL: ${url}`);
+    console.log(`[Audio Duration] Fetching audio from URL for metadata parse: ${url}`);
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -60,7 +77,7 @@ export async function getDurationFromUrl(url: string): Promise<number | null> {
       return null;
     }
 
-    console.log(`[Audio Duration] Extracted from URL: ${duration.toFixed(2)}s`);
+    console.log(`[Audio Duration] Extracted from URL via metadata: ${duration.toFixed(2)}s`);
     return duration;
   } catch (error: any) {
     console.error('[Audio Duration] Failed to parse URL:', error?.message || error);

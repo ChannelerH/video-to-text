@@ -392,7 +392,7 @@ export async function POST(request: NextRequest) {
 
     if (!originalDurationCandidate && (type === 'audio_url' || type === 'file_upload')) {
       try {
-        // Use music-metadata instead of ffmpeg-based probeDurationSeconds (Vercel compatible)
+        // Prefer ffmpeg probing (with metadata fallback) to avoid downloading full media when possible
         const { getDurationFromUrl } = await import('@/lib/audio-duration');
         const duration = await getDurationFromUrl(content);
         if (duration !== null && Number.isFinite(duration) && duration > 0) {
