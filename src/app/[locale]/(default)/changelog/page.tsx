@@ -14,7 +14,7 @@ import {
 } from "react-icons/ri";
 
 export const revalidate = 60;
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 export const dynamicParams = true;
 
 export async function generateMetadata({
