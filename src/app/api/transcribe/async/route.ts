@@ -542,9 +542,14 @@ export async function POST(request: NextRequest) {
           try {
             const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
             const filePrefix = type === 'file_upload' ? 'file' : 'audio';
-            const clippedUrl = await clipAudioForFreeTier(content, jobId, filePrefix, clipConfig.limitSeconds);
-            if (clippedUrl) {
-              audioUrlForSupplier = clippedUrl;
+            const clipped = await clipAudioForFreeTier(content, jobId, filePrefix, clipConfig.limitSeconds);
+            if (clipped?.url) {
+              audioUrlForSupplier = clipped.url;
+              if (clipped.key) {
+                options.r2Key = clipped.key;
+              } else if (clipConfig.shouldClip) {
+                delete options.r2Key;
+              }
             }
           } catch (clipErr) {
             console.warn('[Async] Failed to clip audio for preview/free tier:', clipErr);

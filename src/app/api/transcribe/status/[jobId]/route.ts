@@ -4,6 +4,7 @@ import { getUserTier, UserTier } from '@/services/user-tier';
 import { db } from '@/db';
 import { transcriptions, transcription_results } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { POLICY } from '@/services/policy';
 
 export const maxDuration = 10;
 
@@ -47,6 +48,22 @@ export async function GET(
       );
     }
 
+    const previewWindow = POLICY.preview.freePreviewSeconds || 300;
+    const durationSec = Number(transcription.duration_sec || 0);
+    const originalDurationSec = Number(transcription.original_duration_sec || 0);
+    const processedUrlRaw = transcription.processed_url || '';
+    const processedUrlClean = typeof processedUrlRaw === 'string' && processedUrlRaw.startsWith('download_failed:')
+      ? null
+      : processedUrlRaw;
+
+    const looksTrimmedToPreview = durationSec > 0 && durationSec <= previewWindow + 1;
+    const originalExceedsPreview = originalDurationSec > previewWindow + 1;
+    const processedLooksClipped = typeof processedUrlClean === 'string'
+      ? /clipped-audio|youtube-clips|file-clips/.test(processedUrlClean)
+      : false;
+    const isAnonymousJob = !transcription.user_uuid;
+    const isPreviewJob = isAnonymousJob && ((looksTrimmedToPreview && originalExceedsPreview) || processedLooksClipped);
+
     // 如果已完成，返回结果
     const effectiveTier: UserTier = userUuid ? await getUserTier(userUuid) : UserTier.FREE;
 
@@ -74,8 +91,10 @@ export async function GET(
         tier: effectiveTier,
         source_type: transcription.source_type,
         source_url: transcription.source_url,
-        processed_url: transcription.processed_url,
+        processed_url: processedUrlClean,
         original_duration_sec: transcription.original_duration_sec,
+        is_preview: isPreviewJob,
+        preview_seconds: previewWindow,
       });
     }
 
@@ -100,11 +119,6 @@ export async function GET(
       }
     }
 
-    const processedUrl
-      = typeof transcription.processed_url === 'string' && transcription.processed_url.startsWith('download_failed:')
-        ? null
-        : transcription.processed_url;
-
     // 返回当前状态
     return NextResponse.json({
       status: transcription.status,
@@ -115,8 +129,10 @@ export async function GET(
       tier: effectiveTier,
       source_type: transcription.source_type,
       source_url: transcription.source_url,
-      processed_url: processedUrl,
+      processed_url: processedUrlClean,
       original_duration_sec: transcription.original_duration_sec,
+      is_preview: isPreviewJob,
+      preview_seconds: previewWindow,
       ...(warning && { warning }),
       ...(shouldRetry && { should_retry: true, retry_reason: 'queue_timeout' }),
       ...(errorCode && { error: errorCode, error_code: errorCode })

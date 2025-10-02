@@ -508,7 +508,7 @@
     "go_to_dashboard": "前往工作台",
     "transcription_saved": "转录已成功保存！",
     "tip_edit_for_chapters": "提示：使用编辑器添加章节并导出多种格式",
-    "sign_in_to_access_features": "登录以使用高级编辑功能并保存您的转录",
+    "sign_in_to_access_features": "登录以解锁完整音频转录、使用高级编辑功能并保存您的转录",
     "sign_in_to_save": "登录以保存",
     "editor": {
       "show_chapters": "显示章节",

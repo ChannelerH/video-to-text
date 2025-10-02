@@ -90,9 +90,14 @@ export default function PreviewIndicator({
           />
         </div>
         
-        <p className="text-xs text-gray-400">
-          {t('upgrade_message')}
-        </p>
+        <div className="space-y-1.5 text-xs text-gray-400">
+          <p>
+            {t('upgrade_message')}
+          </p>
+          <p className="text-gray-500">
+            {t('preview_mode_message')}
+          </p>
+        </div>
       </div>
     </div>
   );

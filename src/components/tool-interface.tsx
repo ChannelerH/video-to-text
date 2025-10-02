@@ -2490,7 +2490,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                 />
               </div>
             )}
-            
+
             {/* Main Content - Only visible in simple view */}
             {viewMode === 'simple' && (
               <div className="mt-4 space-y-4">

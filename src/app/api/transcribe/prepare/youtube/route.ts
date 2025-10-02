@@ -77,10 +77,10 @@ export async function POST(request: NextRequest) {
       // For FREE users, need to clip the R2 URL
       if (effectiveClipSeconds && shouldClipMedia(jobOriginalDuration, effectiveClipSeconds)) {
         const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
-        const clippedUrl = await clipAudioForFreeTier(video, job_id, 'rerun', effectiveClipSeconds);
-        
-        if (clippedUrl) {
-          supplierAudioUrl = clippedUrl;
+        const clipped = await clipAudioForFreeTier(video, job_id, 'rerun', effectiveClipSeconds);
+
+        if (clipped?.url) {
+          supplierAudioUrl = clipped.url;
         } else {
           // Fall back to full audio
         }
@@ -293,9 +293,9 @@ export async function POST(request: NextRequest) {
             supplierAudioUrl = finalUrl;
             if (effectiveClipSeconds && shouldClipMedia(videoDurationSeconds ?? jobOriginalDuration, effectiveClipSeconds)) {
               const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
-              const clippedUrl = await clipAudioForFreeTier(finalUrl, job_id, 'youtube', effectiveClipSeconds);
-              if (clippedUrl) {
-                supplierAudioUrl = clippedUrl;
+              const clipped = await clipAudioForFreeTier(finalUrl, job_id, 'youtube', effectiveClipSeconds);
+              if (clipped?.url) {
+                supplierAudioUrl = clipped.url;
               } else {
                 // fallback: full download
                 try {

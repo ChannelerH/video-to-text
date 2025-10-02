@@ -15,12 +15,17 @@ function resolveClipSeconds(seconds?: number | null): number {
 /**
  * Clip audio for preview/free usage and upload to R2. Falls back to original URL when FFmpeg is disabled.
  */
+export interface ClippedAudioResult {
+  url: string;
+  key?: string;
+}
+
 export async function clipAudioForFreeTier(
   sourceUrl: string,
   jobId: string,
   filePrefix: string = 'audio',
   seconds?: number | null
-): Promise<string | null> {
+): Promise<ClippedAudioResult | null> {
   try {
     const clipSeconds = resolveClipSeconds(seconds);
 
@@ -30,7 +35,7 @@ export async function clipAudioForFreeTier(
         filePrefix,
         clipSeconds,
       });
-      return sourceUrl;
+      return { url: sourceUrl };
     }
 
     const clippedBuffer = await createWavClipFromUrl(sourceUrl, clipSeconds);
@@ -54,7 +59,7 @@ export async function clipAudioForFreeTier(
       clipSeconds,
       clippedUrl,
     });
-    return clippedUrl;
+    return { url: clippedUrl, key: upload.key };
   } catch (error: any) {
     console.error('[Audio Clip Helper] Failed to clip audio', {
       jobId,
@@ -107,7 +112,8 @@ export async function clipAudioFromBuffer(
       }
     );
 
-    return clipAudioForFreeTier(tempUpload.publicUrl || tempUpload.url, videoId, 'youtube', seconds);
+    const result = await clipAudioForFreeTier(tempUpload.publicUrl || tempUpload.url, videoId, 'youtube', seconds);
+    return result?.url ?? null;
   } catch (error: any) {
     console.error('[Audio Clip Helper] Failed to process audio buffer', {
       videoId,

@@ -1,8 +1,46 @@
 import { existsSync, chmodSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
+import os from 'os';
 import { ffmpegEnabled } from '@/lib/ffmpeg-config';
 
 let cachedPath: string | null = null;
+
+function resolveInstallerBinary(): string | null {
+  const platformKey = `${os.platform()}-${os.arch()}`;
+  const binaryName = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+
+  try {
+    const packageDir = dirname(require.resolve('@ffmpeg-installer/ffmpeg/package.json'));
+    const candidateRoots = [
+      resolve(packageDir, '..', platformKey),
+      resolve(packageDir, platformKey),
+    ];
+
+    for (const root of candidateRoots) {
+      const candidate = join(root, binaryName);
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[ffmpeg-path] @ffmpeg-installer/ffmpeg not available: ${message}`);
+  }
+
+  const fallbackRoots = [
+    join(process.cwd(), 'node_modules', '@ffmpeg-installer', platformKey),
+    join(process.cwd(), '..', 'node_modules', '@ffmpeg-installer', platformKey),
+  ];
+
+  for (const root of fallbackRoots) {
+    const candidate = join(root, binaryName);
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
 
 /**
  * Resolve an ffmpeg binary path that works in both local dev and serverless environments.
@@ -25,19 +63,10 @@ export function getFfmpegPath(): string {
   }
 
   // Try @ffmpeg-installer/ffmpeg first (better Vercel support)
-  let installerPath: string | undefined;
-  try {
-    // Dynamic import to avoid errors when package is not available
-    const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
-    installerPath = ffmpegInstaller?.path;
-    console.log(`[ffmpeg-path] @ffmpeg-installer/ffmpeg path: ${installerPath}`);
-  } catch (e) {
-    console.log(`[ffmpeg-path] @ffmpeg-installer/ffmpeg not available:`, (e as Error).message);
-  }
+  const installerPath = resolveInstallerBinary();
 
   if (installerPath) {
     try {
-      // Try to make it executable
       if (existsSync(installerPath)) {
         try {
           chmodSync(installerPath, 0o755);
@@ -48,28 +77,8 @@ export function getFfmpegPath(): string {
         cachedPath = installerPath;
         return cachedPath;
       }
-
-      // Try alternative paths in node_modules
-      const alternatives = [
-        join(process.cwd(), 'node_modules', '@ffmpeg-installer', 'linux-x64', 'ffmpeg'),
-        join(process.cwd(), 'node_modules', '@ffmpeg-installer', 'darwin-x64', 'ffmpeg'),
-        join(process.cwd(), 'node_modules', '@ffmpeg-installer', 'darwin-arm64', 'ffmpeg'),
-      ];
-
-      for (const altPath of alternatives) {
-        if (existsSync(altPath)) {
-          try {
-            chmodSync(altPath, 0o755);
-          } catch (e) {
-            console.warn(`[ffmpeg-path] Could not chmod ${altPath}:`, e);
-          }
-          console.log(`[ffmpeg-path] Using alternative @ffmpeg-installer path: ${altPath}`);
-          cachedPath = altPath;
-          return cachedPath;
-        }
-      }
     } catch (e) {
-      console.error(`[ffmpeg-path] Error resolving @ffmpeg-installer:`, e);
+      console.error(`[ffmpeg-path] Error verifying installer path ${installerPath}:`, e);
     }
   }
 

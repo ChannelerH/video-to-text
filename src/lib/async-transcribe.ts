@@ -71,6 +71,9 @@ export async function pollJobStatus(
     // Check the final status
     if (result.status === 'completed') {
       const tier = (result as any).tier || 'free';
+      const isPreviewJob = Boolean((result as any).is_preview);
+      const previewSeconds = Number((result as any).preview_seconds) || 300;
+      const originalDurationSec = Number((result as any).original_duration_sec || 0);
 
       const baseFormats: Record<string, string | undefined> = {
         srt: result.results.srt,
@@ -109,6 +112,7 @@ export async function pollJobStatus(
       const titleFromJson = typeof parsedJson?.title === 'string' ? parsedJson.title : undefined;
       const sourceTypeFromJson = parsedJson?.source_type;
       const sourceUrlFromJson = parsedJson?.source_url;
+      const processedUrlFromJson = parsedJson?.processed_url;
 
       return {
         success: true,
@@ -121,6 +125,8 @@ export async function pollJobStatus(
             title: titleFromJson || result.title,
             source_type: sourceTypeFromJson || result.source_type,
             source_url: sourceUrlFromJson || result.source_url,
+            processed_url: processedUrlFromJson || result.processed_url,
+            original_duration_sec: originalDurationSec,
           },
           title: titleFromJson || result.title,
           formats: baseFormats,
@@ -130,8 +136,11 @@ export async function pollJobStatus(
           processedUrl: result.processed_url,
           originalDurationSec: result.original_duration_sec,
           // 将 jobId 回传给前端用于"Edit Transcription"跳转
-          jobId
-        }
+          jobId,
+        },
+        isPreview: isPreviewJob,
+        previewSeconds,
+        originalDurationSec,
       };
     } else if (result.status === 'failed') {
       const errorCode = result.error_code || result.error;
