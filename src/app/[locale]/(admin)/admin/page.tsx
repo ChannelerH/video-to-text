@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import DataCards from "@/components/blocks/data-cards";
 import DataCharts from "@/components/blocks/data-charts";
 import Header from "@/components/dashboard/header";
