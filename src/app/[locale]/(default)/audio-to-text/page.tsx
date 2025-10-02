@@ -5,7 +5,7 @@ import AudioUploadWidgetEnhanced from "@/components/landing/audio-upload-widget-
 import React from "react";
 
 export const revalidate = 60;
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 export const dynamicParams = true;
 
 export async function generateMetadata({
