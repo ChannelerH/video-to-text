@@ -86,16 +86,22 @@ export class EmailSender {
         
         console.log(`[Resend] Email sent successfully to ${options.to}:`, data?.id);
         return true;
-        
+
       } else if (gmailSender.isConfigured()) {
         // Use Gmail SMTP directly
-        console.log('[EmailSender] Using Gmail SMTP to send email...');
+        console.log('[EmailSender] Using Gmail SMTP to send email...', {
+          user: gmailSender.getUser()
+        });
         const success = await gmailSender.sendEmail(
           options.to,
           options.subject,
           options.html,
           options.text
         );
+        console.log('[EmailSender] Gmail SMTP send completed', {
+          to: options.to,
+          success
+        });
         return success;
         
       } else if (process.env.RESEND_SENDER_EMAIL) {
@@ -109,6 +115,8 @@ export class EmailSender {
         console.log(`  To: ${options.to}`);
         console.log(`  Subject: ${options.subject}`);
         console.log(`  From: ${options.from || this.from}`);
+        console.log('[EmailSender] Gmail configured?', gmailSender.isConfigured());
+        console.log('[EmailSender] Resend configured?', !!resend);
         
         // In development, consider it successful for testing
         if (process.env.NODE_ENV === 'development') {

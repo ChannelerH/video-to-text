@@ -14,15 +14,16 @@ export class GmailSender {
     const fallbackUser = 'channelerH@gmail.com';
     const fallbackPassword = 'vfauehwoeeuckmqq';
 
-    const user =
+    const envUser =
       process.env.GMAIL_USER ||
       process.env.ERROR_ALERT_FROM ||
-      process.env.ERROR_ALERT_EMAIL ||
-      fallbackUser;
-    const password =
+      process.env.ERROR_ALERT_EMAIL;
+    const envPassword =
       process.env.GMAIL_APP_PASSWORD ||
-      process.env.ERROR_ALERT_APP_PASSWORD ||
-      fallbackPassword;
+      process.env.ERROR_ALERT_APP_PASSWORD;
+
+    const user = envUser || fallbackUser;
+    const password = envPassword || fallbackPassword;
     
     this.config = {
       user,
@@ -31,15 +32,25 @@ export class GmailSender {
       port: Number(process.env.GMAIL_SMTP_PORT || 465)
     };
     
-    if (!this.config.password) {
-      console.warn('[GmailSender] No Gmail app password configured');
+    if (!envUser) {
+      console.warn('[GmailSender] GMAIL_USER/ERROR_ALERT_* not provided; using fallback user');
     }
+    if (!envPassword) {
+      console.warn('[GmailSender] Gmail app password env not provided; using fallback password');
+    }
+    console.log('[GmailSender] SMTP configuration ready', {
+      host: this.config.host,
+      port: this.config.port,
+      user: this.config.user,
+      usingFallbackUser: !envUser,
+      usingFallbackPassword: !envPassword
+    });
   }
   
   private base64(value: string): string {
     return Buffer.from(value, 'utf8').toString('base64');
   }
-  
+
   async sendEmail(
     to: string,
     subject: string,
@@ -54,6 +65,11 @@ export class GmailSender {
     const { user, password, host, port } = this.config;
     
     return new Promise((resolve) => {
+      console.log('[GmailSender] Establishing TLS connection', {
+        host,
+        port,
+        user
+      });
       const socket = tls.connect(port!, host!, {
         servername: host,
         rejectUnauthorized: false,
@@ -181,9 +197,13 @@ export class GmailSender {
       .replace(/\s+/g, ' ')
       .trim();
   }
-  
+
   isConfigured(): boolean {
     return !!this.config.password;
+  }
+
+  getUser(): string {
+    return this.config.user;
   }
 }
 
