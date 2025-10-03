@@ -287,126 +287,41 @@ export async function POST(request: NextRequest) {
           };
 
           const isFreeTier = String(user_tier).toLowerCase() === 'free';
+          const finalUrl = await resolveAudioUrl();
+          const needsClipPreview = isFreeTier
+            && effectiveClipSeconds
+            && shouldClipMedia(videoDurationSeconds ?? jobOriginalDuration, effectiveClipSeconds);
 
-          if (isFreeTier) {
-            const finalUrl = await resolveAudioUrl();
-            supplierAudioUrl = finalUrl;
-            if (effectiveClipSeconds && shouldClipMedia(videoDurationSeconds ?? jobOriginalDuration, effectiveClipSeconds)) {
-              const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
-              const clipped = await clipAudioForFreeTier(finalUrl, job_id, 'youtube', effectiveClipSeconds);
-              if (clipped?.url) {
-                supplierAudioUrl = clipped.url;
-              } else {
-                // fallback: full download
-                try {
-                  const response = await fetch(finalUrl, {
-                    headers: {
-                      'User-Agent': 'Mozilla/5.0',
-                      'Accept-Language': 'en-US,en;q=0.9',
-                    },
-                  });
-                  if (!response.ok) {
-                    throw new Error(`Failed to fetch audio stream (${response.status})`);
-                  }
-                  const buffer = Buffer.from(await response.arrayBuffer());
-                  const contentType = response.headers.get('content-type') || 'audio/webm';
-                  const upload = await r2.uploadFile(buffer, `${vid}.webm`, contentType, {
-                    folder: 'youtube-audio',
-                    expiresIn: 24,
-                    makePublic: true,
-                  });
-                  supplierAudioUrl = upload.publicUrl || upload.url;
-                } catch (clipFallbackError) {
-                  console.error('[YouTube Prepare] Free-tier fallback upload failed:', clipFallbackError);
-                }
-              }
+          if (needsClipPreview) {
+            const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
+            const clipped = await clipAudioForFreeTier(finalUrl, job_id, 'youtube', effectiveClipSeconds);
+            if (clipped?.url) {
+              supplierAudioUrl = clipped.url;
+            } else {
+              console.warn('[YouTube Prepare] Clip helper failed, falling back to full audio upload');
             }
-          } else {
-            const finalUrl = await resolveAudioUrl();
-            const bucket = process.env.STORAGE_BUCKET || '';
-            const publicDomain = process.env.STORAGE_DOMAIN || process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN;
-            const key = `youtube-audio/${vid}_${Date.now()}.webm`;
-            const publicUrlBase = publicDomain
-              ? (publicDomain.startsWith('http') ? publicDomain : `https://${publicDomain}`)
-              : `https://pub-${bucket}.r2.dev`;
-            const targetPublicUrl = `${publicUrlBase}/${key}`;
+          }
 
-            const attemptStreamUpload = async () => {
-              const response = await fetch(finalUrl, {
-                headers: {
-                  'User-Agent': 'Mozilla/5.0',
-                  'Accept-Language': 'en-US,en;q=0.9',
-                },
-              });
-              if (!response.ok) {
-                throw new Error(`Failed to fetch audio stream (${response.status})`);
-              }
-              const contentType = response.headers.get('content-type') || 'audio/webm';
-              const contentLengthHeader = response.headers.get('content-length');
-              const contentLength = contentLengthHeader ? parseInt(contentLengthHeader, 10) : undefined;
-
-              if (!response.body || !contentLength || !Number.isFinite(contentLength) || contentLength <= 0) {
-                const buffer = Buffer.from(await response.arrayBuffer());
-                const upload = await r2.uploadFile(buffer, `${vid}.webm`, contentType, {
-                  folder: 'youtube-audio',
-                  expiresIn: 24,
-                  makePublic: true,
-                });
-                supplierAudioUrl = upload.publicUrl || upload.url;
-                return;
-              }
-
-              const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
-              const s3 = new S3Client({
-                region: process.env.STORAGE_REGION || 'auto',
-                endpoint: process.env.STORAGE_ENDPOINT,
-                credentials: {
-                  accessKeyId: process.env.STORAGE_ACCESS_KEY || '',
-                  secretAccessKey: process.env.STORAGE_SECRET_KEY || '',
-                },
-              });
-
-              const nodeStream = Readable.fromWeb(response.body as any);
-              await s3.send(new PutObjectCommand({
-                Bucket: bucket,
-                Key: key,
-                Body: nodeStream,
-                ContentType: contentType,
-                ContentLength: contentLength,
-                Metadata: {
-                  'upload-time': new Date().toISOString(),
-                  source: 'youtube-prepare',
-                },
-              }));
-
-              supplierAudioUrl = targetPublicUrl;
-            };
-
+          if (!supplierAudioUrl) {
             try {
-              await attemptStreamUpload();
-            } catch (streamError) {
-              console.error('[YouTube Prepare] Stream upload failed, falling back to buffered upload:', streamError);
-              try {
-                const response = await fetch(finalUrl, {
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                  },
+              const uploadedUrl = await uploadAudioUrlToR2({
+                sourceUrl: finalUrl,
+                videoId: vid!,
+                r2,
+                contextLabel: '[YouTube Prepare] Upload',
+              });
+              supplierAudioUrl = uploadedUrl || finalUrl;
+              if (uploadedUrl) {
+                console.log('[YouTube Prepare] Audio uploaded to R2', { videoId: vid, uploadedUrl });
+              } else {
+                console.warn('[YouTube Prepare] R2 upload skipped or failed, falling back to original URL', {
+                  videoId: vid,
+                  finalUrl,
                 });
-                if (!response.ok) {
-                  throw new Error(`Failed to fetch audio stream (${response.status})`);
-                }
-                const buffer = Buffer.from(await response.arrayBuffer());
-                const contentType = response.headers.get('content-type') || 'audio/webm';
-                const upload = await r2.uploadFile(buffer, `${vid}.webm`, contentType, {
-                  folder: 'youtube-audio',
-                  expiresIn: 24,
-                  makePublic: true,
-                });
-                supplierAudioUrl = upload.publicUrl || upload.url;
-              } catch (bufferError) {
-                console.error('[YouTube Prepare] Buffered upload fallback failed:', bufferError);
               }
+            } catch (uploadError) {
+              console.error('[YouTube Prepare] Failed to upload audio to R2:', uploadError);
+              supplierAudioUrl = supplierAudioUrl || finalUrl;
             }
           }
         }
@@ -539,6 +454,140 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json({ error: e?.message || 'prepare failed' }, { status: 500 });
+  }
+}
+
+interface UploadAudioUrlToR2Params {
+  sourceUrl: string;
+  videoId: string;
+  r2?: CloudflareR2Service;
+  contextLabel?: string;
+}
+
+async function uploadAudioUrlToR2({
+  sourceUrl,
+  videoId,
+  r2,
+  contextLabel = '[YouTube Prepare] Upload',
+}: UploadAudioUrlToR2Params): Promise<string | null> {
+  const bucket = process.env.STORAGE_BUCKET || '';
+  if (!bucket) {
+    console.warn(`${contextLabel} Missing STORAGE_BUCKET configuration`);
+    return null;
+  }
+
+  const publicDomain = process.env.STORAGE_DOMAIN || process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN;
+  const key = `youtube-audio/${videoId}_${Date.now()}.webm`;
+  const publicUrlBase = publicDomain
+    ? (publicDomain.startsWith('http') ? publicDomain : `https://${publicDomain}`)
+    : `https://pub-${bucket}.r2.dev`;
+  const targetPublicUrl = `${publicUrlBase}/${key}`;
+
+  const headers: Record<string, string> = {
+    'User-Agent': 'Mozilla/5.0',
+    'Accept-Language': 'en-US,en;q=0.9',
+  };
+
+  const attemptStreamUpload = async () => {
+    console.log(`${contextLabel} Attempting stream upload`, {
+      videoId,
+      key,
+      publicUrlBase,
+      sourceUrl,
+    });
+    const response = await fetch(sourceUrl, { headers });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch audio stream (${response.status})`);
+    }
+
+    const contentType = response.headers.get('content-type') || 'audio/webm';
+    const contentLengthHeader = response.headers.get('content-length');
+    const contentLength = contentLengthHeader ? parseInt(contentLengthHeader, 10) : undefined;
+
+    if (!response.body || !contentLength || !Number.isFinite(contentLength) || contentLength <= 0) {
+      console.log(`${contextLabel} Stream metadata incomplete, switching to buffered upload`, {
+        videoId,
+        hasBody: !!response.body,
+        contentLength,
+      });
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const service = r2 ?? new CloudflareR2Service();
+      const upload = await service.uploadFile(buffer, `${videoId}.webm`, contentType, {
+        folder: 'youtube-audio',
+        expiresIn: 24,
+        makePublic: true,
+      });
+      console.log(`${contextLabel} Buffered upload via helper succeeded`, {
+        videoId,
+        key: upload.key,
+        publicUrl: upload.publicUrl,
+      });
+      return upload.publicUrl || upload.url;
+    }
+
+    const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+    const s3 = new S3Client({
+      region: process.env.STORAGE_REGION || 'auto',
+      endpoint: process.env.STORAGE_ENDPOINT,
+      credentials: {
+        accessKeyId: process.env.STORAGE_ACCESS_KEY || '',
+        secretAccessKey: process.env.STORAGE_SECRET_KEY || '',
+      },
+    });
+
+    const nodeStream = Readable.fromWeb(response.body as any);
+    await s3.send(new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: nodeStream,
+      ContentType: contentType,
+      ContentLength: contentLength,
+      Metadata: {
+        'upload-time': new Date().toISOString(),
+        source: 'youtube-prepare',
+      },
+    }));
+    console.log(`${contextLabel} Stream upload to R2 succeeded`, {
+      videoId,
+      key,
+      targetPublicUrl,
+      contentType,
+      contentLength,
+    });
+    return targetPublicUrl;
+  };
+
+  try {
+    return await attemptStreamUpload();
+  } catch (streamError) {
+    console.error(`${contextLabel} Stream upload failed, retrying with buffered upload`, streamError);
+    try {
+      const response = await fetch(sourceUrl, { headers });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audio stream (${response.status})`);
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const contentType = response.headers.get('content-type') || 'audio/webm';
+      const service = r2 ?? new CloudflareR2Service();
+      const upload = await service.uploadFile(buffer, `${videoId}.webm`, contentType, {
+        folder: 'youtube-audio',
+        expiresIn: 24,
+        makePublic: true,
+      });
+      console.log(`${contextLabel} Buffered upload retry succeeded`, {
+        videoId,
+        key: upload.key,
+        publicUrl: upload.publicUrl,
+      });
+      return upload.publicUrl || upload.url;
+    } catch (bufferError) {
+      console.error(`${contextLabel} Buffered upload failed`, {
+        videoId,
+        sourceUrl,
+        error: bufferError,
+      });
+      return null;
+    }
   }
 }
 
