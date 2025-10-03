@@ -737,9 +737,19 @@ export class YouTubeService {
 
   private static applyCdnProxy(url: string, cdnProxy: string): string {
     try {
-      const originalUrl = new URL(url);
+      const originalUrl = new URL(url).toString();
+
+      // Support templated proxy strings like https://proxy.workers.dev?target={url}
+      if (cdnProxy.includes('{url}')) {
+        return cdnProxy.replace('{url}', encodeURIComponent(originalUrl));
+      }
+      if (cdnProxy.includes('%s')) {
+        return cdnProxy.replace('%s', encodeURIComponent(originalUrl));
+      }
+
       const proxyUrl = new URL(cdnProxy);
-      proxyUrl.searchParams.set('url', encodeURIComponent(originalUrl.toString()));
+      // Let URLSearchParams handle encoding so the upstream receives the correct URL
+      proxyUrl.searchParams.set('url', originalUrl);
       return proxyUrl.toString();
     } catch (error) {
       console.warn('Failed to apply CDN proxy, using original URL:', error);
