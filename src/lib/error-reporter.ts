@@ -5,13 +5,9 @@ type EmailPayload = {
   text: string;
 };
 
-const fallbackRecipient = 'channelerH@gmail.com';
-const fallbackSender = 'channelerH@gmail.com';
-const fallbackPassword = 'vfauehwoeeuckmqq';
-
-const recipient = process.env.ERROR_ALERT_EMAIL || fallbackRecipient;
-const sender = process.env.ERROR_ALERT_FROM || fallbackSender;
-const appPassword = process.env.ERROR_ALERT_APP_PASSWORD || fallbackPassword;
+const recipient = process.env.ERROR_ALERT_EMAIL || 'channelerH@gmail.com';
+const sender = process.env.ERROR_ALERT_FROM || recipient;
+const appPassword = process.env.ERROR_ALERT_APP_PASSWORD;
 
 if (!appPassword) {
   console.warn('[ErrorReporter] Missing ERROR_ALERT_APP_PASSWORD env variable. Error emails will be disabled.');

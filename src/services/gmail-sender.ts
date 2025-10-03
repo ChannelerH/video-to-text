@@ -11,40 +11,15 @@ export class GmailSender {
   private config: GmailConfig;
   
   constructor() {
-    const fallbackUser = 'channelerH@gmail.com';
-    const fallbackPassword = 'vfauehwoeeuckmqq';
+    const user = process.env.GMAIL_USER || process.env.ERROR_ALERT_FROM || process.env.ERROR_ALERT_EMAIL || 'channelerH@gmail.com';
+    const password = process.env.GMAIL_APP_PASSWORD || process.env.ERROR_ALERT_APP_PASSWORD || '';
 
-    const envUser =
-      process.env.GMAIL_USER ||
-      process.env.ERROR_ALERT_FROM ||
-      process.env.ERROR_ALERT_EMAIL;
-    const envPassword =
-      process.env.GMAIL_APP_PASSWORD ||
-      process.env.ERROR_ALERT_APP_PASSWORD;
-
-    const user = envUser || fallbackUser;
-    const password = envPassword || fallbackPassword;
-    
     this.config = {
       user,
       password,
       host: process.env.GMAIL_SMTP_HOST || 'smtp.gmail.com',
       port: Number(process.env.GMAIL_SMTP_PORT || 465)
     };
-    
-    if (!envUser) {
-      console.warn('[GmailSender] GMAIL_USER/ERROR_ALERT_* not provided; using fallback user');
-    }
-    if (!envPassword) {
-      console.warn('[GmailSender] Gmail app password env not provided; using fallback password');
-    }
-    console.log('[GmailSender] SMTP configuration ready', {
-      host: this.config.host,
-      port: this.config.port,
-      user: this.config.user,
-      usingFallbackUser: !envUser,
-      usingFallbackPassword: !envPassword
-    });
   }
   
   private base64(value: string): string {
