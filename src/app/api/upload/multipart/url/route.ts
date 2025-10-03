@@ -10,11 +10,15 @@ const s3Client = new S3Client({
     accessKeyId: process.env.STORAGE_ACCESS_KEY || '',
     secretAccessKey: process.env.STORAGE_SECRET_KEY || '',
   },
+  forcePathStyle: true,
+  maxAttempts: 5,
 });
 
 export async function POST(request: NextRequest) {
+  let payload: any;
   try {
-    const { uploadId, key, partNumber, contentLength } = await request.json();
+    payload = await request.json();
+    const { uploadId, key, partNumber, contentLength } = payload;
     
     // 验证参数
     if (!uploadId || !key || !partNumber) {
@@ -47,7 +51,8 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Multipart URL generation error:', error);
+    const partNumber = payload?.partNumber;
+    console.error(`[Multipart] URL generation error${partNumber ? ` (part ${partNumber})` : ''}:`, error);
     return NextResponse.json(
       { 
         success: false, 

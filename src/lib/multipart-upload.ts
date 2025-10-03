@@ -19,6 +19,9 @@ export class MultipartUploader {
   private static readonly CHUNK_SIZE = 10 * 1024 * 1024; // 10MB per chunk
   private static readonly MAX_CONCURRENT_UPLOADS = 3; // 最多3个并发上传
   private static readonly MIN_FILE_SIZE_FOR_MULTIPART = 50 * 1024 * 1024; // 50MB以上使用分片
+  private static readonly MAX_URL_RETRIES = 4;
+  private static readonly MAX_PART_UPLOAD_RETRIES = 3;
+  private static readonly RETRY_DELAY_BASE_MS = 800;
   
   private uploadId: string | null = null;
   private key: string | null = null;
@@ -157,48 +160,105 @@ export class MultipartUploader {
    * 上传单个分片
    */
   private async uploadPart(
-    partNumber: number, 
+    partNumber: number,
     data: Blob,
     onProgress?: (bytes: number) => void
   ): Promise<UploadPart> {
-    // 1. 获取预签名URL
-    const urlResponse = await fetch('/api/upload/multipart/url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        uploadId: this.uploadId,
-        key: this.key,
-        partNumber: partNumber,
-        contentLength: data.size
-      })
-    });
-    
-    if (!urlResponse.ok) {
-      throw new Error(`Failed to get presigned URL for part ${partNumber}`);
+    for (let attempt = 1; attempt <= MultipartUploader.MAX_PART_UPLOAD_RETRIES; attempt++) {
+      if (this.aborted) {
+        throw new Error('Upload aborted');
+      }
+
+      try {
+        const url = await this.requestPresignedUrl(partNumber, data.size);
+        const uploadResult = await this.performXhrUpload(url, partNumber, data, onProgress);
+        return uploadResult;
+      } catch (error) {
+        if (attempt === MultipartUploader.MAX_PART_UPLOAD_RETRIES) {
+          throw error instanceof Error
+            ? new Error(`${error.message} (part ${partNumber}, attempt ${attempt})`)
+            : new Error(`Failed to upload part ${partNumber}`);
+        }
+
+        const delay = MultipartUploader.RETRY_DELAY_BASE_MS * attempt;
+        console.warn(`[Multipart] Part ${partNumber} failed (attempt ${attempt}), retrying in ${delay}ms`);
+        await this.delay(delay);
+      }
     }
-    
-    const { data: { url } } = await urlResponse.json();
-    
-    // 2. 上传分片到R2
+
+    throw new Error(`Failed to upload part ${partNumber}`);
+  }
+
+  private async requestPresignedUrl(partNumber: number, contentLength: number): Promise<string> {
+    for (let attempt = 1; attempt <= MultipartUploader.MAX_URL_RETRIES; attempt++) {
+      if (this.aborted) {
+        throw new Error('Upload aborted');
+      }
+
+      try {
+        const response = await fetch('/api/upload/multipart/url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uploadId: this.uploadId,
+            key: this.key,
+            partNumber,
+            contentLength
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to get presigned URL (status ${response.status})`);
+        }
+
+        const json = await response.json();
+        const url = json?.data?.url;
+        if (!url || typeof url !== 'string') {
+          throw new Error('Missing presigned URL in response');
+        }
+
+        if (attempt > 1) {
+          console.log(`[Multipart] Retrieved presigned URL for part ${partNumber} on attempt ${attempt}`);
+        }
+
+        return url;
+      } catch (error) {
+        if (attempt === MultipartUploader.MAX_URL_RETRIES) {
+          throw new Error(`Failed to get presigned URL for part ${partNumber}`);
+        }
+
+        const delay = MultipartUploader.RETRY_DELAY_BASE_MS * attempt;
+        console.warn(`[Multipart] Failed to get presigned URL for part ${partNumber} (attempt ${attempt}):`, error);
+        await this.delay(delay);
+      }
+    }
+
+    throw new Error(`Failed to get presigned URL for part ${partNumber}`);
+  }
+
+  private async performXhrUpload(
+    url: string,
+    partNumber: number,
+    data: Blob,
+    onProgress?: (bytes: number) => void
+  ): Promise<UploadPart> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      
+
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) {
           onProgress?.(event.loaded);
         }
       });
-      
+
       xhr.addEventListener('load', () => {
         if (xhr.status === 200 || xhr.status === 204) {
-          // 从响应头获取ETag
           let etag = xhr.getResponseHeader('ETag');
           if (!etag) {
-            // 如果没有ETag，生成一个假的（R2应该会返回）
             console.warn(`No ETag returned for part ${partNumber}, using placeholder`);
             etag = `"part-${partNumber}"`;
           }
-          // 保留引号，AWS S3需要带引号的ETag
+
           resolve({
             PartNumber: partNumber,
             ETag: etag
@@ -207,14 +267,22 @@ export class MultipartUploader {
           reject(new Error(`Failed to upload part ${partNumber}: Status ${xhr.status}`));
         }
       });
-      
+
       xhr.addEventListener('error', () => {
         reject(new Error(`Network error uploading part ${partNumber}`));
       });
-      
+
+      xhr.addEventListener('abort', () => {
+        reject(new Error('Upload aborted'));
+      });
+
       xhr.open('PUT', url);
       xhr.send(data);
     });
+  }
+
+  private async delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
   
   /**
