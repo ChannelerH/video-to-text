@@ -9,6 +9,7 @@ const isServer = typeof window === 'undefined';
 const isDev = process.env.NODE_ENV === 'development';
 
 const stackCooldownMs = Number(process.env.ERROR_ALERT_COOLDOWN_MS || 5 * 60 * 1000);
+const alwaysNotify = process.env.ERROR_ALERT_ALWAYS_NOTIFY !== 'false';
 const knownStacks = new Map<string, number>();
 
 function normalize(error: unknown): { message: string; stack?: string } {
@@ -62,8 +63,13 @@ export function handleServerError(
     return;
   }
 
-  if (!shouldNotify(stack)) {
+  if (!alwaysNotify && !shouldNotify(stack)) {
     return;
+  }
+
+  if (alwaysNotify && stack) {
+    // Update last-seen timestamp so future lookups still reflect recent activity
+    knownStacks.set(stack, Date.now());
   }
 
   const subject = `[Harku] Server Error: ${message}`;
