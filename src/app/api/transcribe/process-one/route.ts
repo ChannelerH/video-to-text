@@ -65,9 +65,11 @@ export async function POST(request: NextRequest) {
     await db().update(transcriptions).set({ status: 'processing' }).where(eq(transcriptions.job_id, jobRow.job_id));
 
     const service = new TranscriptionService(process.env.REPLICATE_API_TOKEN || '', process.env.DEEPGRAM_API_KEY);
+    const preferredSourceUrl = tr.processed_url || tr.source_url || '';
+
     const req: any = {
       type: tr.source_type,
-      content: tr.source_url || '',
+      content: preferredSourceUrl,
       options: {
         language: tr.language || 'auto',
         userId: userUuid,

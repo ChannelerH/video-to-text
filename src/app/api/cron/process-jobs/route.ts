@@ -72,14 +72,16 @@ export async function GET(request: NextRequest) {
         process.env.DEEPGRAM_API_KEY
       );
 
-      const req: any = {
-        type: transcription.source_type,
-        content: transcription.source_url || '',
-        options: {
-          language: transcription.language || 'auto',
-          userId: job.user_id,
-          userTier: job.tier || 'free',
-          fallbackEnabled: true,
+    const preferredSourceUrl = transcription.processed_url || transcription.source_url || '';
+
+    const req: any = {
+      type: transcription.source_type,
+      content: preferredSourceUrl,
+      options: {
+        language: transcription.language || 'auto',
+        userId: job.user_id,
+        userTier: job.tier || 'free',
+        fallbackEnabled: true,
           isPreview: false
         }
       };
