@@ -686,6 +686,13 @@ export class YouTubeService {
     const { host, key } = this.getRapidApiCredentials();
     const endpoint = `https://${host}/dl?id=${encodeURIComponent(videoId)}`;
 
+    console.log('[YouTube] RapidAPI request start', {
+      videoId,
+      host,
+      attempt,
+      forceRefresh,
+    });
+
     const response = await fetch(endpoint, {
       headers: {
         'x-rapidapi-host': host,
@@ -695,6 +702,13 @@ export class YouTubeService {
     });
 
     const rawBody = await response.text();
+
+    console.log('[YouTube] RapidAPI response meta', {
+      status: response.status,
+      statusText: response.statusText,
+      length: rawBody.length,
+      attempt,
+    });
 
     if (!response.ok) {
       console.error('[YouTube] RapidAPI request failed', {
@@ -715,6 +729,16 @@ export class YouTubeService {
       });
       throw new Error('RapidAPI response is not valid JSON');
     }
+
+    console.log('[YouTube] RapidAPI parsed data', {
+      status: data.status,
+      msg: data.msg,
+      link: data.link,
+      filesize: data.filesize,
+      duration: data.duration,
+      progress: data.progress,
+      attempt,
+    });
 
     if (!data) {
       throw new Error('RapidAPI response is empty');
