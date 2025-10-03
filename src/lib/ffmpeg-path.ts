@@ -6,17 +6,32 @@ import { spawnSync } from 'child_process';
 
 let cachedPath: string | null = null;
 
-function safeRequireResolve(moduleId: string): string | null {
+function resolveInstallerPackageJson(): string | null {
   try {
-    const resolved = require.resolve(moduleId);
+    const resolved = require.resolve('@ffmpeg-installer/ffmpeg/package.json');
     if (typeof resolved === 'string') {
       return resolved;
     }
-    console.warn(`[ffmpeg-path] require.resolve(${moduleId}) returned non-string (${typeof resolved}); ignoring`);
+    console.warn('[ffmpeg-path] require.resolve(@ffmpeg-installer/ffmpeg/package.json) returned non-string');
     return null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.log(`[ffmpeg-path] require.resolve(${moduleId}) failed: ${message}`);
+    console.log(`[ffmpeg-path] require.resolve(@ffmpeg-installer/ffmpeg/package.json) failed: ${message}`);
+    return null;
+  }
+}
+
+function resolveFfmpegStaticModule(): string | null {
+  try {
+    const resolved = require.resolve('ffmpeg-static');
+    if (typeof resolved === 'string') {
+      return resolved;
+    }
+    console.warn('[ffmpeg-path] require.resolve(ffmpeg-static) returned non-string');
+    return null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[ffmpeg-path] require.resolve(ffmpeg-static) failed: ${message}`);
     return null;
   }
 }
@@ -25,7 +40,7 @@ function resolveInstallerBinary(): string | null {
   const platformKey = `${os.platform()}-${os.arch()}`;
   const binaryName = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
 
-  const packagePath = safeRequireResolve('@ffmpeg-installer/ffmpeg/package.json');
+  const packagePath = resolveInstallerPackageJson();
   if (packagePath) {
     try {
       const packageDir = dirname(packagePath);
@@ -164,7 +179,7 @@ export function getFfmpegPath(): string {
       join(process.cwd(), 'node_modules', 'ffmpeg-static', 'ffmpeg'),
     ];
 
-    const resolvedStaticPath = safeRequireResolve('ffmpeg-static');
+    const resolvedStaticPath = resolveFfmpegStaticModule();
     if (resolvedStaticPath) {
       staticAlternatives.push(join(dirname(resolvedStaticPath), 'ffmpeg'));
     }
