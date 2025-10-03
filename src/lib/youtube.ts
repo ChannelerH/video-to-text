@@ -343,96 +343,115 @@ export class YouTubeService {
       onError
     } = options;
 
-    try {
-      const audioFormat = await this.selectOptimizedAudioFormat(videoId, { preferSmallSize: false });
-      const originalUrl = audioFormat.url;
-      const attempts: Array<{ url: string; viaProxy: boolean }> = [];
-      const baseLabel = options.debugLabel || null;
+    let refreshAttempted = false;
 
-      let proxiedUrl = originalUrl;
-      if (cdnProxy) {
-        proxiedUrl = this.applyCdnProxy(originalUrl, cdnProxy);
-        if (proxiedUrl !== originalUrl) {
-          attempts.push({ url: proxiedUrl, viaProxy: true });
+    while (true) {
+      try {
+        const audioFormat = await this.selectOptimizedAudioFormat(videoId, { preferSmallSize: false });
+        const originalUrl = audioFormat.url;
+        const attempts: Array<{ url: string; viaProxy: boolean }> = [];
+        const baseLabel = options.debugLabel || null;
+
+        let proxiedUrl = originalUrl;
+        if (cdnProxy) {
+          proxiedUrl = this.applyCdnProxy(originalUrl, cdnProxy);
+          if (proxiedUrl !== originalUrl) {
+            attempts.push({ url: proxiedUrl, viaProxy: true });
+          }
         }
-      }
 
-      attempts.push({ url: originalUrl, viaProxy: false });
+        attempts.push({ url: originalUrl, viaProxy: false });
 
-      const logTarget = (target: string, viaProxy: boolean) => {
-        try {
-          const parsed = new URL(target);
-          console.log('[YouTube] Download target selected', {
-            host: parsed.host,
-            pathname: parsed.pathname,
-            viaProxy,
-          });
-        } catch (err) {
-          console.warn('[YouTube] Failed to parse download target for logging', err);
-        }
-      };
+        const logTarget = (target: string, viaProxy: boolean) => {
+          try {
+            const parsed = new URL(target);
+            console.log('[YouTube] Download target selected', {
+              host: parsed.host,
+              pathname: parsed.pathname,
+              viaProxy,
+            });
+          } catch (err) {
+            console.warn('[YouTube] Failed to parse download target for logging', err);
+          }
+        };
 
-      const performDownload = async (targetUrl: string, viaProxy: boolean) => {
-        const debugLabel = baseLabel
-          ? `${baseLabel}:${viaProxy ? 'proxy' : 'direct'}`
-          : viaProxy ? 'proxy' : 'direct';
+        const performDownload = async (targetUrl: string, viaProxy: boolean) => {
+          const debugLabel = baseLabel
+            ? `${baseLabel}:${viaProxy ? 'proxy' : 'direct'}`
+            : viaProxy ? 'proxy' : 'direct';
 
-        if (enableParallelDownload && (audioFormat.supportsRangeRequests ?? true) && audioFormat.contentLength) {
-          return await this.downloadWithParallelChunks(targetUrl, audioFormat.contentLength, {
-            chunkSize,
-            maxConcurrentChunks,
+          if (enableParallelDownload && (audioFormat.supportsRangeRequests ?? true) && audioFormat.contentLength) {
+            return await this.downloadWithParallelChunks(targetUrl, audioFormat.contentLength, {
+              chunkSize,
+              maxConcurrentChunks,
+              timeout,
+              retryAttempts,
+              retryDelay,
+              onProgress,
+              onError,
+              debugLabel,
+            });
+          }
+
+          return await this.downloadWithStream(targetUrl, {
             timeout,
             retryAttempts,
             retryDelay,
             onProgress,
             onError,
+            totalSize: audioFormat.contentLength,
             debugLabel,
           });
-        }
+        };
 
-        return await this.downloadWithStream(targetUrl, {
-          timeout,
-          retryAttempts,
-          retryDelay,
-          onProgress,
-          onError,
-          totalSize: audioFormat.contentLength,
-          debugLabel,
-        });
-      };
-
-      let lastError: unknown;
-      for (const attempt of attempts) {
-        logTarget(attempt.url, attempt.viaProxy);
-        try {
-          return await performDownload(attempt.url, attempt.viaProxy);
-        } catch (err) {
-          lastError = err;
-          const message = err instanceof Error ? err.message : String(err);
-          console.warn('[YouTube] Download attempt failed', {
-            viaProxy: attempt.viaProxy,
-            message,
-            host: (() => { try { return new URL(attempt.url).host; } catch { return null; } })(),
-          });
-
-          const isNotFound = typeof message === 'string' && /HTTP\s+404/.test(message);
-          if (!attempt.viaProxy || !isNotFound) {
-            console.warn('[YouTube] Download failed without proxy fallback', {
+        let lastError: unknown;
+        for (const attempt of attempts) {
+          logTarget(attempt.url, attempt.viaProxy);
+          try {
+            return await performDownload(attempt.url, attempt.viaProxy);
+          } catch (err) {
+            lastError = err;
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn('[YouTube] Download attempt failed', {
               viaProxy: attempt.viaProxy,
+              message,
+              host: (() => { try { return new URL(attempt.url).host; } catch { return null; } })(),
             });
-            break;
+
+            const isNotFound = typeof message === 'string' && /HTTP\s+404/.test(message);
+            if (!attempt.viaProxy || !isNotFound) {
+              console.warn('[YouTube] Download failed without proxy fallback', {
+                viaProxy: attempt.viaProxy,
+              });
+              break;
+            }
+
+            console.warn('[YouTube] Proxy responded with 404, retrying with original URL');
           }
-
-          console.warn('[YouTube] Proxy responded with 404, retrying with original URL');
         }
-      }
 
-      throw lastError ?? new Error('YouTube download failed without explicit error');
-    } catch (error) {
-      if (onError) {
-        onError(error as Error);
+        throw lastError ?? new Error('YouTube download failed without explicit error');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const isNotFound = typeof message === 'string' && /HTTP\s+404/.test(message);
+
+        if (isNotFound && !refreshAttempted) {
+          console.warn('[YouTube] Download failed with 404, refreshing RapidAPI data and retrying');
+          refreshAttempted = true;
+          try {
+            await this.fetchVideoData(videoId, true);
+          } catch (refreshError) {
+            console.error('[YouTube] RapidAPI refresh failed', refreshError);
+            throw error;
+          }
+          continue;
+        }
+
+        if (onError) {
+          onError(error as Error);
+        }
+        throw error;
       }
-      throw error;
     }
   }
 
