@@ -5,26 +5,46 @@ import { ffmpegEnabled } from '@/lib/ffmpeg-config';
 
 let cachedPath: string | null = null;
 
+function safeRequireResolve(moduleId: string): string | null {
+  try {
+    const resolved = require.resolve(moduleId);
+    if (typeof resolved === 'string') {
+      return resolved;
+    }
+    console.warn(`[ffmpeg-path] require.resolve(${moduleId}) returned non-string (${typeof resolved}); ignoring`);
+    return null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[ffmpeg-path] require.resolve(${moduleId}) failed: ${message}`);
+    return null;
+  }
+}
+
 function resolveInstallerBinary(): string | null {
   const platformKey = `${os.platform()}-${os.arch()}`;
   const binaryName = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
 
-  try {
-    const packageDir = dirname(require.resolve('@ffmpeg-installer/ffmpeg/package.json'));
-    const candidateRoots = [
-      resolve(packageDir, '..', platformKey),
-      resolve(packageDir, platformKey),
-    ];
+  const packagePath = safeRequireResolve('@ffmpeg-installer/ffmpeg/package.json');
+  if (packagePath) {
+    try {
+      const packageDir = dirname(packagePath);
+      const candidateRoots = [
+        resolve(packageDir, '..', platformKey),
+        resolve(packageDir, platformKey),
+      ];
 
-    for (const root of candidateRoots) {
-      const candidate = join(root, binaryName);
-      if (existsSync(candidate)) {
-        return candidate;
+      for (const root of candidateRoots) {
+        const candidate = join(root, binaryName);
+        if (existsSync(candidate)) {
+          return candidate;
+        }
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`[ffmpeg-path] @ffmpeg-installer/ffmpeg not available: ${message}`);
     }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.log(`[ffmpeg-path] @ffmpeg-installer/ffmpeg not available: ${message}`);
+  } else {
+    console.log('[ffmpeg-path] @ffmpeg-installer/ffmpeg package.json not resolved; skipping installer binary lookup');
   }
 
   const fallbackRoots = [
@@ -135,8 +155,12 @@ export function getFfmpegPath(): string {
     // Try to find ffmpeg-static in node_modules
     const staticAlternatives = [
       join(process.cwd(), 'node_modules', 'ffmpeg-static', 'ffmpeg'),
-      join(dirname(require.resolve('ffmpeg-static')), 'ffmpeg'),
     ];
+
+    const resolvedStaticPath = safeRequireResolve('ffmpeg-static');
+    if (resolvedStaticPath) {
+      staticAlternatives.push(join(dirname(resolvedStaticPath), 'ffmpeg'));
+    }
 
     for (const altPath of staticAlternatives) {
       if (existsSync(altPath)) {
