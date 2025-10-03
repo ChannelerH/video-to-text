@@ -34,6 +34,7 @@ export interface DownloadOptions {
   cdnProxy?: string;
   onProgress?: (progress: DownloadProgress) => void;
   onError?: (error: Error) => void;
+  debugLabel?: string; // optional hint to tag logs
 }
 
 export interface OptimizedAudioFormat {
@@ -344,32 +345,89 @@ export class YouTubeService {
 
     try {
       const audioFormat = await this.selectOptimizedAudioFormat(videoId, { preferSmallSize: false });
-      let audioUrl = audioFormat.url;
+      const originalUrl = audioFormat.url;
+      const attempts: Array<{ url: string; viaProxy: boolean }> = [];
+      const baseLabel = options.debugLabel || null;
 
+      let proxiedUrl = originalUrl;
       if (cdnProxy) {
-        audioUrl = this.applyCdnProxy(audioUrl, cdnProxy);
+        proxiedUrl = this.applyCdnProxy(originalUrl, cdnProxy);
+        if (proxiedUrl !== originalUrl) {
+          attempts.push({ url: proxiedUrl, viaProxy: true });
+        }
       }
 
-      if (enableParallelDownload && (audioFormat.supportsRangeRequests ?? true) && audioFormat.contentLength) {
-        return await this.downloadWithParallelChunks(audioUrl, audioFormat.contentLength, {
-          chunkSize,
-          maxConcurrentChunks,
+      attempts.push({ url: originalUrl, viaProxy: false });
+
+      const logTarget = (target: string, viaProxy: boolean) => {
+        try {
+          const parsed = new URL(target);
+          console.log('[YouTube] Download target selected', {
+            host: parsed.host,
+            pathname: parsed.pathname,
+            viaProxy,
+          });
+        } catch (err) {
+          console.warn('[YouTube] Failed to parse download target for logging', err);
+        }
+      };
+
+      const performDownload = async (targetUrl: string, viaProxy: boolean) => {
+        const debugLabel = baseLabel
+          ? `${baseLabel}:${viaProxy ? 'proxy' : 'direct'}`
+          : viaProxy ? 'proxy' : 'direct';
+
+        if (enableParallelDownload && (audioFormat.supportsRangeRequests ?? true) && audioFormat.contentLength) {
+          return await this.downloadWithParallelChunks(targetUrl, audioFormat.contentLength, {
+            chunkSize,
+            maxConcurrentChunks,
+            timeout,
+            retryAttempts,
+            retryDelay,
+            onProgress,
+            onError,
+            debugLabel,
+          });
+        }
+
+        return await this.downloadWithStream(targetUrl, {
           timeout,
           retryAttempts,
           retryDelay,
           onProgress,
           onError,
+          totalSize: audioFormat.contentLength,
+          debugLabel,
         });
+      };
+
+      let lastError: unknown;
+      for (const attempt of attempts) {
+        logTarget(attempt.url, attempt.viaProxy);
+        try {
+          return await performDownload(attempt.url, attempt.viaProxy);
+        } catch (err) {
+          lastError = err;
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn('[YouTube] Download attempt failed', {
+            viaProxy: attempt.viaProxy,
+            message,
+            host: (() => { try { return new URL(attempt.url).host; } catch { return null; } })(),
+          });
+
+          const isNotFound = typeof message === 'string' && /HTTP\s+404/.test(message);
+          if (!attempt.viaProxy || !isNotFound) {
+            console.warn('[YouTube] Download failed without proxy fallback', {
+              viaProxy: attempt.viaProxy,
+            });
+            break;
+          }
+
+          console.warn('[YouTube] Proxy responded with 404, retrying with original URL');
+        }
       }
 
-      return await this.downloadWithStream(audioUrl, {
-        timeout,
-        retryAttempts,
-        retryDelay,
-        onProgress,
-        onError,
-        totalSize: audioFormat.contentLength,
-      });
+      throw lastError ?? new Error('YouTube download failed without explicit error');
     } catch (error) {
       if (onError) {
         onError(error as Error);
@@ -737,19 +795,37 @@ export class YouTubeService {
 
   private static applyCdnProxy(url: string, cdnProxy: string): string {
     try {
-      const originalUrl = new URL(url).toString();
+      const parsedOriginal = new URL(url);
+      const originalUrl = parsedOriginal.toString();
 
-      // Support templated proxy strings like https://proxy.workers.dev?target={url}
+      console.log('[YouTube] Applying CDN proxy', {
+        proxy: cdnProxy,
+        originalHost: parsedOriginal.host,
+      });
+
       if (cdnProxy.includes('{url}')) {
-        return cdnProxy.replace('{url}', encodeURIComponent(originalUrl));
+        const proxied = cdnProxy.replace('{url}', encodeURIComponent(originalUrl));
+        console.log('[YouTube] Proxy template resolved', {
+          viaTemplate: true,
+          host: (() => { try { return new URL(proxied).host; } catch { return null; } })(),
+        });
+        return proxied;
       }
       if (cdnProxy.includes('%s')) {
-        return cdnProxy.replace('%s', encodeURIComponent(originalUrl));
+        const proxied = cdnProxy.replace('%s', encodeURIComponent(originalUrl));
+        console.log('[YouTube] Proxy template resolved', {
+          viaTemplate: true,
+          host: (() => { try { return new URL(proxied).host; } catch { return null; } })(),
+        });
+        return proxied;
       }
 
       const proxyUrl = new URL(cdnProxy);
-      // Let URLSearchParams handle encoding so the upstream receives the correct URL
       proxyUrl.searchParams.set('url', originalUrl);
+      console.log('[YouTube] Proxy URL constructed', {
+        host: proxyUrl.host,
+        pathname: proxyUrl.pathname,
+      });
       return proxyUrl.toString();
     } catch (error) {
       console.warn('Failed to apply CDN proxy, using original URL:', error);
@@ -768,9 +844,26 @@ export class YouTubeService {
       retryDelay: number;
       onProgress?: (progress: DownloadProgress) => void;
       onError?: (error: Error) => void;
+      debugLabel?: string;
     }
   ): Promise<Buffer> {
-    const { chunkSize, maxConcurrentChunks, timeout, retryAttempts, retryDelay, onProgress, onError } = options;
+    const { chunkSize, maxConcurrentChunks, timeout, retryAttempts, retryDelay, onProgress, onError, debugLabel } = options;
+
+    const debugHost = (() => {
+      try {
+        return new URL(url).host;
+      } catch {
+        return 'unknown';
+      }
+    })();
+
+    console.log('[YouTube] Parallel download start', {
+      host: debugHost,
+      totalSize,
+      chunkSize,
+      maxConcurrentChunks,
+      debugLabel,
+    });
 
     const chunks: Buffer[] = [];
     const totalChunks = Math.ceil(totalSize / chunkSize);
@@ -795,7 +888,8 @@ export class YouTubeService {
           chunkIndex,
           timeout,
           retryAttempts,
-          retryDelay
+          retryDelay,
+          debugLabel
         ).then(buffer => {
           completedChunks++;
           bytesDownloaded += buffer.length;
@@ -834,6 +928,11 @@ export class YouTubeService {
     const results = await Promise.all(chunkTasks);
     results.sort((a, b) => a.index - b.index);
     const finalBuffer = Buffer.concat(results.map(r => r.buffer));
+    console.log('[YouTube] Parallel download complete', {
+      host: debugHost,
+      totalBytes: finalBuffer.length,
+      debugLabel,
+    });
     return finalBuffer;
   }
 
@@ -844,12 +943,21 @@ export class YouTubeService {
     chunkIndex: number,
     timeout: number,
     retryAttempts: number,
-    retryDelay: number
+    retryDelay: number,
+    debugLabel?: string
   ): Promise<Buffer> {
     for (let attempt = 1; attempt <= retryAttempts; attempt++) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+        console.log('[YouTube] Chunk request', {
+          attempt,
+          chunkIndex,
+          start,
+          end,
+          debugLabel,
+        });
 
         const response = await fetch(url, {
           headers: {
@@ -862,21 +970,47 @@ export class YouTubeService {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
+          console.warn('[YouTube] Chunk response not ok', {
+            status: response.status,
+            statusText: response.statusText,
+            chunkIndex,
+            attempt,
+            debugLabel,
+          });
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
         if (response.status === 206 || response.status === 200) {
+          console.log('[YouTube] Chunk response ok', {
+            status: response.status,
+            chunkIndex,
+            attempt,
+            bytes: response.headers.get('content-length') || 'unknown',
+            debugLabel,
+          });
           const arrayBuffer = await response.arrayBuffer();
           return Buffer.from(arrayBuffer);
         }
 
         throw new Error(`Unexpected status code: ${response.status}`);
       } catch (error) {
+        console.warn('[YouTube] Chunk download error', {
+          attempt,
+          chunkIndex,
+          message: error instanceof Error ? error.message : String(error),
+          debugLabel,
+        });
         if (attempt === retryAttempts) {
           throw error;
         }
 
         const delay = retryDelay * Math.pow(2, attempt - 1);
+        console.log('[YouTube] Chunk retry scheduled', {
+          delay,
+          nextAttempt: attempt + 1,
+          chunkIndex,
+          debugLabel,
+        });
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -893,14 +1027,30 @@ export class YouTubeService {
       onProgress?: (progress: DownloadProgress) => void;
       onError?: (error: Error) => void;
       totalSize?: number;
+      debugLabel?: string;
     }
   ): Promise<Buffer> {
-    const { timeout, retryAttempts, retryDelay, onProgress, onError, totalSize } = options;
+    const { timeout, retryAttempts, retryDelay, onProgress, onError, totalSize, debugLabel } = options;
+
+    const debugHost = (() => {
+      try {
+        return new URL(url).host;
+      } catch {
+        return 'unknown';
+      }
+    })();
 
     for (let attempt = 1; attempt <= retryAttempts; attempt++) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+        console.log('[YouTube] Stream download attempt', {
+          attempt,
+          host: debugHost,
+          totalSize,
+          debugLabel,
+        });
 
         const response = await fetch(url, {
           headers: {
@@ -912,8 +1062,20 @@ export class YouTubeService {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
+          console.warn('[YouTube] Stream response not ok', {
+            status: response.status,
+            statusText: response.statusText,
+            attempt,
+            debugLabel,
+          });
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+
+        console.log('[YouTube] Stream response ok', {
+          status: response.status,
+          contentLength: response.headers.get('content-length') || 'unknown',
+          debugLabel,
+        });
 
         const chunks: Buffer[] = [];
         let bytesDownloaded = 0;
@@ -952,7 +1114,13 @@ export class YouTubeService {
           reader.releaseLock();
         }
 
-        return Buffer.concat(chunks);
+        const buffer = Buffer.concat(chunks);
+        console.log('[YouTube] Stream download complete', {
+          host: debugHost,
+          totalBytes: buffer.length,
+          debugLabel,
+        });
+        return buffer;
       } catch (error) {
         if (attempt === retryAttempts) {
           if (onError) {
@@ -962,6 +1130,12 @@ export class YouTubeService {
         }
 
         const delay = retryDelay * Math.pow(2, attempt - 1);
+        console.log('[YouTube] Stream retry scheduled', {
+          delay,
+          nextAttempt: attempt + 1,
+          host: debugHost,
+          debugLabel,
+        });
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
