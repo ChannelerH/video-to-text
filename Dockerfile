@@ -1,5 +1,5 @@
 FROM node:20-alpine AS base
-RUN apk add --no-cache ffmpeg libc6-compat
+RUN apk add --no-cache ffmpeg libc6-compat bash
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -32,6 +32,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+COPY --from=builder --chown=nextjs:nodejs /app/start.sh ./start.sh
 
 USER nextjs
 
@@ -42,5 +44,8 @@ ENV NODE_ENV production
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
+# Ensure entrypoint scripts are executable
+RUN chmod +x ./start.sh ./scripts/queue-worker.mjs
+
 # server.js is created by next build from the standalone output
-CMD ["node", "server.js"]
+CMD ["./start.sh"]
