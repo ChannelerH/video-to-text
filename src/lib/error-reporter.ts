@@ -155,5 +155,10 @@ export function reportError(subject: string, text: string) {
   }
 
   emailQueue.push({ subject, text });
+  if (!flushing) {
+    flushQueue().catch((error) => {
+      console.error('[ErrorReporter] flushQueue error:', error);
+    });
+  }
   scheduleFlush();
 }
