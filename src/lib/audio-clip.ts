@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import { getFfmpegPath } from '@/lib/ffmpeg-path';
 import { ffmpegEnabled } from '@/lib/ffmpeg-config';
+import { logger } from '@/lib/logger';
 
 /**
  * Fallback to Cloudflare Worker for audio clipping if local ffmpeg fails
@@ -110,6 +111,14 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
 
       proc.on('error', async (err) => {
         console.error('[ffmpeg] spawn failed:', err);
+        logger.error(err, {
+          context: 'ffmpeg_spawn_error',
+          payload: {
+            audioUrl: safeUrlLog,
+            clipSeconds,
+            offsetSeconds,
+          },
+        });
 
         // Try worker fallback
         const workerResult = await clipAudioViaWorker(audioUrl, clipSeconds, offsetSeconds);
@@ -140,6 +149,17 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
           code,
           signal,
           stderr,
+        });
+        logger.error(new Error(`ffmpeg exited with code ${code ?? 'null'}${signal ? ` signal ${signal}` : ''}`), {
+          context: 'ffmpeg_process_exit',
+          payload: {
+            code,
+            signal,
+            stderr,
+            audioUrl: safeUrlLog,
+            clipSeconds,
+            offsetSeconds,
+          },
         });
 
         const workerResult = await clipAudioViaWorker(audioUrl, clipSeconds, offsetSeconds);
