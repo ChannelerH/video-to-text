@@ -46,15 +46,17 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
 
   // On Vercel, skip local ffmpeg entirely and use worker
   const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+  const forceWorker = process.env.FFMPEG_FORCE_WORKER === 'true';
   console.log('[audio-clip] Environment check:', {
     VERCEL: process.env.VERCEL,
     VERCEL_ENV: process.env.VERCEL_ENV,
     isVercel,
+    forceWorker,
     AUDIO_CLIP_WORKER_URL: process.env.AUDIO_CLIP_WORKER_URL ? 'configured' : 'missing'
   });
 
-  if (isVercel) {
-    console.log('[audio-clip] Running on Vercel, using Cloudflare Worker for clipping');
+  if (isVercel || forceWorker) {
+    console.log('[audio-clip] Using Cloudflare Worker for clipping');
     const workerResult = await clipAudioViaWorker(audioUrl, clipSeconds, offsetSeconds);
     if (workerResult) {
       console.log('[audio-clip] Successfully clipped via Cloudflare Worker');
@@ -118,7 +120,7 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
           reject(new Error(`ffmpeg spawn failed: ${err.message}`));
         }
       });
-      proc.on('close', (code) => {
+      proc.on('close', async (code, signal) => {
         if (code === 0) {
           const buf = Buffer.concat(chunks);
           const expectedSize = clipSeconds * 16000 * 2; // 16kHz, 16-bit mono
@@ -130,10 +132,22 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
             sizeRatio: (buf.length / expectedSize).toFixed(2)
           });
           resolve(buf);
+          return;
+        }
+
+        const stderr = Buffer.concat(errChunks).toString('utf8');
+        console.error(`[ffmpeg] exited abnormally`, {
+          code,
+          signal,
+          stderr,
+        });
+
+        const workerResult = await clipAudioViaWorker(audioUrl, clipSeconds, offsetSeconds);
+        if (workerResult) {
+          console.log('[audio-clip] Successfully clipped via worker fallback after ffmpeg exit');
+          resolve(workerResult);
         } else {
-          const stderr = Buffer.concat(errChunks).toString('utf8');
-          console.error(`[ffmpeg] exited with code ${code}:`, stderr);
-          reject(new Error(`ffmpeg exited with code ${code}: ${stderr}`));
+          reject(new Error(`ffmpeg exited with code ${code ?? 'null'}${signal ? ` signal ${signal}` : ''}: ${stderr}`));
         }
       });
     } catch (e: any) {

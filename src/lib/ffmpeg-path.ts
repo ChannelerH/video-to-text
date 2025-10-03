@@ -2,6 +2,7 @@ import { existsSync, chmodSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import os from 'os';
 import { ffmpegEnabled } from '@/lib/ffmpeg-config';
+import { spawnSync } from 'child_process';
 
 let cachedPath: string | null = null;
 
@@ -102,9 +103,12 @@ export function getFfmpegPath(): string {
         } catch (e) {
           console.warn(`[ffmpeg-path] Could not chmod ${installerPath}:`, e);
         }
-        console.log(`[ffmpeg-path] Using @ffmpeg-installer: ${installerPath}`);
-        cachedPath = installerPath;
-        return cachedPath;
+        if (verifyBinary(installerPath, '@ffmpeg-installer')) {
+          console.log(`[ffmpeg-path] Using @ffmpeg-installer: ${installerPath}`);
+          cachedPath = installerPath;
+          return cachedPath;
+        }
+        console.log(`[ffmpeg-path] @ffmpeg-installer binary failed verification; falling back`);
       }
     } catch (e) {
       console.error(`[ffmpeg-path] Error verifying installer path ${installerPath}:`, e);
@@ -147,9 +151,12 @@ export function getFfmpegPath(): string {
       } catch (e) {
         console.warn(`[ffmpeg-path] Could not chmod ${candidate}:`, e);
       }
-      console.log(`[ffmpeg-path] Using ffmpeg-static: ${candidate}`);
-      cachedPath = candidate;
-      return cachedPath;
+      if (verifyBinary(candidate, 'ffmpeg-static')) {
+        console.log(`[ffmpeg-path] Using ffmpeg-static: ${candidate}`);
+        cachedPath = candidate;
+        return cachedPath;
+      }
+      console.log('[ffmpeg-path] ffmpeg-static binary failed verification; trying alternatives');
     }
 
     // Try to find ffmpeg-static in node_modules
@@ -169,9 +176,12 @@ export function getFfmpegPath(): string {
         } catch (e) {
           console.warn(`[ffmpeg-path] Could not chmod ${altPath}:`, e);
         }
-        console.log(`[ffmpeg-path] Using alternative ffmpeg-static path: ${altPath}`);
-        cachedPath = altPath;
-        return cachedPath;
+        if (verifyBinary(altPath, 'ffmpeg-static alt')) {
+          console.log(`[ffmpeg-path] Using alternative ffmpeg-static path: ${altPath}`);
+          cachedPath = altPath;
+          return cachedPath;
+        }
+        console.log(`[ffmpeg-path] Alternative ffmpeg-static path failed verification: ${altPath}`);
       }
     }
   }
@@ -186,13 +196,54 @@ export function getFfmpegPath(): string {
 
   for (const path of systemPaths) {
     if (path !== 'ffmpeg' && existsSync(path)) {
-      console.log(`[ffmpeg-path] Found system ffmpeg: ${path}`);
-      cachedPath = path;
-      return cachedPath;
+      if (verifyBinary(path, 'system ffmpeg')) {
+        console.log(`[ffmpeg-path] Found system ffmpeg: ${path}`);
+        cachedPath = path;
+        return cachedPath;
+      }
+      console.log(`[ffmpeg-path] System ffmpeg failed verification: ${path}`);
     }
   }
 
   console.log(`[ffmpeg-path] No ffmpeg found, falling back to PATH: ffmpeg`);
   cachedPath = 'ffmpeg';
   return cachedPath;
+}
+
+function verifyBinary(binaryPath: string, label: string): boolean {
+  try {
+    const result = spawnSync(binaryPath, ['-version'], {
+      stdio: 'pipe',
+      windowsHide: true,
+      timeout: 5000,
+    });
+
+    if (result.error) {
+      console.log(`[ffmpeg-path] ${label} verification spawn error: ${result.error.message}`);
+      return false;
+    }
+
+    if (typeof result.status === 'number' && result.status === 0) {
+      return true;
+    }
+
+    const stderr = Buffer.isBuffer(result.stderr)
+      ? result.stderr.toString('utf8').trim()
+      : (result.stderr ? String(result.stderr).trim() : '');
+    const stdout = Buffer.isBuffer(result.stdout)
+      ? result.stdout.toString('utf8').trim()
+      : (result.stdout ? String(result.stdout).trim() : '');
+    console.log(`[ffmpeg-path] ${label} verification failed with status ${result.status ?? 'null'}${result.signal ? ` signal ${result.signal}` : ''}`);
+    if (stderr) {
+      console.log(`[ffmpeg-path] ${label} verification stderr: ${stderr}`);
+    }
+    if (stdout) {
+      console.log(`[ffmpeg-path] ${label} verification stdout: ${stdout}`);
+    }
+    return false;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[ffmpeg-path] ${label} verification threw: ${message}`);
+    return false;
+  }
 }
