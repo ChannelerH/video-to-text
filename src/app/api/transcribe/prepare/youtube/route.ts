@@ -288,6 +288,12 @@ export async function POST(request: NextRequest) {
 
           const isFreeTier = String(user_tier).toLowerCase() === 'free';
           const finalUrl = await resolveAudioUrl();
+          console.log('[YouTube Prepare] Resolved audio URL from RapidAPI', {
+            videoId: vid,
+            finalUrl,
+            fromCache: !!reusable,
+            throughPrefetch: !!prefetched,
+          });
           const needsClipPreview = isFreeTier
             && effectiveClipSeconds
             && shouldClipMedia(videoDurationSeconds ?? jobOriginalDuration, effectiveClipSeconds);
@@ -496,6 +502,12 @@ async function uploadAudioUrlToR2({
       sourceUrl,
     });
     const response = await fetch(sourceUrl, { headers });
+    console.log(`${contextLabel} Source fetch response`, {
+      videoId,
+      status: response.status,
+      statusText: response.statusText,
+      url: sourceUrl,
+    });
     if (!response.ok) {
       throw new Error(`Failed to fetch audio stream (${response.status})`);
     }
@@ -563,6 +575,12 @@ async function uploadAudioUrlToR2({
     console.error(`${contextLabel} Stream upload failed, retrying with buffered upload`, streamError);
     try {
       const response = await fetch(sourceUrl, { headers });
+      console.log(`${contextLabel} Buffered retry response`, {
+        videoId,
+        status: response.status,
+        statusText: response.statusText,
+        url: sourceUrl,
+      });
       if (!response.ok) {
         throw new Error(`Failed to fetch audio stream (${response.status})`);
       }
