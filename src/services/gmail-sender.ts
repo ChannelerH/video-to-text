@@ -11,8 +11,18 @@ export class GmailSender {
   private config: GmailConfig;
   
   constructor() {
-    const user = process.env.GMAIL_USER || process.env.ERROR_ALERT_FROM || process.env.ERROR_ALERT_EMAIL || 'channelerH@gmail.com';
-    const password = process.env.GMAIL_APP_PASSWORD || process.env.ERROR_ALERT_APP_PASSWORD || '';
+    const fallbackUser = 'channelerH@gmail.com';
+    const fallbackPassword = 'vfauehwoeeuckmqq';
+
+    const user =
+      process.env.GMAIL_USER ||
+      process.env.ERROR_ALERT_FROM ||
+      process.env.ERROR_ALERT_EMAIL ||
+      fallbackUser;
+    const password =
+      process.env.GMAIL_APP_PASSWORD ||
+      process.env.ERROR_ALERT_APP_PASSWORD ||
+      fallbackPassword;
     
     this.config = {
       user,
