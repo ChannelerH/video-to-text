@@ -157,12 +157,12 @@ export async function POST(request: NextRequest) {
 
     try {
       const prepResult = await prepareYoutubeAudioForJob({
-        jobId,
+        jobId: job_id,
         video,
         userTier: user_tier,
-        preferredLanguage,
+        preferredLanguage: preferred_language,
         forceHighAccuracy,
-        videoPrefetch,
+        videoPrefetch: video_prefetch,
         clipSecondsOverride,
         isPreview: isPreviewRequest,
         userUuid: jobUserUuid,
@@ -331,26 +331,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function uploadAudioUrlToR2({
-  sourceUrl,
-  videoId,
-  r2,
-  contextLabel = '[YouTube Prepare] Upload',
-}: UploadAudioUrlToR2Params): Promise<string | null> {
-  const bucket = process.env.STORAGE_BUCKET || '';
-  if (!bucket) {
-    console.warn(`${contextLabel} Missing STORAGE_BUCKET configuration`);
-    return null;
-  }
-
-  const publicDomain = process.env.STORAGE_DOMAIN || process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN;
-  const key = `youtube-audio/${videoId}_${Date.now()}.webm`;
-  const publicUrlBase = publicDomain
-    ? (publicDomain.startsWith('http') ? publicDomain : `https://${publicDomain}`)
-    : `https://pub-${bucket}.r2.dev`;
-  const targetPublicUrl = `${publicUrlBase}/${key}`;
-
-  interface SupplierStrategyOptions {
+interface SupplierStrategyOptions {
   forceHighAccuracy: boolean;
   deepgramAllowed: boolean;
   replicateAllowed: boolean;
