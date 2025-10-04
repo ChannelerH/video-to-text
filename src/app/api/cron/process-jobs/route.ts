@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { q_jobs, transcriptions, transcription_results } from '@/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { TranscriptionService } from '@/lib/transcription';
+import { prepareYoutubeAudioForJob, YoutubePrepareError } from '@/services/youtube-preparer';
 
 // This runs as a background job, can have longer timeout
 export const maxDuration = 300; // 5 minutes for Pro plan
@@ -65,6 +66,49 @@ export async function GET(request: NextRequest) {
       .set({ status: 'processing' })
       .where(eq(transcriptions.job_id, job.job_id));
 
+    let processedUrl = (transcription.processed_url || '').trim();
+
+    if (
+      transcription.source_type === 'youtube_url' &&
+      transcription.source_url &&
+      (!processedUrl || !isProcessedMediaUrl(processedUrl))
+    ) {
+      try {
+        const prep = await prepareYoutubeAudioForJob({
+          jobId: job.job_id,
+          video: transcription.source_url,
+          userTier: job.tier,
+          preferredLanguage: transcription.language || undefined,
+          userUuid: transcription.user_uuid || null,
+          jobOriginalDuration: transcription.original_duration_sec || null,
+        });
+        processedUrl = prep.processedUrl;
+        console.log('[Cron][YouTube Prepare] processed URL refreshed', {
+          jobId: job.job_id,
+          videoId: prep.videoId,
+          processedUrl,
+        });
+      } catch (error) {
+        if (error instanceof YoutubePrepareError) {
+          await markJobFailed(job.id, job.job_id, error.message);
+          return NextResponse.json({
+            error: 'Job processing failed',
+            details: error.message,
+            code: error.code,
+          }, {
+            status: error.code === 'youtube_manual_upload_required' ? 502 : 400,
+          });
+        }
+
+        const message = error instanceof Error ? error.message : 'Failed to prepare YouTube source';
+        await markJobFailed(job.id, job.job_id, message);
+        return NextResponse.json({
+          error: 'Job processing failed',
+          details: message,
+        }, { status: 500 });
+      }
+    }
+
     try {
       // 5. 执行转录处理（复用主业务 TranscriptionService，支持 YouTube / 音频直链 等）
       const service = new TranscriptionService(
@@ -72,18 +116,18 @@ export async function GET(request: NextRequest) {
         process.env.DEEPGRAM_API_KEY
       );
 
-    const preferredSourceUrl = transcription.processed_url || transcription.source_url || '';
+      const preferredSourceUrl = processedUrl || transcription.source_url || '';
 
-    const req: any = {
-      type: transcription.source_type,
-      content: preferredSourceUrl,
-      options: {
-        language: transcription.language || 'auto',
-        userId: job.user_id,
-        userTier: job.tier || 'free',
-        fallbackEnabled: true,
-          isPreview: false
-        }
+      const req: any = {
+        type: transcription.source_type,
+        content: preferredSourceUrl,
+        options: {
+          language: transcription.language || 'auto',
+          userId: job.user_id,
+          userTier: job.tier || 'free',
+          fallbackEnabled: true,
+          isPreview: false,
+        },
       };
 
       const result = await service.processTranscription(req);
@@ -162,6 +206,11 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function isProcessedMediaUrl(url: string): boolean {
+  if (!url) return false;
+  return url.includes('.r2.dev/') || url.includes('pub-') || url.includes('/api/media/proxy');
 }
 
 // Note: detailed processing moved inline above to reuse TranscriptionService

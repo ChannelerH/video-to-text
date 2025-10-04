@@ -1,12 +1,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { Readable } from 'stream';
 import { db } from '@/db';
 import { transcriptions } from '@/db/schema';
-import { and, eq, ne, desc, isNotNull } from 'drizzle-orm';
-import { CloudflareR2Service } from '@/lib/r2-upload';
-import { POLICY } from '@/services/policy';
+import { and, eq, ne } from 'drizzle-orm';
+import {
+  determineClipSecondsForYoutube,
+  prepareYoutubeAudioForJob,
+  shouldClipMedia,
+  YoutubePrepareError,
+} from '@/services/youtube-preparer';
 
 export const runtime = 'nodejs';
 export const maxDuration = 10; // keep it short
@@ -147,68 +150,40 @@ export async function POST(request: NextRequest) {
       settleSupplierTasks(job_id, processedTasks, '[YouTube Prepare][Processed]');
       return NextResponse.json({ ok: true, rerun: true });
     }
-    
-    // Normal YouTube URL processing
-    const { YouTubeService } = await import('@/lib/youtube');
-    
-    let vid: string | null = null;
-    let audioUrl: string = '';
-    let videoTitle: string | null = null;
-    let videoDurationSeconds: number | null = null;
-
-    const prefetched = parseVideoPrefetch(video_prefetch);
+    let vid: string;
+    let supplierAudioUrl: string | null;
+    let videoTitle: string | null;
+    let videoDurationSeconds: number | null;
 
     try {
-      vid = YouTubeService.validateAndParseUrl(video) || String(video);
-    } catch (error) {
-      console.error('[YouTube Prepare] Failed to parse YouTube URL:', error);
-      return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
-    }
+      const prepResult = await prepareYoutubeAudioForJob({
+        jobId,
+        video,
+        userTier: user_tier,
+        preferredLanguage,
+        forceHighAccuracy,
+        videoPrefetch,
+        clipSecondsOverride,
+        isPreview: isPreviewRequest,
+        userUuid: jobUserUuid,
+        jobOriginalDuration,
+        effectiveClipSeconds,
+      });
 
-    const variantSuffix = forceHighAccuracy ? ':ha1' : ':ha0';
-    const reusable = vid
-      ? (await findReusableAudioForVideo(vid, variantSuffix))
-          || (variantSuffix !== ':ha0' ? await findReusableAudioForVideo(vid, ':ha0') : null)
-      : null;
-    let supplierAudioUrl: string | null = reusable?.processedUrl ?? null;
-    if (reusable) {
-      audioUrl = reusable.processedUrl;
-      videoTitle = reusable.title || null;
-      videoDurationSeconds = reusable.originalDurationSec ?? null;
-    }
+      vid = prepResult.videoId;
+      supplierAudioUrl = prepResult.supplierAudioUrl ?? prepResult.processedUrl;
+      videoTitle = prepResult.videoTitle;
+      videoDurationSeconds = prepResult.videoDurationSeconds;
 
-    if (prefetched) {
-      if (!audioUrl && prefetched.link) {
-        audioUrl = prefetched.link;
-      }
-      if (!videoTitle && prefetched.title) {
-        videoTitle = prefetched.title;
-      }
-      if (!videoDurationSeconds && typeof prefetched.duration === 'number') {
-        videoDurationSeconds = prefetched.duration;
-      }
-      if (!supplierAudioUrl && prefetched.link && prefetched.isUploadedAsset) {
-        supplierAudioUrl = prefetched.link;
-      }
-    }
-
-    if (!audioUrl) {
-      try {
-        audioUrl = await YouTubeService.getAudioStreamUrl(vid, preferred_language);
-      } catch (error) {
-        // Fallback 1: use optimized audio formats (but try to respect language preference)
-        try {
-          const fmts = await YouTubeService.getOptimizedAudioFormats(vid, preferred_language);
-          const pick = fmts.find(f => !!f.url) || fmts[0];
-          if (pick?.url) {
-            audioUrl = pick.url;
-          }
-        } catch (e) {
-        }
-
-        if (!audioUrl) {
-          console.warn('[YouTube Prepare] Failed to resolve audio URL, prompting manual upload');
-
+      console.log('[YouTube Prepare] Preparation result', {
+        videoId: vid,
+        fromReusable: prepResult.fromReusable,
+        usedPrefetch: prepResult.usedPrefetch,
+        supplierAudioUrl,
+      });
+    } catch (error: any) {
+      if (error instanceof YoutubePrepareError) {
+        if (error.code === 'youtube_manual_upload_required') {
           if (job_id) {
             try {
               await db().update(transcriptions)
@@ -228,143 +203,36 @@ export async function POST(request: NextRequest) {
             error: 'youtube_manual_upload_required'
           }, { status: 502 });
         }
-      }
-    }
 
-    if (!supplierAudioUrl) {
-      try {
-        const r2 = new CloudflareR2Service();
-        const cfg = r2.validateConfig();
-        if (!cfg.isValid) {
-          console.warn('[YouTube Prepare] R2 not configured properly:', cfg);
-        } else {
-          if (!videoTitle || !videoDurationSeconds) {
-            try {
-              const info = await YouTubeService.getVideoInfo(vid!);
-              videoTitle = videoTitle || info.title || null;
-              videoDurationSeconds = videoDurationSeconds || info.duration || null;
-            } catch (error) {
-              console.error('[YouTube Prepare] Failed to get video info:', error);
-            }
+        if (error.code === 'duration_limit_exceeded') {
+          const actualDuration = error.meta?.actualDuration ?? 0;
+          const maxDuration = error.meta?.maxDuration ?? 0;
+          const suggestion = user_tier === 'free'
+            ? 'Upgrade to Basic for longer videos'
+            : 'Please try a shorter video';
+
+          if (job_id) {
+            await db().update(transcriptions)
+              .set({
+                status: 'failed',
+                completed_at: new Date(),
+              })
+              .where(eq(transcriptions.job_id, job_id));
           }
 
-          // Check YouTube video duration limit
-          if (videoDurationSeconds && videoDurationSeconds > 0) {
-            const { getUploadLimitForTier, formatSeconds } = await import('@/lib/duration-limits');
-            // For YouTube, we don't have userUuid here, use tier string directly
-            const uploadLimit = getUploadLimitForTier(user_tier as any, undefined);
-
-            const skipDurationLimit = effectiveClipSeconds && shouldClipMedia(videoDurationSeconds, effectiveClipSeconds);
-
-            if (!skipDurationLimit && uploadLimit > 0 && videoDurationSeconds > uploadLimit) {
-              console.warn(`[YouTube Prepare] Video duration ${videoDurationSeconds}s exceeds ${uploadLimit}s limit for ${user_tier}`);
-
-              // Mark job as failed
-              if (job_id) {
-                await db().update(transcriptions)
-                  .set({
-                    status: 'failed',
-                    completed_at: new Date()
-                  })
-                  .where(eq(transcriptions.job_id, job_id));
-              }
-
-              return NextResponse.json({
-                ok: false,
-                error: `Video duration ${formatSeconds(Math.floor(videoDurationSeconds))} exceeds limit of ${formatSeconds(uploadLimit)}`,
-                code: 'duration_limit_exceeded',
-                actualDuration: Math.floor(videoDurationSeconds),
-                maxDuration: uploadLimit,
-                suggestion: user_tier === 'free' ? 'Upgrade to Basic for longer videos' : 'Please try a shorter video'
-              }, { status: 400 });
-            }
-          }
-
-          const resolveAudioUrl = async () => {
-            if (audioUrl) return audioUrl;
-            audioUrl = await YouTubeService.getAudioStreamUrl(vid!, preferred_language);
-            return audioUrl;
-          };
-
-          const isFreeTier = String(user_tier).toLowerCase() === 'free';
-          const finalUrl = await resolveAudioUrl();
-          console.log('[YouTube Prepare] Resolved audio URL from RapidAPI', {
-            videoId: vid,
-            finalUrl,
-            fromCache: !!reusable,
-            throughPrefetch: !!prefetched,
-          });
-          const needsClipPreview = isFreeTier
-            && effectiveClipSeconds
-            && shouldClipMedia(videoDurationSeconds ?? jobOriginalDuration, effectiveClipSeconds);
-
-          if (needsClipPreview) {
-            const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
-            const clipped = await clipAudioForFreeTier(finalUrl, job_id, 'youtube', effectiveClipSeconds);
-            if (clipped?.url) {
-              supplierAudioUrl = clipped.url;
-            } else {
-              console.warn('[YouTube Prepare] Clip helper failed, falling back to full audio upload');
-            }
-          }
-
-          if (!supplierAudioUrl) {
-            try {
-              const uploadedUrl = await uploadAudioUrlToR2({
-                sourceUrl: finalUrl,
-                videoId: vid!,
-                r2,
-                contextLabel: '[YouTube Prepare] Upload',
-              });
-              supplierAudioUrl = uploadedUrl || finalUrl;
-              if (uploadedUrl) {
-                console.log('[YouTube Prepare] Audio uploaded to R2', { videoId: vid, uploadedUrl });
-              } else {
-                console.warn('[YouTube Prepare] R2 upload skipped or failed, falling back to original URL', {
-                  videoId: vid,
-                  finalUrl,
-                });
-              }
-            } catch (uploadError) {
-              console.error('[YouTube Prepare] Failed to upload audio to R2:', uploadError);
-              supplierAudioUrl = supplierAudioUrl || finalUrl;
-            }
-          }
+          return NextResponse.json({
+            ok: false,
+            error: error.message,
+            code: 'duration_limit_exceeded',
+            actualDuration,
+            maxDuration,
+            suggestion,
+          }, { status: 400 });
         }
-      } catch (e: any) {
-        console.error('[YouTube Prepare] Failed to upload to R2:', e);
-        // Don't fail the whole request, continue with direct YouTube URL if available
       }
-    }
 
-    // Store processed URL and title separately (keep original source_url intact)
-    try {
-      const processedUrl = supplierAudioUrl || audioUrl;
-      
-      // Build update object
-      const updateData: any = { processed_url: processedUrl };
-      
-      // Update title if we got it from YouTube
-      if (videoTitle) {
-        updateData.title = videoTitle;
-      }
-      
-      // Update original duration if we got it from YouTube (important for preview detection)
-      if (videoDurationSeconds && videoDurationSeconds > 0) {
-        updateData.original_duration_sec = videoDurationSeconds;
-        console.log('[YouTube Prepare] Storing original duration:', videoDurationSeconds, 'seconds');
-      }
-      
-      // Update both processed_url and title (if available)
-      if (!job_id) {
-        throw new Error('job_id is required for database update');
-      }
-      await db().update(transcriptions)
-        .set(updateData)
-        .where(and(eq(transcriptions.job_id, job_id), ne(transcriptions.status, 'cancelled')));
-    } catch (e) {
-      console.error('[YouTube Prepare] DB update failed:', e);
-      return NextResponse.json({ error: 'db_update_failed' }, { status: 500 });
+      console.error('[YouTube Prepare] Failed to prepare YouTube audio:', error);
+      return NextResponse.json({ error: 'prepare_failed' }, { status: 500 });
     }
 
     // Fan out to suppliers according to env
@@ -463,13 +331,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-interface UploadAudioUrlToR2Params {
-  sourceUrl: string;
-  videoId: string;
-  r2?: CloudflareR2Service;
-  contextLabel?: string;
-}
-
 async function uploadAudioUrlToR2({
   sourceUrl,
   videoId,
@@ -489,127 +350,7 @@ async function uploadAudioUrlToR2({
     : `https://pub-${bucket}.r2.dev`;
   const targetPublicUrl = `${publicUrlBase}/${key}`;
 
-  const headers: Record<string, string> = {
-    'User-Agent': 'Mozilla/5.0',
-    'Accept-Language': 'en-US,en;q=0.9',
-  };
-
-  const attemptStreamUpload = async () => {
-    console.log(`${contextLabel} Attempting stream upload`, {
-      videoId,
-      key,
-      publicUrlBase,
-      sourceUrl,
-    });
-    const response = await fetch(sourceUrl, { headers });
-    console.log(`${contextLabel} Source fetch response`, {
-      videoId,
-      status: response.status,
-      statusText: response.statusText,
-      url: sourceUrl,
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch audio stream (${response.status})`);
-    }
-
-    const contentType = response.headers.get('content-type') || 'audio/webm';
-    const contentLengthHeader = response.headers.get('content-length');
-    const contentLength = contentLengthHeader ? parseInt(contentLengthHeader, 10) : undefined;
-
-    if (!response.body || !contentLength || !Number.isFinite(contentLength) || contentLength <= 0) {
-      console.log(`${contextLabel} Stream metadata incomplete, switching to buffered upload`, {
-        videoId,
-        hasBody: !!response.body,
-        contentLength,
-      });
-      const buffer = Buffer.from(await response.arrayBuffer());
-      const service = r2 ?? new CloudflareR2Service();
-      const upload = await service.uploadFile(buffer, `${videoId}.webm`, contentType, {
-        folder: 'youtube-audio',
-        expiresIn: 24,
-        makePublic: true,
-      });
-      console.log(`${contextLabel} Buffered upload via helper succeeded`, {
-        videoId,
-        key: upload.key,
-        publicUrl: upload.publicUrl,
-      });
-      return upload.publicUrl || upload.url;
-    }
-
-    const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
-    const s3 = new S3Client({
-      region: process.env.STORAGE_REGION || 'auto',
-      endpoint: process.env.STORAGE_ENDPOINT,
-      credentials: {
-        accessKeyId: process.env.STORAGE_ACCESS_KEY || '',
-        secretAccessKey: process.env.STORAGE_SECRET_KEY || '',
-      },
-    });
-
-    const nodeStream = Readable.fromWeb(response.body as any);
-    await s3.send(new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: nodeStream,
-      ContentType: contentType,
-      ContentLength: contentLength,
-      Metadata: {
-        'upload-time': new Date().toISOString(),
-        source: 'youtube-prepare',
-      },
-    }));
-    console.log(`${contextLabel} Stream upload to R2 succeeded`, {
-      videoId,
-      key,
-      targetPublicUrl,
-      contentType,
-      contentLength,
-    });
-    return targetPublicUrl;
-  };
-
-  try {
-    return await attemptStreamUpload();
-  } catch (streamError) {
-    console.error(`${contextLabel} Stream upload failed, retrying with buffered upload`, streamError);
-    try {
-      const response = await fetch(sourceUrl, { headers });
-      console.log(`${contextLabel} Buffered retry response`, {
-        videoId,
-        status: response.status,
-        statusText: response.statusText,
-        url: sourceUrl,
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch audio stream (${response.status})`);
-      }
-      const buffer = Buffer.from(await response.arrayBuffer());
-      const contentType = response.headers.get('content-type') || 'audio/webm';
-      const service = r2 ?? new CloudflareR2Service();
-      const upload = await service.uploadFile(buffer, `${videoId}.webm`, contentType, {
-        folder: 'youtube-audio',
-        expiresIn: 24,
-        makePublic: true,
-      });
-      console.log(`${contextLabel} Buffered upload retry succeeded`, {
-        videoId,
-        key: upload.key,
-        publicUrl: upload.publicUrl,
-      });
-      return upload.publicUrl || upload.url;
-    } catch (bufferError) {
-      console.error(`${contextLabel} Buffered upload failed`, {
-        videoId,
-        sourceUrl,
-        error: bufferError,
-      });
-      return null;
-    }
-  }
-}
-
-interface SupplierStrategyOptions {
+  interface SupplierStrategyOptions {
   forceHighAccuracy: boolean;
   deepgramAllowed: boolean;
   replicateAllowed: boolean;
@@ -808,100 +549,4 @@ async function isJobCancelled(jobId: string): Promise<boolean> {
     .limit(1);
 
   return statusCheck?.status === 'cancelled';
-}
-
-interface PrefetchedVideoPayload {
-  link?: string;
-  title?: string;
-  duration?: number;
-  filesize?: number;
-  isUploadedAsset?: boolean;
-}
-
-interface ReusableAudioRecord {
-  processedUrl: string;
-  title: string | null;
-  originalDurationSec: number | null;
-}
-
-function parseVideoPrefetch(raw: any): PrefetchedVideoPayload | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const payload: PrefetchedVideoPayload = {};
-  if (typeof raw.link === 'string' && raw.link.length > 0) {
-    payload.link = raw.link;
-    if (!payload.isUploadedAsset) {
-      payload.isUploadedAsset = raw.isUploadedAsset === true || /\.r2\.dev\//.test(raw.link);
-    }
-  }
-  if (typeof raw.title === 'string') {
-    payload.title = raw.title;
-  }
-  const duration = Number(raw.duration ?? raw.duration_seconds ?? raw.original_duration_sec);
-  if (Number.isFinite(duration) && duration > 0) {
-    payload.duration = Math.round(duration);
-  }
-  const filesize = Number(raw.filesize);
-  if (Number.isFinite(filesize) && filesize > 0) {
-    payload.filesize = Math.round(filesize);
-  }
-  return payload;
-}
-
-async function determineClipSecondsForYoutube(params: {
-  userTier?: string;
-  userUuid: string | null;
-  clipSecondsOverride: number | null;
-  isPreview: boolean;
-}): Promise<number | null> {
-  const { userTier, userUuid, clipSecondsOverride, isPreview } = params;
-
-  if (clipSecondsOverride && clipSecondsOverride > 0) {
-    return Math.max(1, Math.ceil(clipSecondsOverride));
-  }
-
-  const normalizedTier = String(userTier || '').toLowerCase();
-  const isAnonymous = !userUuid;
-  const isFreeTier = normalizedTier === 'free';
-
-  if (!isPreview && !isAnonymous && !isFreeTier) {
-    return null;
-  }
-
-  const previewBase = POLICY.preview.freePreviewSeconds || 300;
-  return Math.max(1, Math.ceil(previewBase));
-}
-
-function shouldClipMedia(originalDurationSeconds: number | null, limitSeconds: number): boolean {
-  if (!limitSeconds || limitSeconds <= 0) return false;
-  if (!originalDurationSeconds || !Number.isFinite(originalDurationSeconds)) {
-    return true;
-  }
-  const tolerance = 1;
-  return originalDurationSeconds - limitSeconds > tolerance;
-}
-
-async function findReusableAudioForVideo(videoId: string, variantSuffix: string): Promise<ReusableAudioRecord | null> {
-  try {
-    const [existing] = await db()
-      .select({
-        processedUrl: transcriptions.processed_url,
-        title: transcriptions.title,
-        originalDurationSec: transcriptions.original_duration_sec,
-      })
-      .from(transcriptions)
-      .where(and(
-        eq(transcriptions.source_hash, `${videoId}${variantSuffix}`),
-        eq(transcriptions.status, 'completed'),
-        isNotNull(transcriptions.processed_url)
-      ))
-      .orderBy(desc(transcriptions.created_at), desc(transcriptions.id))
-      .limit(1);
-
-    if (existing && existing.processedUrl) {
-      return existing as ReusableAudioRecord;
-    }
-  } catch (error) {
-    console.warn('[YouTube Prepare] Failed to look up reusable audio:', error);
-  }
-  return null;
 }
