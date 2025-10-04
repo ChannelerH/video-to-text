@@ -366,80 +366,126 @@ async function uploadAudioUrlToR2({
     'Accept-Language': 'en-US,en;q=0.9',
   };
 
-  console.log(`${contextLabel} Attempting stream upload`, {
-    videoId,
-    key,
-    publicUrlBase,
-    sourceUrl,
-  });
+  const maxAttempts = Math.max(1, Number(process.env.RAPIDAPI_DOWNLOAD_MAX_ATTEMPTS || 4));
+  const baseDelayMs = Math.max(200, Number(process.env.RAPIDAPI_DOWNLOAD_RETRY_DELAY || 750));
 
-  const response = await fetch(sourceUrl, { headers });
-  console.log(`${contextLabel} Source fetch response`, {
-    videoId,
-    status: response.status,
-    statusText: response.statusText,
-    url: sourceUrl,
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch audio stream (${response.status})`);
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const attemptLabel = `${contextLabel} Attempt ${attempt}`;
+      console.log(`${attemptLabel} stream upload`, {
+        videoId,
+        key,
+        publicUrlBase,
+        sourceUrl,
+      });
+
+      const response = await fetch(sourceUrl, { headers });
+      console.log(`${attemptLabel} source response`, {
+        videoId,
+        status: response.status,
+        statusText: response.statusText,
+      });
+
+      if (!response.ok) {
+        const error: any = new Error(`Failed to fetch audio stream (${response.status})`);
+        error.status = response.status;
+        throw error;
+      }
+
+      const contentType = response.headers.get('content-type') || 'audio/webm';
+      const contentLengthHeader = response.headers.get('content-length');
+      const contentLength = contentLengthHeader ? parseInt(contentLengthHeader, 10) : undefined;
+
+      if (!response.body || !contentLength || !Number.isFinite(contentLength) || contentLength <= 0) {
+        console.log(`${attemptLabel} switching to buffered upload`, {
+          videoId,
+          hasBody: !!response.body,
+          contentLength,
+        });
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const service = r2 ?? new CloudflareR2Service();
+        const upload = await service.uploadFile(buffer, `${videoId}.webm`, contentType, {
+          folder: 'youtube-audio',
+          expiresIn: 24,
+          makePublic: true,
+        });
+        console.log(`${attemptLabel} buffered upload succeeded`, {
+          videoId,
+          key: upload.key,
+          publicUrl: upload.publicUrl,
+        });
+        return upload.publicUrl || upload.url;
+      }
+
+      const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+      const s3 = new S3Client({
+        region: process.env.STORAGE_REGION || 'auto',
+        endpoint: process.env.STORAGE_ENDPOINT,
+        credentials: {
+          accessKeyId: process.env.STORAGE_ACCESS_KEY || '',
+          secretAccessKey: process.env.STORAGE_SECRET_KEY || '',
+        },
+      });
+
+      const nodeStream = Readable.fromWeb(response.body as any);
+      await s3.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: nodeStream,
+        ContentType: contentType,
+        ContentLength: contentLength,
+        Metadata: {
+          'upload-time': new Date().toISOString(),
+          source: 'youtube-prepare',
+        },
+        ACL: 'public-read',
+      }));
+
+      const publicUrl = `${publicUrlBase}/${key}`;
+      console.log(`${attemptLabel} stream upload succeeded`, {
+        videoId,
+        key,
+        publicUrl,
+        contentLength,
+      });
+
+      return publicUrl;
+    } catch (error) {
+      lastError = error;
+      const status = (error as any)?.status;
+      const message = error instanceof Error ? error.message : String(error);
+      const shouldRetry = status === 404 || status === 403 || status === 500 || status === 502 || status === 503 || status === 504;
+      if (attempt === maxAttempts || !shouldRetry) {
+        console.error(`${contextLabel} upload failed`, {
+          attempt,
+          maxAttempts,
+          status,
+          message,
+        });
+        break;
+      }
+
+      const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), 5000);
+      console.warn(`${contextLabel} upload retry scheduled`, {
+        attempt,
+        nextAttempt: attempt + 1,
+        delay,
+        status,
+        message,
+      });
+      await sleep(delay);
+    }
   }
 
-  const contentType = response.headers.get('content-type') || 'audio/webm';
-  const contentLengthHeader = response.headers.get('content-length');
-  const contentLength = contentLengthHeader ? parseInt(contentLengthHeader, 10) : undefined;
-
-  if (!response.body || !contentLength || !Number.isFinite(contentLength) || contentLength <= 0) {
-    console.log(`${contextLabel} Stream metadata incomplete, switching to buffered upload`, {
-      videoId,
-      hasBody: !!response.body,
-      contentLength,
-    });
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const service = r2 ?? new CloudflareR2Service();
-    const upload = await service.uploadFile(buffer, `${videoId}.webm`, contentType, {
-      folder: 'youtube-audio',
-      expiresIn: 24,
-      makePublic: true,
-    });
-    console.log(`${contextLabel} Buffered upload via helper succeeded`, {
-      videoId,
-      key: upload.key,
-      publicUrl: upload.publicUrl,
-    });
-    return upload.publicUrl || upload.url;
+  if (lastError) {
+    throw lastError;
   }
 
-  const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
-  const s3 = new S3Client({
-    region: process.env.STORAGE_REGION || 'auto',
-    endpoint: process.env.STORAGE_ENDPOINT,
-    credentials: {
-      accessKeyId: process.env.STORAGE_ACCESS_KEY || '',
-      secretAccessKey: process.env.STORAGE_SECRET_KEY || '',
-    },
-  });
+  return null;
+}
 
-  const nodeStream = Readable.fromWeb(response.body as any);
-  await s3.send(new PutObjectCommand({
-    Bucket: bucket,
-    Key: key,
-    Body: nodeStream,
-    ContentType: contentType,
-    ContentLength: contentLength,
-    Metadata: {
-      'upload-time': new Date().toISOString(),
-      source: 'youtube-prepare',
-    },
-    ACL: 'public-read',
-  }));
-
-  const publicUrl = `${publicUrlBase}/${key}`;
-  console.log(`${contextLabel} Stream upload succeeded`, {
-    videoId,
-    key,
-    publicUrl,
-    contentLength,
-  });
-
-  return publicUrl;
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
