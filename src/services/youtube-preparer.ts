@@ -187,6 +187,15 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
 
     const isFreeTier = String(userTier || '').toLowerCase() === 'free';
     let finalUrl = await resolveAudioUrl();
+    const normalizedUrl = normalizeDownloadUrl(finalUrl);
+    if (normalizedUrl !== finalUrl) {
+      console.log('[YouTube Prepare] Normalized download URL', {
+        videoId: vid,
+        original: finalUrl.substring(0, 120),
+        normalized: normalizedUrl.substring(0, 120),
+      });
+      finalUrl = normalizedUrl;
+    }
     console.log('[YouTube Prepare] Resolved audio URL from RapidAPI', {
       videoId: vid,
       finalUrl,
@@ -515,6 +524,16 @@ async function uploadAudioUrlToR2({
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+function normalizeDownloadUrl(url: string): string {
+  try {
+    const decoded = decodeURI(url);
+    return encodeURI(decoded);
+  } catch {
+    return url;
+  }
+}
+
 
 interface EnsureDownloadReadyParams {
   videoId: string;
