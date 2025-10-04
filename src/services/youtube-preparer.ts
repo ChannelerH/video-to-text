@@ -186,13 +186,29 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
     };
 
     const isFreeTier = String(userTier || '').toLowerCase() === 'free';
-    const finalUrl = await resolveAudioUrl();
+    let finalUrl = await resolveAudioUrl();
     console.log('[YouTube Prepare] Resolved audio URL from RapidAPI', {
       videoId: vid,
       finalUrl,
       fromCache: !!reusable,
       throughPrefetch: !!prefetched,
     });
+
+    const verified = await ensureDownloadReady({
+      videoId: vid,
+      preferredLanguage,
+      initialUrl: finalUrl,
+      contextLabel: '[YouTube Prepare] Verify',
+    });
+
+    if (verified?.url) {
+      if (verified.url !== finalUrl) {
+        console.log('[YouTube Prepare] Download URL refreshed after verification', {
+          videoId: vid,
+        });
+      }
+      finalUrl = verified.url;
+    }
 
     const needsClipPreview = isFreeTier
       && effectiveClipSeconds
@@ -498,4 +514,103 @@ async function uploadAudioUrlToR2({
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+interface EnsureDownloadReadyParams {
+  videoId: string;
+  initialUrl: string;
+  preferredLanguage?: string;
+  contextLabel?: string;
+}
+
+async function ensureDownloadReady({
+  videoId,
+  initialUrl,
+  preferredLanguage,
+  contextLabel = '[YouTube Prepare] Verify',
+}: EnsureDownloadReadyParams): Promise<{ url: string } | null> {
+  const maxAttempts = Math.max(1, Number(process.env.RAPIDAPI_VERIFY_MAX_ATTEMPTS || 4));
+  const baseDelayMs = Math.max(500, Number(process.env.RAPIDAPI_VERIFY_RETRY_DELAY || 1000));
+  const headTimeoutMs = Math.max(5000, Number(process.env.RAPIDAPI_VERIFY_HEAD_TIMEOUT || 8000));
+  const refreshLimit = Math.max(0, Number(process.env.RAPIDAPI_VERIFY_MAX_REFRESH || 1));
+
+  let currentUrl = initialUrl;
+  let refreshes = 0;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const ok = await tryHeadRequest(currentUrl, headTimeoutMs);
+      if (ok) {
+        return { url: currentUrl };
+      }
+    } catch (error) {
+      const status = (error as any)?.status ?? null;
+      console.warn(`${contextLabel} verification attempt failed`, {
+        videoId,
+        attempt,
+        status,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    if (refreshes < refreshLimit) {
+      refreshes++;
+      console.log(`${contextLabel} refreshing RapidAPI link`, {
+        videoId,
+        refreshes,
+      });
+      try {
+        if (typeof (YouTubeService as any)?.fetchVideoData === 'function') {
+          await (YouTubeService as any).fetchVideoData(videoId, true);
+        }
+        currentUrl = await YouTubeService.getAudioStreamUrl(videoId, preferredLanguage);
+        continue;
+      } catch (refreshError) {
+        console.error(`${contextLabel} refresh failed`, {
+          videoId,
+          message: refreshError instanceof Error ? refreshError.message : String(refreshError),
+        });
+      }
+    }
+
+    const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), 8000);
+    await sleep(delay);
+  }
+
+  console.warn(`${contextLabel} verification exhausted attempts`, {
+    videoId,
+    attempts: maxAttempts,
+    refreshes,
+  });
+
+  return { url: currentUrl };
+}
+
+async function tryHeadRequest(url: string, timeoutMs: number): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Range': 'bytes=0-1',
+        'User-Agent': 'Mozilla/5.0',
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (response.status === 200 || response.status === 206) {
+      return true;
+    }
+
+    const error: any = new Error(`Verification failed with status ${response.status}`);
+    error.status = response.status;
+    throw error;
+  } catch (error) {
+    clearTimeout(timeout);
+    throw error;
+  }
 }
