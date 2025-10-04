@@ -368,8 +368,18 @@ async function uploadAudioUrlToR2({
 
   const maxAttempts = Math.max(1, Number(process.env.RAPIDAPI_DOWNLOAD_MAX_ATTEMPTS || 4));
   const baseDelayMs = Math.max(200, Number(process.env.RAPIDAPI_DOWNLOAD_RETRY_DELAY || 750));
+  const initialDelayMs = Math.max(0, Number(process.env.RAPIDAPI_DOWNLOAD_INITIAL_DELAY || 0));
 
   let lastError: unknown;
+
+  if (initialDelayMs > 0) {
+    console.log(`${contextLabel} Initial delay before download`, {
+      videoId,
+      delayMs: initialDelayMs,
+      sourceUrl,
+    });
+    await sleep(initialDelayMs);
+  }
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
