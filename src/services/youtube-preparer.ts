@@ -629,7 +629,7 @@ async function tryHeadRequest(url: string, timeoutMs: number): Promise<boolean> 
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(url, {
+    const rangeResponse = await fetch(url, {
       method: 'GET',
       headers: {
         'Range': 'bytes=0-1',
@@ -640,13 +640,47 @@ async function tryHeadRequest(url: string, timeoutMs: number): Promise<boolean> 
 
     clearTimeout(timeout);
 
-    if (response.status === 200 || response.status === 206) {
+    if (rangeResponse.status === 200 || rangeResponse.status === 206) {
       return true;
     }
 
-    const error: any = new Error(`Verification failed with status ${response.status}`);
-    error.status = response.status;
-    throw error;
+    if (![404, 405, 416].includes(rangeResponse.status)) {
+      const error: any = new Error(`Verification failed with status ${rangeResponse.status}`);
+      error.status = rangeResponse.status;
+      throw error;
+    }
+
+    const directController = new AbortController();
+    const directTimeout = setTimeout(() => directController.abort(), timeoutMs);
+    try {
+      const directResponse = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+        },
+        signal: directController.signal,
+      });
+
+      clearTimeout(directTimeout);
+
+      if (!directResponse.ok) {
+        const error: any = new Error(`Verification failed with status ${directResponse.status}`);
+        error.status = directResponse.status;
+        throw error;
+      }
+
+      if (directResponse.body) {
+        try {
+          const reader = directResponse.body.getReader();
+          await reader.read();
+          await reader.cancel();
+        } catch {}
+      }
+
+      return true;
+    } catch (directError) {
+      throw directError;
+    }
   } catch (error) {
     clearTimeout(timeout);
     throw error;
