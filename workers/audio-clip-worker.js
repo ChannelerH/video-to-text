@@ -40,7 +40,14 @@ export default {
       console.log('[Worker] WARNING: Audio clipping not implemented - returning full audio');
 
       // Download and return the full audio file
-      const audioResponse = await fetch(audioUrl);
+      const headers = new Headers();
+      headers.set('User-Agent', 'Mozilla/5.0');
+      headers.set('Accept-Language', 'en-US,en;q=0.9');
+      if (/[?&]range=/.test(audioUrl)) {
+        headers.set('Range', 'bytes=0-');
+      }
+
+      const audioResponse = await fetch(audioUrl, { headers });
       if (!audioResponse.ok) {
         throw new Error(`Failed to download audio: ${audioResponse.statusText}`);
       }

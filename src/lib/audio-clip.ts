@@ -81,11 +81,20 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
       })();
       console.log(`[ffmpeg] Creating WAV clip: ${clipSeconds}s from ${safeUrlLog} (offset: ${offsetSeconds}s)`);
       console.log(`[ffmpeg] Binary: ${ffmpegPath || 'ffmpeg (system PATH)'}`);
+      const httpHeaders: string[] = [
+        'User-Agent: Mozilla/5.0',
+        'Accept-Language: en-US,en;q=0.9',
+      ];
+      if (/[?&]range=/.test(audioUrl)) {
+        httpHeaders.push('Range: bytes=0-');
+      }
+
       const args = [
         '-hide_banner',
         '-loglevel', 'error',
         '-ss', String(offsetSeconds),
         '-t', String(clipSeconds),
+        '-headers', httpHeaders.join('\r\n'),
         '-i', audioUrl,
         '-ar', '16000', // sample rate
         '-ac', '1', // mono

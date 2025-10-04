@@ -391,6 +391,11 @@ async function uploadAudioUrlToR2({
     'Accept-Language': 'en-US,en;q=0.9',
   };
 
+  const requiresRangeHeader = hasRangeQueryParam(sourceUrl);
+  if (requiresRangeHeader) {
+    headers['Range'] = 'bytes=0-';
+  }
+
   const maxAttempts = Math.max(1, Number(process.env.RAPIDAPI_DOWNLOAD_MAX_ATTEMPTS || 4));
   const baseDelayMs = Math.max(200, Number(process.env.RAPIDAPI_DOWNLOAD_RETRY_DELAY || 750));
   const initialDelayMs = Math.max(0, Number(process.env.RAPIDAPI_DOWNLOAD_INITIAL_DELAY || 0));
