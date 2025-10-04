@@ -584,6 +584,14 @@ async function ensureDownloadReady({
 
   let currentUrl = initialUrl;
   let refreshes = 0;
+  const skipVerification = hasRangeQueryParam(initialUrl);
+
+  if (skipVerification) {
+    console.log(`${contextLabel} skipping verification for range-style URL`, {
+      videoId,
+    });
+    return { url: currentUrl };
+  }
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
