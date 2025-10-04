@@ -527,8 +527,27 @@ function sleep(ms: number): Promise<void> {
 
 function normalizeDownloadUrl(url: string): string {
   try {
-    const decoded = decodeURI(url);
-    return encodeURI(decoded);
+    const urlObj = new URL(url);
+
+    const normalizedPath = urlObj.pathname
+      .split('/')
+      .map(segment => encodeURIComponent(decodeURIComponent(segment)))
+      .join('/');
+    urlObj.pathname = normalizedPath;
+
+    const originalParams = urlObj.searchParams;
+    const normalizedParams = new URLSearchParams();
+    originalParams.forEach((value, key) => {
+      try {
+        const decodedValue = decodeURIComponent(value);
+        normalizedParams.append(key, decodedValue);
+      } catch {
+        normalizedParams.append(key, value);
+      }
+    });
+    urlObj.search = normalizedParams.toString();
+
+    return urlObj.toString();
   } catch {
     return url;
   }
