@@ -5,6 +5,8 @@ import { CloudflareR2Service } from '@/lib/r2-upload';
 import { POLICY } from '@/services/policy';
 import { YouTubeService } from '@/lib/youtube';
 import { Readable } from 'stream';
+import { uploadAudioViaWorker } from '@/services/audio-worker';
+import { resolvePublicR2Base } from '@/services/r2-utils';
 
 export class YoutubePrepareError extends Error {
   constructor(public code: string, message: string, public meta?: Record<string, any>) {
@@ -555,18 +557,4 @@ function normalizeDownloadUrl(url: string): string {
   } catch {
     return url;
   }
-}
-
-function resolvePublicR2Base(): string | null {
-  const publicDomain = process.env.STORAGE_DOMAIN || process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN;
-  if (publicDomain) {
-    return publicDomain.startsWith('http') ? publicDomain : `https://${publicDomain}`;
-  }
-
-  const bucket = process.env.STORAGE_BUCKET || '';
-  if (bucket) {
-    return `https://pub-${bucket}.r2.dev`;
-  }
-
-  return null;
 }
