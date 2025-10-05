@@ -418,7 +418,7 @@ export async function POST(request: NextRequest) {
             gte(usage_records.created_at as any, dayStart)
           ));
         const dailyUsed = Number((dailyRow as any)?.c || 0);
-        const dailyLimit = Number(process.env.ANON_DAILY_LIMIT || 5);
+        const dailyLimit = Number(process.env.ANON_DAILY_LIMIT || 10);
         if (dailyUsed >= dailyLimit) {
           return NextResponse.json({ error: `Anonymous daily limit reached (${dailyLimit}/day). Please sign in.` }, { status: 429 });
         }
@@ -433,7 +433,7 @@ export async function POST(request: NextRequest) {
             gte(usage_records.created_at as any, monthStart)
           ));
         const monthlyUsed = Number((monthRow as any)?.total || 0);
-        const monthlyLimit = Number(process.env.ANON_MONTHLY_MINUTES || 30);
+        const monthlyLimit = Number(process.env.ANON_MONTHLY_MINUTES || 90);
         if (monthlyUsed + estimatedAnonMinutes > monthlyLimit) {
           return NextResponse.json({ error: `Anonymous monthly limit reached (${monthlyLimit} minutes). Please sign in.` }, { status: 429 });
         }

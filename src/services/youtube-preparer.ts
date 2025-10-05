@@ -203,22 +203,6 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
       throughPrefetch: !!prefetched,
     });
 
-    const verified = await ensureDownloadReady({
-      videoId: vid,
-      preferredLanguage,
-      initialUrl: finalUrl,
-      contextLabel: '[YouTube Prepare] Verify',
-    });
-
-    if (verified?.url) {
-      if (verified.url !== finalUrl) {
-        console.log('[YouTube Prepare] Download URL refreshed after verification', {
-          videoId: vid,
-        });
-      }
-      finalUrl = verified.url;
-    }
-
     const needsClipPreview = isFreeTier
       && effectiveClipSeconds
       && shouldClipMedia(videoDurationSeconds ?? jobOriginalDuration, effectiveClipSeconds);
@@ -230,6 +214,26 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
         supplierAudioUrl = clipped.url;
       } else {
         console.warn('[YouTube Prepare] Clip helper failed, falling back to full audio upload');
+      }
+    }
+
+    if (!supplierAudioUrl) {
+      try {
+        const workerResult = await uploadAudioViaWorker({
+          jobId,
+          videoId: vid,
+          sourceUrl: finalUrl,
+          sourceHash: `${vid}${variantSuffix}`,
+        });
+        if (workerResult?.uploadedUrl) {
+          supplierAudioUrl = workerResult.uploadedUrl;
+          console.log('[YouTube Prepare] Audio uploaded via worker', {
+            videoId: vid,
+            uploadedUrl: workerResult.uploadedUrl,
+          });
+        }
+      } catch (workerError) {
+        console.error('[YouTube Prepare] Worker upload failed, falling back to local upload', workerError);
       }
     }
 
@@ -366,6 +370,98 @@ async function findReusableAudioForVideo(videoId: string, variantSuffix: string)
     console.warn('[YouTube Prepare] Failed to look up reusable audio:', error);
   }
   return null;
+}
+
+interface WorkerUploadParams {
+  jobId: string;
+  videoId: string;
+  sourceUrl: string;
+  sourceHash?: string | null;
+}
+
+interface WorkerUploadResult {
+  uploadedUrl?: string | null;
+  key?: string;
+}
+
+async function uploadAudioViaWorker(params: WorkerUploadParams): Promise<WorkerUploadResult | null> {
+  const { jobId, videoId, sourceUrl, sourceHash } = params;
+  const workerUrl = process.env.YOUTUBE_TRANSFER_WORKER_URL || process.env.AUDIO_CLIP_WORKER_URL;
+  if (!workerUrl) {
+    return null;
+  }
+
+  const payload: Record<string, any> = {
+    action: 'youtube-upload',
+    sourceUrl,
+    videoId,
+    jobId,
+  };
+
+  const bucketPrefix = process.env.YOUTUBE_WORKER_BUCKET_PREFIX;
+  if (bucketPrefix) {
+    payload.bucketPrefix = bucketPrefix;
+  }
+
+  const publicUrlBase = resolvePublicR2Base();
+  if (publicUrlBase) {
+    payload.publicUrlBase = publicUrlBase;
+  }
+
+  if (sourceHash) {
+    payload.sourceHash = sourceHash;
+  }
+
+  const callbackSecret = process.env.WORKER_UPLOAD_SECRET;
+  const callbackBase = process.env.WORKER_CALLBACK_BASE_URL
+    || process.env.CALLBACK_BASE_URL
+    || process.env.APP_URL
+    || process.env.NEXT_PUBLIC_APP_URL;
+
+  if (callbackSecret && callbackBase) {
+    try {
+      const callbackUrl = new URL(`/api/internal/transcriptions/${encodeURIComponent(jobId)}/processed-url`, callbackBase);
+      payload.callbackUrl = callbackUrl.toString();
+      payload.callbackSecret = callbackSecret;
+    } catch (error) {
+      console.error('[YouTube Prepare] Failed to construct worker callback URL', error);
+    }
+  }
+
+  try {
+    const response = await fetch(workerUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      console.error('[YouTube Prepare] Worker upload failed', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+      });
+      return null;
+    }
+
+    const result = await response.json().catch(() => ({}));
+    if (result?.success === false) {
+      console.error('[YouTube Prepare] Worker reported failure', result);
+      return null;
+    }
+
+    return {
+      uploadedUrl: typeof result?.uploadedUrl === 'string' ? result.uploadedUrl : null,
+      key: typeof result?.key === 'string' ? result.key : undefined,
+    };
+  } catch (error) {
+    console.error('[YouTube Prepare] Worker upload request crashed', error);
+    return null;
+  }
 }
 
 async function uploadAudioUrlToR2({
@@ -553,136 +649,16 @@ function normalizeDownloadUrl(url: string): string {
   }
 }
 
-
-interface EnsureDownloadReadyParams {
-  videoId: string;
-  initialUrl: string;
-  preferredLanguage?: string;
-  contextLabel?: string;
-}
-
-async function ensureDownloadReady({
-  videoId,
-  initialUrl,
-  preferredLanguage,
-  contextLabel = '[YouTube Prepare] Verify',
-}: EnsureDownloadReadyParams): Promise<{ url: string } | null> {
-  const maxAttempts = Math.max(1, Number(process.env.RAPIDAPI_VERIFY_MAX_ATTEMPTS || 4));
-  const baseDelayMs = Math.max(500, Number(process.env.RAPIDAPI_VERIFY_RETRY_DELAY || 1000));
-  const headTimeoutMs = Math.max(5000, Number(process.env.RAPIDAPI_VERIFY_HEAD_TIMEOUT || 8000));
-  const refreshLimit = Math.max(0, Number(process.env.RAPIDAPI_VERIFY_MAX_REFRESH || 1));
-
-  let currentUrl = initialUrl;
-  let refreshes = 0;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const ok = await tryHeadRequest(currentUrl, headTimeoutMs);
-      if (ok) {
-        return { url: currentUrl };
-      }
-    } catch (error) {
-      const status = (error as any)?.status ?? null;
-      console.warn(`${contextLabel} verification attempt failed`, {
-        videoId,
-        attempt,
-        status,
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    if (refreshes < refreshLimit) {
-      refreshes++;
-      console.log(`${contextLabel} refreshing RapidAPI link`, {
-        videoId,
-        refreshes,
-      });
-      try {
-        if (typeof (YouTubeService as any)?.fetchVideoData === 'function') {
-          await (YouTubeService as any).fetchVideoData(videoId, true);
-        }
-        currentUrl = await YouTubeService.getAudioStreamUrl(videoId, preferredLanguage);
-        continue;
-      } catch (refreshError) {
-        console.error(`${contextLabel} refresh failed`, {
-          videoId,
-          message: refreshError instanceof Error ? refreshError.message : String(refreshError),
-        });
-      }
-    }
-
-    const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), 8000);
-    await sleep(delay);
+function resolvePublicR2Base(): string | null {
+  const publicDomain = process.env.STORAGE_DOMAIN || process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN;
+  if (publicDomain) {
+    return publicDomain.startsWith('http') ? publicDomain : `https://${publicDomain}`;
   }
 
-  console.warn(`${contextLabel} verification exhausted attempts`, {
-    videoId,
-    attempts: maxAttempts,
-    refreshes,
-  });
-
-  return { url: currentUrl };
-}
-
-async function tryHeadRequest(url: string, timeoutMs: number): Promise<boolean> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const rangeResponse = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Range': 'bytes=0-1',
-        'User-Agent': 'Mozilla/5.0',
-      },
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    if (rangeResponse.status === 200 || rangeResponse.status === 206) {
-      return true;
-    }
-
-    if (![404, 405, 416].includes(rangeResponse.status)) {
-      const error: any = new Error(`Verification failed with status ${rangeResponse.status}`);
-      error.status = rangeResponse.status;
-      throw error;
-    }
-
-    const directController = new AbortController();
-    const directTimeout = setTimeout(() => directController.abort(), timeoutMs);
-    try {
-      const directResponse = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'Mozilla/5.0',
-        },
-        signal: directController.signal,
-      });
-
-      clearTimeout(directTimeout);
-
-      if (!directResponse.ok) {
-        const error: any = new Error(`Verification failed with status ${directResponse.status}`);
-        error.status = directResponse.status;
-        throw error;
-      }
-
-      if (directResponse.body) {
-        try {
-          const reader = directResponse.body.getReader();
-          await reader.read();
-          await reader.cancel();
-        } catch {}
-      }
-
-      return true;
-    } catch (directError) {
-      throw directError;
-    }
-  } catch (error) {
-    clearTimeout(timeout);
-    throw error;
+  const bucket = process.env.STORAGE_BUCKET || '';
+  if (bucket) {
+    return `https://pub-${bucket}.r2.dev`;
   }
+
+  return null;
 }
