@@ -73,6 +73,15 @@ export async function uploadAudioViaWorker(params: WorkerUploadParams): Promise<
   }
 
   try {
+    const logPayload = { ...payload } as Record<string, unknown>;
+    if (logPayload.callbackSecret) {
+      logPayload.callbackSecret = '[REDACTED]';
+    }
+    console.log('[Audio Worker] Upload request payload', {
+      workerUrl,
+      payload: logPayload,
+    });
+
     const response = await fetch(workerUrl, {
       method: 'POST',
       headers: {
@@ -82,17 +91,34 @@ export async function uploadAudioViaWorker(params: WorkerUploadParams): Promise<
       body: JSON.stringify(payload),
     });
 
+    const responseText = await response.text().catch(() => '');
+
+    console.log('[Audio Worker] Worker raw response', {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText,
+    });
+
     if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
       console.error('[Audio Worker] Upload failed', {
         status: response.status,
         statusText: response.statusText,
-        errorText,
+        errorText: responseText,
       });
       return null;
     }
 
-    const result: WorkerUploadResponse = await response.json().catch(() => ({}));
+    let result: WorkerUploadResponse;
+    try {
+      result = responseText ? (JSON.parse(responseText) as WorkerUploadResponse) : {};
+    } catch (error) {
+      console.error('[Audio Worker] Failed to parse worker JSON response', {
+        error,
+        responseText,
+      });
+      result = {};
+    }
+
     if (result.success === false) {
       console.error('[Audio Worker] Worker explicitly reported failure', result);
       return null;

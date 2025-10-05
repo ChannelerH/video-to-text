@@ -14,19 +14,30 @@ async function clipAudioViaWorker(audioUrl: string, seconds: number, startOffset
   }
 
   try {
-    console.log(`[audio-clip] Attempting to clip via Cloudflare Worker: ${workerUrl}`);
+    console.log('[audio-clip] Attempting to clip via Cloudflare Worker', {
+      workerUrl,
+      payload: { audioUrl, seconds, startOffset }
+    });
     const response = await fetch(workerUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ audioUrl, seconds, startOffset }),
     });
 
+    const responseBuffer = await response.arrayBuffer().catch(() => new ArrayBuffer(0));
+    const responseText = Buffer.from(responseBuffer).toString('utf8');
+
+    console.log('[audio-clip] Worker response', {
+      status: response.status,
+      statusText: response.statusText,
+      bodyPreview: responseText.slice(0, 256),
+    });
+
     if (!response.ok) {
-      throw new Error(`Worker responded with ${response.status}: ${await response.text()}`);
+      throw new Error(`Worker responded with ${response.status}: ${responseText}`);
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    return Buffer.from(responseBuffer);
   } catch (error: any) {
     console.error(`[audio-clip] Worker fallback failed:`, error.message);
     return null;
