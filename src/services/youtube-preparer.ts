@@ -553,16 +553,6 @@ function normalizeDownloadUrl(url: string): string {
   }
 }
 
-function hasRangeQueryParam(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.searchParams.has('range')) {
-      return true;
-    }
-  } catch {}
-  return /[?&]range=/i.test(url);
-}
-
 
 interface EnsureDownloadReadyParams {
   videoId: string;
@@ -587,8 +577,7 @@ async function ensureDownloadReady({
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const allowRangeProbe = !hasRangeQueryParam(currentUrl);
-      const ok = await tryHeadRequest(currentUrl, headTimeoutMs, allowRangeProbe);
+      const ok = await tryHeadRequest(currentUrl, headTimeoutMs);
       if (ok) {
         return { url: currentUrl };
       }
@@ -635,8 +624,32 @@ async function ensureDownloadReady({
   return { url: currentUrl };
 }
 
-async function tryHeadRequest(url: string, timeoutMs: number, allowRangeProbe = true): Promise<boolean> {
-  const performDirectFetch = async () => {
+async function tryHeadRequest(url: string, timeoutMs: number): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const rangeResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Range': 'bytes=0-1',
+        'User-Agent': 'Mozilla/5.0',
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (rangeResponse.status === 200 || rangeResponse.status === 206) {
+      return true;
+    }
+
+    if (![404, 405, 416].includes(rangeResponse.status)) {
+      const error: any = new Error(`Verification failed with status ${rangeResponse.status}`);
+      error.status = rangeResponse.status;
+      throw error;
+    }
+
     const directController = new AbortController();
     const directTimeout = setTimeout(() => directController.abort(), timeoutMs);
     try {
@@ -667,41 +680,7 @@ async function tryHeadRequest(url: string, timeoutMs: number, allowRangeProbe = 
       return true;
     } catch (directError) {
       throw directError;
-    } finally {
-      clearTimeout(directTimeout);
     }
-  };
-
-  if (!allowRangeProbe) {
-    return performDirectFetch();
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const rangeResponse = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Range': 'bytes=0-1',
-        'User-Agent': 'Mozilla/5.0',
-      },
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    if (rangeResponse.status === 200 || rangeResponse.status === 206) {
-      return true;
-    }
-
-    if (![404, 405, 416].includes(rangeResponse.status)) {
-      const error: any = new Error(`Verification failed with status ${rangeResponse.status}`);
-      error.status = rangeResponse.status;
-      throw error;
-    }
-
-    return performDirectFetch();
   } catch (error) {
     clearTimeout(timeout);
     throw error;
