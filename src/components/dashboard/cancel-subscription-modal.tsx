@@ -6,6 +6,8 @@ import { useRouter } from '@/i18n/navigation';
 import { useAppContext } from '@/contexts/app';
 import { trackMixpanelEvent } from '@/lib/mixpanel-browser';
 import type { DowngradeTarget } from '@/services/subscription-plan';
+import { readJson } from '@/lib/read-json';
+import type { ApiResponse, RefundEligibilityResponse } from '@/types/api';
 
 interface CancelSubscriptionModalProps {
   onClose: () => void;
@@ -108,8 +110,8 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
       // Check refund eligibility
       try {
         const response = await fetch('/api/subscription/check-refund-eligibility');
-        const data = await response.json();
-        setRefundEligible(data.eligible || false);
+        const data = await readJson<RefundEligibilityResponse>(response);
+        setRefundEligible(Boolean(data.eligible));
       } catch (error) {
         console.error('Failed to check refund eligibility');
         // Still proceed even if refund check fails
@@ -145,11 +147,11 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
             'Content-Type': 'application/json',
           }
         });
-        
+
         console.log('[handleRetentionOffer] Response status:', response.status);
-        const data = await response.json();
+        const data = await readJson<ApiResponse>(response);
         console.log('[handleRetentionOffer] Response data:', data);
-        
+
         if (data.success) {
           // Refresh user info to update subscription status
           refreshUserInfo?.(true);
@@ -193,7 +195,7 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
         body: JSON.stringify({ target, locale, reason, feedback }),
       });
 
-      const data = await response.json();
+      const data = await readJson<ApiResponse<{ scheduled?: boolean }>>(response);
 
       if (!response.ok || !data.success) {
         // Handle specific error cases with user-friendly messages
@@ -219,8 +221,13 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
           effective_at: data.effectiveAt,
         });
         refreshUserInfo?.(true);
-        const effectiveAt = data.effectiveAt || '';
-        router.push(`/${locale}/dashboard/account?downgradeScheduled=${encodeURIComponent(effectiveAt)}&downgradePlan=${encodeURIComponent(target)}`);
+        const effectiveAt = typeof data.effectiveAt === 'string' ? data.effectiveAt : String(data.effectiveAt ?? '');
+        const targetParam: string = target;
+        router.push(
+          `/${locale}/dashboard/account?downgradeScheduled=${encodeURIComponent(
+            effectiveAt
+          )}&downgradePlan=${encodeURIComponent(targetParam)}`
+        );
         onClose();
         return;
       }
@@ -272,7 +279,7 @@ const CancelSubscriptionModal = ({ onClose, locale, currentPlan }: CancelSubscri
         }),
       });
 
-      const data = await response.json();
+      const data = await readJson<ApiResponse>(response);
 
       if (data.success) {
         trackMixpanelEvent('subscription.cancel_success', {

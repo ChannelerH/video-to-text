@@ -31,7 +31,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<{ 
     cache: 'no-store',
     headers: { cookie: cookieHeader }
   });
-  const { success, data, total } = await res.json();
+
+  const { success, data, total } = (await res.json()) as {
+    success: boolean;
+    data: any[];
+    total?: number;
+  };
   const rows = success ? data : [];
   const totalPages = Math.max(Math.ceil((total || 0) / limit), 1);
 

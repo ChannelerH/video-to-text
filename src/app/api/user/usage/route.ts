@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserUuid } from '@/services/user';
 import { getUserTier } from '@/services/user-tier';
 import { getUserUsageSummary } from '@/services/user-minutes';
+import { readJson } from '@/lib/read-json';
 
 export async function GET(req: NextRequest) {
   try {
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { minutes } = await req.json();
+    const { minutes } = await readJson<{ minutes?: number }>(req);
     
     if (!minutes || minutes <= 0) {
       return NextResponse.json(
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     // Check if user has enough minutes
     const usageResponse = await GET(req);
-    const usageData = await usageResponse.json();
+    const usageData = await readJson<any>(usageResponse);
     
     if (!usageData.isUnlimited && usageData.minutesUsed + minutes > usageData.minutesLimit) {
       return NextResponse.json(

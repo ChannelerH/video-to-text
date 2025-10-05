@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, UploadPartCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { readJson } from '@/lib/read-json';
 
 // 初始化S3客户端
 const s3Client = new S3Client({
@@ -17,7 +18,12 @@ const s3Client = new S3Client({
 export async function POST(request: NextRequest) {
   let payload: any;
   try {
-    payload = await request.json();
+    payload = await readJson<{
+      uploadId?: string;
+      key?: string;
+      partNumber?: number;
+      contentLength?: number;
+    }>(request);
     const { uploadId, key, partNumber, contentLength } = payload;
     
     // 验证参数

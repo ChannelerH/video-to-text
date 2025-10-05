@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { EmailScheduler } from '@/services/email-scheduler';
+import { readJson } from '@/lib/read-json';
 
 // Vercel Cron Job handler for hourly email processing
 export async function GET(request: Request) {
@@ -73,8 +74,8 @@ export async function POST(request: Request) {
   // Parse request for specific campaign
   let campaign: string | null = null;
   try {
-    const body = await request.json();
-    campaign = body.campaign;
+    const body = await readJson<{ campaign?: string }>(request);
+    campaign = body.campaign ?? null;
   } catch {
     // No body or invalid JSON, process all campaigns
   }

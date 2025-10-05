@@ -5,6 +5,7 @@ import { users, transcriptions, refunds } from '@/db/schema';
 import { getCurrentSubscriptionOrder, syncUserSubscriptionTier } from '@/services/user-subscription';
 import { eq, and, sql, gte } from 'drizzle-orm';
 import Stripe from 'stripe';
+import { readJson } from '@/lib/read-json';
 
 export const runtime = 'nodejs';
 
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
       feedback, 
       immediate = false,
       requestRefund = false 
-    } = await request.json();
+    } = await readJson<{ reason?: string; feedback?: string; immediate?: boolean; requestRefund?: boolean }>(request);
 
     // 4. 获取用户的使用统计（用于决定是否退款）
     // 4. 获取 Stripe 订阅，计算本周期开始时间
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
       updatedSub = await stripe.subscriptions.update(subscriptionId, {
         cancel_at_period_end: true,
         metadata: {
-          cancel_reason: reason,
+          cancel_reason: reason ?? null,
           cancel_feedback: feedback || ''
         }
       });
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest) {
           const invoice = await stripe.invoices.retrieve((updatedSub as any).latest_invoice as string);
           if (invoice.payment_intent) {
             // 计算退款金额（可选：按比例退款）
-            const totalAmount = invoice.amount_paid; // 总支付金额（分）
+            const totalAmount = invoice.amount_paid ?? 0; // 总支付金额（分）
             
             // 选项1：全额退款（当前实现）
             const refundAmount = totalAmount;
@@ -130,9 +131,9 @@ export async function POST(request: NextRequest) {
               amount: refundAmount, // 指定退款金额（分）
               reason: 'requested_by_customer',
               metadata: {
-                cancel_reason: reason,
+                cancel_reason: reason ?? '',
                 days_since_charge: daysSinceCharge.toString(),
-                minutes_used: usage.totalMinutes.toString()
+                minutes_used: String(usage.totalMinutes ?? 0)
               }
             });
 

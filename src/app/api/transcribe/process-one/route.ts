@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { q_jobs, transcriptions, transcription_results } from '@/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import { TranscriptionService } from '@/lib/transcription';
+import { readJson } from '@/lib/read-json';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // allow long processing
@@ -22,8 +23,8 @@ export async function POST(request: NextRequest) {
 
     let jobIdFromBody: string | undefined;
     try {
-      const body = await request.json().catch(() => ({} as any));
-      jobIdFromBody = body?.job_id as string | undefined;
+      const body = await readJson<{ job_id?: string }>(request);
+      jobIdFromBody = body?.job_id;
     } catch {}
 
     // Find a pending job for this user

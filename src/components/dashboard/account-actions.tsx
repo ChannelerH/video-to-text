@@ -7,6 +7,7 @@ import { useRouter } from '@/i18n/navigation';
 import CancelSubscriptionModal from './cancel-subscription-modal';
 import { useSearchParams } from 'next/navigation';
 import { useAppContext } from '@/contexts/app';
+import { readJson } from '@/lib/read-json';
 
 interface AccountActionsProps {
   locale: string;
@@ -88,7 +89,7 @@ export default function AccountActions({ locale, currentPlan, pendingPlan, pendi
       const response = await fetch('/api/subscription/downgrade', {
         method: 'DELETE',
       });
-      const data = await response.json();
+      const data = await readJson<{ success?: boolean; error?: string }>(response);
       if (!response.ok || !data.success) {
         setScheduleError(data.error || 'Failed to cancel scheduled downgrade.');
         return;
@@ -138,7 +139,7 @@ export default function AccountActions({ locale, currentPlan, pendingPlan, pendi
       action: async () => {
         try {
           const res = await fetch('/api/billing/portal', { method: 'POST' });
-          const data = await res.json();
+          const data = await readJson<{ url?: string }>(res);
           if (data?.url) window.location.href = data.url;
           else router.push(`/${locale}/pricing`);
         } catch {

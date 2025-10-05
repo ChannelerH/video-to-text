@@ -11,6 +11,22 @@ import { and, gte, eq, count, ne, sql } from 'drizzle-orm';
 import { computeEstimatedMinutes } from '@/lib/estimate-usage';
 import { verifySessionToken } from '@/lib/turnstile-session';
 import { POLICY } from '@/services/policy';
+import { readJson } from '@/lib/read-json';
+
+type TurnstileVerifyResponse = {
+  success: boolean;
+  action?: string;
+  cdata?: string;
+  challenge_ts?: string;
+  hostname?: string;
+  'error-codes'?: string[];
+};
+
+const isTurnstileVerifyResponse = (value: unknown): value is TurnstileVerifyResponse => {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.success === 'boolean';
+};
 
 export const maxDuration = 10; // Vercel hobby limit
 
@@ -33,7 +49,7 @@ export async function POST(request: NextRequest) {
     const anonUsageKey = !maybeUserUuid ? `anon:${anonIp}` : null;
 
     // 2. 解析请求
-    const body = await request.json();
+    const body = await readJson<Record<string, any>>(request);
     const { type, content, options: rawOptions = {}, action, turnstileToken, sessionToken } = body;
     
     console.log('[Async API] Request received:', {
@@ -132,6 +148,15 @@ export async function POST(request: NextRequest) {
             });
 
             const verifyData = await verifyResponse.json();
+
+            if (!isTurnstileVerifyResponse(verifyData)) {
+              console.error('[Async] Unexpected Turnstile response shape', verifyData);
+              return NextResponse.json(
+                { error: 'Verification error. Please try again.', code: 'verification_error' },
+                { status: 500 }
+              );
+            }
+
             console.log('[Async] Turnstile verification result:', verifyData.success);
 
             if (!verifyData.success) {
@@ -418,7 +443,7 @@ export async function POST(request: NextRequest) {
             gte(usage_records.created_at as any, dayStart)
           ));
         const dailyUsed = Number((dailyRow as any)?.c || 0);
-        const dailyLimit = Number(process.env.ANON_DAILY_LIMIT || 10);
+        const dailyLimit = Number(process.env.ANON_DAILY_LIMIT || 5);
         if (dailyUsed >= dailyLimit) {
           return NextResponse.json({ error: `Anonymous daily limit reached (${dailyLimit}/day). Please sign in.` }, { status: 429 });
         }
@@ -433,7 +458,7 @@ export async function POST(request: NextRequest) {
             gte(usage_records.created_at as any, monthStart)
           ));
         const monthlyUsed = Number((monthRow as any)?.total || 0);
-        const monthlyLimit = Number(process.env.ANON_MONTHLY_MINUTES || 90);
+        const monthlyLimit = Number(process.env.ANON_MONTHLY_MINUTES || 30);
         if (monthlyUsed + estimatedAnonMinutes > monthlyLimit) {
           return NextResponse.json({ error: `Anonymous monthly limit reached (${monthlyLimit} minutes). Please sign in.` }, { status: 429 });
         }

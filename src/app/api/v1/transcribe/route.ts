@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserTier, hasFeature, UserTier } from '@/services/user-tier';
 import { TranscriptionService } from '@/lib/transcription';
+import { readJson } from '@/lib/read-json';
 // import { PriorityQueueManager } from '@/lib/priority-queue'; // TODO: 队列功能暂时不启用
 
 // Initialize transcription service
@@ -79,12 +80,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse request body
-    const body = await request.json();
-    const { 
-      url,           // URL to transcribe (YouTube, audio file, etc.)
-      file,          // Base64 encoded file
-      options = {}   // Transcription options
-    } = body;
+    const body = await readJson<Record<string, unknown>>(request);
+    const url = typeof body.url === 'string' ? body.url : undefined;
+    const file = typeof body.file === 'string' ? body.file : undefined;
+    const options =
+      body.options && typeof body.options === 'object'
+        ? (body.options as Record<string, any>)
+        : {};
 
     if (!url && !file) {
       return NextResponse.json(
@@ -101,17 +103,27 @@ export async function POST(request: NextRequest) {
     let type: 'youtube_url' | 'audio_url' | 'file_upload';
     let content: string;
 
-    if (url) {
+    if (typeof url === 'string') {
       if (url.includes('youtube.com') || url.includes('youtu.be')) {
         type = 'youtube_url';
       } else {
         type = 'audio_url';
       }
       content = url;
-    } else {
+    } else if (typeof file === 'string') {
       type = 'file_upload';
       // TODO: Handle file upload to R2 and get URL
       content = file; // For now, pass the base64 data
+    } else {
+      // Should be unreachable because of earlier validation, but keeps TypeScript satisfied.
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Missing input',
+          message: 'Please provide either a URL or a file to transcribe'
+        },
+        { status: 400 }
+      );
     }
 
     // Add to priority queue

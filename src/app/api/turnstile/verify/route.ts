@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSessionToken, verifySessionToken as verifyToken, normalizeIp } from '@/lib/turnstile-session';
+import { readJson } from '@/lib/read-json';
 
 const usedTokens = new Map<string, number>();
 const ipAttempts = new Map<string, { count: number; resetTime: number }>();
@@ -20,7 +21,7 @@ setInterval(() => {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await readJson<{ token?: string; action?: string }>(req);
     const { token, action } = body;
     
     // 获取真实IP
@@ -30,13 +31,20 @@ export async function POST(req: NextRequest) {
     const clientIpRaw = (forwardedFor?.split(',')[0] || realIp || cfConnectingIp || 'unknown').trim();
     const clientIp = normalizeIp(clientIpRaw);
     
-  if (action === 'verify_session') {
-    const result = verifyToken(token, clientIp);
-    if (!result.valid) {
-      return NextResponse.json({ success: false, error: result.error || 'Invalid session' }, { status: 403 });
+    if (action === 'verify_session') {
+      if (!token) {
+        return NextResponse.json(
+          { success: false, error: 'Token is required' },
+          { status: 400 }
+        );
+      }
+
+      const result = verifyToken(token, clientIp);
+      if (!result.valid) {
+        return NextResponse.json({ success: false, error: result.error || 'Invalid session' }, { status: 403 });
+      }
+      return NextResponse.json({ success: true, valid: true, sessionExpiry: result.expiry });
     }
-    return NextResponse.json({ success: true, valid: true, sessionExpiry: result.expiry });
-  }
 
     if (!token) {
       return NextResponse.json(
@@ -104,7 +112,7 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    const outcome = await result.json();
+    const outcome = await readJson<any>(result);
 
     if (outcome.success) {
       usedTokens.set(token, now);

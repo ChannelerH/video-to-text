@@ -3,12 +3,13 @@ import { db } from '@/db';
 import { and, eq, inArray } from 'drizzle-orm';
 import { transcriptions, transcription_results, transcription_edits } from '@/db/schema';
 import { getUserUuid } from '@/services/user';
+import { readJson } from '@/lib/read-json';
 
 export async function POST(req: NextRequest) {
   try {
     const user_uuid = await getUserUuid();
     if (!user_uuid) return NextResponse.json({ success: false, error: 'unauthorized' }, { status: 401 });
-    const { job_ids } = await req.json();
+    const { job_ids } = await readJson<{ job_ids?: string[] }>(req);
     if (!Array.isArray(job_ids) || job_ids.length === 0) {
       return NextResponse.json({ success: false, error: 'invalid job_ids' }, { status: 400 });
     }
@@ -24,4 +25,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'failed' }, { status: 500 });
   }
 }
-

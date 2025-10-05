@@ -1,5 +1,6 @@
 import { JSONValue, experimental_generateImage as generateImage } from "ai";
 import { respData, respErr } from "@/lib/resp";
+import { readJson } from "@/lib/read-json";
 
 import type { ImageModelV1 } from "@ai-sdk/provider";
 import { getUuid } from "@/lib/hash";
@@ -10,7 +11,7 @@ import { replicate } from "@ai-sdk/replicate";
 
 export async function POST(req: Request) {
   try {
-    const { prompt, provider, model } = await req.json();
+    const { prompt, provider, model } = await readJson<{ prompt?: string; provider?: string; model?: string }>(req);
     if (!prompt || !provider || !model) {
       return respErr("invalid params");
     }
@@ -36,12 +37,14 @@ export async function POST(req: Request) {
           },
         };
         break;
-      case "kling":
-        imageModel = kling.image(model);
+      case "kling": {
+        const klingModel = model as Parameters<typeof kling.image>[0];
+        imageModel = kling.image(klingModel);
         providerOptions = {
           kling: {},
         };
         break;
+      }
       default:
         return respErr("invalid provider");
     }

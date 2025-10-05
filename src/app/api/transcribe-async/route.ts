@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { taskQueue } from '@/lib/task-queue';
 import { getTaskProcessor } from '@/lib/task-processor';
 import { TranscriptionRequest } from '@/lib/transcription';
+import { readJson } from '@/lib/read-json';
 
 // 创建异步任务
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await readJson<{ type?: string; content?: string; options?: Record<string, any> }>(request);
     const { type, content, options = {} } = body;
+
+    const isValidType = (value: unknown): value is TranscriptionRequest['type'] =>
+      typeof value === 'string' && ['youtube_url', 'file_upload', 'audio_url'].includes(value);
 
     // 验证必需参数
     if (!type || !content) {
@@ -18,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 验证类型
-    if (!['youtube_url', 'file_upload', 'audio_url'].includes(type)) {
+    if (!isValidType(type)) {
       return NextResponse.json(
         { success: false, error: 'Invalid type. Must be youtube_url, file_upload, or audio_url' },
         { status: 400 }

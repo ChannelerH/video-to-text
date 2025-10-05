@@ -6,6 +6,7 @@ import { POLICY, trimSegmentsToSeconds } from '@/services/policy';
 import { db } from '@/db';
 import { usage_records } from '@/db/schema';
 import { and, eq, gte, count } from 'drizzle-orm';
+import { readJson } from '@/lib/read-json';
 
 export async function POST(
   request: NextRequest,
@@ -22,7 +23,7 @@ export async function POST(
     }
     const userTier = await getUserTier(userUuid);
 
-    const { segments, options } = await request.json();
+    const { segments, options } = await readJson<{ segments?: any[]; options?: any }>(request);
     
     if (!segments || !Array.isArray(segments)) {
       return NextResponse.json(

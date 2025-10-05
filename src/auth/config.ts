@@ -12,6 +12,18 @@ import { handleSignInUser } from "./handler";
 
 let providers: Provider[] = [];
 
+type GoogleTokenPayload = {
+  email?: string;
+  sub?: string;
+  given_name?: string;
+  family_name?: string;
+  email_verified?: boolean;
+  picture?: string;
+};
+
+const isGoogleTokenPayload = (value: unknown): value is GoogleTokenPayload =>
+  !!value && typeof value === "object";
+
 // Google One Tap Auth
 if (
   process.env.NEXT_PUBLIC_AUTH_GOOGLE_ONE_TAP_ENABLED === "true" &&
@@ -43,8 +55,8 @@ if (
           return null;
         }
 
-        const payload = await response.json();
-        if (!payload) {
+        const payload: unknown = await response.json();
+        if (!isGoogleTokenPayload(payload)) {
           console.log("invalid payload from token");
           return null;
         }
@@ -59,6 +71,11 @@ if (
         } = payload;
         if (!email) {
           console.log("invalid email in payload");
+          return null;
+        }
+
+        if (!sub) {
+          console.log("invalid sub in payload");
           return null;
         }
 

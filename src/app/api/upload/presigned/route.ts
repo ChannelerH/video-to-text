@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CloudflareR2Service } from '@/lib/r2-upload';
 import { getUserUuid } from '@/services/user';
+import { readJson } from '@/lib/read-json';
 
 // 支持的文件类型
 const SUPPORTED_VIDEO_TYPES = [
@@ -31,7 +32,7 @@ const MAX_FILE_SIZE = 500 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await readJson<{ fileName?: string; fileType?: string; fileSize?: number; mode?: string }>(request);
     const { fileName, fileType, fileSize, mode = 'video' } = body;
 
     // 验证参数

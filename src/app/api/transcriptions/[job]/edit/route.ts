@@ -3,6 +3,7 @@ import { getUserUuid } from "@/services/user";
 import { db } from "@/db";
 import { transcription_edits } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { readJson } from "@/lib/read-json";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ job: string }> }) {
   const user_uuid = await getUserUuid();
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ job
   const user_uuid = await getUserUuid();
   if (!user_uuid) return NextResponse.json({ success: false, error: "unauthorized" }, { status: 401 });
   const { job } = await params;
-  const body = await req.json();
+  const body = await readJson<Record<string, any>>(req);
   const content = JSON.stringify({ ...body, updatedAt: new Date().toISOString() });
 
   // upsert by job+user
@@ -44,4 +45,3 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ job
 
   return NextResponse.json({ success: true });
 }
-

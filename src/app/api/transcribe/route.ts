@@ -16,6 +16,7 @@ import { quotaTracker } from '@/services/quota-tracker';
 import { headers } from 'next/headers';
 import { YouTubeService } from '@/lib/youtube';
 import { computeEstimatedMinutes } from '@/lib/estimate-usage';
+import { readJson } from '@/lib/read-json';
 // import { PriorityQueueManager } from '@/lib/priority-queue'; // TODO: 队列功能暂时不启用
 
 // 初始化服务 - 支持两个模型：Deepgram + OpenAI Whisper
@@ -34,7 +35,7 @@ console.log(`Deepgram ${deepgramEnabled ? 'enabled' : 'disabled'} - Using ${deep
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await readJson<Record<string, any>>(request);
     const { type, content, options = {}, action = 'transcribe' } = body;
     const userUuid = await getUserUuid();
     console.log('[API] /api/transcribe POST', {

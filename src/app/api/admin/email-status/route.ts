@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { EmailBonusMinutesService } from '@/services/email-bonus-minutes';
+import { readJson } from '@/lib/read-json';
 
 // Admin endpoint to check email system status
 export async function GET(request: Request) {
@@ -152,8 +153,12 @@ export async function POST(request: Request) {
   }
   
   try {
-    const body = await request.json();
-    const { userUuid, minutes, campaignId, validDays } = body;
+    const { userUuid, minutes, campaignId, validDays } = await readJson<{
+      userUuid?: string;
+      minutes?: number;
+      campaignId?: string;
+      validDays?: number;
+    }>(request);
     
     if (!userUuid || !minutes || !campaignId) {
       return NextResponse.json(

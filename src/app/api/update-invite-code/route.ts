@@ -6,10 +6,11 @@ import {
 import { respData, respErr } from "@/lib/resp";
 
 import { getUserUuid } from "@/services/user";
+import { readJson } from "@/lib/read-json";
 
 export async function POST(req: Request) {
   try {
-    const { invite_code } = await req.json();
+    const { invite_code } = await readJson<{ invite_code?: string }>(req);
     if (!invite_code) {
       return respErr("invalid params");
     }

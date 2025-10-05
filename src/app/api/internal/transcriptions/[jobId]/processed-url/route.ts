@@ -1,18 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { transcriptions } from '@/db/schema';
 import { and, eq, ne } from 'drizzle-orm';
+import { readJson } from '@/lib/read-json';
 
 const HEADER_KEY = 'x-worker-secret';
 
-export async function POST(request: NextRequest, { params }: { params: { jobId: string } }) {
+export async function POST(request: Request, context: any) {
+  const { params } = context as { params: { jobId?: string } };
   const secret = process.env.WORKER_UPLOAD_SECRET;
   if (!secret) {
     console.error('[Worker Callback] Missing WORKER_UPLOAD_SECRET configuration');
     return NextResponse.json({ error: 'worker integration not configured' }, { status: 500 });
   }
 
-  const provided = request.headers.get(HEADER_KEY) || request.nextUrl.searchParams.get('secret');
+  const provided = request.headers.get(HEADER_KEY) || new URL(request.url).searchParams.get('secret');
   if (!provided || provided !== secret) {
     console.warn('[Worker Callback] Invalid secret provided for job', params.jobId);
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -25,7 +27,7 @@ export async function POST(request: NextRequest, { params }: { params: { jobId: 
 
   let body: any;
   try {
-    body = await request.json();
+    body = await readJson<Record<string, unknown>>(request);
   } catch (error) {
     console.error('[Worker Callback] Failed to parse request body', error);
     return NextResponse.json({ error: 'invalid json' }, { status: 400 });

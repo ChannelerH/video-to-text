@@ -5,6 +5,7 @@ import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import Stripe from 'stripe';
 import { getCurrentSubscriptionOrder, syncUserSubscriptionTier } from '@/services/user-subscription';
+import { readJson } from '@/lib/read-json';
 
 export const runtime = 'nodejs';
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. 获取请求参数
-    const { duration = 30 } = await request.json(); // 默认暂停30天
+    const { duration = 30 } = await readJson<{ duration?: number }>(request); // 默认暂停30天
 
     // 4. 暂停订阅
     const resumeDate = new Date();

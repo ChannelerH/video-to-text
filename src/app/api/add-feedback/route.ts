@@ -2,10 +2,12 @@ import { respData, respErr } from "@/lib/resp";
 
 import { getUserUuid } from "@/services/user";
 import { insertFeedback } from "@/models/feedback";
+import { readJson } from "@/lib/read-json";
 
 export async function POST(req: Request) {
   try {
-    let { content, rating } = await req.json();
+    const body = await readJson<{ content?: string; rating?: number }>(req);
+    const { content, rating } = body;
     if (!content) {
       return respErr("invalid params");
     }

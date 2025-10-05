@@ -3,13 +3,14 @@ import { CloudflareR2Service } from '@/lib/r2-upload';
 import { getUserUuid } from '@/services/user';
 import { getUserTier, UserTier } from '@/services/user-tier';
 import { POLICY } from '@/services/policy';
+import { readJson } from '@/lib/read-json';
 
 export const runtime = 'nodejs';
 export const maxDuration = 15;
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await readJson<Record<string, unknown>>(req);
     const fileName = String(body?.fileName || '').trim();
     const contentType = String(body?.contentType || '').trim();
     const mode = (String(body?.mode || 'video').trim()) as 'video' | 'audio';
@@ -47,4 +48,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: e?.message || 'presign_failed' }, { status: 500 });
   }
 }
-

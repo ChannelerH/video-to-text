@@ -10,10 +10,11 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { deepseek } from "@ai-sdk/deepseek";
 import { openai } from "@ai-sdk/openai";
 import { respErr } from "@/lib/resp";
+import { readJson } from "@/lib/read-json";
 
 export async function POST(req: Request) {
   try {
-    const { prompt, provider, model } = await req.json();
+    const { prompt, provider, model } = await readJson<{ prompt?: string; provider?: string; model?: string }>(req);
     if (!prompt || !provider || !model) {
       return respErr("invalid params");
     }

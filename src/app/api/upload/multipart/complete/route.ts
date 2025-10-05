@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, CompleteMultipartUploadCommand } from '@aws-sdk/client-s3';
 import { CloudflareR2Service } from '@/lib/r2-upload';
+import { readJson } from '@/lib/read-json';
 
 // 初始化S3客户端
 const s3Client = new S3Client({
@@ -16,7 +17,14 @@ const s3Client = new S3Client({
 
 export async function POST(request: NextRequest) {
   try {
-    const { uploadId, key, parts, fileName, fileType, fileSize } = await request.json();
+    const { uploadId, key, parts, fileName, fileType, fileSize } = await readJson<{
+      uploadId?: string;
+      key?: string;
+      parts?: Array<{ ETag: string; PartNumber: number }>;
+      fileName?: string;
+      fileType?: string;
+      fileSize?: number;
+    }>(request);
     
     // 验证参数
     if (!uploadId || !key || !parts || !Array.isArray(parts)) {

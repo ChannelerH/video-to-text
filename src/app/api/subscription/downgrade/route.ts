@@ -4,6 +4,7 @@ import { getUserUuid } from '@/services/user';
 import { db } from '@/db';
 import { users, orders } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { readJson } from '@/lib/read-json';
 import {
   getCurrentSubscriptionOrder,
   getUserSubscriptionPlan,
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     let body: DowngradeRequestBody;
     try {
-      body = await request.json();
+      body = await readJson<DowngradeRequestBody>(request);
     } catch {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }

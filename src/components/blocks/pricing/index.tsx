@@ -14,6 +14,21 @@ import { toast } from "sonner";
 import { useAppContext } from "@/contexts/app";
 import { useLocale } from "next-intl";
 
+type CheckoutResponse = {
+  code: number;
+  message: string;
+  data?: {
+    checkout_url?: string;
+    [key: string]: unknown;
+  };
+};
+
+const isCheckoutResponse = (value: unknown): value is CheckoutResponse => {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.code === "number" && typeof record.message === "string";
+};
+
 export default function Pricing({ pricing }: { pricing: PricingType }) {
   const t = useTranslations('pricing');
   const qEnabled = (process.env.NEXT_PUBLIC_Q_ENABLED === 'true');
@@ -68,13 +83,19 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
         return;
       }
 
-      const { code, message, data } = await response.json();
+      const json: unknown = await response.json();
+      if (!isCheckoutResponse(json)) {
+        toast.error("checkout failed");
+        return;
+      }
+
+      const { code, message, data } = json;
       if (code !== 0) {
         toast.error(message);
         return;
       }
 
-      const { checkout_url } = data;
+      const checkout_url = typeof data?.checkout_url === "string" ? data.checkout_url : undefined;
       if (!checkout_url) {
         toast.error("checkout failed");
         return;

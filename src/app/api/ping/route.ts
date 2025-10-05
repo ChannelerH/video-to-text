@@ -6,10 +6,11 @@ import {
 import { respData, respErr } from "@/lib/resp";
 
 import { getUserUuid } from "@/services/user";
+import { readJson } from "@/lib/read-json";
 
 export async function POST(req: Request) {
   try {
-    const { message } = await req.json();
+    const { message } = await readJson<{ message?: string }>(req);
     if (!message) {
       return respErr("invalid params");
     }

@@ -10,6 +10,7 @@ import {
   shouldClipMedia,
   YoutubePrepareError,
 } from '@/services/youtube-preparer';
+import { readJson } from '@/lib/read-json';
 
 export const runtime = 'nodejs';
 export const maxDuration = 10; // keep it short
@@ -17,7 +18,7 @@ export const maxDuration = 10; // keep it short
 export async function POST(request: NextRequest) {
   let job_id: string | undefined;
   try {
-    const body = await request.json();
+    const body = await readJson<Record<string, any>>(request);
     ({ job_id } = body);
     const { video, user_tier, preferred_language, enable_diarization_after_whisper, high_accuracy, video_prefetch, clip_seconds, is_preview } = body;
     const forceHighAccuracy = high_accuracy === true;

@@ -19,6 +19,15 @@ type ActionsProps = {
   userTier?: string;
 };
 
+type AsyncTranscribeResponse = {
+  success?: boolean;
+  taskId?: string;
+  error?: string;
+};
+
+const isAsyncTranscribeResponse = (value: unknown): value is AsyncTranscribeResponse =>
+  !!value && typeof value === 'object';
+
 export default function Actions({ row, i18n, userTier: userTierOverride }: ActionsProps) {
   const router = useRouter();
   const { userTier: contextTier } = useAppContext();
@@ -91,7 +100,8 @@ export default function Actions({ row, i18n, userTier: userTierOverride }: Actio
       };
       toast.message(i18n.rerun_ok);
       const res = await fetch('/api/transcribe/async', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const data = await res.json();
+      const json: unknown = await res.json();
+      const data = isAsyncTranscribeResponse(json) ? json : null;
       if (!data?.success) {
         toast.error(i18n.rerun_failed);
       }

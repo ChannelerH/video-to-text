@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { transcriptionCache } from '@/lib/cache';
+import { readJson } from '@/lib/read-json';
 
 export async function GET(request: NextRequest) {
   try {
@@ -86,7 +87,7 @@ function getContentType(format: string): string {
 // POST 方法用于批量下载
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await readJson<Record<string, any>>(request);
     const { type, identifier, formats, userId } = body;
 
     if (!type || !identifier || !formats || !Array.isArray(formats)) {

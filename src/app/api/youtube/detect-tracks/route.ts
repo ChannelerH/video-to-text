@@ -3,13 +3,14 @@ import { db } from '@/db';
 import { transcriptions } from '@/db/schema';
 import { desc, eq } from 'drizzle-orm';
 import { YouTubeService } from '@/lib/youtube';
+import { readJson } from '@/lib/read-json';
 
 export const runtime = 'nodejs';
 export const maxDuration = 10;
 
 export async function POST(request: NextRequest) {
   try {
-    const { url } = await request.json();
+    const { url } = await readJson<{ url?: string }>(request);
     
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
@@ -68,9 +69,12 @@ export async function POST(request: NextRequest) {
           if (!oembedResp.ok) {
             throw new Error(`HTTP ${oembedResp.status}`);
           }
-          const data = await oembedResp.json();
-          if (typeof data.title === 'string') {
-            videoTitle = data.title;
+          const data: unknown = await oembedResp.json();
+          if (data && typeof data === 'object') {
+            const title = (data as Record<string, unknown>).title;
+            if (typeof title === 'string') {
+              videoTitle = title;
+            }
           }
           break;
         } catch (error) {

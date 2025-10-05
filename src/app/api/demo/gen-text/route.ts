@@ -5,6 +5,7 @@ import {
   wrapLanguageModel,
 } from "ai";
 import { respData, respErr } from "@/lib/resp";
+import { readJson } from "@/lib/read-json";
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
@@ -13,7 +14,7 @@ import { openai } from "@ai-sdk/openai";
 
 export async function POST(req: Request) {
   try {
-    const { prompt, provider, model } = await req.json();
+    const { prompt, provider, model } = await readJson<{ prompt?: string; provider?: string; model?: string }>(req);
     if (!prompt || !provider || !model) {
       return respErr("invalid params");
     }

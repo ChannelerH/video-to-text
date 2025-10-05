@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getEmailTemplate, renderTemplate } from '@/services/email-templates';
 import { sendEmail } from '@/services/email-sender';
 import { PersonalizedPSGenerator } from '@/services/ps-generator';
+import { readJson } from '@/lib/read-json';
 
 // Test endpoint to send a sample email
 export async function POST(request: Request) {
@@ -17,7 +18,11 @@ export async function POST(request: Request) {
   }
   
   try {
-    const body = await request.json();
+    const body = await readJson<{
+      to?: string;
+      templateType?: string;
+      testData?: Record<string, any>;
+    }>(request);
     const { 
       to, 
       templateType = 'day3_activation',

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readJson } from '@/lib/read-json';
 
 // Use puppeteer-core with @sparticuz/chromium for serverless-friendly PDF export
 // This route renders an HTML document to PDF to correctly support complex scripts (Indic/RTL/CJK).
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'server_pdf_disabled' }, { status: 503 });
     }
 
-    const body = await req.json();
+    const body = await readJson<Record<string, any>>(req);
     const { title, language, duration, summary, chapters, text, includeChapters, includeTimestamps } = body || {};
 
     // Lazy import chromium + puppeteer-core to reduce cold start

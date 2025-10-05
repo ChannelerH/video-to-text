@@ -1,6 +1,7 @@
 import { getUserEmail, getUserUuid } from "@/services/user";
 import { insertOrder, OrderStatus, updateOrderSession } from "@/models/order";
 import { respData, respErr } from "@/lib/resp";
+import { readJson } from "@/lib/read-json";
 
 import Stripe from "stripe";
 import { findUserByUuid } from "@/models/user";
@@ -13,14 +14,19 @@ import { newCreemClient } from "@/integrations/creem";
 
 export async function POST(req: Request) {
   try {
-    let { product_id, currency, locale } = await req.json();
+    let { product_id, currency, locale } = await readJson<{
+      product_id?: string;
+      currency?: string;
+      locale?: string;
+    }>(req);
+    const resolvedLocale = locale || 'en';
 
     let cancel_url = `${
       process.env.NEXT_PUBLIC_PAY_CANCEL_URL || process.env.NEXT_PUBLIC_WEB_URL
     }`;
     if (cancel_url && cancel_url.startsWith("/")) {
       // relative url
-      cancel_url = `${process.env.NEXT_PUBLIC_WEB_URL}/${locale}${cancel_url}`;
+      cancel_url = `${process.env.NEXT_PUBLIC_WEB_URL}/${resolvedLocale}${cancel_url}`;
     }
 
     if (!product_id) {
@@ -28,7 +34,7 @@ export async function POST(req: Request) {
     }
 
     // validate checkout params
-    const page = await getPricingPage(locale);
+    const page = await getPricingPage(resolvedLocale);
     if (!page || !page.pricing || !page.pricing.items) {
       return respErr("invalid pricing table");
     }
@@ -134,7 +140,7 @@ export async function POST(req: Request) {
       // checkout with creem
       const result = await creemCheckout({
         order: order as any,
-        locale,
+        locale: resolvedLocale,
         cancel_url,
       });
 
@@ -144,7 +150,7 @@ export async function POST(req: Request) {
     // checkout with stripe
     const result = await stripeCheckout({
       order: order as any,
-      locale,
+      locale: resolvedLocale,
       cancel_url,
     });
 

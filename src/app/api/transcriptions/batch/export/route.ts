@@ -7,6 +7,7 @@ import { buildZip } from '@/lib/zip';
 import { getUserTier, UserTier } from '@/services/user-tier';
 import { POLICY, trimSegmentsToSeconds } from '@/services/policy';
 import { UnifiedTranscriptionService } from '@/lib/unified-transcription';
+import { readJson } from '@/lib/read-json';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ success: false, error: 'unauthorized' }), { status: 401 });
     }
 
-    const body = await req.json();
+    const body = await readJson<{ job_ids?: string[] }>(req);
     const job_ids: string[] = body?.job_ids || [];
     if (!Array.isArray(job_ids) || job_ids.length === 0) {
       return new Response(JSON.stringify({ success: false, error: 'invalid job_ids' }), { status: 400 });
