@@ -60,47 +60,7 @@ export interface AudioTrackInfo {
   formats: number; // 可用格式数量
 }
 
-interface RapidApiMediaStreamItem {
-  url: string;
-  lengthMs?: number;
-  mimeType?: string;
-  extension?: string;
-  size?: number;
-  sizeText?: string;
-  hasAudio?: boolean;
-  quality?: string;
-  width?: number;
-  height?: number;
-  isDrc?: boolean;
-  xtags?: string;
-}
-
-interface RapidApiVideoDetailsResponse {
-  errorId?: string;
-  type?: string;
-  id?: string;
-  title?: string;
-  description?: string;
-  lengthSeconds?: number;
-  thumbnails?: Array<{ url: string }>;
-  videos?: {
-    errorId?: string;
-    expiration?: number;
-    items?: RapidApiMediaStreamItem[];
-  };
-  audios?: {
-    errorId?: string;
-    expiration?: number;
-    items?: RapidApiMediaStreamItem[];
-  };
-  subtitles?: {
-    errorId?: string;
-    expiration?: number;
-    items?: Array<{ url: string; code?: string; text?: string }>;
-  };
-}
-
-interface RapidVideoData {
+interface Mp36VideoData {
   status?: string;
   msg?: string;
   link?: string;
@@ -108,11 +68,9 @@ interface RapidVideoData {
   filesize?: number | string;
   duration?: number | string;
   progress?: number | string;
-  audios?: RapidApiMediaStreamItem[];
-  raw?: RapidApiVideoDetailsResponse;
 }
 
-const DEFAULT_RAPIDAPI_HOST = 'youtube-media-downloader.p.rapidapi.com';
+const DEFAULT_RAPIDAPI_HOST = 'youtube-mp36.p.rapidapi.com';
 
 type PrefetchedDownload = {
   videoId: string;
@@ -171,8 +129,8 @@ function parseSizeString(value: string | undefined): number | undefined {
 }
 
 export class YouTubeService {
-  private static rapidApiCache = new Map<string, RapidVideoData>();
-  private static prefetchedCache = new Map<string, RapidVideoData>();
+  private static rapidApiCache = new Map<string, Mp36VideoData>();
+  private static prefetchedCache = new Map<string, Mp36VideoData>();
 
   /**
    * 验证并解析 YouTube URL
@@ -276,152 +234,30 @@ export class YouTubeService {
    */
   static async getOptimizedAudioFormats(videoId: string, preferredLanguage?: string): Promise<OptimizedAudioFormat[]> {
     const data = await this.fetchVideoData(videoId);
+    if (!data.link) {
+      throw new Error('RapidAPI returned empty download link');
+    }
+
     const durationSeconds = this.parseDurationSeconds(data) ?? 0;
+    const fileSize = this.parseFileSize(data.filesize);
 
-    const seen = new Set<string>();
-    const audioStreams = (data.audios ?? []).filter(stream => {
-      if (!stream || typeof stream.url !== 'string' || stream.url.length === 0) {
-        return false;
-      }
-      const key = `${stream.url}|${this.detectDrcFlag(stream) ? '1' : '0'}`;
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    });
-
-    let formats: OptimizedAudioFormat[] = audioStreams.map((stream, index) => {
-      const url = stream.url;
-      const approxDurationMs = typeof stream.lengthMs === 'number'
-        ? stream.lengthMs
-        : durationSeconds > 0
-          ? durationSeconds * 1000
-          : undefined;
-      const secondsForBitrate = approxDurationMs && approxDurationMs > 0
-        ? approxDurationMs / 1000
-        : durationSeconds;
-
-      const contentLength = this.parseFileSize(stream.size ?? stream.sizeText);
-      const bitrate = this.estimateBitrateKbps(secondsForBitrate, contentLength);
-
-      let mimeType = stream.mimeType || '';
-      if (!mimeType) {
-        try {
-          const urlObj = new URL(url);
-          const mimeParam = urlObj.searchParams.get('mime');
-          if (mimeParam) {
-            mimeType = decodeURIComponent(mimeParam);
-          }
-        } catch {}
-      }
-      if (!mimeType) {
-        mimeType = 'audio/mp4';
-      }
-
-      const extension = stream.extension && stream.extension.length > 0
-        ? stream.extension
-        : mimeType.includes('webm')
-          ? 'webm'
-          : mimeType.includes('mp4')
-            ? 'm4a'
-            : 'audio';
-
-      const urlObj = (() => {
-        try {
-          return new URL(url);
-        } catch {
-          return null;
-        }
-      })();
-      const itagParam = urlObj?.searchParams.get('itag');
-      const itag = itagParam ? parseInt(itagParam, 10) : index;
-
-      const audioQuality = mimeType.includes('opus')
-        ? 'opus'
-        : mimeType.includes('mp4a')
-          ? 'aac'
-          : extension.toLowerCase();
-
-      const isDrc = this.detectDrcFlag(stream);
-
-      const labelParts = [extension.toUpperCase()];
-      if (audioQuality && audioQuality !== extension.toLowerCase()) {
-        labelParts.push(audioQuality.toUpperCase());
-      }
-      if (bitrate) {
-        labelParts.push(`${bitrate}kbps`);
-      }
-      if (isDrc) {
-        labelParts.push('DRC');
-      }
-      const audioTrackDisplayName = labelParts.join(' ').trim();
-
-      return {
-        itag: Number.isFinite(itag) ? itag : index,
-        url,
-        mimeType,
-        bitrate,
-        contentLength,
-        quality: extension,
-        audioQuality,
-        approxDurationMs: approxDurationMs ?? (durationSeconds > 0 ? durationSeconds * 1000 : 1),
-        supportsRangeRequests: true,
-        isDrc,
-        isDefaultAudio: false,
-        audioTrackDisplayName,
-        audioTrackId: itagParam ?? undefined,
-      } as OptimizedAudioFormat;
-    });
-
-    const score = (format: OptimizedAudioFormat) => {
-      const mimeScore = format.mimeType.includes('audio/mp4') ? 2
-        : format.mimeType.includes('audio/webm') ? 1
-          : 0;
-      return [
-        format.isDrc ? 0 : 1,
-        mimeScore,
-        format.bitrate ?? 0,
-        format.contentLength ?? 0,
-      ];
+    const format: OptimizedAudioFormat = {
+      itag: 0,
+      url: data.link,
+      mimeType: 'audio/mpeg',
+      bitrate: this.estimateBitrateKbps(durationSeconds, fileSize),
+      contentLength: fileSize,
+      quality: 'mp3',
+      audioQuality: 'mp3',
+      approxDurationMs: Math.max(0, durationSeconds) * 1000,
+      supportsRangeRequests: true,
+      isDrc: false,
+      isDefaultAudio: true,
+      audioTrackDisplayName: 'Default (mp3)',
+      audioTrackId: undefined,
     };
 
-    formats.sort((a, b) => {
-      const scoreA = score(a);
-      const scoreB = score(b);
-      for (let i = 0; i < scoreA.length; i++) {
-        if (scoreA[i] !== scoreB[i]) {
-          return scoreB[i] - scoreA[i];
-        }
-      }
-      return 0;
-    });
-
-    if (!formats.length && data.link) {
-      const fallbackSize = this.parseFileSize(data.filesize);
-      const fallbackFormat: OptimizedAudioFormat = {
-        itag: 0,
-        url: data.link,
-        mimeType: 'audio/mp4',
-        bitrate: this.estimateBitrateKbps(durationSeconds, fallbackSize),
-        contentLength: fallbackSize,
-        quality: 'm4a',
-        audioQuality: 'aac',
-        approxDurationMs: Math.max(0, durationSeconds) * 1000,
-        supportsRangeRequests: true,
-        isDrc: false,
-        isDefaultAudio: true,
-        audioTrackDisplayName: 'Default (m4a)',
-        audioTrackId: undefined,
-      };
-      formats = [fallbackFormat];
-    }
-
-    if (formats.length) {
-      formats[0].isDefaultAudio = true;
-    }
-
-    return formats;
+    return [format];
   }
 
   static async selectOptimizedAudioFormat(videoId: string, options?: { preferSmallSize?: boolean }): Promise<OptimizedAudioFormat> {
@@ -472,70 +308,7 @@ export class YouTubeService {
     return Math.max(64, Math.round(kbps));
   }
 
-  private static detectDrcFlag(item: RapidApiMediaStreamItem): boolean {
-    if (typeof item.isDrc === 'boolean') {
-      return item.isDrc;
-    }
-
-    const resolveSource = (): string | null => {
-      if (typeof item.xtags === 'string') {
-        return item.xtags;
-      }
-      if (typeof item.url === 'string') {
-        try {
-          const urlObj = new URL(item.url);
-          return urlObj.searchParams.get('xtags');
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    };
-
-    const source = resolveSource();
-    if (!source) {
-      return false;
-    }
-
-    try {
-      return /drc=1/i.test(decodeURIComponent(source));
-    } catch {
-      return /drc=1/i.test(source);
-    }
-  }
-
-  private static pickPreferredAudioStream(audios: RapidApiMediaStreamItem[]): RapidApiMediaStreamItem {
-    if (!audios.length) {
-      throw new Error('No audio streams available');
-    }
-
-    const scored = [...audios].sort((a, b) => {
-      const scoreA = this.computeAudioStreamScore(a);
-      const scoreB = this.computeAudioStreamScore(b);
-      for (let i = 0; i < scoreA.length; i++) {
-        if (scoreA[i] !== scoreB[i]) {
-          return scoreB[i] - scoreA[i];
-        }
-      }
-      return 0;
-    });
-
-    return scored[0];
-  }
-
-  private static computeAudioStreamScore(stream: RapidApiMediaStreamItem): [number, number, number, number] {
-    const nonDrcScore = this.detectDrcFlag(stream) ? 0 : 1;
-    const mime = stream.mimeType || '';
-    const mimeScore = mime.includes('audio/mp4') ? 2 : mime.includes('audio/webm') ? 1 : 0;
-    const size = this.parseFileSize(stream.size ?? stream.sizeText) ?? 0;
-    let bitrateScore = 0;
-    if (typeof stream.lengthMs === 'number' && stream.lengthMs > 0 && size > 0) {
-      bitrateScore = this.estimateBitrateKbps(stream.lengthMs / 1000, size);
-    }
-    return [nonDrcScore, mimeScore, bitrateScore, size];
-  }
-
-  private static normalizePrefetchedData(videoId: string, data: PrefetchedDownload | RapidVideoData | undefined | null): RapidVideoData | null {
+  private static normalizePrefetchedData(videoId: string, data: PrefetchedDownload | Mp36VideoData | undefined | null): Mp36VideoData | null {
     if (!data) return null;
     if ('link' in data || 'title' in data || 'filesize' in data || 'duration' in data) {
       const { link, title, filesize, duration } = data as PrefetchedDownload;
@@ -548,7 +321,7 @@ export class YouTubeService {
         duration,
       };
     }
-    return data as RapidVideoData;
+    return data as Mp36VideoData;
   }
 
   /**
@@ -921,7 +694,7 @@ export class YouTubeService {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
   }
 
-  private static async fetchVideoData(videoId: string, forceRefresh = false, attempt = 0): Promise<RapidVideoData> {
+  private static async fetchVideoData(videoId: string, forceRefresh = false, attempt = 0): Promise<Mp36VideoData> {
     if (!forceRefresh) {
       const cached = this.rapidApiCache.get(videoId) || this.prefetchedCache.get(videoId);
       if (cached) {
@@ -930,25 +703,16 @@ export class YouTubeService {
     }
 
     const { host, key } = this.getRapidApiCredentials();
-    const endpoint = new URL(`https://${host}/v2/video/details`);
-    endpoint.searchParams.set('videoId', videoId);
-    endpoint.searchParams.set('urlAccess', process.env.RAPIDAPI_URL_ACCESS || 'normal');
-    endpoint.searchParams.set('videos', process.env.RAPIDAPI_VIDEOS_MODE || 'auto');
-    endpoint.searchParams.set('audios', process.env.RAPIDAPI_AUDIOS_MODE || 'auto');
-    const subtitlesMode = process.env.RAPIDAPI_SUBTITLES_MODE;
-    if (subtitlesMode) {
-      endpoint.searchParams.set('subtitles', subtitlesMode);
-    }
+    const endpoint = `https://${host}/dl?id=${encodeURIComponent(videoId)}`;
 
     console.log('[YouTube] RapidAPI request start', {
       videoId,
       host,
       attempt,
       forceRefresh,
-      endpoint: endpoint.toString(),
     });
 
-    const response = await fetch(endpoint.toString(), {
+    const response = await fetch(endpoint, {
       headers: {
         'x-rapidapi-host': host,
         'x-rapidapi-key': key,
@@ -974,9 +738,9 @@ export class YouTubeService {
       throw new Error(`RapidAPI request failed with status ${response.status}`);
     }
 
-    let parsed: RapidApiVideoDetailsResponse;
+    let data: Mp36VideoData;
     try {
-      parsed = JSON.parse(rawBody) as RapidApiVideoDetailsResponse;
+      data = JSON.parse(rawBody) as Mp36VideoData;
     } catch (parseError) {
       console.error('[YouTube] Failed to parse RapidAPI response as JSON', {
         parseError,
@@ -985,107 +749,42 @@ export class YouTubeService {
       throw new Error('RapidAPI response is not valid JSON');
     }
 
-    const audioItems = (parsed.audios?.items || []).filter((item): item is RapidApiMediaStreamItem => !!item && typeof item.url === 'string' && item.url.length > 0);
-
     console.log('[YouTube] RapidAPI parsed data', {
-      errorId: parsed.errorId,
-      title: parsed.title,
-      lengthSeconds: parsed.lengthSeconds,
-      audioItems: audioItems.length,
+      status: data.status,
+      msg: data.msg,
+      link: data.link,
+      filesize: data.filesize,
+      duration: data.duration,
+      progress: data.progress,
       attempt,
     });
 
-    if (parsed.errorId && parsed.errorId !== 'Success') {
-      throw new Error(`RapidAPI returned error: ${parsed.errorId}`);
+    if (!data) {
+      throw new Error('RapidAPI response is empty');
     }
 
-    if (!audioItems.length) {
-      if (attempt < 2) {
-        const delay = Math.min(1500 * (attempt + 1), 6000);
-        console.warn('[YouTube] RapidAPI returned no audio items, retrying', {
-          videoId,
-          attempt,
-          nextDelayMs: delay,
-        });
-        await sleep(delay);
-        return this.fetchVideoData(videoId, true, attempt + 1);
+    const status = data.status?.toLowerCase();
+    if (status === 'in process' || status === 'processing') {
+      if (attempt >= 4) {
+        throw new Error(data.msg ? String(data.msg) : 'RapidAPI still processing download');
       }
-      throw new Error('RapidAPI returned no audio streams for this video');
+      const delay = Math.min(2000 * Math.pow(2, Math.max(0, attempt - 0)), 16000);
+      await sleep(delay);
+      return this.fetchVideoData(videoId, true, attempt + 1);
     }
 
-    const normalizedAudios = audioItems.map(item => {
-      const normalized: RapidApiMediaStreamItem = { ...item };
+    if (!data.link || (status && status !== 'ok' && status !== 'success')) {
+      throw new Error(data.msg ? String(data.msg) : 'RapidAPI returned invalid download data');
+    }
 
-      if (typeof normalized.size === 'string') {
-        const parsedSize = parseInt(normalized.size, 10);
-        normalized.size = Number.isFinite(parsedSize) ? parsedSize : parseSizeString(normalized.size) ?? undefined;
-      }
-
-      if (normalized.size === undefined && typeof normalized.sizeText === 'string') {
-        normalized.size = parseSizeString(normalized.sizeText);
-      }
-
-      if (typeof normalized.lengthMs === 'string') {
-        const parsedLength = parseInt(normalized.lengthMs, 10);
-        normalized.lengthMs = Number.isFinite(parsedLength) ? parsedLength : undefined;
-      }
-
-      if (normalized.isDrc === undefined) {
-        let drcSource = normalized.xtags;
-        if (!drcSource) {
-          try {
-            drcSource = new URL(normalized.url).searchParams.get('xtags') ?? undefined;
-          } catch {}
-        }
-        if (drcSource) {
-          const decoded = (() => {
-            try {
-              return decodeURIComponent(drcSource as string);
-            } catch {
-              return drcSource as string;
-            }
-          })();
-          normalized.isDrc = /drc=1/i.test(decoded);
-        }
-      }
-
-      return normalized;
-    });
-
-    const preferredAudio = this.pickPreferredAudioStream(normalizedAudios);
-    const preferredSize = this.parseFileSize(preferredAudio.size ?? preferredAudio.sizeText);
-    const durationSeconds = parsed.lengthSeconds
-      ?? (typeof preferredAudio.lengthMs === 'number' ? Math.round(preferredAudio.lengthMs / 1000) : undefined);
-
-    const result: RapidVideoData = {
-      status: parsed.errorId || 'Success',
-      msg: parsed.errorId || 'Success',
-      link: preferredAudio.url,
-      title: parsed.title,
-      filesize: preferredSize ?? preferredAudio.size ?? preferredAudio.sizeText,
-      duration: durationSeconds ?? (typeof preferredAudio.lengthMs === 'number' ? Math.round(preferredAudio.lengthMs / 1000) : undefined),
-      audios: normalizedAudios,
-      raw: parsed,
-    };
-
-    this.rapidApiCache.set(videoId, result);
-    return result;
+    this.rapidApiCache.set(videoId, data);
+    return data;
   }
 
-  private static parseVideoInfo(data: RapidVideoData, videoId: string): VideoInfo {
-    const title = typeof data.title === 'string' && data.title.length > 0
-      ? data.title
-      : typeof data.raw?.title === 'string'
-        ? data.raw.title
-        : '';
+  private static parseVideoInfo(data: Mp36VideoData, videoId: string): VideoInfo {
+    const title = typeof data.title === 'string' && data.title.length > 0 ? data.title : '';
     const duration = this.parseDurationSeconds(data) || 0;
-
-    const rawThumbnails = data.raw?.thumbnails
-      ?.map(t => t?.url)
-      .filter((url): url is string => typeof url === 'string' && url.length > 0) ?? [];
-    const fallbackThumbnails = this.collectThumbnails(videoId);
-    const thumbnailSet = new Set<string>([...rawThumbnails, ...fallbackThumbnails]);
-    const thumbnails = Array.from(thumbnailSet);
+    const thumbnails = this.collectThumbnails(videoId);
 
     return {
       videoId,
@@ -1095,12 +794,9 @@ export class YouTubeService {
     };
   }
 
-  private static parseDurationSeconds(data: RapidVideoData): number | null {
-    const firstAudio = data.audios && data.audios.length > 0 ? data.audios[0] : undefined;
+  private static parseDurationSeconds(data: Mp36VideoData): number | null {
     const candidates: Array<string | number | undefined> = [
       data.duration,
-      data.raw?.lengthSeconds,
-      typeof firstAudio?.lengthMs === 'number' ? firstAudio.lengthMs / 1000 : undefined,
     ];
 
     for (const candidate of candidates) {
@@ -1128,7 +824,7 @@ export class YouTubeService {
     ];
   }
 
-  static primeVideoData(videoId: string, data: PrefetchedDownload | RapidVideoData) {
+  static primeVideoData(videoId: string, data: PrefetchedDownload | Mp36VideoData) {
     const normalized = this.normalizePrefetchedData(videoId, data);
     if (normalized) {
       this.rapidApiCache.set(videoId, normalized);
@@ -1136,7 +832,7 @@ export class YouTubeService {
     }
   }
 
-  static getPrimedVideoData(videoId: string): RapidVideoData | undefined {
+  static getPrimedVideoData(videoId: string): Mp36VideoData | undefined {
     return this.rapidApiCache.get(videoId) || this.prefetchedCache.get(videoId);
   }
 
