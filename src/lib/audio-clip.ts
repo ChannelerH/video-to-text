@@ -4,47 +4,6 @@ import { ffmpegEnabled } from '@/lib/ffmpeg-config';
 import { logger } from '@/lib/logger';
 
 /**
- * Fallback to Cloudflare Worker for audio clipping if local ffmpeg fails
- */
-async function clipAudioViaWorker(audioUrl: string, seconds: number, startOffset: number): Promise<Buffer | null> {
-  const workerUrl = process.env.AUDIO_CLIP_WORKER_URL;
-  if (!workerUrl) {
-    console.log('[audio-clip] No AUDIO_CLIP_WORKER_URL configured, skipping worker fallback');
-    return null;
-  }
-
-  try {
-    console.log('[audio-clip] Attempting to clip via Cloudflare Worker', {
-      workerUrl,
-      payload: { audioUrl, seconds, startOffset }
-    });
-    const response = await fetch(workerUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ audioUrl, seconds, startOffset }),
-    });
-
-    const responseBuffer = await response.arrayBuffer().catch(() => new ArrayBuffer(0));
-    const responseText = Buffer.from(responseBuffer).toString('utf8');
-
-    console.log('[audio-clip] Worker response', {
-      status: response.status,
-      statusText: response.statusText,
-      bodyPreview: responseText.slice(0, 256),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Worker responded with ${response.status}: ${responseText}`);
-    }
-
-    return Buffer.from(responseBuffer);
-  } catch (error: any) {
-    console.error(`[audio-clip] Worker fallback failed:`, error.message);
-    return null;
-  }
-}
-
-/**
  * Create a WAV clip (16kHz mono PCM) of the first N seconds from a remote audio URL using ffmpeg.
  * On Vercel, uses Cloudflare Worker. In local dev, uses local ffmpeg.
  */
@@ -55,27 +14,6 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
   // Allow up to 300s to support 5-minute clips for Free users
   const clipSeconds = Math.max(1, Math.min(300, Math.floor(seconds || 10)));
   const offsetSeconds = Math.max(0, Math.floor(startOffset || 0));
-
-  // On Vercel, skip local ffmpeg entirely and use worker
-  const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
-  const forceWorker = process.env.FFMPEG_FORCE_WORKER === 'true';
-  console.log('[audio-clip] Environment check:', {
-    VERCEL: process.env.VERCEL,
-    VERCEL_ENV: process.env.VERCEL_ENV,
-    isVercel,
-    forceWorker,
-    AUDIO_CLIP_WORKER_URL: process.env.AUDIO_CLIP_WORKER_URL ? 'configured' : 'missing'
-  });
-
-  if (isVercel || forceWorker) {
-    console.log('[audio-clip] Using Cloudflare Worker for clipping');
-    const workerResult = await clipAudioViaWorker(audioUrl, clipSeconds, offsetSeconds);
-    if (workerResult) {
-      console.log('[audio-clip] Successfully clipped via Cloudflare Worker');
-      return workerResult;
-    }
-    throw new Error('Cloudflare Worker clipping failed. Please configure AUDIO_CLIP_WORKER_URL environment variable.');
-  }
 
   // Local dev: use local ffmpeg
   const ffmpegPath = getFfmpegPath();
@@ -130,15 +68,7 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
             offsetSeconds,
           },
         });
-
-        // Try worker fallback
-        const workerResult = await clipAudioViaWorker(audioUrl, clipSeconds, offsetSeconds);
-        if (workerResult) {
-          console.log('[audio-clip] Successfully clipped via worker fallback');
-          resolve(workerResult);
-        } else {
-          reject(new Error(`ffmpeg spawn failed: ${err.message}`));
-        }
+        reject(new Error(`ffmpeg spawn failed: ${err.message}`));
       });
       proc.on('close', async (code, signal) => {
         if (code === 0) {
@@ -172,14 +102,7 @@ export async function createWavClipFromUrl(audioUrl: string, seconds: number = 1
             offsetSeconds,
           },
         });
-
-        const workerResult = await clipAudioViaWorker(audioUrl, clipSeconds, offsetSeconds);
-        if (workerResult) {
-          console.log('[audio-clip] Successfully clipped via worker fallback after ffmpeg exit');
-          resolve(workerResult);
-        } else {
-          reject(new Error(`ffmpeg exited with code ${code ?? 'null'}${signal ? ` signal ${signal}` : ''}: ${stderr}`));
-        }
+        reject(new Error(`ffmpeg exited with code ${code ?? 'null'}${signal ? ` signal ${signal}` : ''}: ${stderr}`));
       });
     } catch (e: any) {
       console.error('[ffmpeg] run failed:', e);

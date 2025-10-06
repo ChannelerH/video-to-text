@@ -25,7 +25,7 @@ export async function uploadAudioViaWorker(params: WorkerUploadParams): Promise<
     bucketPrefix,
   } = params;
 
-  const workerUrl = process.env.YOUTUBE_TRANSFER_WORKER_URL || process.env.AUDIO_CLIP_WORKER_URL;
+  const workerUrl = process.env.YOUTUBE_TRANSFER_WORKER_URL;
   if (!workerUrl) {
     return null;
   }
@@ -77,7 +77,7 @@ export async function uploadAudioViaWorker(params: WorkerUploadParams): Promise<
     if (logPayload.callbackSecret) {
       logPayload.callbackSecret = '[REDACTED]';
     }
-    console.log('[Audio Worker] Upload request payload', {
+    console.log('[Audio Worker=====================] Upload request payload', {
       workerUrl,
       payload: logPayload,
     });
@@ -93,7 +93,7 @@ export async function uploadAudioViaWorker(params: WorkerUploadParams): Promise<
 
     const responseText = await response.text().catch(() => '');
 
-    console.log('[Audio Worker] Worker raw response', {
+    console.log('[Audio Worker=====================] Worker raw response', {
       status: response.status,
       statusText: response.statusText,
       body: responseText,
