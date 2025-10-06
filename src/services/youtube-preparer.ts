@@ -5,7 +5,6 @@ import { CloudflareR2Service } from '@/lib/r2-upload';
 import { POLICY } from '@/services/policy';
 import { YouTubeService } from '@/lib/youtube';
 import { Readable } from 'stream';
-import { uploadAudioViaWorker } from '@/services/audio-worker';
 import { resolvePublicR2Base } from '@/services/r2-utils';
 
 export class YoutubePrepareError extends Error {
@@ -216,26 +215,6 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
         supplierAudioUrl = clipped.url;
       } else {
         console.warn('[YouTube Prepare] Clip helper failed, falling back to full audio upload');
-      }
-    }
-
-    if (!supplierAudioUrl) {
-      try {
-        const workerResult = await uploadAudioViaWorker({
-          jobId,
-          videoId: vid,
-          sourceUrl: finalUrl,
-          sourceHash: `${vid}${variantSuffix}`,
-        });
-        if (workerResult?.uploadedUrl) {
-          supplierAudioUrl = workerResult.uploadedUrl;
-          console.log('[YouTube Prepare] Audio uploaded via worker', {
-            videoId: vid,
-            uploadedUrl: workerResult.uploadedUrl,
-          });
-        }
-      } catch (workerError) {
-        console.error('[YouTube Prepare] Worker upload failed, falling back to local upload', workerError);
       }
     }
 
