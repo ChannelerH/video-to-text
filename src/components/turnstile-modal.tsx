@@ -27,7 +27,6 @@ export default function TurnstileModal({
   }, []);
 
   const handleVerify = useCallback((token: string) => {
-    console.log('[Turnstile] Verification successful, token:', token.substring(0, 20) + '...');
     setIsVerifying(true);
     // Small delay for better UX
     setTimeout(() => {

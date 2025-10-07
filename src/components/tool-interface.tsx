@@ -513,7 +513,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
               });
             },
             onPartComplete: (partNumber, totalParts) => {
-              console.debug(`[Multipart] Part ${partNumber}/${totalParts} completed`);
             }
             });
             
@@ -747,7 +746,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           
           // 如果是CORS错误，尝试回退到传统上传方式
           if (uploadError instanceof Error && uploadError.message.includes('CORS')) {
-            console.debug('CORS error detected, falling back to traditional upload...');
             setProgress('Uploading file...');
             
             // 回退到传统上传
@@ -899,7 +897,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         sessionExpiryRef.current = 0;
         if (sessionToken) setSessionToken(null);
         if (sessionExpiry) setSessionExpiry(0);
-        console.debug('[ToolInterface] Anonymous user without valid session, prompting Turnstile');
         pendingTranscriptionRef.current = { preferredLanguage: undefined };
         setShowTurnstile(true);
         return;
@@ -919,29 +916,19 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         
         if (detectResponse.ok) {
           const response = await detectResponse.json();
-          console.debug('[YouTube] Detect tracks response:', response);
           const { tracks, videoTitle, hasMultipleTracks } = response;
-          
-          console.debug('[YouTube] Track detection result:', {
-            hasMultipleTracks,
-            tracksLength: tracks?.length,
-            shouldShowSelector: hasMultipleTracks && tracks?.length > 1
-          });
-          
+
           if (hasMultipleTracks && tracks.length > 1) {
             // 显示音轨选择对话框
-            console.debug('[YouTube] Showing track selector with tracks:', tracks);
             setAvailableTracks(tracks);
             setTrackVideoTitle(videoTitle);
             setShowTrackSelector(true);
             setProgress("");
             return; // 等待用户选择
           } else {
-            console.debug('[YouTube] Not showing track selector, proceeding with default');
           }
         }
       } catch (error) {
-        console.warn('Failed to detect audio tracks, continuing with default:', error);
       }
     }
     
@@ -951,7 +938,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   
   // 音轨选择后继续转录
   const handleTrackSelected = async (languageCode: string) => {
-    console.debug('[AudioTrack] User selected language:', languageCode);
     setSelectedLanguage(languageCode);
     setShowTrackSelector(false);
     
@@ -961,8 +947,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   
   // Handle Turnstile verification success
   const handleTurnstileSuccess = async (token: string) => {
-    console.debug('[ToolInterface] Turnstile verification success, verifying token with backend');
-
     try {
       const response = await fetch('/api/turnstile/verify', {
         method: 'POST',
@@ -985,23 +969,19 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
 
         setTimeout(async () => {
           if (pending) {
-            console.debug('[ToolInterface] Resuming pending transcription after verification', pending);
             await performTranscription(pending.preferredLanguage);
             return;
           }
 
           if (url || uploadedFileInfo) {
-            console.debug('[ToolInterface] Continuing transcription after verification');
             await performTranscription();
           }
         }, 100);
       } else {
-        console.warn('[ToolInterface] Verification failed:', data.error);
         showToast('error', 'Verification Failed', data.error || 'Please try again.');
         setShowTurnstile(false);
       }
     } catch (error) {
-      console.error('[ToolInterface] Verification error:', error);
       showToast('error', 'Verification Error', 'Please try again.');
       setShowTurnstile(false);
     }
@@ -1020,7 +1000,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         sessionExpiryRef.current = 0;
         if (sessionToken) setSessionToken(null);
         if (sessionExpiry) setSessionExpiry(0);
-        console.debug('[ToolInterface] Missing or expired Turnstile session, requesting verification');
         pendingTranscriptionRef.current = { preferredLanguage };
         setShowTurnstile(true);
         return;
@@ -1049,7 +1028,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
     try {
       // Determine action based on authentication status
       const action = isAuthenticated ? "transcribe" : "preview";
-      console.debug(`Using action: ${action} (authenticated: ${isAuthenticated})`);
       
       if (url) {
         // 检测URL类型
@@ -1141,19 +1119,11 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           ...sessionPayload,
           ...(turnstileToken ? { turnstileToken } : {}),
         };
-
-        console.debug('[performTranscription] Using anonymous verification tokens', {
-          hasSession: !!sessionPayload.sessionToken,
-          hasTurnstile: !!turnstileToken,
-          sessionPrefix: sessionPayload.sessionToken?.slice(0, 8) || null,
-        });
       }
 
       // Add preferred language if provided
-      console.debug('[performTranscription] preferredLanguage:', preferredLanguage);
       if (preferredLanguage) {
         requestData.options = { ...requestData.options, preferred_language: preferredLanguage };
-        console.debug('[performTranscription] Added preferred_language to options:', requestData.options.preferred_language);
       }
       
       trackMixpanelEvent('transcription.tool_submit', {
@@ -1220,7 +1190,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
           const errorCode = (error as any)?.errorCode || rawMessage;
 
           if (['session_invalid', 'verification_required', 'turnstile_invalid'].includes(errorCode)) {
-            console.warn('[Async Transcribe Anon] Verification required, prompting Turnstile:', errorCode);
             sessionTokenRef.current = null;
             sessionExpiryRef.current = 0;
             setSessionToken(null);
@@ -2724,7 +2693,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                           try {
                             // Use a dummy jobId since we don't need to persist chapters yet
                             const jobId = 'temp-' + Date.now();
-                            console.debug('Generating chapters for segments:', result.data.transcription.segments.length);
                             const response = await fetch(`/api/transcriptions/${jobId}/chapters`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
@@ -2736,7 +2704,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                             
                             const data = await response.json();
                             if (data.success) {
-                              console.debug('Chapters generated:', data.data.chapters);
                               // Show success toast
                               showToast('success', t("results.chapters_generated"), t("results.chapters_generated_desc"));
                               // Store chapters in state for display
@@ -2799,7 +2766,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                           try {
                             // Use a dummy jobId since we don't need to persist summary yet
                             const jobId = 'temp-' + Date.now();
-                            console.debug('Generating summary for segments:', result.data.transcription.segments.length);
                             const response = await fetch(`/api/transcriptions/${jobId}/summary`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
@@ -2811,7 +2777,6 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                             
                             const data = await response.json();
                             if (data.success) {
-                              console.debug('Summary generated:', data.data.summary);
                               // Show success toast
                               showToast('success', t("results.summary_generated"), t("results.summary_generated_desc"));
                               // Store summary in state for display

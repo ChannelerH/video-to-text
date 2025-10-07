@@ -1,3 +1,10 @@
+type YtdlVideoFormat = any;
+type YtdlVideoInfo = any;
+
+const DEFAULT_PROXY_DOWNLOAD_URL = process.env.YOUTUBE_PROXY_DOWNLOAD_URL || 'http://45.32.217.29:8000/download_r2';
+const PROXY_CONCURRENCY = Math.max(1, Number(process.env.YOUTUBE_PROXY_CONCURRENCY || 3));
+const PROXY_REQUEST_TIMEOUT_MS = Math.max(5000, Number(process.env.YOUTUBE_PROXY_TIMEOUT_MS || 60000));
+const INFO_CACHE_TTL_MS = Math.max(30_000, Number(process.env.YOUTUBE_INFO_CACHE_TTL_MS || 5 * 60 * 1000));
 
 export interface VideoInfo {
   videoId: string;
@@ -60,25 +67,54 @@ export interface AudioTrackInfo {
   formats: number; // 可用格式数量
 }
 
-interface Mp36VideoData {
-  status?: string;
-  msg?: string;
-  link?: string;
-  title?: string;
-  filesize?: number | string;
-  duration?: number | string;
-  progress?: number | string;
+interface ProxyDownloadResponse {
+  success: boolean;
+  key?: string;
+  uploadedUrl?: string;
+  bytes?: number;
+  message?: string;
 }
 
-const DEFAULT_RAPIDAPI_HOST = 'youtube-mp36.p.rapidapi.com';
-
-type PrefetchedDownload = {
+type AudioAsset = {
   videoId: string;
-  link?: string;
-  title?: string;
-  filesize?: number | string;
-  duration?: number | string;
+  url: string;
+  key: string;
+  bytes?: number;
+  fetchedAt: number;
 };
+
+type CachedVideoInfo = {
+  info: YtdlVideoInfo;
+  fetchedAt: number;
+};
+
+class Semaphore {
+  private available: number;
+  private readonly queue: Array<() => void> = [];
+
+  constructor(count: number) {
+    this.available = Math.max(1, count);
+  }
+
+  async acquire(): Promise<void> {
+    if (this.available > 0) {
+      this.available -= 1;
+      return;
+    }
+    await new Promise<void>(resolve => this.queue.push(resolve));
+  }
+
+  release() {
+    if (this.queue.length > 0) {
+      const next = this.queue.shift();
+      if (next) {
+        next();
+        return;
+      }
+    }
+    this.available += 1;
+  }
+}
 
 function parseDurationFromString(value: string): number | null {
   if (!value) return null;
@@ -129,8 +165,209 @@ function parseSizeString(value: string | undefined): number | undefined {
 }
 
 export class YouTubeService {
-  private static rapidApiCache = new Map<string, Mp36VideoData>();
-  private static prefetchedCache = new Map<string, Mp36VideoData>();
+  private static infoCache = new Map<string, CachedVideoInfo>();
+  private static audioAssetCache = new Map<string, AudioAsset>();
+  private static ytdlClientPromise: Promise<any> | null = null;
+
+  private static async getYtdlClient(): Promise<any> {
+    if (!this.ytdlClientPromise) {
+      this.ytdlClientPromise = (async () => {
+        const mod = await import('@ybd-project/ytdl-core');
+        const ctor = (mod as any)?.default ?? (mod as any)?.YtdlCore ?? mod;
+
+        if (typeof ctor === 'function') {
+          const instance = new ctor();
+          if (typeof instance.getFullInfo === 'function' || typeof instance.getInfo === 'function') {
+            return instance;
+          }
+        } else if (typeof (ctor as any)?.getFullInfo === 'function' || typeof (ctor as any)?.getInfo === 'function') {
+          return ctor;
+        }
+
+        throw new Error('Unsupported ytdl-core interface');
+      })();
+    }
+
+    return this.ytdlClientPromise;
+  }
+
+  private static getProxySemaphore(): Semaphore {
+    const globalAny = globalThis as unknown as { __youtubeProxySemaphore?: Semaphore };
+    if (!globalAny.__youtubeProxySemaphore) {
+      globalAny.__youtubeProxySemaphore = new Semaphore(PROXY_CONCURRENCY);
+    }
+    return globalAny.__youtubeProxySemaphore;
+  }
+
+  private static getProxyEndpoint(): string {
+    return DEFAULT_PROXY_DOWNLOAD_URL;
+  }
+
+  private static buildWatchUrl(videoId: string): string {
+    return `https://www.youtube.com/watch?v=${videoId}`;
+  }
+
+  private static buildDefaultThumbnails(videoId: string): string[] {
+    return [
+      `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+      `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    ];
+  }
+
+  private static isCacheFresh(ts: number, ttl: number): boolean {
+    return Date.now() - ts < ttl;
+  }
+
+  private static async fetchYtdlInfo(videoId: string, forceRefresh = false, attempt = 0): Promise<YtdlVideoInfo> {
+    const cached = this.infoCache.get(videoId);
+    if (!forceRefresh && cached && this.isCacheFresh(cached.fetchedAt, INFO_CACHE_TTL_MS)) {
+      return cached.info;
+    }
+
+    try {
+      const ytdl = await this.getYtdlClient();
+      const info: YtdlVideoInfo = typeof ytdl.getFullInfo === 'function'
+        ? await ytdl.getFullInfo(videoId)
+        : await ytdl.getInfo(videoId);
+      this.infoCache.set(videoId, { info, fetchedAt: Date.now() });
+      return info;
+    } catch (error: any) {
+      this.ytdlClientPromise = null;
+      if (attempt < 2) {
+        const delay = Math.min(1500 * Math.pow(1.5, attempt), 4000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.fetchYtdlInfo(videoId, forceRefresh, attempt + 1);
+      }
+      console.error('[YouTube] Failed to fetch metadata via ytdl', {
+        videoId,
+        error: error?.message,
+      });
+      throw new Error(error?.message || 'Unable to retrieve YouTube metadata');
+    }
+  }
+
+  private static extractCaptions(info: YtdlVideoInfo): Caption[] {
+    const tracks =
+      info.player_response?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+
+    return tracks.map((track: any) => ({
+      languageCode: track.languageCode || track.vssId || 'unknown',
+      name: track.name?.simpleText || track.languageName?.simpleText || track.languageCode || 'Unknown',
+      url: track.baseUrl || track?.url || '',
+      isAutomatic: track.kind === 'asr',
+    })).filter((caption: any) => Boolean(caption.url));
+  }
+
+  private static transformYtdlFormat(format: YtdlVideoFormat, durationSeconds: number): OptimizedAudioFormat {
+    const bitrateBps = format.bitrate || format.averageBitrate || 0;
+    const bitrateKbps = bitrateBps ? Math.max(64, Math.round(bitrateBps / 1000)) : 128;
+    const contentLength = format.contentLength ? Number(format.contentLength) : undefined;
+    const approxDurationMs = durationSeconds > 0
+      ? durationSeconds * 1000
+      : (format.approxDurationMs ? Number(format.approxDurationMs) : 0);
+
+    return {
+      itag: format.itag,
+      url: format.url,
+      mimeType: format.mimeType || 'audio/webm',
+      bitrate: bitrateKbps,
+      contentLength,
+      quality: format.audioQuality || format.qualityLabel || 'audio',
+      audioQuality: format.audioQuality || 'unknown',
+      approxDurationMs,
+      supportsRangeRequests: !format.isHLS,
+      isDrc: false,
+      isDefaultAudio: false,
+      audioTrackId: (format as any)?.audioTrack?.id,
+      audioTrackDisplayName: (format as any)?.audioTrack?.displayName,
+    };
+  }
+
+  private static async getAudioAsset(
+    videoId: string,
+    options: {
+      youtubeUrl?: string;
+      forceRefresh?: boolean;
+      debugLabel?: string;
+    } = {}
+  ): Promise<AudioAsset> {
+    const allowCache = !options.forceRefresh;
+    const cached = this.audioAssetCache.get(videoId);
+    if (allowCache && cached) {
+      return cached;
+    }
+
+    const semaphore = this.getProxySemaphore();
+    await semaphore.acquire();
+
+    try {
+      const youtubeUrl = options.youtubeUrl || this.buildWatchUrl(videoId);
+      const endpoint = `${this.getProxyEndpoint()}?url=${encodeURIComponent(youtubeUrl)}`;
+
+      console.log('[YouTube] Proxy download request start', {
+        videoId,
+        endpoint,
+        debugLabel: options.debugLabel,
+      });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), PROXY_REQUEST_TIMEOUT_MS);
+
+      const response = await fetch(endpoint, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          'Accept': 'application/json',
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const rawBody = await response.text();
+
+      console.log('[YouTube] Proxy download response', {
+        rawBody,
+       });
+
+      if (!response.ok) {
+        console.error('[YouTube] Proxy download failed', {
+          videoId,
+          status: response.status,
+          statusText: response.statusText,
+          body: rawBody.slice(0, 500),
+        });
+        throw new Error(`Proxy download failed with status ${response.status}`);
+      }
+
+      let parsed: ProxyDownloadResponse;
+      try {
+        parsed = JSON.parse(rawBody) as ProxyDownloadResponse;
+      } catch (error) {
+        console.error('[YouTube] Proxy response JSON parse error', {
+          videoId,
+          rawSnippet: rawBody.slice(0, 500),
+        });
+        throw new Error('Proxy service returned invalid JSON');
+      }
+
+      if (!parsed.success || !parsed.uploadedUrl) {
+        throw new Error(parsed.message || 'Proxy service did not return uploadedUrl');
+      }
+
+      const asset: AudioAsset = {
+        videoId,
+        url: parsed.uploadedUrl,
+        key: parsed.key || '',
+        bytes: typeof parsed.bytes === 'number' ? parsed.bytes : undefined,
+        fetchedAt: Date.now(),
+      };
+
+      this.audioAssetCache.set(videoId, asset);
+      return asset;
+    } finally {
+      semaphore.release();
+    }
+  }
 
   /**
    * 验证并解析 YouTube URL
@@ -144,14 +381,23 @@ export class YouTubeService {
    */
   static async detectAudioTracks(videoId: string): Promise<AudioTrackInfo[]> {
     try {
-      const formats = await this.getOptimizedAudioFormats(videoId);
-      if (!formats.length) return [];
-      return [{
-        languageCode: 'default',
-        trackType: 'original',
-        displayName: 'Default (Original)',
-        formats: formats.length,
-      }];
+      const info = await this.fetchYtdlInfo(videoId);
+      const captionsRenderer = info.player_response?.captions?.playerCaptionsTracklistRenderer;
+      if (!captionsRenderer?.captionTracks?.length) {
+        return [{
+          languageCode: 'default',
+          trackType: 'original',
+          displayName: 'Default (Original)',
+          formats: info.formats.filter((format: any) => format.hasAudio && !format.hasVideo).length,
+        }];
+      }
+
+      return captionsRenderer.captionTracks.map((track: any) => ({
+        languageCode: track.languageCode || track.vssId || 'unknown',
+        trackType: track.kind === 'asr' ? 'dubbed-auto' : 'original',
+        displayName: track.name?.simpleText || track.languageName?.simpleText || track.languageCode || 'Unknown',
+        formats: info.formats.filter((format: any) => format.hasAudio && !format.hasVideo).length,
+      }));
     } catch (error) {
       console.error('Error detecting audio tracks:', error);
       return [];
@@ -161,33 +407,59 @@ export class YouTubeService {
   /**
    * 获取视频信息和字幕
    */
-  static async getVideoInfo(videoId: string, retryCount = 0): Promise<VideoInfo> {
-    const maxRetries = process.env.YOUTUBE_SPEED_MODE === 'true' ? 1 : 2;
-    const baseDelay = 500;
-
+  static async getVideoInfo(videoId: string, forceRefresh = false): Promise<VideoInfo> {
     try {
-      const data = await this.fetchVideoData(videoId, retryCount > 0);
-      return this.parseVideoInfo(data, videoId);
-    } catch (error: any) {
-      console.error(`Error getting video info (attempt ${retryCount + 1}):`, {
-        error: error?.message,
+      const info = await this.fetchYtdlInfo(videoId, forceRefresh);
+      const details = info.videoDetails;
+
+      const title = details.title || '';
+      const duration = Number.parseInt(details.lengthSeconds || '0', 10) || 0;
+      const thumbnails = details.thumbnails?.length
+        ? details.thumbnails.map((item: any) => item.url).reverse()
+        : this.buildDefaultThumbnails(videoId);
+
+      const captions = this.extractCaptions(info);
+
+      return {
+        videoId,
+        title,
+        duration,
+        thumbnails,
+        captions,
+      };
+    } catch (error) {
+      const fallback = await this.fetchOEmbedVideoInfo(videoId);
+      if (fallback) {
+        return fallback;
+      }
+      throw error;
+    }
+  }
+
+  private static async fetchOEmbedVideoInfo(videoId: string): Promise<VideoInfo | null> {
+    try {
+      const oEmbedUrl = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(this.buildWatchUrl(videoId))}`;
+      const response = await fetch(oEmbedUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
       });
 
-      const isNetworkError =
-        error?.name === 'AbortError' ||
-        error?.code === 'ECONNRESET' ||
-        error?.code === 'ENOTFOUND' ||
-        error?.code === 'ETIMEDOUT' ||
-        error?.message?.includes('socket hang up') ||
-        error?.message?.includes('read ECONNRESET');
-
-      if (isNetworkError && retryCount < maxRetries) {
-        const delay = Math.min(baseDelay * Math.pow(1.5, retryCount), 2000);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return this.getVideoInfo(videoId, retryCount + 1);
+      if (!response.ok) {
+        return null;
       }
 
-      throw new Error(`Failed to get video info after ${retryCount + 1} attempts: ${error?.message ?? error}`);
+      const payload = await response.json() as { title?: string; author_name?: string; thumbnail_url?: string };
+      const title = payload.title || payload.author_name || '';
+      const thumbnail = payload.thumbnail_url ? [payload.thumbnail_url] : this.buildDefaultThumbnails(videoId);
+
+      return {
+        videoId,
+        title,
+        duration: 0,
+        thumbnails: thumbnail,
+        captions: [],
+      };
+    } catch {
+      return null;
     }
   }
 
@@ -208,24 +480,25 @@ export class YouTubeService {
   /**
    * 获取音频流 URL（用于转录）
    */
-  static async getAudioStreamUrl(videoId: string, preferredLanguage?: string, retryCount = 0): Promise<string> {
+  static async getAudioStreamUrl(videoId: string, _preferredLanguage?: string, retryCount = 0): Promise<string> {
     try {
-      const formats = await this.getOptimizedAudioFormats(videoId, preferredLanguage);
-      if (!formats.length) {
-        throw new Error('No audio formats available');
-      }
-      return formats[0].url;
+      const asset = await this.getAudioAsset(videoId, {
+        forceRefresh: retryCount > 0,
+        debugLabel: retryCount > 0 ? `retry-${retryCount}` : undefined,
+      });
+      return asset.url;
     } catch (error: any) {
-      console.error(`Error getting audio stream (attempt ${retryCount + 1}):`, {
+      console.error(`[YouTube] Failed to resolve proxy audio (attempt ${retryCount + 1})`, {
+        videoId,
         error: error?.message,
       });
 
       if (retryCount < 2) {
-        await new Promise(resolve => setTimeout(resolve, 500 * (retryCount + 1)));
-        return this.getAudioStreamUrl(videoId, preferredLanguage, retryCount + 1);
+        await new Promise(resolve => setTimeout(resolve, 700 * (retryCount + 1)));
+        return this.getAudioStreamUrl(videoId, _preferredLanguage, retryCount + 1);
       }
 
-      throw new Error(`Failed to get audio stream after ${retryCount + 1} attempts: ${error?.message ?? error}`);
+      throw new Error(error?.message || 'Failed to obtain audio asset');
     }
   }
 
@@ -233,31 +506,34 @@ export class YouTubeService {
    * 获取优化的音频格式列表（用于快速下载）
    */
   static async getOptimizedAudioFormats(videoId: string, preferredLanguage?: string): Promise<OptimizedAudioFormat[]> {
-    const data = await this.fetchVideoData(videoId);
-    if (!data.link) {
-      throw new Error('RapidAPI returned empty download link');
+    const info = await this.fetchYtdlInfo(videoId);
+    const durationSeconds = Number.parseInt(info.videoDetails.lengthSeconds || '0', 10) || 0;
+
+    const audioFormats = info.formats
+      .filter((format: any) => format.hasAudio && !format.hasVideo)
+      .map((format: any) => this.transformYtdlFormat(format, durationSeconds))
+      .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
+
+    if (!audioFormats.length) {
+      throw new Error('No audio-only formats available for this video');
     }
 
-    const durationSeconds = this.parseDurationSeconds(data) ?? 0;
-    const fileSize = this.parseFileSize(data.filesize);
+    if (audioFormats.length) {
+      audioFormats[0].isDefaultAudio = true;
+    }
 
-    const format: OptimizedAudioFormat = {
-      itag: 0,
-      url: data.link,
-      mimeType: 'audio/mpeg',
-      bitrate: this.estimateBitrateKbps(durationSeconds, fileSize),
-      contentLength: fileSize,
-      quality: 'mp3',
-      audioQuality: 'mp3',
-      approxDurationMs: Math.max(0, durationSeconds) * 1000,
-      supportsRangeRequests: true,
-      isDrc: false,
-      isDefaultAudio: true,
-      audioTrackDisplayName: 'Default (mp3)',
-      audioTrackId: undefined,
-    };
+    const normalizedLanguage = preferredLanguage?.toLowerCase();
+    if (normalizedLanguage) {
+      const languageMatch = audioFormats.filter((format: any) =>
+        format.audioTrackId?.toLowerCase().includes(normalizedLanguage) ||
+        format.audioTrackDisplayName?.toLowerCase().includes(normalizedLanguage)
+      );
+      if (languageMatch.length) {
+        return languageMatch;
+      }
+    }
 
-    return [format];
+    return audioFormats;
   }
 
   static async selectOptimizedAudioFormat(videoId: string, options?: { preferSmallSize?: boolean }): Promise<OptimizedAudioFormat> {
@@ -284,46 +560,6 @@ export class YouTubeService {
     return balanced;
   }
 
-  private static parseFileSize(input: number | string | undefined): number | undefined {
-    if (input === undefined || input === null) {
-      return undefined;
-    }
-    if (typeof input === 'number') {
-      return Number.isFinite(input) && input > 0 ? Math.round(input) : undefined;
-    }
-    if (/^\d+$/.test(input)) {
-      const parsed = parseInt(input, 10);
-      return parsed > 0 ? parsed : undefined;
-    }
-    const parsed = parseSizeString(input);
-    return parsed && parsed > 0 ? parsed : undefined;
-  }
-
-  private static estimateBitrateKbps(durationSeconds: number, fileSizeBytes?: number | undefined): number {
-    if (!fileSizeBytes || !Number.isFinite(fileSizeBytes) || fileSizeBytes <= 0 || !durationSeconds || durationSeconds <= 0) {
-      return 128; // sensible default for mp3
-    }
-    const bytesPerSecond = fileSizeBytes / durationSeconds;
-    const kbps = (bytesPerSecond * 8) / 1024;
-    return Math.max(64, Math.round(kbps));
-  }
-
-  private static normalizePrefetchedData(videoId: string, data: PrefetchedDownload | Mp36VideoData | undefined | null): Mp36VideoData | null {
-    if (!data) return null;
-    if ('link' in data || 'title' in data || 'filesize' in data || 'duration' in data) {
-      const { link, title, filesize, duration } = data as PrefetchedDownload;
-      return {
-        status: 'ok',
-        msg: 'prefetched',
-        link,
-        title,
-        filesize,
-        duration,
-      };
-    }
-    return data as Mp36VideoData;
-  }
-
   /**
    * 流式下载音频（优化版本）
    */
@@ -338,121 +574,35 @@ export class YouTubeService {
       timeout = 60000,
       retryAttempts = 1,
       retryDelay = 1000,
-      cdnProxy,
       onProgress,
-      onError
+      onError,
     } = options;
 
-    let refreshAttempted = false;
+    const asset = await this.getAudioAsset(videoId, { debugLabel: options.debugLabel });
+    const totalSize = asset.bytes;
 
-    while (true) {
-      try {
-        const audioFormat = await this.selectOptimizedAudioFormat(videoId, { preferSmallSize: false });
-        const originalUrl = audioFormat.url;
-        const attempts: Array<{ url: string; viaProxy: boolean }> = [];
-        const baseLabel = options.debugLabel || null;
-
-        let proxiedUrl = originalUrl;
-        if (cdnProxy) {
-          proxiedUrl = this.applyCdnProxy(originalUrl, cdnProxy);
-          if (proxiedUrl !== originalUrl) {
-            attempts.push({ url: proxiedUrl, viaProxy: true });
-          }
-        }
-
-        attempts.push({ url: originalUrl, viaProxy: false });
-
-        const logTarget = (target: string, viaProxy: boolean) => {
-          try {
-            const parsed = new URL(target);
-            console.log('[YouTube] Download target selected', {
-              host: parsed.host,
-              pathname: parsed.pathname,
-              viaProxy,
-            });
-          } catch (err) {
-            console.warn('[YouTube] Failed to parse download target for logging', err);
-          }
-        };
-
-        const performDownload = async (targetUrl: string, viaProxy: boolean) => {
-          const debugLabel = baseLabel
-            ? `${baseLabel}:${viaProxy ? 'proxy' : 'direct'}`
-            : viaProxy ? 'proxy' : 'direct';
-
-          if (enableParallelDownload && (audioFormat.supportsRangeRequests ?? true) && audioFormat.contentLength) {
-            return await this.downloadWithParallelChunks(targetUrl, audioFormat.contentLength, {
-              chunkSize,
-              maxConcurrentChunks,
-              timeout,
-              retryAttempts,
-              retryDelay,
-              onProgress,
-              onError,
-              debugLabel,
-            });
-          }
-
-          return await this.downloadWithStream(targetUrl, {
-            timeout,
-            retryAttempts,
-            retryDelay,
-            onProgress,
-            onError,
-            totalSize: audioFormat.contentLength,
-            debugLabel,
-          });
-        };
-
-        let lastError: unknown;
-        for (const attempt of attempts) {
-          logTarget(attempt.url, attempt.viaProxy);
-          try {
-            return await performDownload(attempt.url, attempt.viaProxy);
-          } catch (err) {
-            lastError = err;
-            const message = err instanceof Error ? err.message : String(err);
-            console.warn('[YouTube] Download attempt failed', {
-              viaProxy: attempt.viaProxy,
-              message,
-              host: (() => { try { return new URL(attempt.url).host; } catch { return null; } })(),
-            });
-
-            const isNotFound = typeof message === 'string' && /HTTP\s+404/.test(message);
-            if (!attempt.viaProxy || !isNotFound) {
-              console.warn('[YouTube] Download failed without proxy fallback', {
-                viaProxy: attempt.viaProxy,
-              });
-              break;
-            }
-
-            console.warn('[YouTube] Proxy responded with 404, retrying with original URL');
-          }
-        }
-
-        throw lastError ?? new Error('YouTube download failed without explicit error');
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        const isNotFound = typeof message === 'string' && /HTTP\s+404/.test(message);
-
-        if (isNotFound && !refreshAttempted) {
-          console.warn('[YouTube] Download failed with 404, refreshing RapidAPI data and retrying');
-          refreshAttempted = true;
-          try {
-            await this.fetchVideoData(videoId, true);
-          } catch (refreshError) {
-            console.error('[YouTube] RapidAPI refresh failed', refreshError);
-            throw error;
-          }
-          continue;
-        }
-
-        if (onError) {
-          onError(error as Error);
-        }
-        throw error;
-      }
+    if (enableParallelDownload && totalSize && totalSize > chunkSize) {
+      return this.downloadWithParallelChunks(asset.url, totalSize, {
+        chunkSize,
+        maxConcurrentChunks,
+        timeout,
+        retryAttempts,
+        retryDelay,
+        onProgress,
+        onError,
+        debugLabel: options.debugLabel,
+      });
     }
+
+    return this.downloadWithStream(asset.url, {
+      timeout,
+      retryAttempts,
+      retryDelay,
+      onProgress,
+      onError,
+      totalSize,
+      debugLabel: options.debugLabel,
+    });
   }
 
   /**
@@ -521,14 +671,14 @@ export class YouTubeService {
     recommendations: string[];
   }> {
     try {
-      const data = await this.fetchVideoData(videoId);
+      const info = await this.fetchYtdlInfo(videoId);
       const formats = await this.getOptimizedAudioFormats(videoId);
 
       const reasons: string[] = [];
       const recommendations: string[] = [];
       let isOptimized = true;
 
-      const duration = this.parseDurationSeconds(data) ?? 0;
+      const duration = Number.parseInt(info.videoDetails.lengthSeconds || '0', 10) || 0;
       if (duration > 3600) {
         reasons.push('Long video may benefit from parallel download');
         recommendations.push('Use larger chunk sizes and more concurrent connections');
@@ -692,188 +842,6 @@ export class YouTubeService {
     const ms = Math.floor((seconds % 1) * 1000);
 
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
-  }
-
-  private static async fetchVideoData(videoId: string, forceRefresh = false, attempt = 0): Promise<Mp36VideoData> {
-    if (!forceRefresh) {
-      const cached = this.rapidApiCache.get(videoId) || this.prefetchedCache.get(videoId);
-      if (cached) {
-        return cached;
-      }
-    }
-
-    const { host, key } = this.getRapidApiCredentials();
-    const endpoint = `https://${host}/dl?id=${encodeURIComponent(videoId)}`;
-
-    console.log('[YouTube] RapidAPI request start', {
-      videoId,
-      host,
-      attempt,
-      forceRefresh,
-    });
-
-    const response = await fetch(endpoint, {
-      headers: {
-        'x-rapidapi-host': host,
-        'x-rapidapi-key': key,
-        'Accept': 'application/json',
-      },
-    });
-
-    const rawBody = await response.text();
-
-    console.log('[YouTube] RapidAPI response meta', {
-      status: response.status,
-      statusText: response.statusText,
-      length: rawBody.length,
-      attempt,
-    });
-
-    if (!response.ok) {
-      console.error('[YouTube] RapidAPI request failed', {
-        status: response.status,
-        statusText: response.statusText,
-        body: rawBody,
-      });
-      throw new Error(`RapidAPI request failed with status ${response.status}`);
-    }
-
-    let data: Mp36VideoData;
-    try {
-      data = JSON.parse(rawBody) as Mp36VideoData;
-    } catch (parseError) {
-      console.error('[YouTube] Failed to parse RapidAPI response as JSON', {
-        parseError,
-        bodySnippet: rawBody.slice(0, 500),
-      });
-      throw new Error('RapidAPI response is not valid JSON');
-    }
-
-    console.log('[YouTube] RapidAPI parsed data', {
-      status: data.status,
-      msg: data.msg,
-      link: data.link,
-      filesize: data.filesize,
-      duration: data.duration,
-      progress: data.progress,
-      attempt,
-    });
-
-    if (!data) {
-      throw new Error('RapidAPI response is empty');
-    }
-
-    const status = data.status?.toLowerCase();
-    if (status === 'in process' || status === 'processing') {
-      if (attempt >= 4) {
-        throw new Error(data.msg ? String(data.msg) : 'RapidAPI still processing download');
-      }
-      const delay = Math.min(2000 * Math.pow(2, Math.max(0, attempt - 0)), 16000);
-      await sleep(delay);
-      return this.fetchVideoData(videoId, true, attempt + 1);
-    }
-
-    if (!data.link || (status && status !== 'ok' && status !== 'success')) {
-      throw new Error(data.msg ? String(data.msg) : 'RapidAPI returned invalid download data');
-    }
-
-    this.rapidApiCache.set(videoId, data);
-    return data;
-  }
-
-  private static parseVideoInfo(data: Mp36VideoData, videoId: string): VideoInfo {
-    const title = typeof data.title === 'string' && data.title.length > 0 ? data.title : '';
-    const duration = this.parseDurationSeconds(data) || 0;
-    const thumbnails = this.collectThumbnails(videoId);
-
-    return {
-      videoId,
-      title,
-      duration,
-      thumbnails,
-    };
-  }
-
-  private static parseDurationSeconds(data: Mp36VideoData): number | null {
-    const candidates: Array<string | number | undefined> = [
-      data.duration,
-    ];
-
-    for (const candidate of candidates) {
-      if (candidate === undefined || candidate === null) continue;
-      if (typeof candidate === 'number') {
-        if (Number.isFinite(candidate) && candidate > 0) {
-          return Math.round(candidate);
-        }
-        continue;
-      }
-
-      const parsed = parseDurationFromString(candidate);
-      if (parsed && parsed > 0) {
-        return Math.round(parsed);
-      }
-    }
-
-    return null;
-  }
-
-  private static collectThumbnails(videoId: string): string[] {
-    return [
-      `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
-      `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-    ];
-  }
-
-  static primeVideoData(videoId: string, data: PrefetchedDownload | Mp36VideoData) {
-    const normalized = this.normalizePrefetchedData(videoId, data);
-    if (normalized) {
-      this.rapidApiCache.set(videoId, normalized);
-      this.prefetchedCache.set(videoId, normalized);
-    }
-  }
-
-  static getPrimedVideoData(videoId: string): Mp36VideoData | undefined {
-    return this.rapidApiCache.get(videoId) || this.prefetchedCache.get(videoId);
-  }
-
-  private static applyCdnProxy(url: string, cdnProxy: string): string {
-    try {
-      const parsedOriginal = new URL(url);
-      const originalUrl = parsedOriginal.toString();
-
-      console.log('[YouTube] Applying CDN proxy', {
-        proxy: cdnProxy,
-        originalHost: parsedOriginal.host,
-      });
-
-      if (cdnProxy.includes('{url}')) {
-        const proxied = cdnProxy.replace('{url}', encodeURIComponent(originalUrl));
-        console.log('[YouTube] Proxy template resolved', {
-          viaTemplate: true,
-          host: (() => { try { return new URL(proxied).host; } catch { return null; } })(),
-        });
-        return proxied;
-      }
-      if (cdnProxy.includes('%s')) {
-        const proxied = cdnProxy.replace('%s', encodeURIComponent(originalUrl));
-        console.log('[YouTube] Proxy template resolved', {
-          viaTemplate: true,
-          host: (() => { try { return new URL(proxied).host; } catch { return null; } })(),
-        });
-        return proxied;
-      }
-
-      const proxyUrl = new URL(cdnProxy);
-      proxyUrl.searchParams.set('url', originalUrl);
-      console.log('[YouTube] Proxy URL constructed', {
-        host: proxyUrl.host,
-        pathname: proxyUrl.pathname,
-      });
-      return proxyUrl.toString();
-    } catch (error) {
-      console.warn('Failed to apply CDN proxy, using original URL:', error);
-      return url;
-    }
   }
 
   private static async downloadWithParallelChunks(
@@ -1224,18 +1192,4 @@ export class YouTubeService {
     return null;
   }
 
-  private static getRapidApiCredentials(): { host: string; key: string } {
-    const host = process.env.RAPIDAPI_YTSTREAM_HOST || DEFAULT_RAPIDAPI_HOST;
-    const key = process.env.RAPIDAPI_YTSTREAM_KEY || process.env.RAPIDAPI_KEY || process.env.RAPIDAPI_TOKEN;
-
-    if (!key) {
-      throw new Error('Missing RapidAPI credentials. Set RAPIDAPI_YTSTREAM_KEY or RAPIDAPI_KEY environment variable.');
-    }
-
-    return { host, key };
-  }
-}
-
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }

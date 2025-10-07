@@ -478,27 +478,17 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
     const effectiveToken = passedToken || turnstileToken;
     const effectiveSession = passedSession || sessionToken;
     
-    console.log('[runTranscription] Parameters:', {
-      hasPassedSession: !!passedSession,
-      hasStoredSession: !!sessionToken,
-      effectiveSession: effectiveSession?.substring(0, 20),
-      isAuthenticated
-    });
-
     // 如果用户未登录，检查session的有效性
     if (!isAuthenticated) {
       const now = Date.now();
       
       // 没有session或者session过期了，显示验证
       if (!effectiveSession || (sessionExpiry && now > sessionExpiry)) {
-        console.log('[AudioUploadWidget] No auth and no valid session, showing Turnstile');
         pendingTranscriptionParams.current = params;
         setShowTurnstile(true);
         return;
       }
     }
-
-    console.log('[AudioUploadWidget] Starting transcription with auth:', isAuthenticated, 'token:', !!effectiveToken);
 
     setPreviewError(null);
     setCurrentJobId(null);
@@ -539,14 +529,6 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
         // 后向兼容：也传递turnstileToken
         ...(effectiveToken && !isAuthenticated ? { turnstileToken: effectiveToken } : {}),
       } as const;
-
-      console.log('[AudioUploadWidget] Sending request with:', {
-        action: requestData.action,
-        hasSession: !!(requestData as any).sessionToken,
-        hasToken: !!(requestData as any).turnstileToken,
-        sessionToken: (requestData as any).sessionToken?.substring(0, 20),
-        fullData: requestData
-      });
 
       trackMixpanelEvent('transcription.tool_submit', {
         source: 'audio_widget_enhanced',
@@ -698,8 +680,6 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
 
   // Handle Turnstile verification success
   const handleTurnstileSuccess = useCallback(async (token: string) => {
-    console.log('[AudioUploadWidget] Turnstile verification success, verifying with backend...');
-    
     try {
       // 验证token并获取session
       const response = await fetch('/api/turnstile/verify', {
@@ -711,7 +691,6 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
       const data = await response.json();
       
       if (data.success && data.sessionToken) {
-        console.log('[AudioUploadWidget] Session token received:', data.sessionToken.substring(0, 20) + '...');
         setTurnstileToken(token);
         setSessionToken(data.sessionToken);
         setSessionExpiry(data.sessionExpiry);
@@ -719,7 +698,6 @@ const formatSpeakerLabel = (value: string | number | undefined | null) => {
         
         // Continue with the pending transcription
         if (pendingTranscriptionParams.current) {
-          console.log('[AudioUploadWidget] Continuing with transcription after verification');
           const params = pendingTranscriptionParams.current;
           pendingTranscriptionParams.current = null;
           

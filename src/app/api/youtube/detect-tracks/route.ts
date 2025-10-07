@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     let downloadLink: string | null = null;
     let durationSec: number | null = null;
 
-    // Try to reuse existing transcription (no RapidAPI call needed)
+    // Try to reuse existing transcription (no additional download needed)
     const suffixes = [':ha0', ':ha1'];
     for (const suffix of suffixes) {
       const [existing] = await db()
