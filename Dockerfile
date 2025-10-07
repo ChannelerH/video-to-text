@@ -1,5 +1,5 @@
 FROM node:20-alpine AS base
-RUN apk add --no-cache ffmpeg libc6-compat bash
+RUN apk add --no-cache ffmpeg libc6-compat bash curl ca-certificates && update-ca-certificates
 
 # Install dependencies only when needed
 FROM base AS deps
