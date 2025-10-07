@@ -72,6 +72,11 @@ interface ProxyDownloadResponse {
   key?: string;
   uploadedUrl?: string;
   bytes?: number;
+  title?: string;
+  duration_seconds?: number;
+  ext?: string;
+  mime?: string;
+  id?: string;
   message?: string;
 }
 
@@ -80,6 +85,10 @@ type AudioAsset = {
   url: string;
   key: string;
   bytes?: number;
+  title?: string | null;
+  durationSeconds?: number | null;
+  ext?: string | null;
+  mimeType?: string | null;
   fetchedAt: number;
 };
 
@@ -357,8 +366,20 @@ export class YouTubeService {
       const asset: AudioAsset = {
         videoId,
         url: parsed.uploadedUrl,
-        key: parsed.key || '',
-        bytes: typeof parsed.bytes === 'number' ? parsed.bytes : undefined,
+        key: parsed.key || cached?.key || '',
+        bytes: typeof parsed.bytes === 'number' ? parsed.bytes : cached?.bytes,
+        title: typeof parsed.title === 'string'
+          ? parsed.title
+          : (cached?.title ?? null),
+        durationSeconds: typeof parsed.duration_seconds === 'number'
+          ? parsed.duration_seconds
+          : (cached?.durationSeconds ?? null),
+        ext: typeof parsed.ext === 'string'
+          ? parsed.ext
+          : (cached?.ext ?? null),
+        mimeType: typeof parsed.mime === 'string'
+          ? parsed.mime
+          : (cached?.mimeType ?? null),
         fetchedAt: Date.now(),
       };
 
@@ -408,6 +429,32 @@ export class YouTubeService {
    * 获取视频信息和字幕
    */
   static async getVideoInfo(videoId: string, forceRefresh = false): Promise<VideoInfo> {
+    let proxyAsset = this.audioAssetCache.get(videoId);
+
+    if (!proxyAsset || forceRefresh) {
+      try {
+        proxyAsset = await this.getAudioAsset(videoId, {
+          forceRefresh,
+          debugLabel: 'video-info',
+        });
+      } catch (error) {
+        console.warn('[YouTube] Proxy metadata unavailable, falling back to ytdl', {
+          videoId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (proxyAsset && (proxyAsset.title || typeof proxyAsset.durationSeconds === 'number')) {
+      return {
+        videoId,
+        title: proxyAsset.title || '',
+        duration: proxyAsset.durationSeconds ?? 0,
+        thumbnails: this.buildDefaultThumbnails(videoId),
+        captions: [],
+      };
+    }
+
     try {
       const info = await this.fetchYtdlInfo(videoId, forceRefresh);
       const details = info.videoDetails;
