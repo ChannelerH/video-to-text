@@ -68,6 +68,9 @@ export async function GET(request: NextRequest) {
 
     let processedUrl = (transcription.processed_url || '').trim();
 
+    let preparedVideoInfo: { videoId: string; title?: string | null; duration?: number | null } | null = null;
+    const transcriptionMetadata: Record<string, any> = (transcription as any).metadata || {};
+
     if (
       transcription.source_type === 'youtube_url' &&
       transcription.source_url &&
@@ -81,6 +84,7 @@ export async function GET(request: NextRequest) {
           preferredLanguage: transcription.language || undefined,
           userUuid: transcription.user_uuid || null,
           jobOriginalDuration: transcription.original_duration_sec || null,
+          existingMetadata: transcriptionMetadata,
         });
         processedUrl = prep.processedUrl;
         console.log('[Cron][YouTube Prepare] processed URL refreshed', {
@@ -88,6 +92,11 @@ export async function GET(request: NextRequest) {
           videoId: prep.videoId,
           processedUrl,
         });
+        preparedVideoInfo = {
+          videoId: prep.videoId,
+          title: prep.videoTitle,
+          duration: prep.videoDurationSeconds,
+        };
       } catch (error) {
         if (error instanceof YoutubePrepareError) {
           await markJobFailed(job.id, job.job_id, error.message);
@@ -117,18 +126,37 @@ export async function GET(request: NextRequest) {
       );
 
       const preferredSourceUrl = processedUrl || transcription.source_url || '';
+      const requestedLanguage = transcription.language || transcriptionMetadata.preferredLanguage || 'auto';
 
       const req: any = {
         type: transcription.source_type,
         content: preferredSourceUrl,
         options: {
-          language: transcription.language || 'auto',
+          language: requestedLanguage,
           userId: job.user_id,
           userTier: job.tier || 'free',
           fallbackEnabled: true,
           isPreview: false,
         },
       };
+
+      if (transcriptionMetadata.highAccuracyMode === true) {
+        req.options.highAccuracyMode = true;
+      }
+      if (transcriptionMetadata.enableDiarizationAfterWhisper === true) {
+        req.options.enableDiarizationAfterWhisper = true;
+      }
+      if (preparedVideoInfo) {
+        const resolvedTitle = preparedVideoInfo.title ?? transcriptionMetadata.videoTitle ?? transcription.title ?? '';
+        const resolvedDuration = preparedVideoInfo.duration ?? transcriptionMetadata.videoDurationSeconds ?? transcription.original_duration_sec ?? 0;
+        req.options.prefetchedVideoInfo = {
+          videoId: preparedVideoInfo.videoId,
+          title: resolvedTitle,
+          duration: typeof resolvedDuration === 'number' ? resolvedDuration : Number(resolvedDuration) || 0,
+          thumbnails: [],
+          captions: [],
+        };
+      }
 
       const result = await service.processTranscription(req);
 

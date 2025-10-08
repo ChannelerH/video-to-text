@@ -510,6 +510,24 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    const metadataPayload: Record<string, any> = {};
+    if (isHighAccuracyActive) {
+      metadataPayload.highAccuracyMode = true;
+    }
+    if (options?.enableDiarizationAfterWhisper === true) {
+      metadataPayload.enableDiarizationAfterWhisper = true;
+    }
+    if (options?.language) {
+      metadataPayload.preferredLanguage = options.language;
+    }
+    if (clipConfig) {
+      metadataPayload.clip = {
+        limitSeconds: clipConfig.limitSeconds,
+        clipSeconds: clipConfig.clipSeconds,
+        enforceTrim: clipConfig.enforceTrim,
+      };
+    }
+
     await db().insert(transcriptions).values({
       job_id: jobId,
       user_uuid: userUuid,
@@ -523,7 +541,8 @@ export async function POST(request: NextRequest) {
       deleted: false,
       duration_sec: 0,
       original_duration_sec: initialOriginalDurationSec,
-      cost_minutes: '0'  // numeric类型需要字符串
+      cost_minutes: '0',  // numeric类型需要字符串
+      metadata: metadataPayload,
     }).catch(() => {});
 
     // 7. 将任务加入队列（用于非供应商异步类型的兜底处理）

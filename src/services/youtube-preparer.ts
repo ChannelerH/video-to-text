@@ -37,6 +37,7 @@ export interface PrepareYoutubeAudioParams {
   userUuid?: string | null;
   jobOriginalDuration?: number | null;
   effectiveClipSeconds?: number | null;
+  existingMetadata?: Record<string, any> | null;
 }
 
 export interface PrepareYoutubeAudioResult {
@@ -64,6 +65,7 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
     userUuid = null,
     jobOriginalDuration = null,
     effectiveClipSeconds: providedClipSeconds = null,
+    existingMetadata = null,
   } = params;
 
   if (!jobId) {
@@ -216,14 +218,27 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
   const processedUrl = supplierAudioUrl || audioUrl;
   const updateData: Record<string, any> = { processed_url: processedUrl };
 
-  if (videoTitle) {
-    updateData.title = videoTitle;
+  const normalizedTitle = typeof videoTitle === 'string' ? videoTitle.trim() : '';
+  if (normalizedTitle) {
+    updateData.title = normalizedTitle;
   }
 
-  if (videoDurationSeconds && videoDurationSeconds > 0) {
-    updateData.original_duration_sec = videoDurationSeconds;
-    console.log('[YouTube Prepare] Storing original duration:', videoDurationSeconds, 'seconds');
+  const normalizedDuration = typeof videoDurationSeconds === 'number' && Number.isFinite(videoDurationSeconds)
+    ? Math.max(0, Math.round(videoDurationSeconds))
+    : null;
+
+  if (normalizedDuration !== null) {
+    updateData.original_duration_sec = normalizedDuration;
+    console.log('[YouTube Prepare] Storing original duration:', normalizedDuration, 'seconds');
   }
+
+  const mergedMetadata = {
+    ...(existingMetadata || {}),
+    videoId: vid,
+    videoTitle: normalizedTitle || (existingMetadata?.videoTitle ?? null),
+    videoDurationSeconds: normalizedDuration ?? existingMetadata?.videoDurationSeconds ?? null,
+  };
+  updateData.metadata = mergedMetadata;
 
   await db().update(transcriptions)
     .set(updateData)

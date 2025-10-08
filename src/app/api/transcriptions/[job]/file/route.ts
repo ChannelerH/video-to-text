@@ -9,6 +9,16 @@ import { db } from "@/db";
 import { transcription_edits } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 
+const sanitizeFileBase = (raw: string | null | undefined, fallback: string): string => {
+  const cleaned = (raw || '')
+    .replace(/[\\/:*?"<>|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\.+$/, '');
+  if (!cleaned) return fallback;
+  return cleaned.replace(/\s+/g, '_');
+};
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ job: string }> }) {
   const user_uuid = await getUserUuid();
   if (!user_uuid) return NextResponse.json({ success:false, error: 'unauthorized' }, { status: 401 });
@@ -231,9 +241,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ job:
   }
 
   // Use original filename for file uploads, title for URLs
-  const baseName = jobData.source_type === 'file_upload' && jobData.title
-    ? jobData.title.replace(/\.[^/.]+$/, '') // Remove extension if exists
-    : (jobData.title || jobData.job_id);
+  const meta = (jobData as any)?.metadata || {};
+  const metaTitle = typeof meta.videoTitle === 'string'
+    ? meta.videoTitle
+    : (typeof meta.title === 'string' ? meta.title : undefined);
+  const rawBase = jobData.source_type === 'file_upload' && jobData.title
+    ? jobData.title.replace(/\.[^/.]+$/, '')
+    : (jobData.title || metaTitle || jobData.job_id);
+  const baseName = sanitizeFileBase(rawBase, jobData.job_id);
   const filename = `${baseName}.${format}`;
   const typeMap: Record<string,string> = {
     txt: 'text/plain; charset=utf-8',

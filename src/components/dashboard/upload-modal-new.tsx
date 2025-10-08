@@ -63,8 +63,16 @@ export default function UploadModal({ isOpen, onClose, mode }: UploadModalProps)
   const { userTier } = useAppContext();
   
   // Check user permissions
-  const canUseDiarization = ['basic', 'pro', 'premium'].includes(userTier?.toLowerCase() || '');
-  const canUseHighAccuracy = userTier?.toLowerCase() === 'pro';
+  const normalizedTier = String(userTier || 'free').toLowerCase();
+  const tierId = normalizedTier.includes('premium')
+    ? 'premium'
+    : normalizedTier.includes('pro')
+      ? 'pro'
+      : normalizedTier.includes('basic')
+        ? 'basic'
+        : normalizedTier;
+  const canUseDiarization = ['basic', 'pro', 'premium'].includes(tierId);
+  const canUseHighAccuracy = tierId === 'pro' || tierId === 'premium';
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];

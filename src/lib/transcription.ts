@@ -725,10 +725,6 @@ export class TranscriptionService {
       }));
       console.log('[TEST][YT-002] model.used', { model: 'deepgram_or_whisper_decided_above' });
 
-      if (request.options?.trimToSeconds) {
-        this.clampTranscriptionToLimit(transcription, request.options.trimToSeconds);
-      }
-
       // Optional: overlay diarization for PRO users when enabled
       const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && ['pro', 'basic', 'premium'].includes(String(request.options?.userTier || '').toLowerCase());
       if (enableOverlay) {
@@ -816,20 +812,21 @@ export class TranscriptionService {
             console.log('[Align] Deepgram: no anchors/words; skip realignment');
           }
         } else if (!isDeepgramOutput && isZh) {
-      transcription.segments = alignSentencesWithSegments(
-        transcription.text,
-        transcription.segments as any,
-        transcription.language
-      );
-      (transcription as any).srtText = undefined;
-      if (request.options?.trimToSeconds) {
-        this.clampTranscriptionToLimit(transcription, request.options.trimToSeconds);
-      }
+          transcription.segments = alignSentencesWithSegments(
+            transcription.text,
+            transcription.segments as any,
+            transcription.language
+          );
+          (transcription as any).srtText = undefined;
           console.log('[Align] Non-Deepgram sentence alignment applied');
         } else {
           console.log('[Align] Skipped sentence realignment (not applicable)');
         }
       } catch {}
+
+      if (request.options?.trimToSeconds) {
+        this.clampTranscriptionToLimit(transcription, request.options.trimToSeconds);
+      }
 
       // Report formatting phase
       if (request.options?.onProgress) {
@@ -1025,6 +1022,23 @@ export class TranscriptionService {
       }
       
       // 5. 使用 R2 URL 进行转录
+      const preferredTitle = (() => {
+        const opt = request.options || {};
+        const prefetched = (opt as any).prefetchedVideoInfo as { title?: string } | undefined;
+        if (prefetched?.title && String(prefetched.title).trim().length > 0) {
+          return String(prefetched.title).trim();
+        }
+        const originalFileName = (opt as any).originalFileName as string | undefined;
+        if (typeof originalFileName === 'string' && originalFileName.trim().length > 0) {
+          return originalFileName.replace(/\.[^/.]+$/, '').trim();
+        }
+        const fallbackTitle = (opt as any).title as string | undefined;
+        if (typeof fallbackTitle === 'string' && fallbackTitle.trim().length > 0) {
+          return fallbackTitle.trim();
+        }
+        return null;
+      })();
+
       const transcription = await this.time('model.transcribe', this.transcriptionService.transcribeAudio(audioUrlForTranscription, {
         language: request.options?.language || 'auto',
         userTier: request.options?.userTier, // 传递用户等级信息
@@ -1089,16 +1103,18 @@ export class TranscriptionService {
             transcription.language
           );
           (transcription as any).srtText = undefined;
-          if (request.options?.trimToSeconds) {
-            this.clampTranscriptionToLimit(transcription, request.options.trimToSeconds);
-          }
         } else {
           console.log('[Align] Skipped sentence realignment for non-Chinese to preserve timing');
         }
       } catch {}
 
+      if (request.options?.trimToSeconds) {
+        this.clampTranscriptionToLimit(transcription, request.options.trimToSeconds);
+      }
+
       // 7. 生成不同格式
-      const formats = await this.time('formats.generate', this.generateFormats(transcription, audioInfo.filename || 'audio'));
+      const exportTitle = preferredTitle || audioInfo.filename || 'audio';
+      const formats = await this.time('formats.generate', this.generateFormats(transcription, exportTitle));
       console.log('[TEST][FMT-001] formats.generated', { txt: !!formats.txt, srt: !!formats.srt, vtt: !!formats.vtt, json: !!formats.json, md: !!formats.md });
 
       // （已禁用缓存）不写入缓存
@@ -1143,7 +1159,7 @@ export class TranscriptionService {
             source_type: 'audio_url',
             source_hash: urlHash + this.variantSuffix(request.options),
             source_url: url,
-            title: audioInfo.filename,
+            title: preferredTitle || audioInfo.filename,
             language: transcription.language,
             duration_sec: transcription.duration,
             original_duration_sec: originalDurationSec || transcription.duration || 0,
@@ -1633,6 +1649,10 @@ export class TranscriptionService {
         (transcription as any).srtText = undefined;
       } catch {}
 
+      if (request.options?.trimToSeconds) {
+        this.clampTranscriptionToLimit(transcription, request.options.trimToSeconds);
+      }
+
       // Report formatting phase
       if (request.options?.onProgress) {
         request.options.onProgress({
@@ -2110,6 +2130,28 @@ export class TranscriptionService {
           (transcription as any).srtText = undefined;
         } catch {}
       }
+    }
+
+    const anyTranscription = transcription as any;
+
+    if (Array.isArray(anyTranscription.words)) {
+      anyTranscription.words = anyTranscription.words
+        .filter((word: any) => Number(word?.start ?? 0) < maxSec)
+        .map((word: any) => {
+          const start = Math.max(0, Number(word.start ?? 0));
+          const end = Math.max(start, Math.min(Number(word.end ?? start), maxSec));
+          return { ...word, start, end };
+        });
+    }
+
+    if (Array.isArray(anyTranscription.anchors)) {
+      anyTranscription.anchors = anyTranscription.anchors
+        .filter((anchor: any) => Number(anchor?.start ?? 0) < maxSec)
+        .map((anchor: any) => {
+          const start = Math.max(0, Number(anchor.start ?? 0));
+          const end = Math.max(start, Math.min(Number(anchor.end ?? start), maxSec));
+          return { ...anchor, start, end };
+        });
     }
   }
 }

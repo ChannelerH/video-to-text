@@ -173,9 +173,16 @@ export default function AudioUploadWidgetEnhanced({ locale, notice }: Props) {
   
   // Check if user has high accuracy access
   const normalizedTier = String(userTier || 'free').toLowerCase();
-  const canUseHighAccuracy = isAuthenticated && normalizedTier === 'pro';
-  const canUseDiarization = isAuthenticated && ['basic', 'pro', 'premium'].includes(normalizedTier);
-  const diarizationTierEligible = ['basic', 'pro', 'premium'].includes(normalizedTier);
+  const tierId = normalizedTier.includes('premium')
+    ? 'premium'
+    : normalizedTier.includes('pro')
+      ? 'pro'
+      : normalizedTier.includes('basic')
+        ? 'basic'
+        : normalizedTier;
+  const canUseHighAccuracy = isAuthenticated && (tierId === 'pro' || tierId === 'premium');
+  const canUseDiarization = isAuthenticated && ['basic', 'pro', 'premium'].includes(tierId);
+  const diarizationTierEligible = ['basic', 'pro', 'premium'].includes(tierId);
 
   useEffect(() => {
     if (!canUseHighAccuracy && highAccuracy) {

@@ -186,6 +186,7 @@ export const transcriptions = pgTable("v2tx_transcriptions", {
   created_at: timestamp({ withTimezone: true }),
   completed_at: timestamp({ withTimezone: true }),
   deleted: boolean().notNull().default(false),
+  metadata: jsonb('metadata'),
 });
 
 // Transcription results in multiple formats

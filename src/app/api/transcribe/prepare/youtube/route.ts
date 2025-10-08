@@ -21,7 +21,8 @@ export async function POST(request: NextRequest) {
     const body = await readJson<Record<string, any>>(request);
     ({ job_id } = body);
     const { video, user_tier, preferred_language, enable_diarization_after_whisper, high_accuracy, video_prefetch, clip_seconds, is_preview } = body;
-    const forceHighAccuracy = high_accuracy === true;
+    let forceHighAccuracy = high_accuracy === true;
+    let requestedDiarization = enable_diarization_after_whisper === true;
     console.log('[YouTube Prepare] incoming request', {
       job_id,
       hasVideo: typeof video === 'string' && video.length > 0,
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
         status: transcriptions.status,
         user_uuid: transcriptions.user_uuid,
         original_duration_sec: transcriptions.original_duration_sec,
+        metadata: transcriptions.metadata,
       })
       .from(transcriptions)
       .where(eq(transcriptions.job_id, job_id))
@@ -54,6 +56,13 @@ export async function POST(request: NextRequest) {
     }
 
     const jobUserUuid = (currentTranscription.user_uuid || '').trim() || null;
+    const metadata = (currentTranscription.metadata || {}) as Record<string, any>;
+    if (!forceHighAccuracy && metadata.highAccuracyMode === true) {
+      forceHighAccuracy = true;
+    }
+    if (!requestedDiarization && metadata.enableDiarizationAfterWhisper === true) {
+      requestedDiarization = true;
+    }
     const recordedOriginalDuration = Number(currentTranscription.original_duration_sec);
     const jobOriginalDuration = Number.isFinite(recordedOriginalDuration) && recordedOriginalDuration > 0
       ? recordedOriginalDuration
@@ -116,7 +125,7 @@ export async function POST(request: NextRequest) {
       const origin = new URL(request.url).origin;
       const cbBase = process.env.CALLBACK_BASE_URL || origin;
       
-      const enableDiarization = !!enable_diarization_after_whisper && ['basic', 'pro', 'premium'].includes(String(user_tier).toLowerCase());
+      const enableDiarization = requestedDiarization && ['basic', 'pro', 'premium'].includes(String(user_tier).toLowerCase());
       console.log('[YouTube Prepare] processed-url branch', {
         enableDiarization,
         supplier,
@@ -169,6 +178,7 @@ export async function POST(request: NextRequest) {
         userUuid: jobUserUuid,
         jobOriginalDuration,
         effectiveClipSeconds,
+        existingMetadata: metadata,
       });
 
       vid = prepResult.videoId;
@@ -252,7 +262,7 @@ export async function POST(request: NextRequest) {
     const tasks: Promise<any>[] = [];
 
     // Only send to Deepgram if we have a public R2 URL (proxy URL is not accessible from outside)
-    const enableDiarization = !!enable_diarization_after_whisper && ['basic', 'pro', 'premium'].includes(String(user_tier).toLowerCase());
+    const enableDiarization = requestedDiarization && ['basic', 'pro', 'premium'].includes(String(user_tier).toLowerCase());
 
     const { shouldUseDeepgram, shouldUseReplicate, fallbackToReplicate } = resolveSupplierStrategy({
       forceHighAccuracy,

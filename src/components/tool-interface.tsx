@@ -130,9 +130,16 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   const isAuthenticated = !!(session?.user || user);
   const tier = (userTier || (user as any)?.userTier || 'free') as string;
   const normalizedTier = String(tier || 'free').toLowerCase();
-  const canUseHighAccuracy = isAuthenticated && (normalizedTier === 'pro');
-  const canUseDiarization = isAuthenticated && ['basic', 'pro', 'premium'].includes(normalizedTier);
-  const diarizationTierEligible = ['basic', 'pro', 'premium'].includes(normalizedTier);
+  const tierId = normalizedTier.includes('premium')
+    ? 'premium'
+    : normalizedTier.includes('pro')
+      ? 'pro'
+      : normalizedTier.includes('basic')
+        ? 'basic'
+        : normalizedTier;
+  const canUseHighAccuracy = isAuthenticated && (tierId === 'pro' || tierId === 'premium');
+  const canUseDiarization = isAuthenticated && ['basic', 'pro', 'premium'].includes(tierId);
+  const diarizationTierEligible = ['basic', 'pro', 'premium'].includes(tierId);
   
   const [enableDiarizationAfterWhisper, setEnableDiarizationAfterWhisper] = useState(false);
   
@@ -1060,6 +1067,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         requestData.options.userTier = tier;
         if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
           requestData.options.highAccuracyMode = true;
+          (requestData.options as any).high_accuracy = true;
         }
         if (canUseDiarization && enableDiarizationAfterWhisper) {
           (requestData.options as any).enableDiarizationAfterWhisper = true;
@@ -1090,6 +1098,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
         }
         if (canUseHighAccuracy && action === 'transcribe' && highAccuracy) {
           requestData.options.highAccuracyMode = true;
+          (requestData.options as any).high_accuracy = true;
         }
         if (canUseDiarization && enableDiarizationAfterWhisper) {
           (requestData.options as any).enableDiarizationAfterWhisper = true;

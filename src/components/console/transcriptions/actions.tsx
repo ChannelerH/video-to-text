@@ -96,7 +96,10 @@ export default function Actions({ row, i18n, userTier: userTierOverride }: Actio
       const body = {
         type: effectiveType as 'youtube_url' | 'audio_url',
         content: urlToUse,  // Use the selected URL
-        options: { formats: ['txt','srt','vtt','json','md'] }
+        options: {
+          formats: ['txt','srt','vtt','json','md'],
+          title: row.title || undefined
+        }
       };
       toast.message(i18n.rerun_ok);
       const res = await fetch('/api/transcribe/async', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
