@@ -751,7 +751,7 @@
       "youtube_limit_reached_title": "Monthly Limit Reached",
       "youtube_limit_reached_message": "You've hit the monthly YouTube URL quota for the Free plan. Upgrade your plan or download the video and upload the file to continue.",
       "youtube_manual_upload_required_title": "Manual Upload Needed",
-      "youtube_manual_upload_required_message": "We couldn't download this YouTube video automatically. Please download the video manually and upload the file to continue the transcription."
+      "youtube_manual_upload_required_message": "We couldn't download this YouTube video automatically. Please download the video to your device and upload the file again to start the transcription."
     },
     "warnings": {
       "staging_failed_title": "Processing Notice",

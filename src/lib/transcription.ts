@@ -643,6 +643,30 @@ export class TranscriptionService {
 
       // Free用户：先切割音频到5分钟
       let audioUrlForTranscription = uploadResult.publicUrl || uploadResult.url;
+      const cachedAsset = YouTubeService.getCachedAudioAsset(videoInfo.videoId);
+      if (cachedAsset) {
+        if ((!videoInfo.title || videoInfo.title.trim().length === 0) && cachedAsset.title) {
+          videoInfo.title = cachedAsset.title;
+        }
+        if ((!videoInfo.duration || videoInfo.duration <= 0) && typeof cachedAsset.durationSeconds === 'number') {
+          videoInfo.duration = cachedAsset.durationSeconds;
+        }
+      }
+
+      if (request.options?.trimToSeconds && videoInfo?.duration) {
+        const detected = Math.ceil(videoInfo.duration);
+        if (Number.isFinite(detected) && detected > 0) {
+          const adjusted = Math.min(request.options.trimToSeconds, detected);
+          if (adjusted !== request.options.trimToSeconds) {
+            console.log('[FREE_CLIP] Adjusting trimToSeconds based on detected video duration', {
+              previous: request.options.trimToSeconds,
+              detected,
+              adjusted,
+            });
+            request.options.trimToSeconds = adjusted;
+          }
+        }
+      }
       if (request.options?.trimToSeconds) {
         console.log(`[FREE_CLIP] Starting audio clip for Free user:`, {
           originalUrl: uploadResult.url,
@@ -700,6 +724,10 @@ export class TranscriptionService {
         enableDiarizationAfterWhisper: !!request.options?.enableDiarizationAfterWhisper
       }));
       console.log('[TEST][YT-002] model.used', { model: 'deepgram_or_whisper_decided_above' });
+
+      if (request.options?.trimToSeconds) {
+        this.clampTranscriptionToLimit(transcription, request.options.trimToSeconds);
+      }
 
       // Optional: overlay diarization for PRO users when enabled
       const enableOverlay = !!request.options?.enableDiarizationAfterWhisper && ['pro', 'basic', 'premium'].includes(String(request.options?.userTier || '').toLowerCase());
@@ -788,12 +816,15 @@ export class TranscriptionService {
             console.log('[Align] Deepgram: no anchors/words; skip realignment');
           }
         } else if (!isDeepgramOutput && isZh) {
-          transcription.segments = alignSentencesWithSegments(
-            transcription.text,
-            transcription.segments as any,
-            transcription.language
-          );
-          (transcription as any).srtText = undefined;
+      transcription.segments = alignSentencesWithSegments(
+        transcription.text,
+        transcription.segments as any,
+        transcription.language
+      );
+      (transcription as any).srtText = undefined;
+      if (request.options?.trimToSeconds) {
+        this.clampTranscriptionToLimit(transcription, request.options.trimToSeconds);
+      }
           console.log('[Align] Non-Deepgram sentence alignment applied');
         } else {
           console.log('[Align] Skipped sentence realignment (not applicable)');
@@ -1058,6 +1089,9 @@ export class TranscriptionService {
             transcription.language
           );
           (transcription as any).srtText = undefined;
+          if (request.options?.trimToSeconds) {
+            this.clampTranscriptionToLimit(transcription, request.options.trimToSeconds);
+          }
         } else {
           console.log('[Align] Skipped sentence realignment for non-Chinese to preserve timing');
         }
@@ -2028,6 +2062,54 @@ export class TranscriptionService {
     } catch {
       // 回退到原字符串的MD5，最差也能稳定对应相同输入
       return crypto.createHash('md5').update(contentUrl).digest('hex');
+    }
+  }
+
+  private clampTranscriptionToLimit(transcription: TranscriptionResult, limitSeconds: number) {
+    if (!limitSeconds || !Number.isFinite(limitSeconds)) return;
+    const maxSec = Math.max(0, Math.floor(limitSeconds));
+    if (!Number.isFinite(transcription.duration || NaN) || (transcription.duration ?? 0) > maxSec) {
+      transcription.duration = maxSec;
+    }
+    if (Array.isArray(transcription.segments)) {
+      const filtered: any[] = [];
+      let changed = false;
+
+      transcription.segments.forEach((segment, index) => {
+        const rawStart = Number(segment.start ?? 0);
+        const rawEnd = Number(segment.end ?? rawStart);
+
+        if (rawStart >= maxSec) {
+          changed = true;
+          return; // discard segments fully beyond the preview window
+        }
+
+        const clampedStart = Math.max(0, rawStart);
+        const clampedEnd = Math.max(clampedStart, Math.min(rawEnd, maxSec));
+        if (clampedStart !== rawStart || clampedEnd !== rawEnd) {
+          changed = true;
+        }
+
+        filtered.push({
+          ...segment,
+          id: segment.id ?? index,
+          start: clampedStart,
+          end: clampedEnd,
+        });
+      });
+
+      transcription.segments = filtered;
+
+      // Rebuild plain text when we dropped or truncated segments to keep preview text consistent
+      if (changed) {
+        try {
+          const rebuilt = rebuildTextFromSegments(filtered as any);
+          if (rebuilt) {
+            transcription.text = rebuilt;
+          }
+          (transcription as any).srtText = undefined;
+        } catch {}
+      }
     }
   }
 }

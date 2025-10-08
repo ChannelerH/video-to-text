@@ -178,6 +178,10 @@ export class YouTubeService {
   private static audioAssetCache = new Map<string, AudioAsset>();
   private static ytdlClientPromise: Promise<any> | null = null;
 
+  static getCachedAudioAsset(videoId: string): AudioAsset | undefined {
+    return this.audioAssetCache.get(videoId);
+  }
+
   private static async getYtdlClient(): Promise<any> {
     if (!this.ytdlClientPromise) {
       this.ytdlClientPromise = (async () => {
@@ -401,28 +405,8 @@ export class YouTubeService {
    * 检测视频的可用音轨语言
    */
   static async detectAudioTracks(videoId: string): Promise<AudioTrackInfo[]> {
-    try {
-      const info = await this.fetchYtdlInfo(videoId);
-      const captionsRenderer = info.player_response?.captions?.playerCaptionsTracklistRenderer;
-      if (!captionsRenderer?.captionTracks?.length) {
-        return [{
-          languageCode: 'default',
-          trackType: 'original',
-          displayName: 'Default (Original)',
-          formats: info.formats.filter((format: any) => format.hasAudio && !format.hasVideo).length,
-        }];
-      }
-
-      return captionsRenderer.captionTracks.map((track: any) => ({
-        languageCode: track.languageCode || track.vssId || 'unknown',
-        trackType: track.kind === 'asr' ? 'dubbed-auto' : 'original',
-        displayName: track.name?.simpleText || track.languageName?.simpleText || track.languageCode || 'Unknown',
-        formats: info.formats.filter((format: any) => format.hasAudio && !format.hasVideo).length,
-      }));
-    } catch (error) {
-      console.error('Error detecting audio tracks:', error);
-      return [];
-    }
+    console.warn('[YouTube] Audio track detection skipped (ytdl disabled)', { videoId });
+    return [];
   }
 
   /**
@@ -438,7 +422,7 @@ export class YouTubeService {
           debugLabel: 'video-info',
         });
       } catch (error) {
-        console.warn('[YouTube] Proxy metadata unavailable, falling back to ytdl', {
+        console.warn('[YouTube] Proxy metadata unavailable', {
           videoId,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -455,32 +439,18 @@ export class YouTubeService {
       };
     }
 
-    try {
-      const info = await this.fetchYtdlInfo(videoId, forceRefresh);
-      const details = info.videoDetails;
-
-      const title = details.title || '';
-      const duration = Number.parseInt(details.lengthSeconds || '0', 10) || 0;
-      const thumbnails = details.thumbnails?.length
-        ? details.thumbnails.map((item: any) => item.url).reverse()
-        : this.buildDefaultThumbnails(videoId);
-
-      const captions = this.extractCaptions(info);
-
-      return {
-        videoId,
-        title,
-        duration,
-        thumbnails,
-        captions,
-      };
-    } catch (error) {
-      const fallback = await this.fetchOEmbedVideoInfo(videoId);
-      if (fallback) {
-        return fallback;
-      }
-      throw error;
+    const fallback = await this.fetchOEmbedVideoInfo(videoId);
+    if (fallback) {
+      return fallback;
     }
+
+    return {
+      videoId,
+      title: '',
+      duration: 0,
+      thumbnails: this.buildDefaultThumbnails(videoId),
+      captions: [],
+    };
   }
 
   private static async fetchOEmbedVideoInfo(videoId: string): Promise<VideoInfo | null> {

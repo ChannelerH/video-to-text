@@ -426,8 +426,10 @@ export async function POST(request: NextRequest) {
       originalDurationSeconds: originalDurationCandidate,
     });
 
-    if (clipConfig?.limitSeconds) {
-      options.trimToSeconds = clipConfig.limitSeconds;
+    if (clipConfig?.enforceTrim) {
+      options.trimToSeconds = clipConfig.clipSeconds;
+    } else {
+      delete (options as any).trimToSeconds;
     }
 
     const estimatedAnonMinutes = calculateAnonMinutes(clipConfig, originalDurationCandidate);
@@ -563,11 +565,11 @@ export async function POST(request: NextRequest) {
       if (type === 'audio_url' || type === 'file_upload') {
         let audioUrlForSupplier = content;
 
-        if (clipConfig?.limitSeconds && clipConfig.shouldClip) {
+        if (clipConfig?.enforceTrim) {
           try {
             const { clipAudioForFreeTier } = await import('@/lib/audio-clip-helper');
             const filePrefix = type === 'file_upload' ? 'file' : 'audio';
-            const clipped = await clipAudioForFreeTier(content, jobId, filePrefix, clipConfig.limitSeconds);
+            const clipped = await clipAudioForFreeTier(content, jobId, filePrefix, clipConfig.clipSeconds);
             if (clipped?.url) {
               audioUrlForSupplier = clipped.url;
               if (clipped.key) {
@@ -791,7 +793,9 @@ function getDurationFromOptions(options: Record<string, any> | undefined): numbe
 
 type ClipConfig = {
   limitSeconds: number;
+  clipSeconds: number;
   shouldClip: boolean;
+  enforceTrim: boolean;
 };
 
 async function resolveClipConfig(args: {
@@ -809,19 +813,29 @@ async function resolveClipConfig(args: {
   }
 
   const limitSeconds = Math.max(1, Math.ceil(POLICY.preview.freePreviewSeconds || 300));
+  const hasDuration = Number.isFinite(originalDurationSeconds) && (originalDurationSeconds ?? 0) > 0;
+  const clipSeconds = hasDuration
+    ? Math.min(limitSeconds, Math.ceil(originalDurationSeconds as number))
+    : limitSeconds;
+  const shouldClip = shouldClipMedia(originalDurationSeconds, limitSeconds);
 
   return {
     limitSeconds,
-    shouldClip: shouldClipMedia(originalDurationSeconds, limitSeconds),
+    clipSeconds,
+    shouldClip,
+    enforceTrim: shouldClip || !hasDuration,
   };
 }
 
 function calculateAnonMinutes(clipConfig: ClipConfig | null, originalDurationSeconds: number | null): number {
   const limitSeconds = clipConfig?.limitSeconds ?? Math.max(1, Math.ceil(POLICY.preview.freePreviewSeconds || 300));
-  // If we have original duration, take the lesser of original and limit
-  const effectiveSeconds = originalDurationSeconds && Number.isFinite(originalDurationSeconds)
-    ? Math.min(originalDurationSeconds, limitSeconds)
-    : limitSeconds;
+  const clipSeconds = clipConfig?.clipSeconds ?? Math.min(
+    limitSeconds,
+    Number.isFinite(originalDurationSeconds || 0) && (originalDurationSeconds || 0) > 0
+      ? Math.ceil(originalDurationSeconds as number)
+      : limitSeconds
+  );
+  const effectiveSeconds = Math.min(clipSeconds, limitSeconds);
   const minutes = effectiveSeconds / 60;
   return Math.max(1, Math.ceil(minutes));
 }

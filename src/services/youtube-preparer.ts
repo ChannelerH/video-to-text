@@ -132,6 +132,18 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
   }
 
   if (!videoTitle || !videoDurationSeconds) {
+    const cachedAsset = YouTubeService.getCachedAudioAsset(vid);
+    if (cachedAsset) {
+      if (!videoTitle && cachedAsset.title) {
+        videoTitle = cachedAsset.title;
+      }
+      if (!videoDurationSeconds && typeof cachedAsset.durationSeconds === 'number') {
+        videoDurationSeconds = cachedAsset.durationSeconds;
+      }
+    }
+  }
+
+  if (!videoTitle || !videoDurationSeconds) {
     try {
       const info = await YouTubeService.getVideoInfo(vid);
       videoTitle = videoTitle || info.title || null;

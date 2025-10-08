@@ -606,7 +606,7 @@
       "youtube_limit_reached_title": "YouTube 次数已用完",
       "youtube_limit_reached_message": "本月的 YouTube 链接转写次数已达上限。升级套餐，或先下载视频后通过文件上传继续转写。",
       "youtube_manual_upload_required_title": "需要手动上传",
-      "youtube_manual_upload_required_message": "我们无法自动下载此 YouTube 视频，请先手动下载视频，然后通过文件上传方式继续转录。"
+      "youtube_manual_upload_required_message": "我们无法自动下载此 YouTube 视频，请先将视频下载到本地，然后通过文件上传方式重新发起转录。"
     },
     "warnings": {
       "staging_failed_title": "处理提示",
