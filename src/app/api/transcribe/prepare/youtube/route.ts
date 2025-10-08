@@ -86,6 +86,11 @@ export async function POST(request: NextRequest) {
       
       // Directly use the R2 URL as supplier URL
       let supplierAudioUrl = video;
+      const existingMeta = (currentTranscription.metadata || {}) as Record<string, any>;
+      const normalizedMetaTitle = typeof existingMeta.videoTitle === 'string'
+        ? existingMeta.videoTitle.trim()
+        : (typeof existingMeta.title === 'string' ? String(existingMeta.title).trim() : '');
+      const normalizedMetaDuration = Number(existingMeta.videoDurationSeconds ?? existingMeta.duration);
       
       // For FREE users, need to clip the R2 URL
       if (effectiveClipSeconds && shouldClipMedia(jobOriginalDuration, effectiveClipSeconds)) {
@@ -102,8 +107,15 @@ export async function POST(request: NextRequest) {
       // Store the URL and proceed to Deepgram
       if (job_id) {
         try {
+          const updateData: Record<string, any> = { processed_url: supplierAudioUrl };
+          if (normalizedMetaTitle) {
+            updateData.title = normalizedMetaTitle;
+          }
+          if (Number.isFinite(normalizedMetaDuration) && normalizedMetaDuration > 0) {
+            updateData.original_duration_sec = Math.round(normalizedMetaDuration);
+          }
           await db().update(transcriptions)
-            .set({ processed_url: supplierAudioUrl })
+            .set(updateData)
             .where(and(eq(transcriptions.job_id, job_id), ne(transcriptions.status, 'cancelled')));
         } catch (e) {
           console.error('[YouTube Prepare] DB update failed:', e);
