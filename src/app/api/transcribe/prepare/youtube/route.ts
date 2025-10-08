@@ -198,6 +198,25 @@ export async function POST(request: NextRequest) {
       videoTitle = prepResult.videoTitle;
       videoDurationSeconds = prepResult.videoDurationSeconds;
 
+      if (job_id) {
+        const updatePayload: Record<string, any> = {};
+        if (typeof videoTitle === 'string' && videoTitle.trim().length > 0) {
+          updatePayload.title = videoTitle.trim();
+        }
+        if (typeof videoDurationSeconds === 'number' && Number.isFinite(videoDurationSeconds) && videoDurationSeconds > 0) {
+          updatePayload.original_duration_sec = Math.round(videoDurationSeconds);
+        }
+        if (Object.keys(updatePayload).length > 0) {
+          try {
+            await db().update(transcriptions)
+              .set(updatePayload)
+              .where(and(eq(transcriptions.job_id, job_id), ne(transcriptions.status, 'cancelled')));
+          } catch (err) {
+            console.warn('[YouTube Prepare] Failed to update title/duration from prepare result', err);
+          }
+        }
+      }
+
       console.log('[YouTube Prepare] Preparation result', {
         videoId: vid,
         fromReusable: prepResult.fromReusable,
