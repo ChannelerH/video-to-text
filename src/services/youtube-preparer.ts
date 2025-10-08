@@ -141,23 +141,23 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
     }
   }
 
-  if (videoDurationSeconds && videoDurationSeconds > 0) {
-    const { getUploadLimitForTier, formatSeconds } = await import('@/lib/duration-limits');
-    const uploadLimit = getUploadLimitForTier(userTier as any, undefined);
-    const skipDurationLimit = effectiveClipSeconds && shouldClipMedia(videoDurationSeconds, effectiveClipSeconds);
+  // if (videoDurationSeconds && videoDurationSeconds > 0) {
+  //   const { getUploadLimitForTier, formatSeconds } = await import('@/lib/duration-limits');
+  //   const uploadLimit = getUploadLimitForTier(userTier as any, undefined);
+  //   const skipDurationLimit = effectiveClipSeconds && shouldClipMedia(videoDurationSeconds, effectiveClipSeconds);
 
-    if (!skipDurationLimit && uploadLimit > 0 && videoDurationSeconds > uploadLimit) {
-      const actualDuration = Math.floor(videoDurationSeconds);
-      throw new YoutubePrepareError(
-        'duration_limit_exceeded',
-        `Video duration ${formatSeconds(actualDuration)} exceeds limit of ${formatSeconds(uploadLimit)}`,
-        {
-          actualDuration,
-          maxDuration: uploadLimit,
-        }
-      );
-    }
-  }
+  //   if (!skipDurationLimit && uploadLimit > 0 && videoDurationSeconds > uploadLimit) {
+  //     const actualDuration = Math.floor(videoDurationSeconds);
+  //     throw new YoutubePrepareError(
+  //       'duration_limit_exceeded',
+  //       `Video duration ${formatSeconds(actualDuration)} exceeds limit of ${formatSeconds(uploadLimit)}`,
+  //       {
+  //         actualDuration,
+  //         maxDuration: uploadLimit,
+  //       }
+  //     );
+  //   }
+  // }
 
   const resolveAudioUrl = async () => {
     if (audioUrl && isProxyHostedAudio(audioUrl)) {
