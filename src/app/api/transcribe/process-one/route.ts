@@ -76,7 +76,8 @@ export async function POST(request: NextRequest) {
         userId: userUuid,
         userTier: jobRow.tier || 'free',
         fallbackEnabled: true,
-        isPreview: false
+        isPreview: false,
+        jobId: jobRow.job_id
       }
     };
 

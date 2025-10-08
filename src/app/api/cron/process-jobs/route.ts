@@ -137,6 +137,7 @@ export async function GET(request: NextRequest) {
           userTier: job.tier || 'free',
           fallbackEnabled: true,
           isPreview: false,
+          jobId: job.job_id,
         },
       };
 

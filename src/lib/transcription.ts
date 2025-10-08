@@ -21,6 +21,7 @@ export interface TranscriptionRequest {
   options?: {
     language?: string;
     userId?: string;
+    jobId?: string;
     userTier?: string;
     isPreview?: boolean; // 是否为预览请求
     fallbackEnabled?: boolean; // 是否启用降级
@@ -364,32 +365,17 @@ export class TranscriptionService {
       ));
       console.log('[CACHE] youtube.cache.set', { videoId: videoInfo.videoId, variant: this.variantSuffix(request.options) });
 
-      let jobId = crypto.randomUUID();
-
-      // 写入数据库（仅登录用户）
-      if (request.options?.userId) {
-        try {
-          const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
-          const row = await this.time('db.write', createOrReuseTranscription({
-            job_id: jobId,
-            user_uuid: request.options?.userId || "",
-            source_type: 'youtube_url',
-            source_hash: videoInfo.videoId + this.variantSuffix(request.options),
-            source_url: request.content,
-            title: videoInfo.title,
-            language: transcription.language,
-            // 记录两份：原始总时长 + 实际处理时长
-            duration_sec: transcription.duration,
-            original_duration_sec: videoInfo.duration,
-            cost_minutes: Number(((transcription.duration || 0)/60).toFixed(3)),
-            status: 'completed'
-          }));
-          jobId = (row as any).job_id || jobId;
-          await this.time('db.write_formats', upsertTranscriptionFormats(jobId, formats));
-        } catch (e) {
-          // ignore
-        }
-      }
+      const jobId = await this.persistTranscriptionResult({
+        request,
+        sourceType: 'youtube_url',
+        sourceHash: videoInfo.videoId + this.variantSuffix(request.options),
+        sourceUrl: request.content,
+        title: videoInfo.title,
+        language: transcription.language,
+        durationSec: transcription.duration || 0,
+        originalDurationSec: videoInfo.duration,
+        formats,
+      });
 
       return {
         success: true,
@@ -867,32 +853,18 @@ export class TranscriptionService {
         }
       }, 60000); // 1分钟后清理
 
-      // 写入数据库（仅登录用户，保存润色后的文本）
-      let jobId: string | undefined;
-      if (request.options?.userId) {
-        try {
-          const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
-          jobId = crypto.randomUUID();
-          const row = await createOrReuseTranscription({
-            job_id: jobId,
-            user_uuid: request.options?.userId || "",
-            source_type: 'youtube_url',
-            source_hash: videoInfo.videoId + this.variantSuffix(request.options),
-            source_url: request.content,
-            title: videoInfo.title,
-            language: transcription.language,
-            duration_sec: transcription.duration,
-            cost_minutes: Number((transcription.duration/60).toFixed(3)),
-            status: 'completed'
-          });
-          jobId = (row as any).job_id || jobId;
-          if (jobId) {
-            await upsertTranscriptionFormats(jobId, formats);
-          }
-        } catch (e) {
-          console.warn('DB write skipped:', e);
-        }
-      }
+      const jobId = await this.persistTranscriptionResult({
+        request,
+        sourceType: 'youtube_url',
+        sourceHash: videoInfo.videoId + this.variantSuffix(request.options),
+        sourceUrl: request.content,
+        title: videoInfo.title,
+        language: transcription.language,
+        durationSec: transcription.duration || 0,
+        originalDurationSec: videoInfo.duration || transcription.duration || 0,
+        processedUrl: audioUrlForTranscription,
+        formats,
+      });
 
       // Report 100% completion
       if (request.options?.onProgress) {
@@ -1147,33 +1119,18 @@ export class TranscriptionService {
           Math.max(...transcription.segments.map((s: any) => s.end)) : 60
       );
 
-      // 9. 写入数据库（仅登录用户）
-      let jobId: string | undefined;
-      if (request.options?.userId) {
-        try {
-          const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
-          jobId = crypto.randomUUID();
-          const row = await this.time('db.write', createOrReuseTranscription({
-            job_id: jobId,
-            user_uuid: request.options?.userId || "",
-            source_type: 'audio_url',
-            source_hash: urlHash + this.variantSuffix(request.options),
-            source_url: url,
-            title: preferredTitle || audioInfo.filename,
-            language: transcription.language,
-            duration_sec: transcription.duration,
-            original_duration_sec: originalDurationSec || transcription.duration || 0,
-            cost_minutes: Number((transcription.duration/60).toFixed(3)),
-            status: 'completed'
-          }));
-          jobId = (row as any).job_id || jobId;
-          if (jobId) {
-            await this.time('db.write_formats', upsertTranscriptionFormats(jobId, formats));
-          }
-        } catch (e) {
-          console.warn('DB write skipped:', e);
-        }
-      }
+      const jobId = await this.persistTranscriptionResult({
+        request,
+        sourceType: 'audio_url',
+        sourceHash: urlHash + this.variantSuffix(request.options),
+        sourceUrl: url,
+        title: preferredTitle || audioInfo.filename,
+        language: transcription.language,
+        durationSec: transcription.duration || 0,
+        originalDurationSec: originalDurationSec || transcription.duration || 0,
+        processedUrl: audioUrlForTranscription,
+        formats,
+      });
 
       return {
         success: true,
@@ -1682,33 +1639,18 @@ export class TranscriptionService {
         { userId: request.options?.userId }
       ));
 
-      // 写入数据库（仅登录用户）
-      let jobId: string | undefined;
-      if (request.options?.userId) {
-        try {
-          const { createOrReuseTranscription, upsertTranscriptionFormats } = await import("@/models/transcription");
-          jobId = crypto.randomUUID();
-          const row = await this.time('db.write', createOrReuseTranscription({
-            job_id: jobId,
-            user_uuid: request.options?.userId || "",
-            source_type: 'file_upload',
-            source_hash: fileHash + this.variantSuffix(request.options),
-            source_url: filePath,
-            title: (request.options as any)?.fileName || 'uploaded file',
-            language: transcription.language,
-            duration_sec: transcription.duration,
-            original_duration_sec: originalDurationSec || transcription.duration || 0,
-            cost_minutes: Number((transcription.duration/60).toFixed(3)),
-            status: 'completed'
-          }));
-          jobId = (row as any).job_id || jobId;
-          if (jobId) {
-            await this.time('db.write_formats', upsertTranscriptionFormats(jobId, formats));
-          }
-        } catch(e) {
-          // ignore
-        }
-      }
+      const jobId = await this.persistTranscriptionResult({
+        request,
+        sourceType: 'file_upload',
+        sourceHash: fileHash + this.variantSuffix(request.options),
+        sourceUrl: filePath,
+        title: (request.options as any)?.fileName || 'uploaded file',
+        language: transcription.language,
+        durationSec: transcription.duration || 0,
+        originalDurationSec: originalDurationSec || transcription.duration || 0,
+        processedUrl: audioForTranscription,
+        formats,
+      });
 
       // Report completion
       if (request.options?.onProgress) {
@@ -1886,6 +1828,85 @@ export class TranscriptionService {
         duration: 0
       }
     };
+  }
+
+  private async persistTranscriptionResult(args: {
+    request: TranscriptionRequest;
+    sourceType: TranscriptionType;
+    sourceHash: string;
+    sourceUrl: string;
+    title?: string | null;
+    language?: string;
+    durationSec: number;
+    originalDurationSec: number;
+    processedUrl?: string | null;
+    formats: Record<string, string>;
+  }): Promise<string | undefined> {
+    const userId = args.request.options?.userId;
+    if (!userId) {
+      return undefined;
+    }
+
+    const [{ createOrReuseTranscription, upsertTranscriptionFormats }, { db }, { transcriptions }, { eq }] = await Promise.all([
+      import('@/models/transcription'),
+      import('@/db'),
+      import('@/db/schema'),
+      import('drizzle-orm'),
+    ]);
+
+    let jobId = args.request.options?.jobId ?? crypto.randomUUID();
+    const now = new Date();
+    const sanitizedTitle = args.title?.trim() || undefined;
+    const sanitizedLanguage = args.language || 'auto';
+    const durationSec = Math.max(0, Math.ceil(args.durationSec || 0));
+    const originalDurationSec = Math.max(0, Math.ceil(args.originalDurationSec || durationSec));
+    const costMinutes = Number(((args.durationSec || 0) / 60).toFixed(3));
+
+    if (args.request.options?.jobId) {
+      const updateData: Record<string, any> = {
+        language: sanitizedLanguage,
+        duration_sec: durationSec,
+        original_duration_sec: originalDurationSec,
+        cost_minutes: costMinutes,
+        status: 'completed',
+        completed_at: now,
+        deleted: false,
+      };
+      if (sanitizedTitle) updateData.title = sanitizedTitle;
+      if (args.processedUrl) updateData.processed_url = args.processedUrl;
+
+      await this.time('db.update_transcription', db().update(transcriptions)
+        .set(updateData)
+        .where(eq(transcriptions.job_id, jobId)));
+    } else {
+      const row = await this.time('db.write', createOrReuseTranscription({
+        job_id: jobId,
+        user_uuid: userId,
+        source_type: args.sourceType,
+        source_hash: args.sourceHash,
+        source_url: args.sourceUrl,
+        title: sanitizedTitle,
+        language: sanitizedLanguage,
+        duration_sec: durationSec,
+        original_duration_sec: originalDurationSec,
+        cost_minutes: costMinutes,
+        status: 'completed'
+      }));
+      jobId = (row as any).job_id || jobId;
+
+      const updatePayload: Record<string, any> = { completed_at: now };
+      if (args.processedUrl) updatePayload.processed_url = args.processedUrl;
+
+      await this.time('db.update_new_transcription', db().update(transcriptions)
+        .set(updatePayload)
+        .where(eq(transcriptions.job_id, jobId)));
+    }
+
+    if (jobId) {
+      await this.time('db.write_formats', upsertTranscriptionFormats(jobId, args.formats));
+    }
+
+    return jobId;
   }
 
   /**

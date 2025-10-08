@@ -623,8 +623,17 @@ export async function POST(request: NextRequest) {
         const fallbackToReplicate = !shouldUseDeepgram && !deepgramAllowed && replicateAllowed && !isHighAccuracyActive;
         const enableDiarization = !!options?.enableDiarizationAfterWhisper && ['basic', 'pro', 'premium'].includes(String(userTier).toLowerCase());
 
+        const markJobPicked = async () => {
+          try {
+            await db().update(q_jobs).set({ picked_at: new Date() }).where(and(eq(q_jobs.job_id, jobId), eq(q_jobs.done, false)));
+          } catch (err) {
+            console.warn('[Async] Failed to mark job picked', err);
+          }
+        };
+
         if (shouldUseReplicate || fallbackToReplicate) {
           try {
+            await markJobPicked();
             const cbUrl = new URL(`${callbackBase}/api/callback/replicate`);
             cbUrl.searchParams.set('job_id', jobId);
             if (isHighAccuracyActive) {
@@ -672,6 +681,7 @@ export async function POST(request: NextRequest) {
 
         if (shouldUseDeepgram) {
           try {
+            await markJobPicked();
             let cb = `${callbackBase}/api/callback/deepgram?job_id=${encodeURIComponent(jobId)}`;
             if (process.env.DEEPGRAM_WEBHOOK_SECRET) {
               const sig = crypto.createHmac('sha256', process.env.DEEPGRAM_WEBHOOK_SECRET).update(jobId).digest('hex');

@@ -528,6 +528,7 @@ async function runStreamingTranscription(params: StreamingParams) {
             ...options,
             userId: userUuid,
             userTier,
+            jobId,
             fallbackEnabled: true,
             onProgress: (progress: any) => {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({
@@ -544,7 +545,7 @@ async function runStreamingTranscription(params: StreamingParams) {
             result = await transcriptionService.processTranscription({
               type,
               content,
-              options: { ...options, userId: userUuid, userTier, fallbackEnabled: true }
+              options: { ...options, userId: userUuid, userTier, jobId, fallbackEnabled: true }
             });
           } catch {}
         }
@@ -640,6 +641,7 @@ async function runStandardTranscription(params: StandardParams) {
         ...options,
         userId: userUuid,
         userTier,
+        jobId,
         fallbackEnabled: true
       }
     });
@@ -650,7 +652,7 @@ async function runStandardTranscription(params: StandardParams) {
         result = await transcriptionService.processTranscription({
           type,
           content,
-          options: { ...options, userId: userUuid, userTier, fallbackEnabled: true }
+          options: { ...options, userId: userUuid, userTier, jobId, fallbackEnabled: true }
         });
       } catch {}
     }
