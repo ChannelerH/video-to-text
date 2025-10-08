@@ -310,21 +310,29 @@ export async function POST(req: NextRequest) {
                           currentTitle === 'Transcription' ||
                           currentTitle === '';
     
-    if (isDefaultTitle && text) {
-      // Generate a better title based on the first few words of the transcript
-      const words = text.split(/\s+/).filter(w => w.length > 0);
-      if (words.length > 0) {
-        // Take first 5-8 words as title
-        const titleWords = words.slice(0, Math.min(8, words.length));
-        let betterTitle = titleWords.join(' ');
-        if (words.length > 8) {
-          betterTitle += '...';
+    if (isDefaultTitle) {
+      const meta = (currentTranscription as any)?.metadata || {};
+      const metaTitle = typeof meta.videoTitle === 'string'
+        ? meta.videoTitle.trim()
+        : (typeof meta.title === 'string' ? String(meta.title).trim() : '');
+      if (metaTitle) {
+        updateData.title = metaTitle;
+      } else if (text) {
+        // Generate a better title based on the first few words of the transcript
+        const words = text.split(/\s+/).filter(w => w.length > 0);
+        if (words.length > 0) {
+          // Take first 5-8 words as title
+          const titleWords = words.slice(0, Math.min(8, words.length));
+          let betterTitle = titleWords.join(' ');
+          if (words.length > 8) {
+            betterTitle += '...';
+          }
+          // Limit title length to 100 characters
+          if (betterTitle.length > 100) {
+            betterTitle = betterTitle.substring(0, 97) + '...';
+          }
+          updateData.title = betterTitle;
         }
-        // Limit title length to 100 characters
-        if (betterTitle.length > 100) {
-          betterTitle = betterTitle.substring(0, 97) + '...';
-        }
-        updateData.title = betterTitle;
       }
     }
     

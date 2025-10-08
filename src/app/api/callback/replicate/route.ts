@@ -169,13 +169,21 @@ export async function POST(req: NextRequest) {
     if (currentTranscription) {
       const currentTitle = currentTranscription.title || '';
       const defaultTitles = new Set(['Processing...', 'YouTube Video', 'Transcription', '']);
-      if (defaultTitles.has(currentTitle) && txt) {
-        const words = txt.split(/\s+/).filter(Boolean);
-        if (words.length > 0) {
-          let title = words.slice(0, Math.min(8, words.length)).join(' ');
-          if (words.length > 8) title += '...';
-          if (title.length > 100) title = `${title.slice(0, 97)}...`;
-          updatePayload.title = title;
+      if (defaultTitles.has(currentTitle)) {
+        const meta = (currentTranscription as any)?.metadata || {};
+        const metaTitle = typeof meta.videoTitle === 'string'
+          ? meta.videoTitle.trim()
+          : (typeof meta.title === 'string' ? String(meta.title).trim() : '');
+        if (metaTitle) {
+          updatePayload.title = metaTitle;
+        } else if (txt) {
+          const words = txt.split(/\s+/).filter(Boolean);
+          if (words.length > 0) {
+            let title = words.slice(0, Math.min(8, words.length)).join(' ');
+            if (words.length > 8) title += '...';
+            if (title.length > 100) title = `${title.slice(0, 97)}...`;
+            updatePayload.title = title;
+          }
         }
       }
     }
