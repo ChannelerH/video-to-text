@@ -1899,12 +1899,9 @@ export class TranscriptionService {
         deleted: false,
       };
 
-      // Only update title if current is default and new title is valid
-      if (isDefaultTitle && hasValidNewTitle) {
+      if (hasValidNewTitle && sanitizedTitle) {
         updateData.title = sanitizedTitle;
-        console.log('[Transcription Service] Updating title to:', sanitizedTitle);
-      } else if (hasValidNewTitle) {
-        console.log('[Transcription Service] Keeping existing title:', currentTitle);
+        console.log('[Transcription Service] Setting title to:', sanitizedTitle, { fromDefault: isDefaultTitle, currentTitle });
       }
 
       if (args.processedUrl) updateData.processed_url = args.processedUrl;
