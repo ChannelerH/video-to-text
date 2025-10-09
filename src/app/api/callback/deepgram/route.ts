@@ -216,10 +216,24 @@ export async function POST(req: NextRequest) {
         const isZh = language && language.toLowerCase().includes('zh');
 
         if (isZh) {
-          // Use shared refinement logic
+          // Extract words for timestamp alignment (if available)
+          const words = payload?.results?.channels?.[0]?.alternatives?.[0]?.words || [];
+
+          // Use shared refinement logic with timestamp information
           const { applyChineseRefinement } = await import('@/lib/chinese-refinement');
-          const refined = await applyChineseRefinement(text, segments, language);
-          
+          const refined = await applyChineseRefinement(text, segments, language, {
+            anchors: segments.map((s: any) => ({
+              start: s.start || 0,
+              end: s.end || 0,
+              text: s.text || ''
+            })),
+            words: Array.isArray(words) && words.length > 0 ? words.map((w: any) => ({
+              start: w.start || 0,
+              end: w.end || 0,
+              text: w.punctuated_word || w.word || ''
+            })) : undefined
+          });
+
           text = refined.text;
           segments = refined.segments;
         }

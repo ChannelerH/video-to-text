@@ -372,8 +372,8 @@ export class YouTubeService {
         url: parsed.uploadedUrl,
         key: parsed.key || cached?.key || '',
         bytes: typeof parsed.bytes === 'number' ? parsed.bytes : cached?.bytes,
-        title: typeof parsed.title === 'string'
-          ? parsed.title
+        title: typeof parsed.title === 'string' && parsed.title.trim().length > 0
+          ? parsed.title.trim()
           : (cached?.title ?? null),
         durationSeconds: typeof parsed.duration_seconds === 'number'
           ? parsed.duration_seconds
@@ -386,6 +386,13 @@ export class YouTubeService {
           : (cached?.mimeType ?? null),
         fetchedAt: Date.now(),
       };
+
+      console.log('[YouTube] Audio asset created', {
+        videoId,
+        title: asset.title,
+        parsedTitle: parsed.title,
+        durationSeconds: asset.durationSeconds,
+      });
 
       this.audioAssetCache.set(videoId, asset);
       return asset;
@@ -429,18 +436,33 @@ export class YouTubeService {
       }
     }
 
-    if (proxyAsset && (proxyAsset.title || typeof proxyAsset.durationSeconds === 'number')) {
+    if (proxyAsset && proxyAsset.title && proxyAsset.title.trim().length > 0) {
+      console.log('[YouTube] getVideoInfo returning from proxy asset:', {
+        videoId,
+        title: proxyAsset.title,
+        duration: proxyAsset.durationSeconds,
+      });
       return {
         videoId,
-        title: proxyAsset.title || '',
+        title: proxyAsset.title,
         duration: proxyAsset.durationSeconds ?? 0,
         thumbnails: this.buildDefaultThumbnails(videoId),
         captions: [],
       };
     }
 
+    console.log('[YouTube] Proxy asset has no title, trying oEmbed:', {
+      videoId,
+      hasProxyAsset: !!proxyAsset,
+      proxyTitle: proxyAsset?.title,
+    });
+
     const fallback = await this.fetchOEmbedVideoInfo(videoId);
     if (fallback) {
+      console.log('[YouTube] getVideoInfo returning from oEmbed:', {
+        videoId,
+        title: fallback.title,
+      });
       return fallback;
     }
 

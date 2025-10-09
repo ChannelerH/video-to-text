@@ -769,19 +769,15 @@ export class TranscriptionService {
       } catch {}
 
       // 对齐最终文本句子到模型时间戳：
-      // - Deepgram：如果已经直接润色了 segments，可以跳过对齐；否则使用词/字级时间线精确映射润色后的句子边界
+      // - Deepgram：使用词/字级时间线精确映射润色后的句子边界
       // - 非 Deepgram：使用原始 segment 窗口按句对齐（中文）
       try {
         const { isChineseLangOrText } = await import('./refine-local');
         const isDeepgramOutput = !!(transcription as any).srtText; // DeepgramService 会设置 srtText
         const isZh = isChineseLangOrText(transcription.language, transcription.text);
-        const segmentsEnabled = process.env.PUNCTUATE_LLM_SEGMENTS_ENABLED === 'true';
-        
-        // 如果已经对 segments 进行了 LLM 润色，跳过复杂的对齐
-        if (isDeepgramOutput && isZh && segmentsEnabled) {
-          console.log('[Align] Skipped - segments already refined by LLM');
-          (transcription as any).srtText = undefined;
-        } else if (isDeepgramOutput && isZh) {
+
+        // 对于中文内容，无论是否进行了 LLM 润色，都需要重新对齐时间戳
+        if (isDeepgramOutput && isZh) {
           const { alignSentencesWithAnchors, alignSentencesWithWordTimeline } = await import('./sentence-align');
           const anchors = (transcription as any).anchors as any[] | undefined;
           const words = (transcription as any).words as any[] | undefined;
@@ -795,7 +791,7 @@ export class TranscriptionService {
               { wordUnits: words, advancedSplit }
             );
             (transcription as any).srtText = undefined;
-            console.log('[Align] Deepgram anchor-based alignment applied');
+            console.log('[Align] Deepgram anchor-based alignment applied (after LLM refinement)');
           } else if (words && words.length > 0) {
             transcription.segments = alignSentencesWithWordTimeline(
               transcription.text,
@@ -804,7 +800,7 @@ export class TranscriptionService {
               transcription.duration
             );
             (transcription as any).srtText = undefined;
-            console.log('[Align] Deepgram word-level alignment applied');
+            console.log('[Align] Deepgram word-level alignment applied (after LLM refinement)');
           } else {
             console.log('[Align] Deepgram: no anchors/words; skip realignment');
           }

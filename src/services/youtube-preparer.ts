@@ -138,6 +138,7 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
     if (cachedAsset) {
       if (!videoTitle && cachedAsset.title) {
         videoTitle = cachedAsset.title;
+        console.log('[YouTube Prepare] Got title from cached asset:', videoTitle);
       }
       if (!videoDurationSeconds && typeof cachedAsset.durationSeconds === 'number') {
         videoDurationSeconds = cachedAsset.durationSeconds;
@@ -150,6 +151,7 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
       const info = await YouTubeService.getVideoInfo(vid);
       videoTitle = videoTitle || info.title || null;
       videoDurationSeconds = videoDurationSeconds || info.duration || null;
+      console.log('[YouTube Prepare] Got title from getVideoInfo:', videoTitle, 'duration:', videoDurationSeconds);
     } catch (error) {
       console.error('[YouTube Prepare] Failed to get video info:', error);
     }

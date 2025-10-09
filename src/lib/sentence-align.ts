@@ -118,6 +118,153 @@ export function alignSentencesWithSegments(
   return result;
 }
 
+/**
+ * 移除标点符号和空格，仅保留文字内容用于匹配
+ */
+function removePunctuation(text: string, isZh: boolean): string {
+  if (isZh) {
+    // 中文：移除所有标点和空格(包括中英文标点)
+    return text.replace(/[，。！？；：、""''…—,\.!?;:"""''\-\s]/g, '');
+  } else {
+    // 英文：移除标点，保留空格
+    return text.replace(/[,\.!?;:"""''\-—]/g, '');
+  }
+}
+
+/**
+ * 模糊匹配评分：检查从startIdx开始的words是否匹配sentence
+ * 返回匹配度 0-1
+ */
+function fuzzyMatchScore(
+  sentence: string,
+  words: Array<{ text: string }>,
+  startIdx: number,
+  maxCheckLen: number = 20
+): number {
+  let matched = 0;
+  const checkLen = Math.min(sentence.length, words.length - startIdx, maxCheckLen);
+
+  if (checkLen === 0) return 0;
+
+  for (let i = 0; i < checkLen; i++) {
+    const wordText = words[startIdx + i]?.text || '';
+    const sentChar = sentence[i];
+
+    if (wordText === sentChar) {
+      matched++;
+    }
+  }
+
+  return matched / checkLen;
+}
+
+/**
+ * 字级精确对齐：使用words数组的字级时间戳进行精确对齐
+ */
+function alignSentencesWithWordLevel(
+  sentences: string[],
+  words: Array<{ start: number; end: number; text: string }>,
+  lang?: string
+): TranscriptionSegment[] | null {
+  const isZh = isChineseLangOrText(lang, sentences.join(''));
+  const result: TranscriptionSegment[] = [];
+  let wordIdx = 0; // 当前搜索起点
+
+  console.log(`[Align] Word-level alignment: ${sentences.length} sentences, ${words.length} words`);
+
+  for (let sentIdx = 0; sentIdx < sentences.length; sentIdx++) {
+    const sentence = sentences[sentIdx];
+    const cleanSentence = removePunctuation(sentence, isZh);
+
+    if (!cleanSentence || cleanSentence.length === 0) {
+      // 空句子，跳过
+      continue;
+    }
+
+    const firstChar = cleanSentence[0];
+    const lastChar = cleanSentence[cleanSentence.length - 1];
+
+    let startIdx = -1;
+    let endIdx = -1;
+
+    // 查找首字
+    for (let i = wordIdx; i < words.length; i++) {
+      if (words[i].text === firstChar) {
+        // 验证后续字符是否匹配
+        const score = fuzzyMatchScore(cleanSentence, words, i);
+        if (score > 0.5) { // 至少50%匹配
+          startIdx = i;
+          console.log(`[Align] Sentence ${sentIdx} start found at word ${i}, score=${score.toFixed(2)}, char="${firstChar}"`);
+          break;
+        }
+      }
+    }
+
+    if (startIdx === -1) {
+      console.warn(`[Align] Failed to find start for sentence ${sentIdx}: "${sentence.substring(0, 20)}..."`);
+      return null; // 匹配失败，降级到比例分配
+    }
+
+    // 从startIdx向后查找尾字，找最接近句子长度的匹配
+    let bestEndIdx = startIdx;
+    let bestEndScore = -1;
+    const targetLen = cleanSentence.length;
+
+    for (let i = startIdx; i < Math.min(startIdx + cleanSentence.length * 2, words.length); i++) {
+      if (words[i].text === lastChar) {
+        // 验证是否匹配整个句子的尾部
+        const endCheckLen = Math.min(10, cleanSentence.length);
+        let endMatched = 0;
+        for (let j = 0; j < endCheckLen; j++) {
+          const sentCharIdx = cleanSentence.length - endCheckLen + j;
+          const wordCharIdx = i - endCheckLen + 1 + j;
+          if (sentCharIdx >= 0 && wordCharIdx >= 0 && wordCharIdx < words.length) {
+            if (cleanSentence[sentCharIdx] === words[wordCharIdx]?.text) {
+              endMatched++;
+            }
+          }
+        }
+
+        const matchScore = endMatched / endCheckLen;
+        const lengthMatch = 1 - Math.abs((i - startIdx + 1) - targetLen) / targetLen;
+        const totalScore = matchScore * 0.6 + lengthMatch * 0.4; // 60%内容匹配 + 40%长度匹配
+
+        if (totalScore > bestEndScore && matchScore > 0.6) {
+          bestEndScore = totalScore;
+          bestEndIdx = i;
+        }
+      }
+    }
+
+    endIdx = bestEndIdx;
+
+    if (endIdx < startIdx) {
+      console.warn(`[Align] Failed to find end for sentence ${sentIdx}: "${sentence.substring(0, 20)}..."`);
+      return null;
+    }
+
+    console.log(`[Align] Sentence ${sentIdx} matched: words[${startIdx}-${endIdx}], time=${words[startIdx].start.toFixed(2)}-${words[endIdx].end.toFixed(2)}`);
+
+    result.push({
+      id: result.length,
+      seek: 0,
+      start: words[startIdx].start,
+      end: words[endIdx].end,
+      text: sentence, // 保留原始标点!
+      tokens: [],
+      temperature: 0,
+      avg_logprob: 0,
+      compression_ratio: 1,
+      no_speech_prob: 0
+    });
+
+    wordIdx = endIdx + 1; // 下一句从这里开始查找
+  }
+
+  console.log(`[Align] Word-level alignment succeeded: ${result.length} segments created`);
+  return result;
+}
+
 // 方案5实现：基于位置而非内容的对齐策略
 // 不依赖内容匹配，而是按照anchors和润色句子的数量比例进行映射
 // 这样可以避免LLM改写导致的匹配失败，同时保持时间戳的准确性
@@ -147,10 +294,25 @@ export function alignSentencesWithAnchors(
     }));
   }
 
-  console.log(`[Align] Using position-based alignment (方案5): ${anchors.length} anchors, finalText length: ${finalText.length}`);
-
   // 将润色后的文本按句子分割
   const sentences = splitIntoSentences(finalText, lang);
+
+  // 策略1: 如果有wordUnits，优先尝试字级精确对齐
+  if (_options?.wordUnits && _options.wordUnits.length > 0) {
+    try {
+      const wordLevelResult = alignSentencesWithWordLevel(sentences, _options.wordUnits, lang);
+      if (wordLevelResult) {
+        console.log(`[Align] Word-level alignment successful`);
+        return wordLevelResult;
+      }
+      console.warn('[Align] Word-level alignment failed, fallback to anchor ratio alignment');
+    } catch (e) {
+      console.warn('[Align] Word-level alignment error:', e);
+    }
+  }
+
+  // 策略2: 降级到基于位置比例的对齐（原有逻辑）
+  console.log(`[Align] Using position-based alignment (fallback): ${anchors.length} anchors, finalText length: ${finalText.length}`);
 
   if (sentences.length === 0) {
     console.warn('[Align] No sentences found in finalText, using original anchors');
