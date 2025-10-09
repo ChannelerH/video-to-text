@@ -1854,14 +1854,48 @@ export class TranscriptionService {
       return undefined;
     }
 
-    const [{ createOrReuseTranscription, upsertTranscriptionFormats }, { db }, { transcriptions }, { eq }] = await Promise.all([
+    const [{ createOrReuseTranscription, upsertTranscriptionFormats }, { db }, { transcriptions }, { and, desc, eq, ne }] = await Promise.all([
       import('@/models/transcription'),
       import('@/db'),
       import('@/db/schema'),
       import('drizzle-orm'),
     ]);
 
-    let jobId = args.request.options?.jobId ?? crypto.randomUUID();
+    const jobIdFromRequest = args.request.options?.jobId;
+    let jobId = jobIdFromRequest ?? crypto.randomUUID();
+    let reuseExistingJob = false;
+
+    if (!jobIdFromRequest) {
+      try {
+        const [existing] = await db().select({
+          job_id: transcriptions.job_id,
+          status: transcriptions.status,
+          created_at: transcriptions.created_at,
+        })
+        .from(transcriptions)
+        .where(and(
+          eq(transcriptions.user_uuid, userId),
+          eq(transcriptions.source_hash, args.sourceHash),
+          ne(transcriptions.status, 'completed' as any),
+        ))
+        .orderBy(desc(transcriptions.created_at))
+        .limit(1);
+
+        if (existing) {
+          jobId = existing.job_id;
+          reuseExistingJob = true;
+          console.log('[Transcription Service] Reusing existing pending job for result persistence', {
+            jobId,
+            sourceHash: args.sourceHash,
+            existingStatus: existing.status,
+            existingCreatedAt: existing.created_at,
+          });
+        }
+      } catch (lookupError) {
+        console.warn('[Transcription Service] Failed to lookup existing job for reuse', lookupError);
+      }
+    }
+
     const now = new Date();
     const sanitizedTitle = args.title?.trim() || undefined;
     let resolvedTitle = sanitizedTitle;
@@ -1870,7 +1904,7 @@ export class TranscriptionService {
     const originalDurationSec = Math.max(0, Math.ceil(args.originalDurationSec || durationSec));
     const costMinutes = Number(((args.durationSec || 0) / 60).toFixed(3));
 
-    if (args.request.options?.jobId) {
+    if (jobIdFromRequest || reuseExistingJob) {
       // Get current transcription to check if we should update title
       const [currentTr] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
       if (!resolvedTitle && currentTr && (currentTr as any)?.metadata) {
