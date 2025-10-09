@@ -1870,6 +1870,25 @@ export class TranscriptionService {
     const costMinutes = Number(((args.durationSec || 0) / 60).toFixed(3));
 
     if (args.request.options?.jobId) {
+      // Get current transcription to check if we should update title
+      const [currentTr] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
+      const currentTitle = currentTr?.title || '';
+      const isDefaultTitle = currentTitle === 'Processing...' ||
+                            currentTitle === 'YouTube Video' ||
+                            currentTitle === 'Transcription' ||
+                            currentTitle === '';
+
+      const hasValidNewTitle = sanitizedTitle && sanitizedTitle.trim().length > 0;
+
+      console.log('[Transcription Service] Title check:', {
+        jobId,
+        currentTitle,
+        isDefaultTitle,
+        newTitle: sanitizedTitle,
+        hasValidNewTitle,
+        willUpdateTitle: isDefaultTitle && hasValidNewTitle,
+      });
+
       const updateData: Record<string, any> = {
         language: sanitizedLanguage,
         duration_sec: durationSec,
@@ -1879,12 +1898,27 @@ export class TranscriptionService {
         completed_at: now,
         deleted: false,
       };
-      if (sanitizedTitle) updateData.title = sanitizedTitle;
+
+      // Only update title if current is default and new title is valid
+      if (isDefaultTitle && hasValidNewTitle) {
+        updateData.title = sanitizedTitle;
+        console.log('[Transcription Service] Updating title to:', sanitizedTitle);
+      } else if (hasValidNewTitle) {
+        console.log('[Transcription Service] Keeping existing title:', currentTitle);
+      }
+
       if (args.processedUrl) updateData.processed_url = args.processedUrl;
+
+      console.log('[Transcription Service] Final updateData BEFORE DB update:', {
+        jobId,
+        updateData,
+      });
 
       await this.time('db.update_transcription', db().update(transcriptions)
         .set(updateData)
         .where(eq(transcriptions.job_id, jobId)));
+
+      console.log('[Transcription Service] DB update completed for job:', jobId);
     } else {
       const row = await this.time('db.write', createOrReuseTranscription({
         job_id: jobId,
