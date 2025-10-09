@@ -171,54 +171,33 @@ export function alignSentencesWithAnchors(
   console.log(`[Align] Split into ${sentences.length} sentences from ${anchors.length} anchors`);
 
   // 策略：按比例将润色后的句子映射到原始anchors的时间戳
-  // 例如：10个句子，15个anchors → 每1.5个anchor对应1个句子
-  const ratio = anchors.length / sentences.length;
+  // 两种情况：
+  // 1. 句子数 <= anchors数：每个句子占用多个anchors (ratio >= 1)
+  // 2. 句子数 > anchors数：多个句子共享anchors，按时间线性插值 (ratio < 1)
 
   const result: TranscriptionSegment[] = [];
 
-  for (let i = 0; i < sentences.length; i++) {
-    const sentence = sentences[i];
+  if (sentences.length <= anchors.length) {
+    // 情况1：句子少，每个句子可以精确映射到anchor范围
+    const ratio = anchors.length / sentences.length;
 
-    // 计算这个句子对应的anchor范围
-    const startAnchorIdx = Math.floor(i * ratio);
-    const endAnchorIdx = Math.min(
-      Math.floor((i + 1) * ratio),
-      anchors.length
-    ) - 1;
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i];
 
-    // 确保索引有效
-    const safeStartIdx = Math.max(0, Math.min(startAnchorIdx, anchors.length - 1));
-    const safeEndIdx = Math.max(safeStartIdx, Math.min(endAnchorIdx, anchors.length - 1));
+      const startAnchorIdx = Math.floor(i * ratio);
+      const endAnchorIdx = Math.min(
+        Math.ceil((i + 1) * ratio) - 1,
+        anchors.length - 1
+      );
 
-    const startAnchor = anchors[safeStartIdx];
-    const endAnchor = anchors[safeEndIdx];
+      const start = anchors[startAnchorIdx].start;
+      const end = anchors[endAnchorIdx].end;
 
-    // 使用anchor的原始时间戳
-    const start = startAnchor.start;
-    const end = endAnchor.end;
-
-    // 验证时间戳有效性
-    if (start >= 0 && end >= start) {
-      result.push({
-        id: i,
-        seek: 0,
-        start,
-        end,
-        text: sentence,
-        tokens: [],
-        temperature: 0,
-        avg_logprob: 0,
-        compression_ratio: 1,
-        no_speech_prob: 0
-      });
-    } else {
-      // 时间戳异常，记录警告但仍然添加（使用修正后的时间戳）
-      console.warn(`[Align] Invalid timestamp for sentence ${i}: start=${start}, end=${end}, using corrected values`);
       result.push({
         id: i,
         seek: 0,
         start: Math.max(0, start),
-        end: Math.max(Math.max(0, start), end),
+        end: Math.max(start, end),
         text: sentence,
         tokens: [],
         temperature: 0,
@@ -227,6 +206,41 @@ export function alignSentencesWithAnchors(
         no_speech_prob: 0
       });
     }
+  } else {
+    // 情况2：句子多于anchors，需要按时间线性插值
+    // 计算总时长
+    const totalDuration = anchors[anchors.length - 1].end - anchors[0].start;
+    const startTime = anchors[0].start;
+
+    // 按文本长度比例分配时间
+    const totalTextLength = sentences.reduce((sum, s) => sum + s.length, 0);
+    let cumulativeLength = 0;
+
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i];
+      const sentenceLength = sentence.length;
+
+      // 计算这个句子的起始和结束时间（按文本长度比例）
+      const start = startTime + (cumulativeLength / totalTextLength) * totalDuration;
+      const end = startTime + ((cumulativeLength + sentenceLength) / totalTextLength) * totalDuration;
+
+      cumulativeLength += sentenceLength;
+
+      result.push({
+        id: i,
+        seek: 0,
+        start: Math.max(0, start),
+        end: Math.max(start, end),
+        text: sentence,
+        tokens: [],
+        temperature: 0,
+        avg_logprob: 0,
+        compression_ratio: 1,
+        no_speech_prob: 0
+      });
+    }
+
+    console.log(`[Align] Using interpolation: ${sentences.length} sentences from ${anchors.length} anchors`);
   }
 
   console.log(`[Align] Position-based alignment completed: ${result.length} segments created`);

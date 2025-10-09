@@ -602,6 +602,17 @@ export class TranscriptionService {
       }
       console.log(`[Stage] youtube.download_audio ${Date.now() - _dlStart}ms`);
 
+      // 重新获取videoInfo以更新title（download_r2返回的真实title）
+      try {
+        const updatedVideoInfo = await YouTubeService.getVideoInfo(videoInfo.videoId);
+        if (updatedVideoInfo.title && updatedVideoInfo.title !== videoInfo.title) {
+          console.log(`[Title] Updated from "${videoInfo.title}" to "${updatedVideoInfo.title}"`);
+          videoInfo = updatedVideoInfo;
+        }
+      } catch (error) {
+        console.warn('[Title] Failed to update video info after download:', error);
+      }
+
       // Report transcription phase
       if (request.options?.onProgress) {
         request.options.onProgress({
