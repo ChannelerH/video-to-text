@@ -66,6 +66,12 @@ export async function applyChineseRefinement(
   // Step 6: 重新对齐时间戳 - 使用原始时间戳信息将润色后的文本对齐
   // 这一步很关键,因为LLM润色可能会改变文本结构,导致时间戳错位
   if (originalAnchors && originalAnchors.length > 0) {
+    console.log(`[Chinese Refinement] Starting timestamp realignment:`, {
+      anchors: originalAnchors.length,
+      words: options?.words?.length || 0,
+      textLength: finalText.length
+    });
+
     try {
       const alignedSegments = alignSentencesWithAnchors(
         finalText,
@@ -74,12 +80,14 @@ export async function applyChineseRefinement(
         { wordUnits: options?.words }
       );
 
-      console.log(`[Chinese Refinement] Timestamp realignment: ${segments.length} -> ${alignedSegments.length} segments`);
+      console.log(`[Chinese Refinement] ✅ Timestamp realignment complete: ${segments.length} -> ${alignedSegments.length} segments`);
 
       return { text: finalText, segments: alignedSegments };
     } catch (e) {
-      console.warn('[Chinese Refinement] Timestamp alignment failed, using original segments:', e);
+      console.warn('[Chinese Refinement] ❌ Timestamp alignment failed, using original segments:', e);
     }
+  } else {
+    console.warn('[Chinese Refinement] ⚠️ No anchors available, skipping realignment');
   }
 
   return { text: finalText, segments };

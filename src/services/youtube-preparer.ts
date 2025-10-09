@@ -242,6 +242,14 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
   };
   updateData.metadata = mergedMetadata;
 
+  console.log('[YouTube Prepare] Final update data:', {
+    jobId,
+    title: updateData.title,
+    metadataVideoTitle: mergedMetadata.videoTitle,
+    videoDurationSeconds: mergedMetadata.videoDurationSeconds,
+    processedUrl: updateData.processed_url,
+  });
+
   await db().update(transcriptions)
     .set(updateData)
     .where(and(eq(transcriptions.job_id, jobId), ne(transcriptions.status, 'cancelled')));

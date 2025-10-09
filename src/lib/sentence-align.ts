@@ -299,16 +299,19 @@ export function alignSentencesWithAnchors(
 
   // 策略1: 如果有wordUnits，优先尝试字级精确对齐
   if (_options?.wordUnits && _options.wordUnits.length > 0) {
+    console.log(`[Align] Attempting word-level alignment with ${_options.wordUnits.length} words`);
     try {
       const wordLevelResult = alignSentencesWithWordLevel(sentences, _options.wordUnits, lang);
       if (wordLevelResult) {
-        console.log(`[Align] Word-level alignment successful`);
+        console.log(`[Align] ✅ Word-level alignment successful: ${wordLevelResult.length} segments`);
         return wordLevelResult;
       }
-      console.warn('[Align] Word-level alignment failed, fallback to anchor ratio alignment');
+      console.warn('[Align] ⚠️ Word-level alignment failed, fallback to anchor ratio alignment');
     } catch (e) {
-      console.warn('[Align] Word-level alignment error:', e);
+      console.warn('[Align] ❌ Word-level alignment error:', e);
     }
+  } else {
+    console.log(`[Align] No wordUnits provided (wordUnits=${_options?.wordUnits?.length || 0}), skipping word-level alignment`);
   }
 
   // 策略2: 降级到基于位置比例的对齐（原有逻辑）
