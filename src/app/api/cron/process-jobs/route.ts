@@ -167,7 +167,6 @@ export async function GET(request: NextRequest) {
 
       const t = result.data.transcription;
       const vf = result.data.videoInfo;
-      const title = vf?.title || transcription.title || 'Untitled';
 
       // 6. 保存结果（保持与前端轮询协议兼容：json 存 segments 数组）
       const out: Record<string, string> = {
@@ -196,16 +195,21 @@ export async function GET(request: NextRequest) {
       }
 
       // 更新transcription状态
+      const cronUpdate: Record<string, any> = {
+        status: 'completed',
+        duration_sec: Math.ceil(t.duration || 0),
+        original_duration_sec: Math.ceil((vf?.duration || t.duration || 0)),
+        cost_minutes: ((t.duration || 0) / 60).toFixed(3),
+        completed_at: new Date()
+      };
+
+      if (transcription.source_type !== 'youtube_url') {
+        cronUpdate.title = vf?.title || transcription.title || 'Untitled';
+      }
+
       await db()
         .update(transcriptions)
-        .set({
-          status: 'completed',
-          title,
-          duration_sec: Math.ceil(t.duration || 0),
-          original_duration_sec: Math.ceil((vf?.duration || t.duration || 0)),
-          cost_minutes: ((t.duration || 0) / 60).toFixed(3),
-          completed_at: new Date()
-        })
+        .set(cronUpdate)
         .where(eq(transcriptions.job_id, job.job_id));
 
       // 标记任务完成

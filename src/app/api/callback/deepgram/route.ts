@@ -332,43 +332,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (isDefaultTitle) {
-      const meta = (currentTranscription as any)?.metadata || {};
-      const metaVideoTitle = meta.videoTitle;
-      const metaTitle = meta.title;
-
-      console.log('[Deepgram Callback] Metadata analysis:', {
+      console.log('[Deepgram Callback] Skipping auto title generation for default title placeholder', {
         jobId,
-        metaVideoTitle,
-        metaVideoTitleType: typeof metaVideoTitle,
-        metaTitle,
-        metaTitleType: typeof metaTitle,
+        currentTitle,
       });
-
-      const finalMetaTitle = typeof metaVideoTitle === 'string' && metaVideoTitle.trim().length > 0
-        ? metaVideoTitle.trim()
-        : (typeof metaTitle === 'string' && metaTitle.trim().length > 0 ? metaTitle.trim() : '');
-
-      if (finalMetaTitle) {
-        console.log('[Deepgram Callback] Using metadata title:', finalMetaTitle);
-        updateData.title = finalMetaTitle;
-      } else if (text) {
-        // Generate a better title based on the first few words of the transcript
-        const words = text.split(/\s+/).filter(w => w.length > 0);
-        if (words.length > 0) {
-          // Take first 5-8 words as title
-          const titleWords = words.slice(0, Math.min(8, words.length));
-          let betterTitle = titleWords.join(' ');
-          if (words.length > 8) {
-            betterTitle += '...';
-          }
-          // Limit title length to 100 characters
-          if (betterTitle.length > 100) {
-            betterTitle = betterTitle.substring(0, 97) + '...';
-          }
-          console.log('[Deepgram Callback] Generated title from transcript:', betterTitle);
-          updateData.title = betterTitle;
-        }
-      }
     } else {
       console.log('[Deepgram Callback] Keeping existing title:', currentTitle);
     }

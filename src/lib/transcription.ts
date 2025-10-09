@@ -1873,7 +1873,7 @@ export class TranscriptionService {
     if (args.request.options?.jobId) {
       // Get current transcription to check if we should update title
       const [currentTr] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
-      if (!resolvedTitle) {
+      if (!resolvedTitle && currentTr && (currentTr as any)?.metadata) {
         const meta = (currentTr as any)?.metadata;
         const metaTitle = typeof meta?.videoTitle === 'string'
           ? meta.videoTitle.trim()
@@ -1896,7 +1896,7 @@ export class TranscriptionService {
         isDefaultTitle,
         newTitle: resolvedTitle,
         hasValidNewTitle,
-        willUpdateTitle: isDefaultTitle && hasValidNewTitle,
+        willUpdateTitle: hasValidNewTitle && args.sourceType !== 'youtube_url',
       });
 
       const updateData: Record<string, any> = {
@@ -1909,7 +1909,15 @@ export class TranscriptionService {
         deleted: false,
       };
 
-      if (hasValidNewTitle && resolvedTitle) {
+      if (hasValidNewTitle && args.sourceType === 'youtube_url') {
+        console.log('[Transcription Service] Skipping YouTube title update to preserve metadata value', {
+          jobId,
+          resolvedTitle,
+          currentTitle,
+        });
+      }
+
+      if (hasValidNewTitle && resolvedTitle && args.sourceType !== 'youtube_url') {
         updateData.title = resolvedTitle;
         console.log('[Transcription Service] Setting title to:', resolvedTitle, { fromDefault: isDefaultTitle, currentTitle });
       }

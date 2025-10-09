@@ -118,21 +118,15 @@ export async function POST(request: NextRequest) {
 
       // Only update title if it's a default value and we have a valid new title
       const currentTitle = tr.title || '';
-      const isDefaultTitle = currentTitle === 'Processing...' ||
-                            currentTitle === 'YouTube Video' ||
-                            currentTitle === 'Transcription' ||
-                            currentTitle === '';
-
       const newTitle = result.data.videoInfo?.title;
-      const hasValidNewTitle = typeof newTitle === 'string' && newTitle.trim().length > 0;
+      const hasValidNewTitle = typeof newTitle === 'string' && newTitle.trim().length > 0 && tr.source_type !== 'youtube_url';
 
       console.log('[Process-One] Title check:', {
         jobId: jobRow.job_id,
         currentTitle,
-        isDefaultTitle,
         newTitle,
         hasValidNewTitle,
-        willUpdateTitle: isDefaultTitle && hasValidNewTitle,
+        willUpdateTitle: hasValidNewTitle,
       });
 
       const updateTranscription: any = {
@@ -142,12 +136,9 @@ export async function POST(request: NextRequest) {
         completed_at: new Date()
       };
 
-      // Only update title if current is default and new title is valid
-      if (isDefaultTitle && hasValidNewTitle) {
+      if (hasValidNewTitle) {
         updateTranscription.title = newTitle.trim();
         console.log('[Process-One] Updating title to:', newTitle.trim());
-      } else {
-        console.log('[Process-One] Keeping existing title:', currentTitle);
       }
 
       const existingOriginalSec = Number(tr.original_duration_sec || 0);

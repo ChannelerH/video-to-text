@@ -179,35 +179,10 @@ export async function POST(req: NextRequest) {
       });
 
       if (isDefaultTitle) {
-        const meta = (currentTranscription as any)?.metadata || {};
-        const metaVideoTitle = meta.videoTitle;
-        const metaTitle = meta.title;
-
-        console.log('[Replicate Callback] Metadata analysis:', {
+        console.log('[Replicate Callback] Skipping auto title generation for default title placeholder', {
           jobId,
-          metaVideoTitle,
-          metaVideoTitleType: typeof metaVideoTitle,
-          metaTitle,
-          metaTitleType: typeof metaTitle,
+          currentTitle,
         });
-
-        const finalMetaTitle = typeof metaVideoTitle === 'string' && metaVideoTitle.trim().length > 0
-          ? metaVideoTitle.trim()
-          : (typeof metaTitle === 'string' && metaTitle.trim().length > 0 ? metaTitle.trim() : '');
-
-        if (finalMetaTitle) {
-          console.log('[Replicate Callback] Using metadata title:', finalMetaTitle);
-          updatePayload.title = finalMetaTitle;
-        } else if (txt) {
-          const words = txt.split(/\s+/).filter(Boolean);
-          if (words.length > 0) {
-            let title = words.slice(0, Math.min(8, words.length)).join(' ');
-            if (words.length > 8) title += '...';
-            if (title.length > 100) title = `${title.slice(0, 97)}...`;
-            console.log('[Replicate Callback] Generated title from transcript:', title);
-            updatePayload.title = title;
-          }
-        }
       } else {
         console.log('[Replicate Callback] Keeping existing title:', currentTitle);
       }
