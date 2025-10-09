@@ -1864,6 +1864,7 @@ export class TranscriptionService {
     let jobId = args.request.options?.jobId ?? crypto.randomUUID();
     const now = new Date();
     const sanitizedTitle = args.title?.trim() || undefined;
+    let resolvedTitle = sanitizedTitle;
     const sanitizedLanguage = args.language || 'auto';
     const durationSec = Math.max(0, Math.ceil(args.durationSec || 0));
     const originalDurationSec = Math.max(0, Math.ceil(args.originalDurationSec || durationSec));
@@ -1872,19 +1873,28 @@ export class TranscriptionService {
     if (args.request.options?.jobId) {
       // Get current transcription to check if we should update title
       const [currentTr] = await db().select().from(transcriptions).where(eq(transcriptions.job_id, jobId)).limit(1);
+      if (!resolvedTitle) {
+        const meta = (currentTr as any)?.metadata;
+        const metaTitle = typeof meta?.videoTitle === 'string'
+          ? meta.videoTitle.trim()
+          : (typeof meta?.title === 'string' ? String(meta.title).trim() : '');
+        if (metaTitle) {
+          resolvedTitle = metaTitle;
+        }
+      }
       const currentTitle = currentTr?.title || '';
       const isDefaultTitle = currentTitle === 'Processing...' ||
                             currentTitle === 'YouTube Video' ||
                             currentTitle === 'Transcription' ||
                             currentTitle === '';
 
-      const hasValidNewTitle = sanitizedTitle && sanitizedTitle.trim().length > 0;
+      const hasValidNewTitle = resolvedTitle && resolvedTitle.trim().length > 0;
 
       console.log('[Transcription Service] Title check:', {
         jobId,
         currentTitle,
         isDefaultTitle,
-        newTitle: sanitizedTitle,
+        newTitle: resolvedTitle,
         hasValidNewTitle,
         willUpdateTitle: isDefaultTitle && hasValidNewTitle,
       });
@@ -1899,9 +1909,9 @@ export class TranscriptionService {
         deleted: false,
       };
 
-      if (hasValidNewTitle && sanitizedTitle) {
-        updateData.title = sanitizedTitle;
-        console.log('[Transcription Service] Setting title to:', sanitizedTitle, { fromDefault: isDefaultTitle, currentTitle });
+      if (hasValidNewTitle && resolvedTitle) {
+        updateData.title = resolvedTitle;
+        console.log('[Transcription Service] Setting title to:', resolvedTitle, { fromDefault: isDefaultTitle, currentTitle });
       }
 
       if (args.processedUrl) updateData.processed_url = args.processedUrl;
