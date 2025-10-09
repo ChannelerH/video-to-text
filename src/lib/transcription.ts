@@ -1919,6 +1919,18 @@ export class TranscriptionService {
         .where(eq(transcriptions.job_id, jobId)));
 
       console.log('[Transcription Service] DB update completed for job:', jobId);
+
+      // Verify the update
+      const [verifyTr2] = await db().select({ title: transcriptions.title, original_duration_sec: transcriptions.original_duration_sec, status: transcriptions.status })
+        .from(transcriptions)
+        .where(eq(transcriptions.job_id, jobId))
+        .limit(1);
+      console.log('[Transcription Service] Verified DB after update:', {
+        jobId,
+        title: verifyTr2?.title,
+        original_duration_sec: verifyTr2?.original_duration_sec,
+        status: verifyTr2?.status,
+      });
     } else {
       const row = await this.time('db.write', createOrReuseTranscription({
         job_id: jobId,

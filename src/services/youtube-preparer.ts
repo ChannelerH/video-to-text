@@ -256,6 +256,17 @@ export async function prepareYoutubeAudioForJob(params: PrepareYoutubeAudioParam
 
   console.log('[YouTube Prepare] DB update completed for job:', jobId);
 
+  // Verify the update
+  const [verifyTr] = await db().select({ title: transcriptions.title, original_duration_sec: transcriptions.original_duration_sec })
+    .from(transcriptions)
+    .where(eq(transcriptions.job_id, jobId))
+    .limit(1);
+  console.log('[YouTube Prepare] Verified DB after update:', {
+    jobId,
+    title: verifyTr?.title,
+    original_duration_sec: verifyTr?.original_duration_sec,
+  });
+
   return {
     videoId: vid,
     processedUrl,
