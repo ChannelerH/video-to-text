@@ -115,13 +115,40 @@ export async function POST(request: NextRequest) {
       }
 
       const durationSec = Math.ceil(t.duration || 0);
+
+      // Only update title if it's a default value and we have a valid new title
+      const currentTitle = tr.title || '';
+      const isDefaultTitle = currentTitle === 'Processing...' ||
+                            currentTitle === 'YouTube Video' ||
+                            currentTitle === 'Transcription' ||
+                            currentTitle === '';
+
+      const newTitle = result.data.videoInfo?.title;
+      const hasValidNewTitle = typeof newTitle === 'string' && newTitle.trim().length > 0;
+
+      console.log('[Process-One] Title check:', {
+        jobId: jobRow.job_id,
+        currentTitle,
+        isDefaultTitle,
+        newTitle,
+        hasValidNewTitle,
+        willUpdateTitle: isDefaultTitle && hasValidNewTitle,
+      });
+
       const updateTranscription: any = {
         status: 'completed',
-        title: result.data.videoInfo?.title || tr.title,
         duration_sec: durationSec,
         cost_minutes: Number(((t.duration || 0) / 60).toFixed(3)),
         completed_at: new Date()
       };
+
+      // Only update title if current is default and new title is valid
+      if (isDefaultTitle && hasValidNewTitle) {
+        updateTranscription.title = newTitle.trim();
+        console.log('[Process-One] Updating title to:', newTitle.trim());
+      } else {
+        console.log('[Process-One] Keeping existing title:', currentTitle);
+      }
 
       const existingOriginalSec = Number(tr.original_duration_sec || 0);
       if (durationSec > 0) {
@@ -132,7 +159,14 @@ export async function POST(request: NextRequest) {
         updateTranscription.original_duration_sec = 0;
       }
 
+      console.log('[Process-One] Final updateTranscription BEFORE DB update:', {
+        jobId: jobRow.job_id,
+        updateTranscription,
+      });
+
       await db().update(transcriptions).set(updateTranscription).where(eq(transcriptions.job_id, jobRow.job_id));
+
+      console.log('[Process-One] DB update completed for job:', jobRow.job_id);
 
       await db().update(q_jobs).set({ done: true }).where(eq(q_jobs.id, jobRow.id));
 
