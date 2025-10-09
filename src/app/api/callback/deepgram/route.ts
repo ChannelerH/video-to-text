@@ -319,18 +319,38 @@ export async function POST(req: NextRequest) {
     
     // 只有当标题是默认值（Processing...、YouTube Video 等）时才生成新标题
     const currentTitle = currentTranscription?.title || '';
-    const isDefaultTitle = currentTitle === 'Processing...' || 
-                          currentTitle === 'YouTube Video' || 
+    const isDefaultTitle = currentTitle === 'Processing...' ||
+                          currentTitle === 'YouTube Video' ||
                           currentTitle === 'Transcription' ||
                           currentTitle === '';
-    
+
+    console.log('[Deepgram Callback] Title check:', {
+      jobId,
+      currentTitle,
+      isDefaultTitle,
+      metadata: currentTranscription?.metadata,
+    });
+
     if (isDefaultTitle) {
       const meta = (currentTranscription as any)?.metadata || {};
-      const metaTitle = typeof meta.videoTitle === 'string'
-        ? meta.videoTitle.trim()
-        : (typeof meta.title === 'string' ? String(meta.title).trim() : '');
-      if (metaTitle) {
-        updateData.title = metaTitle;
+      const metaVideoTitle = meta.videoTitle;
+      const metaTitle = meta.title;
+
+      console.log('[Deepgram Callback] Metadata analysis:', {
+        jobId,
+        metaVideoTitle,
+        metaVideoTitleType: typeof metaVideoTitle,
+        metaTitle,
+        metaTitleType: typeof metaTitle,
+      });
+
+      const finalMetaTitle = typeof metaVideoTitle === 'string' && metaVideoTitle.trim().length > 0
+        ? metaVideoTitle.trim()
+        : (typeof metaTitle === 'string' && metaTitle.trim().length > 0 ? metaTitle.trim() : '');
+
+      if (finalMetaTitle) {
+        console.log('[Deepgram Callback] Using metadata title:', finalMetaTitle);
+        updateData.title = finalMetaTitle;
       } else if (text) {
         // Generate a better title based on the first few words of the transcript
         const words = text.split(/\s+/).filter(w => w.length > 0);
@@ -345,12 +365,22 @@ export async function POST(req: NextRequest) {
           if (betterTitle.length > 100) {
             betterTitle = betterTitle.substring(0, 97) + '...';
           }
+          console.log('[Deepgram Callback] Generated title from transcript:', betterTitle);
           updateData.title = betterTitle;
         }
       }
+    } else {
+      console.log('[Deepgram Callback] Keeping existing title:', currentTitle);
     }
-    
+
+    console.log('[Deepgram Callback] Final updateData BEFORE DB update:', {
+      jobId,
+      updateData,
+    });
+
     await db().update(transcriptions).set(updateData).where(eq(transcriptions.job_id, jobId));
+
+    console.log('[Deepgram Callback] DB update completed for job:', jobId);
 
     const userUuid = currentTranscription?.user_uuid || '';
     if (userUuid && roundedMinutes > 0) {

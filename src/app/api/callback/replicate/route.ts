@@ -169,26 +169,58 @@ export async function POST(req: NextRequest) {
     if (currentTranscription) {
       const currentTitle = currentTranscription.title || '';
       const defaultTitles = new Set(['Processing...', 'YouTube Video', 'Transcription', '']);
-      if (defaultTitles.has(currentTitle)) {
+      const isDefaultTitle = defaultTitles.has(currentTitle);
+
+      console.log('[Replicate Callback] Title check:', {
+        jobId,
+        currentTitle,
+        isDefaultTitle,
+        metadata: currentTranscription?.metadata,
+      });
+
+      if (isDefaultTitle) {
         const meta = (currentTranscription as any)?.metadata || {};
-        const metaTitle = typeof meta.videoTitle === 'string'
-          ? meta.videoTitle.trim()
-          : (typeof meta.title === 'string' ? String(meta.title).trim() : '');
-        if (metaTitle) {
-          updatePayload.title = metaTitle;
+        const metaVideoTitle = meta.videoTitle;
+        const metaTitle = meta.title;
+
+        console.log('[Replicate Callback] Metadata analysis:', {
+          jobId,
+          metaVideoTitle,
+          metaVideoTitleType: typeof metaVideoTitle,
+          metaTitle,
+          metaTitleType: typeof metaTitle,
+        });
+
+        const finalMetaTitle = typeof metaVideoTitle === 'string' && metaVideoTitle.trim().length > 0
+          ? metaVideoTitle.trim()
+          : (typeof metaTitle === 'string' && metaTitle.trim().length > 0 ? metaTitle.trim() : '');
+
+        if (finalMetaTitle) {
+          console.log('[Replicate Callback] Using metadata title:', finalMetaTitle);
+          updatePayload.title = finalMetaTitle;
         } else if (txt) {
           const words = txt.split(/\s+/).filter(Boolean);
           if (words.length > 0) {
             let title = words.slice(0, Math.min(8, words.length)).join(' ');
             if (words.length > 8) title += '...';
             if (title.length > 100) title = `${title.slice(0, 97)}...`;
+            console.log('[Replicate Callback] Generated title from transcript:', title);
             updatePayload.title = title;
           }
         }
+      } else {
+        console.log('[Replicate Callback] Keeping existing title:', currentTitle);
       }
     }
 
+    console.log('[Replicate Callback] Final updatePayload BEFORE DB update:', {
+      jobId,
+      updatePayload,
+    });
+
     await db().update(transcriptions).set(updatePayload).where(eq(transcriptions.job_id, jobId));
+
+    console.log('[Replicate Callback] DB update completed for job:', jobId);
 
     const userUuid = currentTranscription?.user_uuid || '';
     if (userUuid && roundedMinutes > 0) {
