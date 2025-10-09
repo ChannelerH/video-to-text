@@ -17,6 +17,7 @@ export function splitIntoSentences(text: string, lang?: string): string[] {
 }
 
 // Create sentence-level segments by merging original segments to sentence boundaries
+// 修改为使用比例分配策略,避免LLM润色后内容匹配失败
 export function alignSentencesWithSegments(
   finalText: string,
   originalSegments: TranscriptionSegment[],
@@ -25,12 +26,11 @@ export function alignSentencesWithSegments(
   const sentences = splitIntoSentences(finalText, lang);
   if (!sentences.length) return [];
   if (!originalSegments || originalSegments.length === 0) {
-    // No timing info; return one dummy segment at 0..0 per sentence
     return sentences.map((t, i) => ({
       id: i,
       seek: 0,
-      start: i === 0 ? 0 : originalSegments?.[0]?.start || 0,
-      end: originalSegments?.[0]?.end || 0,
+      start: 0,
+      end: 0,
       text: t,
       tokens: [],
       temperature: 0,
@@ -40,82 +40,17 @@ export function alignSentencesWithSegments(
     }));
   }
 
-  const isZh = isChineseLangOrText(lang, finalText);
-  const clean = (s: string) => (s || '').replace(isZh ? /\s+/g : /\s+/g, isZh ? '' : ' ').trim();
-  const segTexts = originalSegments.map(s => clean(String(s.text || '')));
+  console.log(`[Align] alignSentencesWithSegments: ${sentences.length} sentences from ${originalSegments.length} segments`);
 
-  const result: TranscriptionSegment[] = [];
-  let segIdx = 0;
-  let buffer = '';
-  let sentId = 0;
-  while (sentId < sentences.length && segIdx < originalSegments.length) {
-    const target = clean(sentences[sentId]);
-    if (!target) { sentId++; continue; }
+  // 将originalSegments转换为anchors格式,然后使用比例对齐
+  const anchors = originalSegments.map(seg => ({
+    start: seg.start,
+    end: seg.end,
+    text: seg.text || ''
+  }));
 
-    let startIdx = segIdx;
-    buffer = '';
-    while (segIdx < originalSegments.length && buffer.length < target.length) {
-      buffer += segTexts[segIdx];
-      segIdx++;
-      // allow small overshoot due to punctuation normalization
-      if (buffer.length >= target.length * 0.92) break;
-    }
-
-    const first = originalSegments[startIdx];
-    const last = originalSegments[Math.max(startIdx, segIdx - 1)];
-    if (!first || !last) break;
-
-    // Determine majority speaker in merged window (if any)
-    const windowSegs = originalSegments.slice(startIdx, Math.max(startIdx, segIdx));
-    let speaker: string | undefined;
-    try {
-      const counts = new Map<string, number>();
-      windowSegs.forEach((s: any) => {
-        if (s && s.speaker != null) {
-          const key = String(s.speaker);
-          counts.set(key, (counts.get(key) || 0) + 1);
-        }
-      });
-      let bestKey: string | undefined;
-      let best = -1;
-      counts.forEach((v, k) => { if (v > best) { best = v; bestKey = k; } });
-      speaker = bestKey;
-    } catch {}
-
-    result.push({
-      id: result.length,
-      seek: 0,
-      start: first.start,
-      end: last.end,
-      text: sentences[sentId],
-      tokens: [],
-      temperature: 0,
-      avg_logprob: 0,
-      compression_ratio: 1,
-      no_speech_prob: 0,
-      ...(speaker ? { speaker } as any : {})
-    });
-    sentId++;
-  }
-
-  // If there are remaining sentences but no segments left, append them with the last timestamp
-  const tailEnd = originalSegments[originalSegments.length - 1]?.end ?? 0;
-  while (sentId < sentences.length) {
-    result.push({
-      id: result.length,
-      seek: 0,
-      start: tailEnd,
-      end: tailEnd,
-      text: sentences[sentId++],
-      tokens: [],
-      temperature: 0,
-      avg_logprob: 0,
-      compression_ratio: 1,
-      no_speech_prob: 0
-    });
-  }
-
-  return result;
+  // 直接调用alignSentencesWithAnchors,使用比例分配策略
+  return alignSentencesWithAnchors(finalText, anchors, lang);
 }
 
 /**

@@ -174,8 +174,6 @@ export async function POST(request: NextRequest) {
     }
     let vid: string;
     let supplierAudioUrl: string | null;
-    let videoTitle: string | null;
-    let videoDurationSeconds: number | null;
 
     try {
       const prepResult = await prepareYoutubeAudioForJob({
@@ -195,30 +193,11 @@ export async function POST(request: NextRequest) {
 
       vid = prepResult.videoId;
       supplierAudioUrl = prepResult.supplierAudioUrl ?? prepResult.processedUrl;
-      videoTitle = prepResult.videoTitle;
-      videoDurationSeconds = prepResult.videoDurationSeconds;
-
-      if (job_id) {
-        const updatePayload: Record<string, any> = {};
-        if (typeof videoTitle === 'string' && videoTitle.trim().length > 0) {
-          updatePayload.title = videoTitle.trim();
-        }
-        if (typeof videoDurationSeconds === 'number' && Number.isFinite(videoDurationSeconds) && videoDurationSeconds > 0) {
-          updatePayload.original_duration_sec = Math.round(videoDurationSeconds);
-        }
-        if (Object.keys(updatePayload).length > 0) {
-          try {
-            await db().update(transcriptions)
-              .set(updatePayload)
-              .where(and(eq(transcriptions.job_id, job_id), ne(transcriptions.status, 'cancelled')));
-          } catch (err) {
-            console.warn('[YouTube Prepare] Failed to update title/duration from prepare result', err);
-          }
-        }
-      }
 
       console.log('[YouTube Prepare] Preparation result', {
         videoId: vid,
+        videoTitle: prepResult.videoTitle,
+        videoDurationSeconds: prepResult.videoDurationSeconds,
         fromReusable: prepResult.fromReusable,
         usedPrefetch: prepResult.usedPrefetch,
         supplierAudioUrl,
@@ -285,10 +264,6 @@ export async function POST(request: NextRequest) {
     const deepgramAllowed = hasDeepgram && (supplier === '' || supplier === 'both' || supplier.includes('deepgram'));
     const origin = new URL(request.url).origin;
     const cbBase = process.env.CALLBACK_BASE_URL || origin;
-    // Provide suppliers with preferred R2 URL; fallback to our proxy URL if R2 not available
-    const youtubeWatchUrl = `https://www.youtube.com/watch?v=${vid}`;
-    const proxyUrl = `${origin}/api/media/proxy?url=${encodeURIComponent(youtubeWatchUrl)}`;
-    const supplierUrl = supplierAudioUrl || proxyUrl;
 
     const tasks: Promise<any>[] = [];
 
