@@ -25,8 +25,8 @@ interface UseCasesProps {
 
 const content: Record<string, any> = {
   en: {
-    title: "Video to Text Use Cases - Convert Video to Text for Any Industry",
-    subtitle: "Discover how our video to text converter helps professionals transform video content to text daily",
+    title: "Speech to Text & Video to Text Use Cases - Convert Audio & Video for Any Industry",
+    subtitle: "Discover how our speech to text and video to text converter helps professionals transform content daily",
     categories: [
       {
         title: "Education & Training",
@@ -34,60 +34,60 @@ const content: Record<string, any> = {
         cases: [
           {
             icon: RiGraduationCapLine,
-            title: "Convert Online Course Videos to Text",
-            description: "Transform video to text for e-learning - make video content searchable with video to text conversion"
+            title: "Convert Online Course Speech to Text",
+            description: "Transform lectures for e-learning - make audio content searchable"
           },
           {
             icon: RiBookOpenLine,
-            title: "Convert Video Lectures to Text Notes",
-            description: "Video to text for education - convert lecture videos to text study materials instantly"
+            title: "Lecture Transcription to Notes",
+            description: "Speech to text for education - convert lectures to study materials instantly"
           },
           {
             icon: RiSearchEyeLine,
-            title: "Research Interview Video to Text",
-            description: "Convert interview videos to text for analysis - essential video to text for research"
+            title: "Research Interview Transcription",
+            description: "Convert interview audio for analysis - essential for qualitative research"
           }
         ]
       },
       {
-        title: "Video to Text for Content Creation",
-        subtitle: "Convert video to text to repurpose your content",
+        title: "Speech to Text & Video to Text for Content Creation",
+        subtitle: "Convert speech to text and video to text to repurpose your content",
         cases: [
           {
             icon: RiVideoLine,
-            title: "YouTube Video to Text Conversion",
-            description: "Convert YouTube videos to text - generate captions with our video to text tool"
+            title: "YouTube Audio Transcription",
+            description: "Convert YouTube audio - generate captions with our speech to text tool"
           },
           {
             icon: RiMicLine,
-            title: "Podcast Video to Text Transcripts",
-            description: "Convert podcast video to text - create show notes from video to text conversion"
+            title: "Podcast Transcripts",
+            description: "Convert podcast audio - create show notes automatically"
           },
           {
             icon: RiFileTextLine,
-            title: "Social Media Video to Text",
-            description: "Extract video to text quotes - convert video clips to text for social posts"
+            title: "Social Media Clips",
+            description: "Extract quotes - convert audio clips to text for social posts"
           }
         ]
       },
       {
-        title: "Business Video to Text Solutions",
-        subtitle: "Convert corporate videos to text for productivity",
+        title: "Business Speech to Text & Video to Text Solutions",
+        subtitle: "Convert corporate audio and video to text for productivity",
         cases: [
           {
             icon: RiTeamLine,
-            title: "Meeting Video to Text Minutes",
-            description: "Convert video meetings to text automatically - video to text for documentation"
+            title: "Meeting Minutes Transcription",
+            description: "Convert meeting audio automatically - speech to text for documentation"
           },
           {
             icon: RiBuildingLine,
-            title: "Training Video to Text Conversion",
-            description: "Convert training videos to text - build searchable video to text knowledge bases"
+            title: "Training Content Transcription",
+            description: "Convert training audio - build searchable knowledge bases"
           },
           {
             icon: RiChatQuoteLine,
-            title: "Testimonial Video to Text",
-            description: "Convert customer video to text - transform video testimonials to text case studies"
+            title: "Customer Testimonials",
+            description: "Convert customer audio - transform testimonials to text case studies"
           }
         ]
       },

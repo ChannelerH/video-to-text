@@ -35,18 +35,18 @@
     "show_locale": true
   },
   "hero": {
-    "title": "Video to Text Converter — Transcribe Videos with 98.5% Accuracy",
-    "description": "Convert any video to text instantly. Free daily quota, no signup required. Supports 100+ languages, YouTube links, and all video formats.",
+    "title": "Speech to Text Converter — Transcribe Video & Audio with 98.5% AI Accuracy",
+    "description": "Convert speech to text and video to text from videos, audio files, and YouTube links instantly. Fast AI-powered speech to text transcription with speaker labels and auto punctuation. Free daily quota, no signup required. Supports 100+ languages and all video formats.",
     "show_tool": true,
     "tool_mode": "video",
     "announcement": {
       "label": "⚡ New",
-      "title": "98.5% accuracy with Whisper V3 - Try it free",
+      "title": "98.5% accuracy with Whisper V3 - Try speech to text and video to text free",
       "url": "#demo"
     },
     "buttons": [
       {
-        "title": "Start Free - No Signup",
+        "title": "Start Free Transcription",
         "url": "#tool",
         "target": "_self",
         "variant": "default",
@@ -63,23 +63,23 @@
   },
   "comparison": {
     "title": "Why choose us? Data speaks",
-    "description": "\n\n                    Us            Others\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nFree quota          30min/month    3min/day\nFile size limit     500MB          100MB\nExport formats      5 formats      2 formats\nBatch processing    ✓              ✗\nNo watermark        ✓              ✗\nProcessing speed    2min/hour      5min/hour"
+    "description": "\n\n                    Us            Others\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nFree quota          30min/month    3min/day\nFile size limit     500MB          100MB\nExport formats      5 formats      2 formats\nBatch processing    ✓              ✗\nTranscription       Included       Add-on fee\nAPI access          ✓              ✗\nNo watermark        ✓              ✗\nProcessing speed    2min/hour      5min/hour"
   },
   "conversion_cases": {
-    "title": "Real conversion examples",
-    "description": "Actual results from users:\n\n[Case 1: English Lecture]\nInput: TED Talk video\nOutput: Complete transcript with timestamps  \nAccuracy: 98%\n\n[Case 2: Chinese Meeting]\nInput: Tencent Meeting recording\nOutput: Structured meeting minutes\nAccuracy: 95%\n\n[Case 3: Bilingual Video]\nInput: YouTube tutorial\nOutput: Chinese-English dual subtitles\nFormats: SRT/VTT"
+    "title": "Real speech to text and video to text conversion examples",
+    "description": "Actual results from users:\n\n[Case 1: English Lecture]\nInput: TED Talk video\nOutput: Complete speech to text transcript with timestamps  \nAccuracy: 98%\n\n[Case 2: Chinese Meeting]\nInput: Tencent Meeting recording\nOutput: Structured speech to text meeting minutes\nAccuracy: 95%\n\n[Case 3: Bilingual Video]\nInput: YouTube tutorial\nOutput: Chinese-English dual subtitles with synced video to text notes\nFormats: SRT/VTT"
   },
   "tech_specs": {
     "title": "Technical specifications",
-    "description": "📊 Detailed specs\n\n• Speed: 60min video ≈ 2min completion\n• Concurrent: Free 1 task / Pro 10 tasks\n• Video formats: MP4, MOV, AVI, MKV, WMV, FLV\n• Audio formats: MP3, WAV, M4A, AAC, OGG\n• Output: SRT, VTT, TXT, DOCX, JSON\n• AI model: OpenAI Whisper Large V3\n• Accuracy: 95%+ (English) 90%+ (Chinese)\n• Languages: 100+ auto-detection\n• File limits: Free 500MB / Paid 2GB\n• Queue: First-come-first-serve"
+    "description": "📊 Detailed specs\n\n• Speed: 60min video ≈ 2min completion\n• Concurrent: Free 1 task / Pro 10 tasks\n• Video formats: MP4, MOV, AVI, MKV, WMV, FLV\n• Audio formats: MP3, WAV, M4A, AAC, OGG\n• Output: SRT, VTT, TXT, DOCX, JSON\n• AI model: OpenAI Whisper Large V3\n• Accuracy: 95%+ (English) 90%+ (Chinese)\n• Features: diarization, smart casing, timestamps\n• Languages: 100+ auto-detection\n• File limits: Free 500MB / Paid 2GB\n• Queue: First-come-first-serve"
   },
   "cost_calculator": {
-    "title": "Calculate your savings",
-    "description": "See how much you can save vs traditional transcription",
+    "title": "Calculate your transcription savings",
+    "description": "See how much AI automation saves vs traditional methods",
     "items": [
       {
-        "title": "Monthly Transcription",
-        "description": "How many hours do you transcribe monthly?",
+        "title": "Monthly Transcription Volume",
+        "description": "How many hours do you need transcribed monthly?",
         "icon": "RiTimeLine"
       },
       {
@@ -88,19 +88,19 @@
         "icon": "RiMoneyDollarCircleLine"
       },
       {
-        "title": "Our Service",
-        "description": "AI transcription: Starting $9/month",
+        "title": "Our AI Service",
+        "description": "Automated transcription: Starting $9/month",
         "icon": "RiRobot2Line"
       },
       {
-        "title": "Your Savings",
+        "title": "Your Total Savings",
         "description": "Save up to 93% on transcription costs",
         "icon": "RiSaveLine"
       }
     ]
   },
   "integrations": {
-    "title": "Export to your tools",
+    "title": "Export results to your favorite tools",
     "description": "🔗 Works with:\n\nCloud Storage: Google Drive | Dropbox | OneDrive\nNote-taking: Notion | Obsidian | Evernote  \nTeam Chat: Slack | Teams | Discord"
   },
   "security": {
@@ -161,7 +161,7 @@
       },
       {
         "title": "156 Videos",
-        "description": "Converted this week",
+        "description": "Conversions this week",
         "icon": "RiVideoLine"
       },
       {
@@ -227,7 +227,7 @@
   "pricing": {
     "name": "pricing",
     "title": "Simple, transparent pricing",
-    "description": "Choose a plan that fits • 🔥 Limited: 20% off annual (this month)",
+    "description": "Choose a plan that fits your needs • 🔥 Limited: 20% off annual (this month)",
     "items": [
       {
         "title": "Free",
@@ -237,8 +237,8 @@
         "is_featured": false,
         "features_title": "Basic Features",
         "features": [
-          "10 min/day",
-          "Basic formats",
+          "10 min/day transcription",
+          "Basic export formats",
           "Standard processing",
           "No API",
           "No batch"
@@ -259,8 +259,8 @@
         "annual_savings": "Save 20%",
         "features_title": "Professional Features",
         "features": [
-          "Unlimited minutes",
-          "All formats",
+          "Unlimited transcription minutes",
+          "All export formats",
           "Priority processing",
           "API access",
           "Batch processing"
@@ -305,7 +305,7 @@
       {
         "title": "Sarah Chen",
         "label": "Video Creator",
-        "description": "Way faster than other tools I've tried. The accuracy even gets technical terms right.",
+        "description": "Way faster than other transcription tools I've tried. The accuracy even gets technical terms right.",
         "image": {
           "src": "/imgs/users/7.png",
           "alt": "Sarah"
@@ -334,44 +334,44 @@
   "faq": {
     "name": "faq",
     "label": "FAQ",
-    "title": "Frequently Asked Questions About Video to Text Conversion",
-    "description": "Everything you need to know about converting videos to text with our AI-powered transcription service",
+    "title": "Frequently Asked Questions About Speech to Text, Video to Text and Audio Transcription",
+    "description": "Everything you need to know about converting speech to text, video to text and audio with our AI-powered service",
     "items": [
       {
-        "title": "I need high accuracy for my professional work - how accurate is your video to text conversion, and what factors might affect the transcription quality of my recordings?",
-        "description": "Our video to text converter achieves an impressive 98.5% accuracy rate for clear audio, surpassing most competitors. We utilize OpenAI's Whisper V3, the most advanced speech recognition model available today. For English content, expect near-perfect transcription with proper punctuation and formatting. Other major languages like Spanish, French, German, and Chinese maintain 95%+ accuracy. The system handles various accents exceptionally well - from British and Australian English to regional American dialects. Background noise is intelligently filtered, though extremely noisy environments may reduce accuracy by 5-10%. Pro users can enhance accuracy further by adding industry-specific terminology, technical jargon, or brand names to their custom vocabulary. Real-world testing shows our transcriptions require minimal editing, saving you hours of manual correction work."
+        "title": "I need high accuracy for my professional work - how accurate is your speech to text and audio transcription, and what factors might affect the transcription quality of my recordings?",
+        "description": "Our speech to text converter achieves an impressive 98.5% accuracy rate for clear audio, surpassing most competitors. We utilize OpenAI's Whisper V3, the most advanced AI transcription model available today. For English speech to text conversion, expect near-perfect transcription with proper punctuation and formatting. Other major languages like Spanish, French, German, and Chinese maintain 95%+ accuracy. The system handles various accents exceptionally well - from British and Australian English to regional American dialects. Background noise is intelligently filtered, though extremely noisy environments may reduce accuracy by 5-10%. Pro users can enhance speech to text accuracy further by adding industry-specific terminology, technical jargon, or brand names to their custom vocabulary. Real-world testing shows our speech to text transcriptions require minimal editing, saving you hours of manual correction work."
       },
       {
-        "title": "I'm hesitant about free trials that require credit cards - can I really convert my videos to text for free without any signup, hidden fees, or payment information?",
-        "description": "Absolutely! We offer a generous free tier that resets daily - convert up to 10 minutes of video to text completely free, no credit card or signup required. Just upload your video and start transcribing immediately. Free users enjoy full access to our core features: upload files up to 500MB (5x larger than most competitors), process videos in MP4, MOV, AVI, and 20+ formats, export transcripts in multiple formats (SRT for subtitles, TXT for documents, VTT for web videos), use our online editor to refine transcriptions, and download results without watermarks. The free tier is perfect for students working on lecture notes, content creators testing our service, small businesses with occasional transcription needs, or anyone wanting to try before upgrading. When you're ready for unlimited transcription, our Pro plan starts at just $29/month."
+        "title": "I'm hesitant about free trials that require credit cards - can I really convert my speech to text for free without any signup, hidden fees, or payment information?",
+        "description": "Absolutely! We offer a generous free tier that resets daily - convert up to 10 minutes of speech to text completely free, no credit card or signup required. Just upload your audio or video and start transcribing immediately. Free users enjoy full access to our core speech to text features: upload files up to 500MB (5x larger than most competitors), process videos in MP4, MOV, AVI, and 20+ formats, export speech to text transcripts in multiple formats (SRT for subtitles, TXT for documents, VTT for web videos), use our online editor to refine transcriptions, and download results without watermarks. The free tier is perfect for students working on lecture notes, content creators testing our service, small businesses with occasional transcription needs, or anyone wanting to try before upgrading. When you're ready for unlimited speech to text transcription, our Pro plan starts at just $29/month."
       },
       {
-        "title": "I have a 2-hour meeting recording that I need transcribed urgently - how long will it take to convert my video to text, and will I have to wait in a processing queue?",
-        "description": "Lightning fast! Our GPU-accelerated servers convert video to text at remarkable speeds. A 1-hour video typically completes in just 2 minutes - that's 30x faster than real-time playback. Here's what to expect: 5-minute clips process in under 15 seconds, 30-minute videos complete in about 1 minute, 2-hour recordings finish in 4-5 minutes. The process includes multiple stages: audio extraction and optimization (5 seconds), AI speech recognition processing (varies by length), timestamp synchronization (2 seconds), and formatting & quality checks (3 seconds). Processing begins immediately upon upload with a real-time progress bar showing exact completion percentage. Pro users enjoy priority queue access, cutting wait times by 50% during peak hours. Our infrastructure scales automatically to handle demand, ensuring consistent fast performance even during busy periods. Unlike human transcription taking hours or days, you'll have your text ready in minutes."
+        "title": "I have a 2-hour meeting recording that I need transcribed urgently - how long will it take to convert my speech to text, and will I have to wait in a processing queue?",
+        "description": "Lightning fast! Our GPU-accelerated servers convert speech to text at remarkable speeds. A 1-hour recording typically completes in just 2 minutes - that's 30x faster than real-time playback. Here's what to expect with our speech to text service: 5-minute clips process in under 15 seconds, 30-minute recordings complete in about 1 minute, 2-hour files finish in 4-5 minutes. The process includes multiple stages: audio extraction and optimization (5 seconds), AI speech recognition processing (varies by length), timestamp synchronization (2 seconds), and formatting & quality checks (3 seconds). Processing begins immediately upon upload with a real-time progress bar showing exact completion percentage. Pro users enjoy priority queue access, cutting wait times by 50% during peak hours. Our infrastructure scales automatically to handle demand, ensuring consistent fast performance even during busy periods. Unlike human transcription taking hours or days, you'll have your speech to text results ready in minutes."
       },
       {
-        "title": "I'm concerned about uploading sensitive business meetings and confidential content - how secure is my video during the text conversion process, and what exactly happens to my files after transcription?",
-        "description": "Your privacy is our top priority. We implement bank-level security measures to protect your content throughout the entire video to text conversion process. All file transfers use 256-bit SSL encryption, the same standard used by financial institutions. Your videos are processed in isolated, encrypted containers that are destroyed immediately after transcription. Files are automatically purged from our servers within 24 hours - no exceptions. We maintain strict data policies: we never view, share, or analyze your content, we don't use your videos to train or improve AI models, no third parties ever access your files, and no human reviews your transcriptions. Our infrastructure is GDPR compliant and SOC 2 Type 2 certified, meeting the strictest data protection standards. We use secure data centers in the US and EU with 24/7 monitoring. For organizations requiring maximum security, we offer on-premises deployment options where the entire system runs within your own infrastructure."
+        "title": "I'm concerned about uploading sensitive business meetings and confidential content - how secure are my files during the speech to text conversion process, and what exactly happens to my data after transcription?",
+        "description": "Your privacy is our top priority. We implement bank-level security measures to protect your content throughout the entire speech to text conversion process. All file transfers use 256-bit SSL encryption, the same standard used by financial institutions. Your files are processed in isolated, encrypted containers that are destroyed immediately after transcription. Files are automatically purged from our servers within 24 hours - no exceptions. We maintain strict data policies: we never view, share, or analyze your content, we don't use your data to train or improve AI models, no third parties ever access your files, and no human reviews your transcriptions. Our infrastructure is GDPR compliant and SOC 2 Type 2 certified, meeting the strictest data protection standards. We use secure data centers in the US and EU with 24/7 monitoring. For organizations requiring maximum security, we offer on-premises deployment options where the entire system runs within your own infrastructure."
       },
       {
         "title": "I want to create transcripts of educational YouTube videos for my studies - can I convert YouTube videos to text by simply pasting the URL, and does this work with other platforms like Vimeo or TikTok?",
-        "description": "Yes! Converting YouTube videos to text is one of our most popular features. Simply paste any YouTube URL into our tool - no downloads needed. The process is seamless: paste the YouTube link (works with regular, shortened, and playlist URLs), our system extracts the audio directly from YouTube, AI transcribes the content with timestamps, and you receive perfectly formatted text in minutes. This works brilliantly for: educational content (lectures, tutorials, documentaries), podcast episodes and interviews, conference talks and webinars, music videos with lyrics, news clips and reports, and how-to guides and reviews. Note: Please respect copyright and only transcribe content you have permission to use."
+        "description": "Yes! Converting YouTube videos to text is one of our most popular features. Simply paste any YouTube URL into our tool - no downloads needed. The process is seamless: paste the YouTube link (works with regular, shortened, and playlist URLs), our system extracts the audio directly from YouTube, AI transcribes the video to text with timestamps, and you receive perfectly formatted text in minutes. This video to text feature works brilliantly for: educational content (lectures, tutorials, documentaries), podcast episodes and interviews, conference talks and webinars, music videos with lyrics, news clips and reports, and how-to guides and reviews. Our video to text converter handles YouTube, Vimeo, and most major video platforms. Note: Please respect copyright and only transcribe content you have permission to use."
       },
       {
-        "title": "I have various video files from different devices and cameras - what specific video and audio formats can I upload for transcription, and are there any file size or video duration limits I should know about?",
-        "description": "We support virtually every video and audio format you'll encounter. Our video to text converter handles 25+ formats seamlessly without requiring any conversion on your end. Supported video formats include: MP4 (most common, perfect compatibility), MOV (Apple/iPhone recordings), AVI (Windows standard format), MKV (high-quality video files), WebM (web-optimized videos), WMV (Windows Media), FLV (Flash videos), MPEG/MPG (standard video), 3GP (mobile phone videos), and M4V (iTunes videos). Audio formats supported: MP3 (music and podcasts), WAV (uncompressed audio), M4A (Apple audio), AAC (advanced audio), FLAC (lossless audio), WMA (Windows audio), OGG (open-source format), and OPUS (modern compression). File size limits are generous: Free users can upload up to 500MB (about 2 hours of video), while Pro users enjoy 2GB uploads (8+ hours of content). Our system automatically optimizes any format for the best transcription quality - just drag, drop, and convert!"
+        "title": "I have various audio and video files from different devices - what specific formats can I upload for transcription, and are there any file size or duration limits I should know about?",
+        "description": "We support virtually every audio and video format you'll encounter. Our converter handles 25+ formats seamlessly without requiring any conversion on your end. Supported video formats include: MP4 (most common, perfect compatibility), MOV (Apple/iPhone recordings), AVI (Windows standard format), MKV (high-quality video files), WebM (web-optimized videos), WMV (Windows Media), FLV (Flash videos), MPEG/MPG (standard video), 3GP (mobile phone videos), and M4V (iTunes videos). Audio formats supported: MP3 (music and podcasts), WAV (uncompressed audio), M4A (Apple audio), AAC (advanced audio), FLAC (lossless audio), WMA (Windows audio), OGG (open-source format), and OPUS (modern compression). File size limits are generous: Free users can upload up to 500MB (about 2 hours of audio), while Pro users enjoy 2GB uploads (8+ hours of content). Our system automatically optimizes any format for the best transcription quality - just drag, drop, and convert!"
       },
       {
-        "title": "My videos contain multiple languages and speakers with different accents - which languages can your video to text converter accurately transcribe, and can it handle regional dialects or code-switching between languages?",
-        "description": "Our video to text converter supports an impressive 100+ languages, covering 95% of the world's spoken languages. Major languages with highest accuracy (95-98%): English (all accents), Spanish (including Latin American variants), French (European and Canadian), German (Standard and Swiss), Mandarin Chinese (Simplified/Traditional), Japanese (with Kanji support), Korean, Italian, Portuguese (Brazilian and European), Russian, and Arabic (Modern Standard). Strong support (90-95% accuracy) for: Hindi, Dutch, Polish, Turkish, Swedish, Norwegian, Danish, Finnish, Greek, Hebrew, Thai, Vietnamese, Indonesian, Malay, and 50+ more languages. Unique multilingual features include: automatic language detection (no need to specify), seamless code-switching handling (perfect for bilingual content), mixed-language transcription in one video, proper formatting for right-to-left languages, and accent recognition within languages. The AI adapts to regional dialects, colloquialisms, and speaking styles, making it perfect for international business meetings, foreign language learning content, and global audience videos."
+        "title": "My recordings contain multiple languages and speakers with different accents - which languages can your speech to text converter accurately transcribe, and can it handle regional dialects or code-switching between languages?",
+        "description": "Our speech to text converter supports an impressive 100+ languages, covering 95% of the world's spoken languages. Major languages with highest speech to text accuracy (95-98%): English (all accents), Spanish (including Latin American variants), French (European and Canadian), German (Standard and Swiss), Mandarin Chinese (Simplified/Traditional), Japanese (with Kanji support), Korean, Italian, Portuguese (Brazilian and European), Russian, and Arabic (Modern Standard). Strong speech to text support (90-95% accuracy) for: Hindi, Dutch, Polish, Turkish, Swedish, Norwegian, Danish, Finnish, Greek, Hebrew, Thai, Vietnamese, Indonesian, Malay, and 50+ more languages. Unique multilingual speech to text features include: automatic language detection (no need to specify), seamless code-switching handling (perfect for bilingual content), mixed-language transcription in one recording, proper formatting for right-to-left languages, and accent recognition within languages. The AI adapts to regional dialects, colloquialisms, and speaking styles, making our speech to text service perfect for international business meetings, foreign language learning content, and global audience recordings."
       },
       {
-        "title": "After converting my video to text, I might need to make corrections or adjustments - can I edit the transcript directly in your platform, and what file formats can I export the final text to?",
-        "description": "Yes! Our built-in editor makes refining your transcripts effortless. After your video converts to text, you'll access our powerful online editor with synchronized playback - click any text to jump to that moment in the video. Essential editing features include: real-time text editing with auto-saveimage.png, find and replace functionality for quick corrections, speaker label management and identification, timestamp adjustment with frame precision, and paragraph formatting with automatic breaks. Export options are comprehensive: SRT files for YouTube/video subtitles, VTT for HTML5 web players, clean TXT for documents and blogs, formatted DOCX for Word processing, structured JSON for developers, and PDF for final presentations."
+        "title": "After converting my speech to text, I might need to make corrections or adjustments - can I edit the transcript directly in your platform, and what file formats can I export the final text to?",
+        "description": "Yes! Our built-in editor makes refining your transcripts effortless. After your speech to text conversion completes, you'll access our powerful online editor with synchronized playback - click any text to jump to that moment in the recording. Essential editing features include: real-time text editing with auto-save, find and replace functionality for quick corrections, speaker label management and identification, timestamp adjustment with frame precision, and paragraph formatting with automatic breaks. Export options for your transcripts are comprehensive: SRT files for YouTube/video subtitles, VTT for HTML5 web players, clean TXT for documents and blogs, formatted DOCX for Word processing, structured JSON for developers, and PDF for final presentations."
       },
       {
-        "title": "I'm comparing different transcription services and wondering what makes Harku different - why should I choose your video to text converter over established services like Rev, Otter.ai, Descript, or even YouTube's auto-captions?",
-        "description": "Harku stands out with superior technology and generous features. Here's how we compare: ACCURACY - Harku achieves 98.5% with Whisper V3 vs 85-90% for most competitors using older models. FREE TIER - We offer 10 minutes daily (300min/month) vs others limiting to 3-5 minutes or requiring signup. PROCESSING SPEED - 1-hour video in 2 minutes vs 5-10 minutes elsewhere, thanks to our GPU optimization. FILE SIZE - 500MB free limit vs 100MB industry standard, letting you upload longer videos. PRICING - $29/month for unlimited vs $15-30 for similar services. NO WATERMARKS - Clean exports even on free plan vs branded outputs elsewhere. KEY ADVANTAGES: No account required to start (unlike Rev, Otter.ai), better accuracy than Google's auto-captions, faster than Descript or Sonix, more languages than Happy Scribe, cheaper than human services ($600+), no software installation needed (unlike desktop apps), works on any device with a browser, and continuous AI improvements. Users consistently choose Harku for reliability, speed, and value. Try it free and see the difference!"
+        "title": "I'm comparing different transcription services and wondering what makes Harku different - why should I choose your speech to text converter over established services like Rev, Otter.ai, Descript, or even YouTube's auto-captions?",
+        "description": "Harku's speech to text stands out with superior technology and generous features. Here's how our service compares: ACCURACY - Harku achieves 98.5% speech to text accuracy with Whisper V3 vs 85-90% for most competitors using older models. FREE TIER - We offer 10 minutes daily (300min/month) vs others limiting to 3-5 minutes or requiring signup. PROCESSING SPEED - 1-hour conversion in 2 minutes vs 5-10 minutes elsewhere, thanks to our GPU optimization. FILE SIZE - 500MB free limit vs 100MB industry standard. PRICING - $29/month for unlimited transcription vs $15-30 for similar services. NO WATERMARKS - Clean exports even on free plan vs branded outputs elsewhere. KEY ADVANTAGES: No account required to start (unlike Rev, Otter.ai), better accuracy than Google's auto-captions, faster than Descript or Sonix, more languages than Happy Scribe, cheaper than human transcription services ($600+), no software installation needed (unlike desktop apps), works on any device with a browser, and continuous AI improvements. Users consistently choose Harku for reliability, speed, and value. Try it free and see the difference!"
       }
     ],
     "disabled": false
@@ -379,7 +379,7 @@
   "cta": {
     "name": "cta",
     "title": "Ready to save hours on transcription?",
-    "description": "⏱️ Average savings: 8h/week • ¥2000/month • 90% manual work\n🎯 Join 10,000+ users: creators • schools • companies • media\n💡 Today’s free quota left: 10 minutes\n30‑day refund • No credit card • Cancel anytime",
+    "description": "⏱️ Average savings: 8h/week • ¥2000/month • 90% less manual work\n🎯 Join 10,000+ users: creators • schools • companies • media\n💡 Today's free quota left: 10 minutes\n30‑day refund • No credit card • Cancel anytime",
     "buttons": [
       {
         "title": "Start Free Now",
@@ -485,7 +485,7 @@
   },
   "service_matrix": {
     "name": "service-matrix",
-    "title": "Why choose us? Real numbers",
+    "title": "Why choose our service? Real numbers",
     "description": "Cost savings and feature comparison based on 100 hours monthly usage",
     "savings": {
       "title": "Annual Cost Savings",
@@ -560,24 +560,24 @@
   },
   "tech_advantages": {
     "name": "tech-advantages",
-    "title": "Built on modern AI",
-    "description": "Practical advantages that matter",
+    "title": "Built on modern AI for speech to text and video to text accuracy",
+    "description": "Practical advantages that matter for your speech to text and video to text workflow",
     "items": [
       {
         "title": "Whisper V3",
-        "description": "State-of-the-art ASR accuracy"
+        "description": "State-of-the-art accuracy for speech to text and video to text"
       },
       {
         "title": "GPU acceleration",
-        "description": "~10x faster than CPU"
+        "description": "~10x faster processing than CPU"
       },
       {
         "title": "Noise reduction",
-        "description": "Filters background noise"
+        "description": "Filters background noise for cleaner results"
       },
       {
         "title": "Chunk processing",
-        "description": "Stable for long videos"
+        "description": "Stable transcription for long recordings"
       }
     ]
   },
@@ -599,8 +599,8 @@
   "footer": {
     "name": "footer",
     "brand": {
-      "title": "Harku - Video to Text Converter",
-      "description": "Convert video to text instantly with 98.5% accuracy. Free online video to text converter supporting 100+ languages. Transcribe YouTube videos, lectures, meetings, and podcasts to text in minutes.",
+      "title": "Harku - Speech to Text & Video to Text Converter",
+      "description": "Convert speech to text and video to text instantly with 98.5% accuracy. Free online speech to text converter supporting 100+ languages. Transcribe YouTube videos, lectures, meetings, and podcasts to text in minutes.",
       "logo": {
         "src": "/logo.png",
         "alt": "Harku"
@@ -1329,18 +1329,18 @@
     },
     "cta_section": {
       "title": "Ready to get started?",
-      "description": "Upload your first video and experience the power of AI transcription<br />First 5 minutes completely free, no registration required to start",
-      "upload_btn": "Upload Video Now",
-      "demo_btn": "Watch Demo Video",
+      "description": "Upload your first video and experience the power of AI video to text and speech to text transcription<br />First 5 minutes completely free, no registration required to start",
+      "upload_btn": "Try Video to Text Now",
+      "demo_btn": "Watch Demo",
       "features": [
         {
-          "label": "5-minute free preview"
+          "label": "Free video to text preview"
         },
         {
-          "label": "Multi-format export"
+          "label": "Multi-format export (SRT, VTT, TXT)"
         },
         {
-          "label": "GPU-accelerated processing"
+          "label": "Fast GPU-accelerated processing"
         }
       ]
     }

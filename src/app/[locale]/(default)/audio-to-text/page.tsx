@@ -22,8 +22,8 @@ export async function generateMetadata({
     canonicalUrl = `${baseUrl}/${locale}/audio-to-text`;
   }
 
-  const title = "Audio to Text Converter - Free AI Transcription Online | Harku";
-  const description = "Convert audio to text instantly with 99.2% accuracy. Free audio to text converter supporting MP3, WAV, M4A and 45+ formats. Transcribe audio to text in 80+ languages online.";
+  const title = "Audio to Text Converter - Free AI Audio Transcription | Harku";
+  const description = "Convert audio to text instantly with 99.2% accuracy. Our AI-powered audio to text converter supports MP3, WAV, M4A and 45+ audio formats. Transcribe audio files to text in 80+ languages. Free audio to text online - no signup required.";
 
   return {
     title,
@@ -119,18 +119,18 @@ export default async function AudioToTextPage({
               🎯 #1 Audio to Text Converter Online
             </span>
             <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-4">
-              {page?.hero?.title || "Audio to Text — Convert audio to text & subtitles instantly"}
+              {page?.hero?.title || "Audio to Text Converter — Convert Audio Files to Text Instantly"}
             </h1>
             <p className="text-slate-300 mb-8 text-base md:text-lg">
               {page?.hero?.description ||
-                "Transform audio to text instantly with our advanced AI converter. Perfect for podcasts, meetings, interviews, and lectures. Start transcribing now."}
+                "Transform audio to text instantly with our advanced AI audio to text converter. Perfect for podcasts, meetings, interviews, and lectures. Upload MP3, WAV, M4A and convert audio to text with 99.2% accuracy."}
             </p>
 
             <div className="flex flex-col gap-3 mb-8">
               {[
-                "99.2% transcription accuracy",
+                "99.2% audio to text accuracy",
                 "Support for 80+ languages",
-                "Real-time processing",
+                "Fast audio to text processing",
               ].map((t) => (
                 <div key={t} className="flex items-center gap-3 text-slate-300">
                   <span className="w-6 h-6 inline-flex items-center justify-center rounded-full bg-cyan-500/20 text-cyan-400">✓</span>
@@ -183,26 +183,26 @@ export default async function AudioToTextPage({
       {/* How It Works */}
       <section className="container py-16 md:py-24" id="how-it-works">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-semibold">How Audio to Text Works</h2>
-          <p className="text-slate-400 mt-3">Simple 3-step process - convert your files in minutes</p>
+          <h2 className="text-3xl md:text-4xl font-semibold">How Audio to Text Conversion Works</h2>
+          <p className="text-slate-400 mt-3">Simple 3-step process to convert audio to text in minutes</p>
         </div>
         <div className="relative max-w-3xl mx-auto pl-10">
           <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-gradient-to-b from-cyan-400/80 to-transparent" />
           {[
             {
-              t: "Upload Your Audio",
+              t: "Upload Your Audio File",
               d:
-                "Upload any format - MP3, WAV, M4A, and more. Our system accepts files up to 5GB for batch processing.",
+                "Upload any audio format - MP3, WAV, M4A, and more. Our audio to text system accepts files up to 5GB for batch processing.",
             },
             {
-              t: "AI Processing",
+              t: "AI Audio to Text Processing",
               d:
-                "Our advanced AI analyzes your files with speaker identification and automatic punctuation.",
+                "Our advanced AI analyzes your audio files with speaker identification and automatic punctuation for accurate audio to text conversion.",
             },
             {
-              t: "Download Results",
+              t: "Download Audio to Text Results",
               d:
-                "Review your transcription, edit if needed, and export in multiple formats including TXT, SRT, DOCX, and more.",
+                "Review your audio to text transcription, edit if needed, and export in multiple formats including TXT, SRT, DOCX, and more.",
             },
           ].map((x, i) => (
             <div key={x.t} className="relative mb-10">

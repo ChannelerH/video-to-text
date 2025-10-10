@@ -33,8 +33,8 @@ export async function generateMetadata({
     canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL}/${locale}`;
   }
 
-  const title = "Video to Text Converter - Harku AI Video to Text Tool";
-  const description = "Convert video to text instantly with Harku's video to text converter. Transform any video to text with 98.5% accuracy. Our online video to text tool supports 100+ languages. Free video to text conversion - no signup needed. Start video to text transcription now.";
+  const title = "Speech to Text & Video Converter - 98.5% AI Accuracy | Harku";
+  const description = "Convert speech to text and video to text with 98.5% AI accuracy. Free transcription for YouTube videos, audio files, and meetings. Supports 100+ languages. No signup required.";
 
   return {
     title,

@@ -19,43 +19,43 @@ interface WhyChooseUsProps {
 
 const content: Record<string, any> = {
   en: {
-    title: "Why Choose Harku for Video to Text?",
-    subtitle: "The most trusted video to text converter - see why professionals choose our video to text solution",
+    title: "Why Choose Harku for Speech to Text & Video to Text?",
+    subtitle: "The most trusted speech to text and video to text converter - see why professionals choose our solution",
     features: [
       {
         icon: RiRocketLine,
-        title: "Lightning Fast Video to Text",
-        description: "Convert hours of video to text in minutes - fastest video to text conversion with optimized AI",
+        title: "Lightning Fast Speech to Text",
+        description: "Convert hours of audio in minutes - fastest transcription with optimized AI",
         highlight: "5x faster"
       },
       {
         icon: RiCheckDoubleLine,
-        title: "98.5% Video to Text Accuracy",
-        description: "Industry-leading video to text accuracy - convert video to text with near-perfect precision",
+        title: "98.5% Accuracy",
+        description: "Industry-leading speech to text precision - convert audio with near-perfect accuracy",
         highlight: "Best in class"
       },
       {
         icon: RiGlobalLine,
-        title: "98+ Languages Video to Text",
-        description: "Convert video to text in any language - global video to text support for all dialects",
+        title: "98+ Languages Supported",
+        description: "Transcribe speech to text in any language - global support for all dialects",
         highlight: "Global coverage"
       },
       {
         icon: RiMoneyDollarCircleLine,
-        title: "Affordable Video to Text",
-        description: "Save 90% on video to text conversion - most cost-effective video to text service available",
+        title: "Affordable Pricing",
+        description: "Save 90% on transcription - most cost-effective speech to text service available",
         highlight: "10x cheaper"
       },
       {
         icon: RiShieldCheckLine,
-        title: "Secure Video to Text Processing",
-        description: "Your video to text conversion is encrypted - private video to text with enterprise security",
+        title: "Secure Processing",
+        description: "Your data is encrypted - private speech to text with enterprise security",
         highlight: "Enterprise grade"
       },
       {
         icon: RiTimeLine,
-        title: "24/7 Video to Text Service",
-        description: "Convert video to text anytime - instant video to text processing without waiting",
+        title: "24/7 Availability",
+        description: "Convert audio anytime - instant speech to text processing without waiting",
         highlight: "Always online"
       }
     ]
