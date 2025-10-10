@@ -54,8 +54,8 @@ export default function TranscriptionsSearch({
           defaultValue={defaultQuery}
           placeholder={placeholder || 'Search transcriptions...'}
           className="
-            w-full px-4 py-3 pl-12 rounded-xl 
-            bg-gray-900/50 border border-gray-800 
+            w-full px-4 py-2.5 pl-12 pr-24 rounded-xl
+            bg-gray-900/50 border border-gray-800
             focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/20
             transition-all duration-200 text-sm text-white
             placeholder:text-gray-500
@@ -67,7 +67,7 @@ export default function TranscriptionsSearch({
         <button
           className="
             absolute right-2 top-1/2 -translate-y-1/2
-            px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white
+            px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white
             transition-colors duration-200 text-sm font-medium
           "
           type="submit"

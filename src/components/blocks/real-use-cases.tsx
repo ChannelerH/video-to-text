@@ -55,7 +55,58 @@ export default function RealUseCases({ locale }: { locale: string }) {
           <p className="text-gray-300">{t("subtitle")}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="md:hidden mobile-snap-container">
+          {cases.map((useCase, index) => (
+            <Card key={index} className="mobile-snap-card hover:shadow-xl transition-all duration-300 bg-white/5 backdrop-blur-sm border-white/10">
+              <CardHeader>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 bg-blue-600/20 rounded-lg">
+                    <useCase.icon className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <Badge variant="secondary" className="bg-green-600/20 text-green-400">
+                    {useCase.badge}
+                  </Badge>
+                </div>
+                <h3 className="text-lg font-semibold mb-2 text-white">{useCase.title}</h3>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-300 mb-2">
+                      {useCase.scenario}
+                    </p>
+                    <div className="flex items-center gap-2 text-blue-400">
+                      <ArrowRight className="w-4 h-4" />
+                      <p className="font-medium">{useCase.result}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-white/10">
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <Clock className="w-4 h-4 mx-auto mb-1 text-gray-400" />
+                        <p className="text-xs text-gray-400">{t("time")}</p>
+                        <p className="font-semibold text-sm text-white">{useCase.metrics.time}</p>
+                      </div>
+                      <div>
+                        <FileText className="w-4 h-4 mx-auto mb-1 text-gray-400" />
+                        <p className="text-xs text-gray-400">{t("case_accuracy")}</p>
+                        <p className="font-semibold text-sm text-white">{useCase.metrics.accuracy}</p>
+                      </div>
+                      <div>
+                        <FileText className="w-4 h-4 mx-auto mb-1 text-gray-400" />
+                        <p className="text-xs text-gray-400">{t("format")}</p>
+                        <p className="font-semibold text-sm text-white">{useCase.metrics.output}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {cases.map((useCase, index) => (
             <Card key={index} className="hover:shadow-xl transition-all duration-300 bg-white/5 backdrop-blur-sm border-white/10">
               <CardHeader>
@@ -80,7 +131,7 @@ export default function RealUseCases({ locale }: { locale: string }) {
                       <p className="font-medium">{useCase.result}</p>
                     </div>
                   </div>
-                  
+
                   <div className="pt-4 border-t border-white/10">
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div>

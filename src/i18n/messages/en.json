@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "title": "Harku - Video to Text Converter Online | Free Video Transcription",
-    "description": "Harku is the best video to text converter online. Convert videos to text instantly with AI-powered transcription. Free 5‑minute preview, export SRT, TXT, DOCX formats.",
+  "title": "Speech to Text Converter - 98.5% AI Accuracy | Free Online Tool",
+  "description": "Convert speech to text online with 98.5% AI accuracy. Professional speech to text transcription for meetings, interviews, and audio files. Also supports video to text conversion for YouTube videos and recordings. 100+ languages. No signup required.",
     "keywords": ""
   },
   "stats": {
@@ -25,9 +25,9 @@
     "chinese_processing": "Chinese transcripts may take a bit longer while we polish punctuation automatically."
   },
   "pricing_cta": {
-    "title": "Simple, Transparent Pricing",
-    "subtitle": "Start free with 30 minutes per month",
-    "description": "No credit card required. Upgrade anytime.",
+    "title": "Simple Speech to Text Pricing",
+    "subtitle": "Start free with 30 minutes of speech to text per month",
+    "description": "No credit card required. Upgrade anytime for more speech to text capacity.",
     "compare_features": "Compare all features and find the perfect plan",
     "button": "View Pricing Plans",
     "free_tier": "Free",
@@ -231,8 +231,8 @@
     }
   },
   "use_cases_old": {
-    "title": "📹 What can Harku Video to Text do for you?",
-    "description": "From education to content creation, from business to research<br />Discover the powerful applications of video-to-text across various fields",
+    "title": "📹 What can Harku Speech to Text do for you?",
+    "description": "From education to content creation, from business to research<br />Discover the powerful applications of speech to text transcription across various fields",
     "processing_notice": "⚡ Batch Processing • Non-Real-Time Transcription",
     "categories": [
       {
@@ -871,34 +871,34 @@
     "recommended": "Recommended"
   },
   "hero_new": {
-    "title": "Professional Video to Text Converter",
-    "subtitle": "Transform video to text instantly. No software needed.",
-    "description": "Convert your video to text with AI-powered transcription. Upload any video to text format and get accurate results in minutes.",
-    "features": "Video to Text in 95+ Languages • 98.5% Accuracy • Online Video to Text Tool",
-    "cta_primary": "Start Video to Text Conversion",
-    "cta_secondary": "See Video to Text Demo",
-    "free_trial": "Try video to text free - 3 minutes"
+    "title": "Professional Speech to Text Converter",
+    "subtitle": "Transform speech to text instantly. No software needed.",
+    "description": "Convert your speech to text with AI-powered transcription. Upload audio or video files and get accurate results in minutes. Perfect for transcribing YouTube videos, meetings, and podcasts into text.",
+    "features": "Speech to Text in 95+ Languages • Video to Text Support • 98.5% Accuracy • Free Online Tool",
+    "cta_primary": "Start Speech to Text Conversion",
+    "cta_secondary": "See Speech to Text Demo",
+    "free_trial": "Try speech to text free - 3 minutes"
   },
   "trust_indicators": {
-    "minutes_transcribed": "Video to Text Minutes",
-    "active_users": "Video to Text Users",
-    "supported_languages": "Languages for Video to Text",
-    "average_processing": "Video to Text Speed",
+    "minutes_transcribed": "Speech to Text Minutes",
+    "active_users": "Speech to Text Users",
+    "supported_languages": "Languages for Speech to Text",
+    "average_processing": "Speech to Text Speed",
     "minutes": "min"
   },
   "workflow": {
-    "title": "How Video to Text Works",
-    "subtitle": "Convert video to text in three simple steps",
-    "step1_title": "Upload Video to Text",
-    "step1_description": "Drag and drop your video to text converter",
-    "step2_title": "Video to Text Processing",
-    "step2_description": "AI converts your video to text automatically",
-    "step3_title": "Download Text from Video",
-    "step3_description": "Get video to text results in TXT, SRT, DOCX"
+    "title": "How Speech to Text Works",
+    "subtitle": "Convert speech to text in three simple steps",
+    "step1_title": "Upload Audio or Video",
+    "step1_description": "Drag and drop your audio files or video to text files",
+    "step2_title": "Speech to Text Processing",
+    "step2_description": "AI converts your speech to text automatically with high accuracy",
+    "step3_title": "Download Your Transcription",
+    "step3_description": "Export your transcription in TXT, SRT, DOCX, or VTT format"
   },
   "feature_comparison": {
-    "title": "Video to Text Tools Comparison",
-    "subtitle": "Compare Harku video to text converter with other tools",
+    "title": "Speech to Text Tools Comparison",
+    "subtitle": "Compare Harku with leading speech to text and video to text tools",
     "price_per_minute": "Price/Minute",
     "languages_count": "Languages",
     "offline_files": "Offline Files",
@@ -907,12 +907,12 @@
     "no_installation": "No Install",
     "api_access": "API Access",
     "real_time_processing": "Real-time",
-    "disclaimer": "* Video to text prices and features based on publicly available information as of January 2025"
+    "disclaimer": "* Speech to text prices and features based on publicly available information as of January 2025"
   },
   "technical_specs": {
-    "title": "Video to Text Technical Specifications",
-    "subtitle": "Professional video to text conversion capabilities",
-    "input_formats": "Video to Text Input Formats",
+    "title": "Technical Specifications",
+    "subtitle": "Professional speech to text and video to text conversion capabilities",
+    "input_formats": "Supported Input Formats",
     "output_formats": "Text Output Formats",
     "specifications": "Specifications",
     "performance": "Performance",
@@ -925,19 +925,19 @@
     "hours": "hours"
   },
   "use_cases": {
-    "title": "Video to Text Real Results",
-    "subtitle": "See how professionals convert video to text with Harku",
-    "case1_title": "Meeting Video to Text",
-    "case1_scenario": "1-hour meeting video to text",
-    "case1_result": "Video to text conversion in 5 minutes",
+    "title": "Speech to Text Real Results",
+    "subtitle": "See how professionals use our transcription service",
+    "case1_title": "Meeting Transcription",
+    "case1_scenario": "Convert 1-hour meeting speech to text",
+    "case1_result": "Full transcription completed in 5 minutes",
     "case1_badge": "Business",
-    "case2_title": "YouTube Video to Text",
-    "case2_scenario": "Convert YouTube video to text",
-    "case2_result": "Video to text SRT file instantly",
+    "case2_title": "Interview to Text",
+    "case2_scenario": "Transcribe interviews with high accuracy",
+    "case2_result": "Detailed transcript with speaker timestamps",
     "case2_badge": "Content",
-    "case3_title": "Content Video to Text",
-    "case3_scenario": "Podcast video to text conversion",
-    "case3_result": "Video to text blog draft ready",
+    "case3_title": "Video to Text for Podcasts",
+    "case3_scenario": "Convert podcast videos into written content",
+    "case3_result": "SEO-ready blog draft from video to text",
     "case3_badge": "Creative",
     "time": "Time",
     "case_accuracy": "Accuracy",

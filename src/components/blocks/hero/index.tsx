@@ -1,16 +1,14 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import HappyUsers from "./happy-users";
 import HeroBg from "./bg";
 import { Hero as HeroType } from "@/types/blocks/hero";
 import Icon from "@/components/icon";
 import { Link } from "@/i18n/navigation";
-import ToolInterface from "@/components/tool-interface";
 import TypewriterText from "./TypewriterText";
+import ToolInterface from "@/components/tool-interface";
 import Image from "next/image";
-import { useMobileOptimization } from "@/hooks/use-mobile-optimization";
 
 interface HeroProps {
   hero: HeroType;
@@ -18,16 +16,8 @@ interface HeroProps {
 }
 
 export default function Hero({ hero, notice }: HeroProps) {
-  const { isMobile, shouldAnimate } = useMobileOptimization();
-  
   if (hero.disabled) {
     return null;
-  }
-
-  const highlightText = hero.highlight_text;
-  let texts = null;
-  if (highlightText) {
-    texts = hero.title?.split(highlightText, 2);
   }
 
   return (
@@ -75,17 +65,17 @@ export default function Hero({ hero, notice }: HeroProps) {
               className="design-description"
               dangerouslySetInnerHTML={{ __html: hero.description || "" }}
             />
-            
+
             {/* 工具界面 */}
             {hero.show_tool && (
               <div className="mt-8">
-                <ToolInterface 
-                  mode={hero.tool_mode || "video"} 
+                <ToolInterface
+                  mode={hero.tool_mode || "video"}
                   notice={notice}
                 />
               </div>
             )}
-            
+
             {hero.buttons && (
               <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row hero-cta-group">
                 {hero.buttons.map((item, i) => {

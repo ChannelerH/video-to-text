@@ -283,7 +283,8 @@ export default function AudioUploadWidget({ locale }: Props) {
           </div>
         </div>
       )}
-      <div className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] opacity-40" aria-hidden>
+      {/* Background gradient - hidden on mobile for performance */}
+      <div className="hidden sm:block absolute -top-1/2 -left-1/2 w-[200%] h-[200%] opacity-40" aria-hidden>
         <div
           className="w-full h-full"
           style={{ background: "radial-gradient(circle, rgba(6,182,212,0.12) 0%, transparent 60%)" }}
@@ -292,11 +293,12 @@ export default function AudioUploadWidget({ locale }: Props) {
 
       <div className="relative">
         <div
-          className="cursor-pointer mx-auto w-56 h-56 rounded-full border-2 border-dashed border-cyan-400/60 bg-cyan-500/10 flex flex-col items-center justify-center gap-2 text-center hover:scale-[1.02] transition-transform relative"
+          className="cursor-pointer mx-auto w-48 sm:w-56 h-48 sm:h-56 rounded-full border-2 border-dashed border-cyan-400/60 bg-cyan-500/10 flex flex-col items-center justify-center gap-2 text-center sm:hover:scale-[1.02] transition-transform relative"
           onClick={triggerBrowse}
         >
-          <div className="absolute inset-0 rounded-full animate-[pulse_2s_ease_infinite]" />
-          <div className="text-5xl">🎙️</div>
+          {/* Pulse animation - disabled on mobile for performance */}
+          <div className="hidden sm:block absolute inset-0 rounded-full animate-[pulse_2s_ease_infinite]" />
+          <div className="text-4xl sm:text-5xl">🎙️</div>
           <div className="text-sm">Upload Audio</div>
         </div>
         <input

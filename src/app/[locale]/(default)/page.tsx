@@ -7,7 +7,22 @@ import RealUseCases from "@/components/blocks/real-use-cases";
 import PricingCTA from "@/components/blocks/pricing-cta";
 import FAQ from "@/components/blocks/faq/server";
 import Feedback from "@/components/feedback";
+import dynamicImport from "next/dynamic";
 import { getLandingPage } from "@/services/page";
+
+// Lazy load below-the-fold components for better mobile performance
+const LazyRealUseCases = dynamicImport(() => import("@/components/blocks/real-use-cases"), {
+  loading: () => <div className="py-16" />,
+});
+const LazyPricingCTA = dynamicImport(() => import("@/components/blocks/pricing-cta"), {
+  loading: () => <div className="py-16" />,
+});
+const LazyFAQ = dynamicImport(() => import("@/components/blocks/faq/server"), {
+  loading: () => <div className="py-16" />,
+});
+const LazyFeedback = dynamicImport(() => import("@/components/feedback"), {
+  loading: () => null,
+});
 import { setRequestLocale } from "next-intl/server";
 import { 
   StructuredData, 
@@ -33,8 +48,8 @@ export async function generateMetadata({
     canonicalUrl = `${process.env.NEXT_PUBLIC_WEB_URL}/${locale}`;
   }
 
-  const title = "Speech to Text & Video Converter - 98.5% AI Accuracy | Harku";
-  const description = "Convert speech to text and video to text with 98.5% AI accuracy. Free transcription for YouTube videos, audio files, and meetings. Supports 100+ languages. No signup required.";
+  const title = "Speech to Text Converter - 98.5% AI Accuracy | Free Online Tool";
+  const description = "Convert speech to text online with 98.5% AI accuracy. Professional speech to text transcription for meetings, interviews, and audio files. Also supports video to text conversion. 100+ languages. No signup required.";
 
   return {
     title,
@@ -54,7 +69,7 @@ export async function generateMetadata({
           url: `${process.env.NEXT_PUBLIC_WEB_URL || "https://harku.io"}/og-image.png`,
           width: 1200,
           height: 630,
-          alt: "Harku - AI-Powered Video to Text Converter",
+          alt: "Harku - AI-Powered Speech to Text Converter",
         },
       ],
     },
@@ -110,19 +125,20 @@ export default async function VideoToTextPage({
       {/* 4. Feature Comparison Table */}
       <FeatureComparison locale={locale} />
 
-      {/* 5. Real Use Cases with Results */}
-      <RealUseCases locale={locale} />
+      {/* 5. Real Use Cases with Results - Lazy loaded */}
+      <LazyRealUseCases locale={locale} />
 
       {/* 6. Technical Specifications */}
       {/* <TechnicalSpecs locale={locale} /> */}
 
-      {/* 7. Pricing CTA */}
-      <PricingCTA locale={locale} />
+      {/* 7. Pricing CTA - Lazy loaded */}
+      <LazyPricingCTA locale={locale} />
 
-      {/* 8. FAQ */}
-      {page.faq && <FAQ section={page.faq} locale={locale} />}
+      {/* 8. FAQ - Lazy loaded */}
+      {page.faq && <LazyFAQ section={page.faq} locale={locale} />}
 
-      <Feedback />
+      {/* Feedback - Lazy loaded */}
+      <LazyFeedback />
     </>
   );
 }

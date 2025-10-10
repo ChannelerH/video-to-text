@@ -84,7 +84,8 @@ export default function FeatureComparison({ locale }: { locale: string }) {
           <p className="text-gray-300">{t("subtitle")}</p>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Desktop Table View (≥640px) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full max-w-6xl mx-auto bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden">
             <thead>
               <tr className="border-b border-white/10">
@@ -132,6 +133,46 @@ export default function FeatureComparison({ locale }: { locale: string }) {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View (<640px) */}
+        <div className="sm:hidden space-y-6">
+          {features.map((row, index) => (
+            <div
+              key={index}
+              className="bg-white/5 backdrop-blur-sm rounded-xl p-4 space-y-3"
+            >
+              <h3 className="text-base font-semibold text-gray-200 mb-3 pb-2 border-b border-white/10">
+                {row.feature}
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-600/10 border border-blue-600/30 rounded-lg p-3">
+                  <div className="text-xs text-blue-400 mb-1 font-medium">Harku</div>
+                  <div className="text-blue-600 font-bold flex justify-center">
+                    {renderCell(row.harku)}
+                  </div>
+                </div>
+                <div className="bg-white/5 rounded-lg p-3">
+                  <div className="text-xs text-gray-400 mb-1">Rev</div>
+                  <div className="text-gray-300 flex justify-center">
+                    {renderCell(row.rev)}
+                  </div>
+                </div>
+                <div className="bg-white/5 rounded-lg p-3">
+                  <div className="text-xs text-gray-400 mb-1">Otter.ai</div>
+                  <div className="text-gray-300 flex justify-center">
+                    {renderCell(row.otter)}
+                  </div>
+                </div>
+                <div className="bg-white/5 rounded-lg p-3">
+                  <div className="text-xs text-gray-400 mb-1">Descript</div>
+                  <div className="text-gray-300 flex justify-center">
+                    {renderCell(row.descript)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="text-center mt-8">

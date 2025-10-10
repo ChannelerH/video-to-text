@@ -718,3 +718,97 @@ details[open] summary ~ * {
     transform: translateY(0);
   }
 }
+
+/* ===== MOBILE PRICING PAGE FIXES ===== */
+@media (max-width: 768px) {
+  /* Pricing toggle container - force proper styling */
+  .pricing-toggle-container {
+    width: 100% !important;
+  }
+
+  .pricing-toggle-container button {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Force text color for active button - override any gradient styles */
+  .pricing-toggle-container button.bg-white span,
+  .pricing-toggle-container button[class*="bg-white"] span {
+    color: rgb(17, 24, 39) !important;
+    -webkit-text-fill-color: rgb(17, 24, 39) !important;
+    background-clip: initial !important;
+    -webkit-background-clip: initial !important;
+    background-image: none !important;
+  }
+
+  /* Force text color for inactive button */
+  .pricing-toggle-container button.bg-transparent span,
+  .pricing-toggle-container button:not([class*="bg-white"]) span {
+    color: rgb(243, 244, 246) !important;
+    -webkit-text-fill-color: rgb(243, 244, 246) !important;
+    background-clip: initial !important;
+    -webkit-background-clip: initial !important;
+    background-image: none !important;
+  }
+
+  /* Pricing grid - single column with proper spacing */
+  .pricing-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3rem !important;
+    padding-top: 2rem !important;
+  }
+
+  /* Pricing cards - remove scaling and improve spacing */
+  .pricing-card {
+    transform: none !important;
+    opacity: 1 !important;
+    padding: 1.25rem !important;
+    margin-bottom: 0 !important;
+  }
+
+  .pricing-card.featured {
+    transform: none !important;
+    scale: 1 !important;
+  }
+
+  /* Pricing card content optimization */
+  .pricing-card h3 {
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .pricing-card .design-stat-number {
+    font-size: 3rem !important;
+    line-height: 1 !important;
+  }
+
+  /* Feature list spacing */
+  .pricing-card .design-feature-list {
+    margin-top: 1rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .pricing-card .design-feature-list li {
+    font-size: 0.875rem !important;
+    line-height: 1.75 !important;
+    padding-top: 0.625rem !important;
+    padding-bottom: 0.625rem !important;
+  }
+
+  /* Buttons full width and prominent */
+  .pricing-card button {
+    width: 100% !important;
+    padding-top: 0.875rem !important;
+    padding-bottom: 0.875rem !important;
+    font-size: 1rem !important;
+    border-radius: 0.75rem !important;
+    min-height: 3.5rem !important;
+  }
+
+  /* Featured card badge positioning */
+  .pricing-card.featured > div:first-child {
+    top: -1.25rem !important;
+  }
+}

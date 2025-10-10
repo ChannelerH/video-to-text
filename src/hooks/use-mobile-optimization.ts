@@ -48,23 +48,16 @@ export function useMobileOptimization() {
 
     window.addEventListener('resize', handleResize);
     
-    // Add mobile-specific optimizations
+    // Add mobile-specific optimizations without freezing scroll
     if (isMobile) {
-      // Disable hover effects on mobile
       document.body.classList.add('touch-device');
-      
-      // Enable hardware acceleration for scrolling
-      document.body.style.setProperty('-webkit-overflow-scrolling', 'touch');
-      
-      // Prevent iOS bounce effect
-      document.body.style.overscrollBehavior = 'none';
+    } else {
+      document.body.classList.remove('touch-device');
     }
 
     return () => {
       window.removeEventListener('resize', handleResize);
       document.body.classList.remove('touch-device');
-      document.body.style.removeProperty('-webkit-overflow-scrolling');
-      document.body.style.overscrollBehavior = '';
       cleanup();
     };
   }, [isMobile]);

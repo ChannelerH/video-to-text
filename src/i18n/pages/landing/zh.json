@@ -54,8 +54,8 @@
     },
     "buttons": [
       {
-        "title": "试试样例视频",
-        "url": "#demo",
+        "title": "查看使用流程",
+        "url": "#how-it-works",
         "target": "_self",
         "variant": "outline",
         "icon": "RiPlayLine"
@@ -542,7 +542,7 @@
       },
       {
         "title": "查看演示",
-        "url": "#demo",
+        "url": "#how-it-works",
         "icon": "RiMovieLine",
         "variant": "outline"
       },

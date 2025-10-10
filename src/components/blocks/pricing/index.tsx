@@ -32,7 +32,7 @@ const isCheckoutResponse = (value: unknown): value is CheckoutResponse => {
 export default function Pricing({ pricing }: { pricing: PricingType }) {
   const t = useTranslations('pricing');
   const qEnabled = (process.env.NEXT_PUBLIC_Q_ENABLED === 'true');
-  
+
   if (pricing.disabled) {
     return null;
   }
@@ -121,7 +121,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
   }, [pricing.items]);
 
   return (
-    <section id={pricing.name} className="design-section" style={{ overflow: 'visible' }}>
+    <section id={pricing.name} className="design-section pricing-layout" style={{ overflow: 'visible' }}>
       <div className="container">
         <div className="text-center mb-16">
           <h2 className="design-heading-2">
@@ -133,46 +133,59 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
         </div>
         <div className="w-full flex flex-col items-center gap-1">
           {pricing.groups && pricing.groups.length > 0 && (
-            <div className="flex h-12 mb-12 items-center rounded-md bg-muted p-1 text-lg">
-              <RadioGroup
-                value={group}
-                className={`h-full grid-cols-${pricing.groups.length}`}
-                onValueChange={(value) => {
-                  setGroup(value);
-                }}
-              >
+            <div className="w-full px-4 md:px-0 max-w-2xl md:max-w-none md:w-auto mb-10 md:mb-12">
+              <div className="pricing-toggle-container flex flex-col md:inline-flex md:flex-row gap-3 md:gap-1 p-2 md:p-1 rounded-2xl md:rounded-lg bg-gray-800/90 md:bg-muted">
                 {pricing.groups.map((item, i) => {
+                  const isActive = group === item.name;
                   return (
-                    <div
+                    <button
                       key={i}
-                      className='h-full rounded-md transition-all has-[button[data-state="checked"]]:bg-white'
+                      type="button"
+                      onClick={() => setGroup(item.name || "")}
+                      className={`
+                        flex flex-col md:flex-row items-center justify-center gap-1.5 md:gap-2
+                        px-6 py-3 md:py-2 md:px-6
+                        rounded-xl md:rounded-md
+                        font-bold text-base
+                        transition-all duration-200
+                        min-h-[56px] md:min-h-0
+                        whitespace-nowrap
+                        ${isActive
+                          ? 'bg-white shadow-lg'
+                          : 'bg-transparent hover:bg-gray-700/50'
+                        }
+                      `}
                     >
-                      <RadioGroupItem
-                        value={item.name || ""}
-                        id={item.name}
-                        className="peer sr-only"
-                      />
-                      <Label
-                        htmlFor={item.name}
-                        className="flex h-full cursor-pointer items-center justify-center px-4 font-semibold text-muted-foreground peer-data-[state=checked]:text-primary"
+                      <span
+                        className="font-bold text-base"
+                        style={{
+                          color: isActive ? '#111827' : '#f3f4f6',
+                          WebkitTextFillColor: isActive ? '#111827' : '#f3f4f6'
+                        }}
                       >
                         {item.title}
-                        {item.label && (
-                          <Badge
-                            variant="outline"
-                            className={`px-1.5 ml-1 border-primary bg-primary text-primary-foreground`}
-                          >
-                            {item.label}
-                          </Badge>
-                        )}
-                      </Label>
-                    </div>
+                      </span>
+                      {item.label && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                          style={{
+                            backgroundColor: isActive ? '#f3e8ff' : 'rgba(168, 85, 247, 0.2)',
+                            color: isActive ? '#7c3aed' : '#d8b4fe',
+                            WebkitTextFillColor: isActive ? '#7c3aed' : '#d8b4fe',
+                            backgroundClip: 'initial',
+                            WebkitBackgroundClip: 'initial'
+                          }}
+                        >
+                          {item.label}
+                        </span>
+                      )}
+                    </button>
                   );
                 })}
-              </RadioGroup>
+              </div>
             </div>
           )}
-          <div className="design-grid design-grid-3 w-full overflow-visible pt-8">
+          <div className="design-grid design-grid-3 pricing-grid w-full overflow-visible pt-8 grid-cols-1 md:grid-cols-3 gap-12 md:gap-8">
             {pricing.items?.map((item, index) => {
               if (item.group && item.group !== group) {
                 return null;
@@ -181,48 +194,48 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
               return (
                 <div
                   key={index}
-                  className={`design-card relative overflow-visible text-left ${item.is_featured ? 'featured transform scale-110 z-10 shadow-2xl shadow-purple-500/40 ring-4 ring-purple-400/60 ring-offset-4 ring-offset-gray-900 bg-gradient-to-br from-purple-500/10 to-blue-500/10 animate-pulse' : 'scale-95 opacity-90'}`}
+                  className={`design-card pricing-card relative overflow-visible text-left ${item.is_featured ? 'featured transform scale-110 z-10 shadow-2xl shadow-purple-500/40 ring-4 ring-purple-400/60 ring-offset-4 ring-offset-gray-900 bg-gradient-to-br from-purple-500/10 to-blue-500/10 animate-pulse md:scale-110' : 'scale-100 md:scale-95 md:opacity-90'}`}
                   style={item.is_featured ? {
                     filter: 'drop-shadow(0 0 20px rgba(147, 51, 234, 0.4)) drop-shadow(0 0 40px rgba(79, 70, 229, 0.3))',
                     animation: 'glow 2s ease-in-out infinite alternate'
                   } : {}}
                 >
                   {item.is_featured && (
-                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10">
-                      <div className="px-3 py-1 text-xs font-bold bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-full shadow-lg whitespace-nowrap">
+                    <div className="absolute -top-5 md:-top-6 left-1/2 transform -translate-x-1/2 z-10">
+                      <div className="px-4 py-1.5 text-xs md:text-xs font-bold bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-full shadow-lg whitespace-nowrap">
                         🔥 {t('most_popular')} 🔥
                       </div>
                     </div>
                   )}
                   <div className="pricing-topbar" />
-                  <div className="flex h-full flex-col justify-between gap-5 p-6">
+                  <div className="flex h-full flex-col justify-between gap-5 p-5 md:p-6">
                     <div>
-                      <div className="flex items-center gap-2 mb-4">
+                      <div className="flex items-center gap-2 mb-3 md:mb-4">
                         {item.title && (
-                          <h3 className="design-heading-3">
+                          <h3 className="design-heading-3 text-2xl md:text-2xl font-bold">
                             {item.title}
                           </h3>
                         )}
                         <div className="flex-1"></div>
                         {item.label && (
-                          <div className={`design-badge px-4 py-2 text-xs font-medium whitespace-nowrap ${item.is_featured ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 border border-purple-500/30' : ''}`}>
+                          <div className={`design-badge px-3 md:px-4 py-1.5 md:py-2 text-xs font-medium whitespace-nowrap ${item.is_featured ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 border border-purple-500/30' : ''}`}>
                             {item.label}
                           </div>
                         )}
                       </div>
-                      <div className="flex items-end gap-2 mb-4">
+                      <div className="flex items-end gap-2 mb-3 md:mb-4">
                         {item.original_price && (
-                          <span className="text-xl text-muted-foreground font-semibold line-through">
+                          <span className="text-lg md:text-xl text-muted-foreground font-semibold line-through">
                             {item.original_price}
                           </span>
                         )}
                         {item.price && (
-                          <span className={`design-stat-number ${item.is_featured ? 'text-6xl bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent font-black' : ''}`}>
+                          <span className={`design-stat-number text-5xl md:text-6xl ${item.is_featured ? 'bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent font-black' : 'font-bold'}`}>
                             {item.price}
                           </span>
                         )}
                         {item.unit && (
-                          <span className="block font-semibold">
+                          <span className="block font-semibold text-base md:text-base">
                             {item.unit}
                           </span>
                         )}
@@ -243,7 +256,7 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                       )}
                       {item.features && (
                         <>
-                          <ul className="design-feature-list">
+                          <ul className="design-feature-list space-y-2.5 md:space-y-2">
                             {(expanded[item.product_id] ? item.features : item.features.slice(0, 5))
                               .filter((feature) => {
                                 const ftxt = String(feature);
@@ -253,14 +266,14 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                                 return true;
                               })
                               .map((feature, fi) => (
-                                <li className="design-feature-item" key={`feature-${fi}`}>
+                                <li className="design-feature-item text-sm md:text-base leading-relaxed" key={`feature-${fi}`}>
                                   {feature}
                                 </li>
                               ))}
                           </ul>
                           {item.features.length > 5 && (
                             <button
-                              className="text-sm font-semibold mt-2 text-purple-300 hover:text-purple-200"
+                              className="text-sm font-semibold mt-3 md:mt-2 text-purple-300 hover:text-purple-200"
                               onClick={() => setExpanded(prev => ({ ...prev, [item.product_id]: !prev[item.product_id] }))}
                             >
                               {expanded[item.product_id] ? t('show_less') : t('view_full_comparison')}
@@ -269,30 +282,10 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                         </>
                       )}
                     </div>
-                    <div className="flex flex-col gap-2">
-                      {item.cn_amount && item.cn_amount > 0 ? (
-                        <div className="flex items-center gap-x-2 mt-2">
-                          <span className="text-sm">{t('cny_payment')} 👉</span>
-                          <div
-                            className="inline-block p-2 hover:cursor-pointer hover:bg-base-200 rounded-md"
-                            onClick={() => {
-                              if (isLoading) {
-                                return;
-                              }
-                              handleCheckout(item, true);
-                            }}
-                          >
-                            <img
-                              src="/imgs/cnpay.png"
-                              alt="cnpay"
-                              className="w-20 h-10 rounded-lg"
-                            />
-                          </div>
-                        </div>
-                      ) : null}
+                    <div className="flex flex-col gap-3 mt-2 md:mt-0">
                       {item.button && (
                         <button
-                          className={`${item.is_featured ? 'design-btn-primary px-8 py-3 font-bold bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30' : 'design-btn-primary'} w-full sm:w-auto mx-auto`}
+                          className={`${item.is_featured ? 'design-btn-primary px-8 py-3.5 md:py-3 font-bold text-base bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30' : 'design-btn-primary py-3.5 md:py-3 text-base'} w-full`}
                           disabled={isLoading}
                           onClick={() => {
                             if (isLoading) {
@@ -310,8 +303,28 @@ export default function Pricing({ pricing }: { pricing: PricingType }) {
                           )}
                         </button>
                       )}
+                      {item.cn_amount && item.cn_amount > 0 ? (
+                        <div className="flex flex-col md:flex-row items-center justify-center gap-2 pt-2 md:pt-0 md:mt-2 border-t md:border-t-0 border-gray-800/50">
+                          <span className="text-sm text-gray-400 mb-1 md:mb-0">{t('cny_payment')} 👉</span>
+                          <div
+                            className="inline-block p-2 hover:cursor-pointer hover:bg-gray-800/30 rounded-md transition-colors"
+                            onClick={() => {
+                              if (isLoading) {
+                                return;
+                              }
+                              handleCheckout(item, true);
+                            }}
+                          >
+                            <img
+                              src="/imgs/cnpay.png"
+                              alt="cnpay"
+                              className="w-20 h-10 rounded-lg"
+                            />
+                          </div>
+                        </div>
+                      ) : null}
                       {item.tip && (
-                        <p className="text-muted-foreground text-sm mt-2">
+                        <p className="text-muted-foreground text-xs md:text-sm text-center mt-1">
                           {item.tip}
                         </p>
                       )}

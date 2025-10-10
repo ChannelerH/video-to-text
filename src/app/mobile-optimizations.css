@@ -2,19 +2,19 @@
 
 /* ===== Touch Target Optimization ===== */
 @media (max-width: 768px) {
-  /* Ensure all interactive elements meet 44x44px minimum touch target */
-  button, 
-  a, 
+  /* Ensure all interactive elements meet 48x48px minimum touch target */
+  button,
+  a,
   [role="button"],
   input[type="checkbox"],
   input[type="radio"],
   .clickable,
   [onclick] {
-    min-height: 44px;
-    min-width: 44px;
+    min-height: 48px;
+    min-width: 48px;
     position: relative;
   }
-  
+
   /* Small buttons get invisible expanded hit area */
   button:not(.mobile-optimized)::after,
   [role="button"]:not(.mobile-optimized)::after {
@@ -23,15 +23,15 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 48px;
+    min-height: 48px;
     pointer-events: all;
   }
-  
-  /* Increase spacing between clickable elements */
+
+  /* Increase spacing between clickable elements to 12px */
   .btn-group > *,
   .action-buttons > * {
-    margin: 0.5rem;
+    margin: 0.75rem;
   }
 }
 
@@ -41,29 +41,43 @@
   html {
     font-size: 16px; /* Prevent zoom on iOS */
   }
-  
+
   body {
     line-height: 1.6;
     word-spacing: 0.05em;
   }
-  
+
   /* Scale down hero text responsively */
   h1, .hero-title {
     font-size: clamp(1.75rem, 8vw, 3rem) !important;
     line-height: 1.2;
   }
-  
+
   h2 {
     font-size: clamp(1.5rem, 6vw, 2.25rem) !important;
   }
-  
+
   h3 {
     font-size: clamp(1.25rem, 5vw, 1.875rem) !important;
   }
-  
+
   p, .body-text {
     font-size: 16px;
     line-height: 1.7;
+  }
+
+  /* Chinese text paragraph optimization for mobile */
+  .whitespace-pre-wrap {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    /* Optimize line length for Chinese readability on mobile */
+    max-width: 100%;
+  }
+
+  /* For Chinese text content, encourage natural line breaks */
+  [lang="zh"], [lang="zh-CN"], [lang="zh-TW"] {
+    word-break: break-word;
+    line-break: loose;
   }
 }
 
@@ -131,45 +145,119 @@
     padding-left: 1rem;
     padding-right: 1rem;
   }
-  
+
   /* Stack elements on mobile */
   .flex-row-mobile {
     flex-direction: column;
   }
-  
+
   /* Full width buttons on mobile */
   .mobile-full-width {
     width: 100%;
   }
-  
+
   /* Remove horizontal scroll */
   * {
     max-width: 100vw;
     overflow-x: hidden;
   }
-  
+
   /* Card and panel spacing */
   [class*="card"],
   [class*="panel"] {
     padding: 1rem;
     margin: 0.5rem 0;
   }
+
+  /* Section padding optimization */
+  section {
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
+  }
+
+  /* Reduce excessive padding in landing sections */
+  .py-16 {
+    padding-top: 3rem !important;
+    padding-bottom: 3rem !important;
+  }
+
+  .py-20 {
+    padding-top: 3.5rem !important;
+    padding-bottom: 3.5rem !important;
+  }
+
+  .py-24 {
+    padding-top: 4rem !important;
+    padding-bottom: 4rem !important;
+  }
+
+  /* Optimize margins between sections */
+  .mb-12 {
+    margin-bottom: 2rem !important;
+  }
+
+  .mb-16 {
+    margin-bottom: 2.5rem !important;
+  }
+
+  /* Content padding inside cards */
+  .p-8 {
+    padding: 1.25rem !important;
+  }
+
+  .p-6 {
+    padding: 1rem !important;
+  }
 }
 
 /* ===== Performance Optimization ===== */
+@media (max-width: 768px) {
+  /* Disable backdrop-blur on mobile - very expensive */
+  .backdrop-blur-sm,
+  .backdrop-blur,
+  .backdrop-blur-md,
+  .backdrop-blur-lg {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Disable pulse animations on mobile */
+  [class*="animate-pulse"],
+  .animate-pulse {
+    animation: none !important;
+  }
+
+  /* Simplify complex gradients */
+  [class*="bg-gradient"] {
+    background-attachment: scroll !important;
+  }
+
+  /* Use GPU acceleration for transforms only */
+  [class*="transition"] {
+    will-change: auto !important;
+  }
+
+  /* Disable expensive filters */
+  .blur-sm,
+  .blur,
+  .blur-md {
+    filter: none !important;
+  }
+}
+
 @media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
   /* Reduce animation complexity on mobile */
   * {
     animation-duration: 0.2s !important;
     transition-duration: 0.2s !important;
   }
-  
+
   /* Disable heavy animations */
   .hero-title {
     animation: none !important;
     background-size: 100% 100% !important;
   }
-  
+
   /* Simplify gradients */
   .gradient-animation {
     animation: none;
@@ -189,41 +277,280 @@
 
 /* ===== Tool Interface Mobile Optimization ===== */
 @media (max-width: 768px) {
-  /* Tool interface layout */
+  /* Container optimization - full width on mobile */
+  .tool-interface-wrapper {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
   .tool-interface {
     padding: 1rem;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
-  
+
+  /* Upload area - cleaner, more spacious */
+  .upload-container {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.9));
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Upload zone - larger, more prominent */
+  .upload-zone {
+    border-radius: 16px;
+    padding: 3rem 1.5rem;
+    border: 2px dashed rgba(94, 234, 212, 0.4);
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(37, 99, 235, 0.12));
+    transition: all 0.3s ease;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .upload-zone:active {
+    transform: scale(0.98);
+    border-color: rgba(94, 234, 212, 0.6);
+  }
+
+  .upload-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 0.5rem;
+  }
+
+  .upload-desc {
+    font-size: 0.875rem;
+    color: rgba(226, 232, 240, 0.7);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* URL input section */
+  .url-section {
+    padding: 1.25rem;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    margin-top: 1rem;
+  }
+
+  .url-section input {
+    height: 48px;
+    font-size: 16px;
+    border-radius: 12px;
+    padding: 0 1rem;
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    color: #fff;
+    width: 100%;
+  }
+
+  .url-section input:focus {
+    outline: none;
+    border-color: rgba(6, 182, 212, 0.5);
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+  }
+
+  /* Format selection */
+  .format-section {
+    padding: 1.25rem;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    margin-top: 1rem;
+  }
+
+  .format-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+
+  .format-chip {
+    border-radius: 12px;
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: rgba(30, 41, 59, 0.6);
+    color: rgba(226, 232, 240, 0.9);
+    transition: all 0.2s ease;
+    text-align: center;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .format-chip.selected {
+    background: rgba(6, 182, 212, 0.2);
+    border-color: rgba(6, 182, 212, 0.4);
+    color: #fff;
+  }
+
+  /* Advanced options */
+  .advanced-options-section {
+    padding: 1.25rem;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    margin-top: 1rem;
+  }
+
+  /* Action buttons */
   .tool-buttons {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    margin-top: 1.5rem;
   }
-  
+
   .tool-buttons button {
     width: 100%;
-    min-height: 48px;
+    min-height: 52px;
     font-size: 16px;
-    padding: 12px 20px;
+    font-weight: 600;
+    padding: 14px 24px;
+    border-radius: 14px;
+    transition: all 0.2s ease;
   }
-  
+
+  .tool-buttons button:active {
+    transform: scale(0.98);
+  }
+
   /* Progress indicators */
   .progress-bar {
-    height: 6px;
-    border-radius: 3px;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: rgba(30, 41, 59, 0.8);
   }
-  
-  /* Results section */
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #06b6d4, #3b82f6);
+    transition: width 0.3s ease;
+  }
+
+  /* Results container */
   .results-container {
-    padding: 1rem;
-    font-size: 14px;
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    font-size: 15px;
+    border-radius: 18px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.15);
   }
-  
-  /* Copy button optimization */
+
+  .results-container h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #fff;
+  }
+
+  .results-container p {
+    line-height: 1.7;
+    color: rgba(226, 232, 240, 0.9);
+  }
+
+  /* Copy buttons */
   .copy-button {
     min-width: 48px;
     min-height: 48px;
     padding: 12px;
+    border-radius: 12px;
+    background: rgba(6, 182, 212, 0.15);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    color: #06b6d4;
+    transition: all 0.2s ease;
+  }
+
+  .copy-button:active {
+    transform: scale(0.95);
+    background: rgba(6, 182, 212, 0.25);
+  }
+
+  /* General button styling */
+  button {
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  button[class*="bg-purple"],
+  button[class*="bg-cyan"],
+  button[class*="bg-blue"],
+  .primary-button,
+  .cta-button {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  button[class*="text-xs"],
+  .secondary-button {
+    font-size: 14px;
+  }
+
+  /* Horizontal scroll containers (pricing, workflow) */
+  .mobile-snap-container {
+    display: flex;
+    overflow-x: auto;
+    gap: 1rem;
+    padding: 0 1rem 1.5rem;
+    margin: 0 -1rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .mobile-snap-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-snap-card {
+    flex: 0 0 85%;
+    scroll-snap-align: center;
+  }
+
+  /* Pricing page - removed old styles to allow React component tailwind classes to work */
+
+  /* Transcript segments */
+  .segment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .segment-item {
+    padding: 0.875rem;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .segment-timestamp {
+    font-size: 12px;
+    color: rgba(6, 182, 212, 0.8);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+
+  .segment-text {
+    color: rgba(226, 232, 240, 0.95);
   }
 }
 
@@ -275,65 +602,567 @@
 
 /* ===== Specific Component Fixes ===== */
 @media (max-width: 640px) {
-  /* Hero section */
+  /* Hero section - more compact */
   .design-section {
-    padding: 2rem 0;
+    padding: 1.5rem 0;
   }
-  
-  /* Feature cards */
+
+  .design-section .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Hero title - optimize spacing */
+  .design-heading-1 {
+    font-size: 1.875rem !important;
+    line-height: 1.2 !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Hero description */
+  .design-description {
+    font-size: 0.9375rem !important;
+    line-height: 1.6 !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  /* Hero CTA group - optimize button spacing */
+  .hero-cta-group {
+    gap: 0.75rem !important;
+    margin-top: 1.5rem !important;
+  }
+
+  .design-btn-primary,
+  .design-btn-secondary {
+    padding: 0.875rem 1.5rem !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    border-radius: 12px !important;
+    min-height: 52px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Tool interface CTA card - more compact */
+  .tool-interface + div,
+  [class*="tool"] + div {
+    padding: 1.25rem !important;
+    margin-top: 1.5rem !important;
+  }
+
+  /* Feature cards - optimize padding */
   .feature-card {
-    padding: 1.5rem;
-    margin-bottom: 1rem;
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+    border-radius: 14px;
   }
-  
+
   /* Stats section */
   .stats-grid {
     grid-template-columns: 1fr;
-    gap: 1rem;
+    gap: 0.875rem;
   }
-  
-  /* FAQ items */
+
+  /* FAQ items - larger touch area */
   .faq-item {
     padding: 1rem;
+    margin-bottom: 0.5rem;
   }
-  
-  /* CTA buttons */
+
+  .faq-item button,
+  .faq-item [role="button"] {
+    min-height: 56px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    text-align: left;
+  }
+
+  .faq-item h3,
+  .faq-item h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  /* CTA buttons - full width, prominent */
   .cta-button {
     width: 100%;
-    padding: 1rem;
-    font-size: 18px;
+    padding: 1rem 1.5rem;
+    font-size: 1.0625rem;
     font-weight: 600;
+    border-radius: 14px;
+    min-height: 54px;
+  }
+
+  /* Pricing method cards */
+  [class*="pricing"] [class*="card"],
+  [class*="price"] [class*="card"] {
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* How it works section */
+  [class*="how-"] h2,
+  [class*="workflow"] h2 {
+    font-size: 1.75rem !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  /* Reduce excessive vertical spacing */
+  section + section {
+    margin-top: 0 !important;
+  }
+
+  /* Optimize image containers */
+  .aspect-video,
+  [class*="aspect-"] {
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  /* Badge optimization */
+  .badge,
+  [class*="badge"] {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 999px;
+  }
+
+  /* Stats/Metrics cards optimization */
+  [class*="stats"] > div,
+  [class*="metric"] {
+    padding: 1.25rem 1rem;
+    border-radius: 14px;
+    min-height: auto;
+  }
+
+  [class*="stats"] h3,
+  [class*="metric"] h3,
+  [class*="stats"] .text-4xl,
+  [class*="metric"] .text-4xl {
+    font-size: 2rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  [class*="stats"] p,
+  [class*="metric"] p {
+    font-size: 0.875rem !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Export formats grid */
+  [class*="export"] [class*="grid"],
+  [class*="format"] [class*="grid"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 0.75rem !important;
+  }
+
+  [class*="export"] [class*="card"],
+  [class*="format"] [class*="card"],
+  [class*="export"] > div > div,
+  [class*="format"] > div > div {
+    padding: 1rem !important;
+    border-radius: 12px !important;
+    min-height: 88px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  [class*="export"] svg,
+  [class*="format"] svg,
+  [class*="export"] img,
+  [class*="format"] img {
+    width: 32px !important;
+    height: 32px !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  [class*="export"] span,
+  [class*="format"] span,
+  [class*="export"] p,
+  [class*="format"] p {
+    font-size: 0.75rem !important;
+    text-align: center !important;
+    font-weight: 500 !important;
+  }
+
+  /* Process steps - better spacing */
+  [class*="process"] [class*="step"],
+  [class*="workflow"] [class*="step"] {
+    padding: 1.25rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  [class*="process"] h3,
+  [class*="workflow"] h3 {
+    font-size: 1.0625rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  [class*="process"] p,
+  [class*="workflow"] p {
+    font-size: 0.9375rem !important;
+    line-height: 1.6 !important;
+  }
+
+  /* Industry list optimization */
+  [class*="industry"] li,
+  [class*="industries"] li,
+  [class*="use-case"] li {
+    padding: 0.875rem 1rem !important;
+    margin-bottom: 0.5rem !important;
+    border-radius: 10px !important;
+    font-size: 0.9375rem !important;
+  }
+
+  /* Features list with icons */
+  [class*="feature"] ul li,
+  ul[class*="feature"] li {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+    padding: 0.75rem 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  [class*="feature"] ul li svg,
+  ul[class*="feature"] li svg {
+    flex-shrink: 0 !important;
+    margin-top: 0.125rem !important;
+  }
+
+  /* Comparison table mobile view */
+  [class*="comparison"] table {
+    font-size: 0.875rem !important;
+  }
+
+  [class*="comparison"] td,
+  [class*="comparison"] th {
+    padding: 0.75rem 0.5rem !important;
+  }
+
+  /* Testimonials optimization */
+  [class*="testimonial"] {
+    padding: 1.25rem !important;
+    margin-bottom: 1rem !important;
+    border-radius: 14px !important;
+  }
+
+  [class*="testimonial"] p {
+    font-size: 0.9375rem !important;
+    line-height: 1.7 !important;
+  }
+
+  /* Video/Audio player */
+  [class*="player"],
+  video,
+  audio {
+    border-radius: 12px !important;
+    overflow: hidden !important;
+  }
+
+  /* Content density optimization for audio/video pages */
+  main h1,
+  article h1 {
+    font-size: 1.875rem !important;
+    line-height: 1.2 !important;
+    margin-bottom: 1rem !important;
+  }
+
+  main h2,
+  article h2 {
+    font-size: 1.5rem !important;
+    line-height: 1.3 !important;
+    margin-bottom: 0.875rem !important;
+  }
+
+  main h3,
+  article h3 {
+    font-size: 1.25rem !important;
+    line-height: 1.4 !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  main p,
+  article p {
+    font-size: 0.9375rem !important;
+    line-height: 1.65 !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Dense text sections */
+  [class*="description"],
+  [class*="content"] {
+    font-size: 0.9375rem !important;
+    line-height: 1.7 !important;
+  }
+
+  /* Card grid optimization - 2 column max on mobile */
+  .grid-cols-3,
+  .grid-cols-4,
+  .grid-cols-5,
+  .grid-cols-6 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .grid-cols-2 {
+    gap: 0.75rem !important;
+  }
+
+  /* List spacing optimization */
+  ul:not([class]) li,
+  ol:not([class]) li {
+    margin-bottom: 0.625rem !important;
+    line-height: 1.6 !important;
+  }
+
+  /* Reduce excessive section gaps */
+  main > section,
+  article > section {
+    margin-bottom: 2rem !important;
+  }
+
+  main > div,
+  article > div {
+    margin-bottom: 1.5rem !important;
+  }
+
+  /* Optimize long-form content readability */
+  main,
+  article {
+    font-size: 15px !important;
+  }
+
+  /* Number/stat highlights */
+  .text-5xl,
+  .text-6xl {
+    font-size: 2.25rem !important;
+  }
+
+  .text-4xl {
+    font-size: 2rem !important;
+  }
+
+  .text-3xl {
+    font-size: 1.75rem !important;
+  }
+
+  .text-2xl {
+    font-size: 1.5rem !important;
+  }
+
+  .text-xl {
+    font-size: 1.125rem !important;
   }
 }
 
-/* ===== iOS Specific Fixes ===== */
-@supports (-webkit-touch-callout: none) {
-  /* iOS elastic scroll fix */
-  body {
-    position: fixed;
-    width: 100%;
+/* ===== Dashboard Mobile Optimization ===== */
+@media (max-width: 768px) {
+  /* Prevent body scroll when sidebar is open */
+  body.sidebar-open {
+    overflow: hidden !important;
   }
-  
-  /* iOS input zoom prevention */
-  input, textarea, select {
+
+  /* Force sidebar translate on mobile */
+  aside[data-sidebar-open="false"] {
+    transform: translateX(-100%) !important;
+  }
+
+  aside[data-sidebar-open="true"] {
+    transform: translateX(0) !important;
+  }
+
+  /* ===== Mobile Dashboard Complete Redesign ===== */
+
+  /* Hide right sidebar */
+  .flex.h-screen > .w-80 {
+    display: none !important;
+  }
+
+  /* Main container */
+  .flex.h-screen > .flex-1 {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    padding-top: 60px !important;
+  }
+
+  /* Header area */
+  .flex.h-screen > .flex-1 > .border-b {
+    padding: 1rem !important;
+    border: none !important;
+  }
+
+  /* Hide title on mobile */
+  .flex.h-screen > .flex-1 > .border-b h1 {
+    display: none !important;
+  }
+
+  /* Hide retention banner on mobile */
+  .flex.h-screen > .flex-1 > .border-b > div:first-child .mb-4 {
+    display: none !important;
+  }
+
+  /* Stats - simplify */
+  .flex.h-screen > .flex-1 > .border-b .flex.gap-6 {
+    background: rgba(17, 24, 39, 0.5) !important;
+    border: 1px solid rgba(55, 65, 81, 0.5) !important;
+    border-radius: 0.75rem !important;
+    padding: 0.75rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+
+  .flex.h-screen > .flex-1 > .border-b .flex.gap-6 > div {
+    font-size: 0.875rem !important;
+  }
+
+  /* Main content */
+  .flex.h-screen > .flex-1 > .flex-1 {
+    padding: 1rem !important;
+  }
+
+  /* Hide search on mobile */
+  .flex.h-screen form.mb-6 {
+    display: none !important;
+  }
+
+  /* Hide bulk actions on mobile */
+  .flex.h-screen .bg-gray-900\/30 {
+    display: none !important;
+  }
+
+  /* Table - simple card list */
+  .flex.h-screen table {
+    display: block !important;
+    border: none !important;
+  }
+
+  .flex.h-screen thead {
+    display: none !important;
+  }
+
+  .flex.h-screen tbody {
+    display: block !important;
+  }
+
+  .flex.h-screen tr {
+    display: block !important;
+    background: rgba(17, 24, 39, 0.8) !important;
+    border: 1px solid rgba(55, 65, 81, 0.6) !important;
+    border-radius: 1rem !important;
+    padding: 1rem !important;
+    margin-bottom: 1rem !important;
+    cursor: pointer !important;
+  }
+
+  .flex.h-screen tr:active {
+    background: rgba(17, 24, 39, 0.95) !important;
+  }
+
+  /* Hide checkbox column */
+  .flex.h-screen td:first-child {
+    display: none !important;
+  }
+
+  /* Title */
+  .flex.h-screen td:nth-child(2) {
+    display: block !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    color: white !important;
+    margin-bottom: 0.5rem !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  /* Source */
+  .flex.h-screen td:nth-child(3) {
+    display: block !important;
+    font-size: 0.8125rem !important;
+    color: rgb(156, 163, 175) !important;
+    margin-bottom: 0.25rem !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  /* Date & Duration */
+  .flex.h-screen td:nth-child(4),
+  .flex.h-screen td:nth-child(5) {
+    display: inline-block !important;
+    font-size: 0.75rem !important;
+    color: rgb(156, 163, 175) !important;
+    margin-right: 1rem !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  /* Hide actions column */
+  .flex.h-screen td:last-child {
+    display: none !important;
+  }
+
+  /* Pagination - simpler */
+  .flex.h-screen .mt-8 {
+    margin-top: 1.5rem !important;
+  }
+
+  .flex.h-screen .inline-flex.items-center {
+    padding: 0.5rem !important;
+  }
+
+  .flex.h-screen .inline-flex.items-center a {
+    padding: 0.75rem !important;
+    min-width: 44px !important;
+    font-size: 0.875rem !important;
+  }
+
+}
+
+/* ===== Pricing Page Mobile Optimization - Removed to allow React component control ===== */
+
+/* ===== iOS Specific Tweaks ===== */
+@supports (-webkit-touch-callout: none) {
+  /* Avoid font rendering issues without locking scroll */
+  body {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Prevent zoom on form controls */
+  input,
+  textarea,
+  select {
     font-size: 16px !important;
   }
-  
-  /* iOS tap highlight */
+
+  /* Softer tap highlight */
   * {
-    -webkit-tap-highlight-color: transparent;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.05);
   }
 }
 
-/* ===== Android Specific Fixes ===== */
+/* ===== Android Specific Tweaks ===== */
 @media (max-width: 768px) {
-  /* Android touch delay fix */
-  * {
+  /* Limit touch-action tweaks to interactive elements */
+  button,
+  [role="button"],
+  a[href],
+  input,
+  select,
+  textarea {
     touch-action: manipulation;
   }
-  
-  /* Prevent text selection on buttons */
-  button, [role="button"] {
+
+  /* Prevent accidental long-press selection on actionable elements */
+  button,
+  [role="button"],
+  a[href] {
     user-select: none;
     -webkit-user-select: none;
   }

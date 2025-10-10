@@ -13,7 +13,8 @@ import {
   Users,
   Loader2,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Menu
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app';
 import { trackMixpanelEvent } from '@/lib/mixpanel-browser';
@@ -29,6 +30,7 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingRoute, setLoadingRoute] = useState<string | null>(null);
   const [isUserMenuExpanded, setIsUserMenuExpanded] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     // Set loading to false once we've checked for user
@@ -40,7 +42,22 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
   // Clear loading state when route changes
   useEffect(() => {
     setLoadingRoute(null);
+    // Close mobile sidebar when route changes
+    setIsMobileSidebarOpen(false);
   }, [pathname]);
+
+  // Manage body class for preventing scroll when sidebar is open
+  useEffect(() => {
+    if (isMobileSidebarOpen) {
+      document.body.classList.add('sidebar-open');
+    } else {
+      document.body.classList.remove('sidebar-open');
+    }
+    // Cleanup on unmount
+    return () => {
+      document.body.classList.remove('sidebar-open');
+    };
+  }, [isMobileSidebarOpen]);
 
   const navigation = [
     {
@@ -99,14 +116,50 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
   const userEmail = user?.email || '';
 
   return (
-    <aside className="w-60 h-screen bg-[#0e0e15] border-r border-gray-800 flex flex-col">
-      {/* Logo */}
-      <div className="px-6 py-5 border-b border-gray-800">
-        <a href={`/`} className="flex items-center gap-2">
-          <img src="/logo.png" alt="Harku" className="w-8 h-8 rounded-lg" />
-          <span className="text-lg font-semibold text-white">Harku</span>
-        </a>
-      </div>
+    <>
+      {/* Mobile Hamburger Button - Fixed top-left */}
+      <button
+        onClick={() => setIsMobileSidebarOpen(true)}
+        className="md:hidden fixed top-4 left-4 z-50 p-3 bg-purple-600 text-white rounded-lg shadow-lg hover:bg-purple-700 transition-colors"
+        aria-label="Open menu"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Mobile Overlay */}
+      {isMobileSidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
+          onClick={() => setIsMobileSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        data-sidebar-open={isMobileSidebarOpen}
+        className={`
+          w-60 h-screen bg-[#0e0e15] border-r border-gray-800 flex flex-col
+          fixed md:relative top-0 left-0 z-[60] transition-transform duration-300 ease-in-out
+          ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
+      >
+        {/* Logo with close button */}
+        <div className="px-6 py-5 border-b border-gray-800 flex items-center justify-between">
+          <a href={`/`} className="flex items-center gap-2">
+            <img src="/logo.png" alt="Harku" className="w-8 h-8 rounded-lg" />
+            <span className="text-lg font-semibold text-white">Harku</span>
+          </a>
+
+          {/* Mobile Close Button */}
+          <button
+            onClick={() => setIsMobileSidebarOpen(false)}
+            className="md:hidden p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            aria-label="Close menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
 
       {/* Plan Status */}
       <div className="px-6 py-4 border-b border-gray-800">
@@ -261,5 +314,6 @@ export default function DashboardSidebar({ locale }: DashboardSidebarProps) {
         </div>
       </div>
     </aside>
+    </>
   );
 }

@@ -16,6 +16,7 @@ import { UpgradeModal } from "@/components/upgrade-modal";
 import { ToastNotification, useToast } from "@/components/toast-notification";
 import { DocumentExportService } from "@/lib/export-document";
 import { cn } from "@/lib/utils";
+import { formatTimeMobile, formatTimeWithMilliseconds, isMobileViewport } from "@/lib/format-utils";
 import { usePlayerStore } from "@/stores/player-store";
 import dynamic from 'next/dynamic';
 import AudioTrackSelector from '@/components/audio-track-selector';
@@ -181,6 +182,25 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   const [showSuccess, setShowSuccess] = useState(false);
   const router = useRouter();
   const locale = useLocale();
+
+  const clearSelectedFile = () => {
+    if (uploadXhrRef.current) {
+      isAbortingRef.current = true;
+      uploadXhrRef.current.abort();
+      uploadXhrRef.current = null;
+    }
+
+    setFile(null);
+    setUploadedFileInfo(null);
+    setUrl("");
+    setResult(null);
+    setProgress("");
+    setProgressInfo({ stage: null, percentage: 0, message: '' });
+    setUploadProgress(0);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
   
   // Error handling state
   const [errorState, setErrorState] = useState<{
@@ -335,10 +355,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
     return groups;
   };
   const formatTs = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    const ms = Math.round((s - Math.floor(s)) * 1000);
-    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+    return isMobileViewport() ? formatTimeMobile(s) : formatTimeWithMilliseconds(s);
   };
 
   const formatSpeakerLabel = (value: string | number | undefined | null) => {
@@ -1995,7 +2012,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
   ), [t]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="tool-interface-wrapper w-full max-w-4xl mx-auto">
       {/* Main Tool Interface - Styled to match provided design, behavior unchanged */}
       <div className="upload-container" ref={containerRef}>
         {/* Audio visualizer */}
@@ -2048,27 +2065,9 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                
-                // 如果有正在进行的上传，中断它
-                if (uploadXhrRef.current) {
-                  isAbortingRef.current = true; // 标记为主动中断
-                  uploadXhrRef.current.abort();
-                  uploadXhrRef.current = null;
-                }
-                
-                setFile(null);
-                setUploadedFileInfo(null);
-                setUrl("");
-                setResult(null);
-                setProgress("");
-                setProgressInfo({ stage: null, percentage: 0, message: '' });
-                setUploadProgress(0);
-                // 重置文件输入框的值，这样可以重新选择同一个文件
-                if (fileInputRef.current) {
-                  fileInputRef.current.value = '';
-                }
+                clearSelectedFile();
               }}
-              className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-colors"
+              className="absolute top-3 right-3 hidden h-8 w-8 items-center justify-center rounded-full bg-slate-800/90 text-slate-200 shadow-sm transition-colors hover:bg-slate-700 hover:text-white sm:flex"
               type="button"
               aria-label={t("clear_file")}
             >
@@ -2076,6 +2075,25 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
             </button>
           )}
         </div>
+
+        {file && !url && (
+          <div className="mt-4 flex flex-col gap-2 sm:hidden">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full rounded-xl border border-slate-700 bg-slate-800/70 px-4 py-3 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-700 hover:text-white"
+            >
+              {t("click_to_replace")}
+            </button>
+            <button
+              type="button"
+              onClick={clearSelectedFile}
+              className="w-full rounded-xl bg-gradient-to-r from-purple-600/80 to-pink-600/80 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:brightness-110"
+            >
+              {t("clear")}
+            </button>
+          </div>
+        )}
 
         {/* Subtle separator (remove heavy divider) */}
         <p className="my-4 text-center text-sm opacity-80">{t("or")}</p>
@@ -2513,7 +2531,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                       </Button>
                       {/* AI refine button removed: backend runs optional refine automatically */}
                     </div>
-                    <div className="p-4 rounded-lg max-h-60 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
+                    <div className="p-4 rounded-lg max-h-[40vh] sm:max-h-60 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
                       {displayText.split('\n\n').map((p, i) => (
                         <p key={i} className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{p}</p>
                       ))}
@@ -2585,7 +2603,7 @@ export default function ToolInterface({ mode = "video", notice }: ToolInterfaceP
                           <span>{copiedSegments ? t("results.copied") : t("results.copy")}</span>
                         </button>
                       </div>
-                      <div className="p-4 rounded-lg max-h-96 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
+                      <div className="p-4 rounded-lg max-h-[50vh] sm:max-h-96 overflow-y-auto" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(16,185,129,0.25)" }}>
                         <div className="space-y-4">
                           {(() => {
                             const lang = result.data.transcription.language as string | undefined;

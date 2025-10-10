@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "title": "Harku - 视频转文字在线工具 | 免费视频转录",
-    "description": "Harku 是最好的视频转文字在线工具。AI驱动的视频转录，即时将视频转换为文本。免费5分钟预览，支持导出SRT、TXT、DOCX格式。",
+  "title": "语音转文字在线工具 - 98.5% AI 准确率 | 免费语音转文字",
+  "description": "专业的语音转文字在线工具，98.5% AI 准确率。支持会议、访谈、音频文件的语音转文字转录。同时支持 YouTube 视频和录音的视频转文字。100+ 种语言，无需注册。",
     "keywords": ""
   },
   "stats": {
@@ -25,9 +25,9 @@
     "chinese_processing": "中文转写可能稍慢，我们会自动优化标点与可读性。"
   },
   "pricing_cta": {
-    "title": "简单透明的定价",
-    "subtitle": "免费开始，每月30分钟",
-    "description": "无需信用卡，随时升级",
+    "title": "简单透明的语音转文字定价",
+    "subtitle": "免费开始，每月30分钟语音转文字",
+    "description": "无需信用卡，随时升级获得更多语音转文字额度",
     "compare_features": "比较所有功能，找到最适合的套餐",
     "button": "查看定价方案",
     "free_tier": "免费版",
@@ -715,8 +715,8 @@
     }
   },
   "use_cases_old": {
-    "title": "📹 Harku 视频转文字能为您做什么？",
-    "description": "从教育培训到内容创作，从商业应用到学术研究<br />发现视频转文字在各个领域的强大应用价值",
+    "title": "📹 Harku 语音转文字能为您做什么？",
+    "description": "从教育培训到内容创作，从商业应用到学术研究<br />发现语音转文字转录在各个领域的强大应用价值",
     "processing_notice": "⚡ 批量处理 • 非实时转录",
     "categories": [
       {
@@ -1188,34 +1188,34 @@
     "recommended": "推荐"
   },
   "hero_new": {
-    "title": "专业视频转文字工具",
-    "subtitle": "视频转文字，即时转换。无需下载软件。",
-    "description": "使用AI技术将视频转文字。上传任何视频转文字格式，几分钟内获得准确的视频转文字结果。",
-    "features": "视频转文字支持95+语言 • 98.5%准确率 • 在线视频转文字工具",
-    "cta_primary": "开始视频转文字",
-    "cta_secondary": "查看视频转文字演示",
-    "free_trial": "免费试用视频转文字 - 3分钟"
+    "title": "专业语音转文字工具",
+    "subtitle": "语音转文字，即时转换。无需下载软件。",
+    "description": "使用AI技术将语音转文字。上传音频或视频文件，几分钟内获得准确结果。支持将 YouTube 视频、会议和播客转成文字。",
+    "features": "语音转文字支持95+语言 • 视频转文字支持 • 98.5%准确率 • 免费在线工具",
+    "cta_primary": "开始语音转文字",
+    "cta_secondary": "查看语音转文字演示",
+    "free_trial": "免费试用语音转文字 - 3分钟"
   },
   "trust_indicators": {
-    "minutes_transcribed": "视频转文字分钟数",
-    "active_users": "视频转文字用户",
-    "supported_languages": "视频转文字语言",
-    "average_processing": "视频转文字速度",
+    "minutes_transcribed": "语音转文字分钟数",
+    "active_users": "语音转文字用户",
+    "supported_languages": "语音转文字语言",
+    "average_processing": "语音转文字速度",
     "minutes": "分钟"
   },
   "workflow": {
-    "title": "视频转文字使用流程",
-    "subtitle": "三步完成视频转文字",
-    "step1_title": "上传视频转文字",
-    "step1_description": "拖放视频到视频转文字工具",
-    "step2_title": "视频转文字处理",
-    "step2_description": "AI自动将视频转文字",
-    "step3_title": "下载视频转文字结果",
-    "step3_description": "获取视频转文字的TXT、SRT、DOCX格式"
+    "title": "语音转文字使用流程",
+    "subtitle": "三步完成语音转文字",
+    "step1_title": "上传音频或视频",
+    "step1_description": "拖放您的音频文件或视频转文字文件",
+    "step2_title": "语音转文字处理",
+    "step2_description": "AI自动高精度转换语音为文字",
+    "step3_title": "下载转录结果",
+    "step3_description": "导出TXT、SRT、DOCX或VTT格式"
   },
   "feature_comparison": {
-    "title": "视频转文字工具对比",
-    "subtitle": "对比Harku视频转文字与其他工具",
+    "title": "语音转文字工具对比",
+    "subtitle": "对比Harku与主流语音转文字、视频转文字工具",
     "price_per_minute": "价格/分钟",
     "languages_count": "语言数",
     "offline_files": "离线文件",
@@ -1224,12 +1224,12 @@
     "no_installation": "无需安装",
     "api_access": "API 访问",
     "real_time_processing": "实时处理",
-    "disclaimer": "* 视频转文字价格和功能基于 2025 年 1 月公开信息"
+    "disclaimer": "* 语音转文字价格和功能基于 2025 年 1 月公开信息"
   },
   "technical_specs": {
-    "title": "视频转文字技术规格",
-    "subtitle": "专业的视频转文字转换能力",
-    "input_formats": "视频转文字输入格式",
+    "title": "技术规格",
+    "subtitle": "专业的语音转文字和视频转文字转换能力",
+    "input_formats": "支持的输入格式",
     "output_formats": "文字输出格式",
     "specifications": "规格",
     "performance": "性能",
@@ -1242,19 +1242,19 @@
     "hours": "小时"
   },
   "use_cases": {
-    "title": "视频转文字真实成果",
-    "subtitle": "查看专业人士如何使用Harku视频转文字",
-    "case1_title": "会议视频转文字",
-    "case1_scenario": "1小时会议视频转文字",
-    "case1_result": "5分钟完成视频转文字",
+    "title": "语音转文字真实成果",
+    "subtitle": "查看专业人士如何使用我们的转录服务",
+    "case1_title": "会议转录",
+    "case1_scenario": "将1小时会议语音转成文字",
+    "case1_result": "5分钟完成完整转录",
     "case1_badge": "商务",
-    "case2_title": "YouTube视频转文字",
-    "case2_scenario": "YouTube视频转文字内容",
-    "case2_result": "视频转文字SRT文件即时生成",
+    "case2_title": "访谈转文字",
+    "case2_scenario": "高精度转录访谈内容",
+    "case2_result": "详细的带说话人时间戳的转录稿",
     "case2_badge": "内容",
-    "case3_title": "内容视频转文字",
-    "case3_scenario": "播客视频转文字",
-    "case3_result": "视频转文字博客草稿",
+    "case3_title": "播客视频转文字",
+    "case3_scenario": "将播客视频转换为文字内容",
+    "case3_result": "视频转文字生成SEO友好的博客草稿",
     "case3_badge": "创作",
     "time": "时间",
     "case_accuracy": "准确率",
